@@ -45,6 +45,7 @@ type Source interface {
 // Runner approves and merges batches of pull requests.
 type Runner interface {
 	Start(ctx context.Context, kind runner.Kind, items []runner.Item) (string, <-chan runner.Event)
+	Resume(ctx context.Context, ps []model.Pending) (string, <-chan runner.Event)
 }
 
 // Section is a tab of pull requests found by a search.
@@ -77,6 +78,12 @@ type Settings struct {
 	Plan plan.Settings
 	// Rules are what S offers besides "approved by me".
 	Rules []plan.Rule
+	// Resume are the merges an earlier run was waiting for.
+	Resume []model.Pending
+	// CanWait is whether this gh-triage holds the lock on the record of
+	// pending merges. Without it, merges that wait are left out, since
+	// nothing would go on with them after quitting.
+	CanWait bool
 	// Refresh is how often the shown tab is read again; zero turns it off.
 	Refresh time.Duration
 	// Now is the clock, for tests; nil is time.Now.
@@ -174,7 +181,7 @@ func Run(ctx context.Context, src Source, run Runner, km keymap.Map, log *slog.L
 
 // Init asks for the terminal's background, the viewer, and every tab.
 func (m *Model) Init() tea.Cmd {
-	cmds := []tea.Cmd{m.loadViewer(), m.tick()}
+	cmds := []tea.Cmd{m.loadViewer(), m.tick(), m.resume()}
 	if m.set.Theme == "auto" {
 		cmds = append(cmds, tea.RequestBackgroundColor)
 	}

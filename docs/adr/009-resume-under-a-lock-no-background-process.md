@@ -1,0 +1,28 @@
+# ADR-009: No background process: pending merges resume at the next launch under a lock
+
+## Status
+
+Accepted
+
+## Context
+
+Some merges wait: for required checks, for an approval check to pass after gh-triage approved, for GitHub's auto-merge to happen. These waits can outlast a terminal session (a laptop closed for the night). Three ways were open: keep waiting in a process that outlives the TUI, give up when the TUI quits, or record what is being waited for and go on at the next launch.
+
+A process left running would be a second thing to install, stop and debug, with its own log and life cycle, for a tool that otherwise only runs while it is looked at. Giving up loses work the user confirmed.
+
+Two gh-triage running at once (two terminals) must not both go on with the same record, or the same pull request is handled twice.
+
+## Decision
+
+- No background process. When gh-triage quits, waiting stops.
+- What a merge batch is waiting for is recorded in `$XDG_STATE_HOME/gh-triage/pending.json` (`internal/state`): the pull request, its confirmed head, whether the user agreed to auto-merge, whether gh-triage approved it, whether it is only being watched on auto-merge, and how long it has waited for checks, for its rules, and on auto-merge. A pull request is recorded before gh-triage first writes to GitHub for it, updated at every read while it waits, and removed when it ends.
+- The times waited are recorded, not the times waiting started, so the time gh-triage was not running does not count against `checks_timeout`, `blocked_timeout` and `watch_timeout`, whether it quit or crashed.
+- At launch, the runner goes on with what is recorded, reading each pull request again first: a head that moved, a pull request closed meanwhile, or an approval by gh-triage that was dismissed stops it and says so; one merged meanwhile is reported as merged.
+- The record is guarded by `flock(2)` on `pending.lock`, which the operating system releases when its holder exits, however it exits. Only the holder reads the record and resumes. A gh-triage started while another holds the lock works without it: its confirm popup skips merges that would wait (checks, branch update, auto-merge), saying another gh-triage keeps the waiting merges, so nothing is waited for that would not go on after quitting.
+- Approve batches are not recorded: an approval is a single write that ends at once.
+
+## Consequences
+
+- Closing gh-triage pauses the merges it waits for; they go on when it is opened again, with their limits counted as if no time had passed.
+- A second gh-triage is fully usable except for merges that would wait.
+- The record is a small JSON file a user can read; deleting it while gh-triage is closed drops the pending merges.

@@ -25,6 +25,7 @@ import (
 	"github.com/babarot/gh-triage/internal/model"
 	"github.com/babarot/gh-triage/internal/plan"
 	"github.com/babarot/gh-triage/internal/runner"
+	"github.com/babarot/gh-triage/internal/state"
 	"github.com/babarot/gh-triage/internal/tui"
 )
 
@@ -108,7 +109,23 @@ func Run(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintf(stderr, "gh-triage: could not read who you are on GitHub: %v\n", err)
 		return 1
 	}
-	rn := runner.New(runnerGitHub{gh}, log, runner.Options{Settings: set.Plan, Viewer: viewer,
+	// One gh-triage at a time keeps the record of merges it waits for;
+	// another one runs without waiting merges.
+	store, err := state.Open(state.DefaultDir())
+	if err != nil {
+		log.Warn("could not open the record of pending merges", "err", err.Error())
+	}
+	var rstore runner.Store
+	if store != nil {
+		defer store.Close()
+		rstore = store
+		set.CanWait = true
+		set.Resume = store.Pending()
+		log.Info("pending merges", "count", len(set.Resume))
+	} else {
+		log.Info("another gh-triage holds the record of pending merges")
+	}
+	rn := runner.New(runnerGitHub{gh}, log, runner.Options{Settings: set.Plan, Viewer: viewer, Store: rstore,
 		ChecksTimeout: config.Duration(cfg.Merge.ChecksTimeout), BlockedTimeout: config.Duration(cfg.Merge.BlockedTimeout),
 		WatchTimeout: config.Duration(cfg.Merge.WatchTimeout)})
 	start := time.Now()

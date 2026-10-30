@@ -127,6 +127,16 @@ type fakeRunner struct {
 	kinds   []runner.Kind
 	items   [][]runner.Item
 	results map[model.PRKey]runner.Event
+	resumed []model.Pending
+}
+
+func (r *fakeRunner) Resume(ctx context.Context, ps []model.Pending) (string, <-chan runner.Event) {
+	var items []runner.Item
+	for _, p := range ps {
+		items = append(items, runner.Item{PR: model.PR{ID: p.ID, Key: p.Key}, Head: p.Head})
+	}
+	r.resumed = append(r.resumed, ps...)
+	return r.Start(ctx, runner.Merge, items)
 }
 
 func (r *fakeRunner) Start(_ context.Context, kind runner.Kind, items []runner.Item) (string, <-chan runner.Event) {
@@ -221,7 +231,8 @@ func startWith(t *testing.T, f *fakeSource, km keymap.Map) (*Model, *fakeRunner)
 		PreviewHeight: 10, Collapse: []string{"go.sum"}, Theme: "mocha", Now: func() time.Time { return now },
 		Plan: plan.Settings{Methods: []model.MergeMethod{model.MethodMerge}, AutoMerge: true, UpdateBranch: "humans",
 			AttentionPaths: []string{".github/workflows/*"}},
-		Rules: []plan.Rule{{Name: "octo bumps", Author: "renovate", Packages: []string{"octo/app"}}},
+		Rules:   []plan.Rule{{Name: "octo bumps", Author: "renovate", Packages: []string{"octo/app"}}},
+		CanWait: true,
 	}
 	r := &fakeRunner{results: map[model.PRKey]runner.Event{}}
 	m := New(f, r, km, nil, set)
@@ -580,5 +591,39 @@ func TestSelectByRule(t *testing.T) {
 	}
 	if r, ok := m.current(); !ok || r.pr.Key != key("acme", "api", 30) {
 		t.Errorf("cursor on %v", r.pr.Key)
+	}
+}
+
+func TestResumeAtStart(t *testing.T) {
+	f := fixture()
+	set := Settings{Sections: []Section{{Name: "review", Query: "review", Grouped: true, Limit: 100}}, InboxLimit: 100,
+		Theme: "mocha", Now: func() time.Time { return now }, CanWait: true,
+		Resume: []model.Pending{{Key: key("acme", "api", 12), ID: "1", Head: "aaaaaaa1", Author: "alice"}}}
+	r := &fakeRunner{results: map[model.PRKey]runner.Event{}}
+	m := New(f, r, keymap.Default(), nil, set)
+	m.Update(tea.WindowSizeMsg{Width: 130, Height: 34})
+	run(m, m.Init())
+	if len(r.resumed) != 1 || m.progress[key("acme", "api", 12)].result != runner.Merged {
+		t.Errorf("resumed %v, progress %+v", r.resumed, m.progress)
+	}
+	if m.unseen() != 1 {
+		t.Errorf("no note for the resumed batch: %+v", m.notes)
+	}
+}
+
+func TestNoWaitingWithoutTheLock(t *testing.T) {
+	f := fixture()
+	f.info = map[model.PRKey]func(*model.MergeInfo){
+		key("acme", "api", 12): func(mi *model.MergeInfo) { mi.MergeState = model.MergeBlocked },
+	}
+	m, r := startWith(t, f, keymap.Default())
+	m.set.CanWait = false
+	press(m, "M")
+	if !strings.Contains(screen(m), "another gh-triage") {
+		t.Errorf("popup does not say why:\n%s", screen(m))
+	}
+	press(m, "y")
+	if len(r.items) != 0 {
+		t.Errorf("a waiting merge started without the lock: %+v", r.items)
 	}
 }

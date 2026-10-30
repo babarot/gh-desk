@@ -43,3 +43,17 @@ func ParsePRKey(s string) (PRKey, error) {
 	}
 	return PRKey{Owner: owner, Repo: name, Number: n}, nil
 }
+
+// MarshalText writes the key as owner/repo#number, so it can be a JSON
+// string.
+func (k PRKey) MarshalText() ([]byte, error) { return []byte(k.String()), nil }
+
+// UnmarshalText reads owner/repo#number.
+func (k *PRKey) UnmarshalText(b []byte) error {
+	got, err := ParsePRKey(string(b))
+	if err != nil {
+		return err
+	}
+	*k = got
+	return nil
+}

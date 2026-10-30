@@ -373,3 +373,138 @@ func TestOldMergeCommitIsNotTaken(t *testing.T) {
 		t.Errorf("merged: %v", f.calls)
 	}
 }
+
+// memStore is a Store in memory that remembers whether it ever held a
+// pull request.
+type memStore struct {
+	mu   sync.Mutex
+	now  map[model.PRKey]model.Pending
+	ever map[model.PRKey]bool
+}
+
+func newStore() *memStore {
+	return &memStore{now: map[model.PRKey]model.Pending{}, ever: map[model.PRKey]bool{}}
+}
+
+func (s *memStore) Put(p model.Pending) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.now[p.Key], s.ever[p.Key] = p, true
+	return nil
+}
+
+func (s *memStore) Remove(k model.PRKey) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	delete(s.now, k)
+	return nil
+}
+
+func newRunner(f GitHub, st Store) *Runner {
+	return New(f, logging.Discard(), Options{Settings: settings, Viewer: "me", Store: st,
+		ChecksTimeout: time.Second, BlockedTimeout: 40 * time.Millisecond, WatchTimeout: time.Second,
+		PollFast: 5 * time.Millisecond, PollSlow: 5 * time.Millisecond, Recheck: 2 * time.Millisecond, RecheckFor: 50 * time.Millisecond})
+}
+
+func drain(t *testing.T, ch <-chan Event) []Event {
+	t.Helper()
+	var out []Event
+	done := time.After(3 * time.Second)
+	for {
+		select {
+		case e, ok := <-ch:
+			if !ok {
+				return out
+			}
+			out = append(out, e)
+		case <-done:
+			t.Fatal("the batch did not end")
+		}
+	}
+}
+
+func TestRecordedWhileWaitingForgottenAfter(t *testing.T) {
+	mi, it := pr("1", "api", 1, "alice")
+	mi.MergeState = model.MergeBlocked
+	mi.Checks = []model.Check{{Name: "build", State: model.CheckPending, Required: true}}
+	f := newFake(mi)
+	f.onRead = func(_ string, mi *model.MergeInfo, n int) {
+		if n > 5 {
+			mi.Checks[0].State, mi.MergeState = model.CheckSuccess, model.MergeClean
+		}
+	}
+	st := newStore()
+	_, ch := newRunner(f, st).Start(context.Background(), Merge, []Item{it})
+	es := drain(t, ch)
+	if last(es).Result != Merged || !st.ever[it.PR.Key] || len(st.now) != 0 {
+		t.Errorf("events %+v, recorded %v, left %v", es, st.ever, st.now)
+	}
+}
+
+func TestResumeWatching(t *testing.T) {
+	mi, _ := pr("1", "api", 1, "renovate")
+	mi.MergeState, mi.AutoMerge = model.MergeBlocked, true
+	f := newFake(mi)
+	f.onRead = func(_ string, mi *model.MergeInfo, n int) {
+		if n > 3 {
+			mi.State = model.StateMerged
+		}
+	}
+	st := newStore()
+	p := model.Pending{Key: mi.Key, ID: "1", Head: "h-1", Author: "renovate", AuthorIsBot: true, AutoMerge: true, Watching: true}
+	st.Put(p)
+	_, ch := newRunner(f, st).Resume(context.Background(), []model.Pending{p})
+	es := drain(t, ch)
+	if e := last(es); !e.Watch || e.Result != Merged || len(st.now) != 0 {
+		t.Errorf("events %+v, left %v", es, st.now)
+	}
+	if len(f.calls) != 0 {
+		t.Errorf("wrote to GitHub: %v", f.calls)
+	}
+}
+
+func TestResumeStops(t *testing.T) {
+	moved, _ := pr("1", "api", 1, "alice")
+	moved.HeadOID = "pushed-while-closed"
+	dismissed, _ := pr("2", "web", 2, "alice")
+	dismissed.MergeState = model.MergeBlocked
+	f := newFake(moved, dismissed)
+	ps := []model.Pending{
+		{Key: moved.Key, ID: "1", Head: "h-1", Author: "alice"},
+		{Key: dismissed.Key, ID: "2", Head: "h-2", Author: "alice", Approved: true},
+	}
+	_, ch := newRunner(f, newStore()).Resume(context.Background(), ps)
+	byKey := map[model.PRKey]Event{}
+	for _, e := range drain(t, ch) {
+		byKey[e.Key] = e
+	}
+	if e := byKey[moved.Key]; e.Result != Stopped || !strings.Contains(e.Text, "head changed") {
+		t.Errorf("moved: %+v", e)
+	}
+	if e := byKey[dismissed.Key]; e.Result != Stopped || !strings.Contains(e.Text, "dismissed") {
+		t.Errorf("dismissed: %+v", e)
+	}
+	if len(f.calls) != 0 {
+		t.Errorf("wrote to GitHub: %v", f.calls)
+	}
+}
+
+func TestResumeKeepsTimeWaited(t *testing.T) {
+	mi, _ := pr("1", "api", 1, "alice")
+	mi.MergeState = model.MergeBlocked
+	mi.Reviews = []model.Review{{Author: "me", State: model.ReviewApproved}}
+	mi.Checks = []model.Check{{Name: "build", State: model.CheckSuccess, Required: true}}
+	f := newFake(mi)
+	// Blocked 39ms of the 40ms limit before the last run ended: it stops
+	// at once instead of waiting 40ms more.
+	p := model.Pending{Key: mi.Key, ID: "1", Head: "h-1", Author: "alice", Approved: true, BlockedWaited: 39 * time.Millisecond}
+	start := time.Now()
+	_, ch := newRunner(f, newStore()).Resume(context.Background(), []model.Pending{p})
+	es := drain(t, ch)
+	if e := last(es); e.Result != Stopped || e.Text != "blocked by another rule" {
+		t.Errorf("last = %+v", e)
+	}
+	if time.Since(start) > 35*time.Millisecond {
+		t.Errorf("waited %v; the time already waited was not kept", time.Since(start))
+	}
+}

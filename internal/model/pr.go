@@ -202,3 +202,24 @@ type Detail struct {
 	Checks   []Check
 	Comments []Comment
 }
+
+// Pending is a merge gh-triage waits for, as recorded to go on at the next
+// launch. The times waited are kept, not the times started, so the time
+// gh-triage was not running is not counted against the limits.
+type Pending struct {
+	Key         PRKey  `json:"key"`
+	ID          string `json:"id"`
+	Head        string `json:"head"`
+	Author      string `json:"author"`
+	AuthorIsBot bool   `json:"author_is_bot"`
+	// AutoMerge is whether the user agreed to auto-merge for it.
+	AutoMerge bool `json:"auto_merge"`
+	// Watching is set once auto-merge is on and it is only followed.
+	Watching bool `json:"watching"`
+	// Approved is set when gh-triage approved it; an approval dismissed
+	// meanwhile stops it at the next launch.
+	Approved      bool          `json:"approved"`
+	ChecksWaited  time.Duration `json:"checks_waited"`
+	BlockedWaited time.Duration `json:"blocked_waited"`
+	Watched       time.Duration `json:"watched"`
+}

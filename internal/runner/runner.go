@@ -48,8 +48,16 @@ type Commit struct {
 // the GitHub client's error to it.
 var ErrCleanStatus = errors.New("pull request is in clean status")
 
+// Store records the merges being waited for, so the next launch goes on
+// with them. Nil records nothing.
+type Store interface {
+	Put(p model.Pending) error
+	Remove(k model.PRKey) error
+}
+
 // Options configure a Runner.
 type Options struct {
+	Store    Store
 	Settings plan.Settings
 	Viewer   string
 	// ChecksTimeout is how long to wait for required checks still running.
@@ -153,6 +161,24 @@ func New(gh GitHub, log *slog.Logger, opt Options) *Runner {
 // closed when every pull request has a final result and every auto-merge
 // it turned on is no longer watched. Cancelling ctx stops it all.
 func (r *Runner) Start(ctx context.Context, kind Kind, items []Item) (string, <-chan Event) {
+	return r.run(ctx, kind, items, nil)
+}
+
+// Resume goes on with the merges recorded by an earlier run. Each pull
+// request is read again first: one whose head moved, that was closed, or
+// whose approval by gh-triage was dismissed is stopped, not merged.
+func (r *Runner) Resume(ctx context.Context, ps []model.Pending) (string, <-chan Event) {
+	items := make([]Item, len(ps))
+	pend := map[model.PRKey]model.Pending{}
+	for i, p := range ps {
+		items[i] = Item{PR: model.PR{ID: p.ID, Key: p.Key, Author: p.Author, AuthorIsBot: p.AuthorIsBot, HeadOID: p.Head},
+			Head: p.Head, AutoMerge: p.AutoMerge}
+		pend[p.Key] = p
+	}
+	return r.run(ctx, Merge, items, pend)
+}
+
+func (r *Runner) run(ctx context.Context, kind Kind, items []Item, resume map[model.PRKey]model.Pending) (string, <-chan Event) {
 	batch := logging.NewID()
 	log := r.log.With(logging.KeyBatch, batch)
 	events := make(chan Event, 64)
@@ -166,6 +192,9 @@ func (r *Runner) Start(ctx context.Context, kind Kind, items []Item) (string, <-
 		byRepo[repo] = append(byRepo[repo], it)
 	}
 	verb := map[Kind]string{Approve: "approve", Merge: "merge"}[kind]
+	if resume != nil {
+		verb = "resume"
+	}
 	log.Info("batch start", "kind", verb, "prs", len(items), "repos", len(repos))
 	var wg sync.WaitGroup
 	emit := func(e Event) {
@@ -185,10 +214,15 @@ func (r *Runner) Start(ctx context.Context, kind Kind, items []Item) (string, <-
 				if ctx.Err() != nil {
 					return
 				}
-				j := &job{r: r, ctx: ctx, log: log.With(logging.KeyPR, it.PR.Key.String()), it: it, head: it.Head, emit: emit, wg: &wg}
-				if kind == Approve {
+				j := &job{r: r, ctx: ctx, log: log.With(logging.KeyPR, it.PR.Key.String()), it: it, head: it.Head, emit: emit, wg: &wg,
+					record: kind == Merge && r.opt.Store != nil}
+				switch p, ok := resume[it.PR.Key]; {
+				case ok:
+					j.pend, j.approved = p, p.Approved
+					j.resume()
+				case kind == Approve:
 					j.approveOnly()
-				} else {
+				default:
 					j.merge()
 				}
 			}
@@ -213,13 +247,74 @@ type job struct {
 	wg   *sync.WaitGroup
 	// approved is set once this job sent an approval.
 	approved bool
+	// record keeps pend in the store while the job waits.
+	record bool
+	pend   model.Pending
 }
 
 func (j *job) say(res Result, text string) {
 	j.emit(Event{Key: j.it.PR.Key, Result: res, Text: text, Approved: j.approved})
 	if res.Final() {
 		j.log.Info("pr end", logging.KeyStep, resultWord[res], "why", text)
+		if res != AutoMergeOn {
+			j.forget()
+		}
 	}
+}
+
+// save records where the job is, so the next launch can go on with it.
+func (j *job) save() {
+	if !j.record {
+		return
+	}
+	j.pend.Key, j.pend.ID, j.pend.Head = j.it.PR.Key, j.it.PR.ID, j.head
+	j.pend.Author, j.pend.AuthorIsBot = j.it.PR.Author, j.it.PR.AuthorIsBot
+	j.pend.AutoMerge, j.pend.Approved = j.it.AutoMerge, j.approved
+	if err := j.r.opt.Store.Put(j.pend); err != nil {
+		j.log.Warn("could not record the pending merge", "err", err.Error())
+	}
+}
+
+func (j *job) forget() {
+	if !j.record {
+		return
+	}
+	if err := j.r.opt.Store.Remove(j.it.PR.Key); err != nil {
+		j.log.Warn("could not forget the pending merge", "err", err.Error())
+	}
+}
+
+// resume goes on with a recorded merge after reading it again.
+func (j *job) resume() {
+	j.say(Running, "resuming")
+	mi, ok := j.read(false)
+	if !ok {
+		return
+	}
+	switch {
+	case mi.State == model.StateMerged:
+		j.say(Merged, "merged meanwhile")
+		return
+	case mi.State == model.StateClosed:
+		j.say(Stopped, "closed meanwhile")
+		return
+	}
+	if j.pend.Approved {
+		approved := false
+		for _, r := range mi.Reviews {
+			approved = approved || (r.Author == j.r.opt.Viewer && r.State == model.ReviewApproved)
+		}
+		if !approved {
+			j.say(Stopped, "your approval was dismissed · confirm again")
+			return
+		}
+	}
+	if j.pend.Watching {
+		j.say(AutoMergeOn, "auto-merge on")
+		j.watch()
+		return
+	}
+	j.merge()
 }
 
 var resultWord = map[Result]string{Running: "running", Approved: "approved", Merged: "merged", AutoMergeOn: "auto-merge-on",
@@ -311,6 +406,8 @@ func (j *job) merge() {
 		j.say(Skipped, d.Reason)
 		return
 	}
+	// Recorded before the first write, so a crash after it is resumed.
+	j.save()
 	if d.Approve {
 		if !j.sendApproval() {
 			return
@@ -351,6 +448,7 @@ func (j *job) mergeNow(method model.MergeMethod) bool {
 	if err == nil {
 		j.emit(Event{Key: j.it.PR.Key, Result: Merged, Text: "merged", Approved: j.approved, Method: method})
 		j.log.Info("pr end", logging.KeyStep, resultWord[Merged], "method", string(method))
+		j.forget()
 		return true
 	}
 	// A refused merge is read again to tell why: the head moved, it was
@@ -378,6 +476,8 @@ func (j *job) autoMerge(method model.MergeMethod) {
 		j.say(Failed, "auto-merge failed: "+short(err))
 		return
 	}
+	j.pend.Watching = true
+	j.save()
 	j.say(AutoMergeOn, "auto-merge on")
 	j.wg.Go(j.watch)
 }
@@ -385,16 +485,21 @@ func (j *job) autoMerge(method model.MergeMethod) {
 // watch follows a pull request put on auto-merge until GitHub merges it,
 // it is closed, auto-merge is turned off, or the watch times out.
 func (j *job) watch() {
-	until := time.Now().Add(j.r.opt.WatchTimeout)
+	last := time.Now()
 	for j.sleep(j.r.opt.PollSlow) {
 		got, err := j.r.gh.MergeInfo(j.ctx, []string{j.it.PR.ID}, false)
 		mi, ok := got[j.it.PR.ID]
 		say := func(res Result, text string) {
 			j.emit(Event{Key: j.it.PR.Key, Result: res, Text: text, Watch: true})
 			j.log.Info("watch end", logging.KeyStep, resultWord[res], "why", text)
+			j.forget()
 		}
+		now := time.Now()
+		j.pend.Watched += now.Sub(last)
+		last = now
+		j.save()
 		switch {
-		case time.Now().After(until):
+		case j.pend.Watched > j.r.opt.WatchTimeout:
 			say(Stopped, "auto-merge not done in "+j.r.opt.WatchTimeout.String())
 			return
 		case err != nil || !ok:
@@ -464,8 +569,9 @@ func (j *job) updateBranch(base string) bool {
 // gives up when required checks run past ChecksTimeout, or when it stays
 // blocked BlockedTimeout after its required checks finished.
 func (j *job) wait() {
-	start := time.Now()
-	var blockedSince time.Time
+	// The times waited carry on from a record, so time gh-triage was not
+	// running is not counted.
+	last := time.Now()
 	for {
 		mi, d, ok := j.decide()
 		if !ok {
@@ -483,19 +589,23 @@ func (j *job) wait() {
 			// what was asked, so keep waiting.
 		}
 		running := plan.ChecksRunning(mi, j.r.opt.Settings.ApprovalChecks)
+		now := time.Now()
+		dt := now.Sub(last)
+		last = now
 		switch {
 		case running:
-			blockedSince = time.Time{}
-			if time.Since(start) > j.r.opt.ChecksTimeout {
+			j.pend.BlockedWaited = 0
+			j.pend.ChecksWaited += dt
+			j.save()
+			if j.pend.ChecksWaited > j.r.opt.ChecksTimeout {
 				j.say(Stopped, "checks still running after "+j.r.opt.ChecksTimeout.String())
 				return
 			}
 			j.say(Running, "waiting for checks")
 		default:
-			if blockedSince.IsZero() {
-				blockedSince = time.Now()
-			}
-			if time.Since(blockedSince) > j.r.opt.BlockedTimeout {
+			j.pend.BlockedWaited += dt
+			j.save()
+			if j.pend.BlockedWaited > j.r.opt.BlockedTimeout {
 				j.say(Stopped, "blocked by another rule")
 				return
 			}
@@ -506,7 +616,7 @@ func (j *job) wait() {
 			j.say(Running, text)
 		}
 		every := j.r.opt.PollFast
-		if time.Since(start) > time.Minute {
+		if j.pend.ChecksWaited+j.pend.BlockedWaited > time.Minute {
 			every = j.r.opt.PollSlow
 		}
 		if !j.sleep(every) {

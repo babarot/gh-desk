@@ -49,6 +49,23 @@ func listen(batch string, ch <-chan runner.Event) tea.Cmd {
 	}
 }
 
+// resume goes on with the merges the last run was waiting for.
+func (m *Model) resume() tea.Cmd {
+	if len(m.set.Resume) == 0 {
+		return nil
+	}
+	bs := &batchState{kind: runner.Merge, goes: map[model.PRKey]bool{}, done: map[model.PRKey]progress{}}
+	for _, p := range m.set.Resume {
+		bs.goes[p.Key] = true
+		bs.order = append(bs.order, p.Key)
+		m.progress[p.Key] = progress{text: "resuming"}
+	}
+	id, ch := m.run.Resume(m.ctx, m.set.Resume)
+	m.batches[id] = bs
+	m.setStatus(fmt.Sprintf("going on with %d merges from the last run", len(m.set.Resume)), false)
+	return listen(id, ch)
+}
+
 // event takes in a step of a batch.
 func (m *Model) event(msg eventMsg) tea.Cmd {
 	if !msg.ok {

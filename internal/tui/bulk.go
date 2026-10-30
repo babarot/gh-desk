@@ -33,12 +33,15 @@ type bulkItem struct {
 	moved bool
 	// running is set when another batch is still working on it.
 	running bool
+	// noWait is set when the merge would wait while another gh-triage
+	// holds the record of pending merges.
+	noWait bool
 }
 
 // goes reports whether the item is acted on.
 func (it bulkItem) goes(kind runner.Kind) bool {
 	switch {
-	case !it.ok || it.moved || it.running:
+	case !it.ok || it.moved || it.running || it.noWait:
 		return false
 	case kind == runner.Approve:
 		return it.d.Approve
@@ -54,6 +57,8 @@ func (it bulkItem) why() string {
 		return "changed since it was read · R to read again"
 	case it.running:
 		return "already running"
+	case it.noWait:
+		return "would wait, and another gh-triage keeps the waiting merges"
 	}
 	return it.d.Reason
 }
@@ -157,6 +162,10 @@ func (m *Model) decideBulk() {
 			it.d = plan.ForApprove(it.mi, it.pr, m.viewer, b.includeFailing, m.set.Plan)
 		} else {
 			it.d = plan.ForMerge(it.mi, it.pr, m.viewer, m.set.Plan)
+			switch it.d.Step {
+			case plan.StepWait, plan.StepUpdate, plan.StepAutoMerge:
+				it.noWait = !m.set.CanWait
+			}
 		}
 	}
 }
