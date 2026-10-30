@@ -177,6 +177,10 @@ func (m *Model) switchTab(i int) tea.Cmd {
 	// A tab not read for longer than the refresh interval is read again
 	// when it is opened.
 	if at, ok := m.refreshed[m.cur]; ok && m.set.Refresh > 0 && m.set.Now().Sub(at) > m.set.Refresh && !m.tab().loading {
+		m.tab().keep = model.PRKey{}
+		if r, ok := m.current(); ok && r.kind == rowPR {
+			m.tab().keep = r.pr.Key
+		}
 		return tea.Batch(m.ensure(), m.loadTab(m.cur))
 	}
 	return m.ensure()
