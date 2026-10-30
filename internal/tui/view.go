@@ -142,7 +142,11 @@ func (m *Model) tabLabel(i int) string {
 	if i == m.cur {
 		name, num = st.tabOn, st.teal.Bold(true).Underline(true)
 	}
-	return st.dim.Render(fmt.Sprint(i+1)) + " " + name.Render(t.name) + name.Render(" ") + num.Render(count)
+	label := name.Render(t.name) + name.Render(" ") + num.Render(count)
+	if ks := m.keys.Keys(keymap.Action(fmt.Sprintf("tab_%d", i+1))); len(ks) > 0 {
+		label = st.dim.Render(ks[0]) + " " + label
+	}
+	return label
 }
 
 func (m *Model) headerRight() string {

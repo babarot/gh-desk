@@ -856,3 +856,15 @@ func TestDescriptionWraps(t *testing.T) {
 		t.Errorf("table and code became %q, want them uncut", got[n:])
 	}
 }
+
+func TestTabShowsItsBoundKey(t *testing.T) {
+	km, ps := keymap.Apply(keymap.Default(), map[string][]string{"tab_2": {"w"}})
+	if len(ps) > 0 {
+		t.Fatal(ps)
+	}
+	m := start(t, fixture(), km)
+	header := strings.SplitN(screen(m), "\n", 2)[0]
+	if !strings.Contains(header, "w mine") || strings.Contains(header, "2 mine") {
+		t.Errorf("header = %q, want the mine tab marked w", header)
+	}
+}
