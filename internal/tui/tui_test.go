@@ -918,3 +918,24 @@ func TestTabShowsItsBoundKey(t *testing.T) {
 		t.Errorf("header = %q, want the mine tab marked w", header)
 	}
 }
+
+// A popup keeps what is left and right of it, colored or wide.
+func TestPlaceKeepsTheSides(t *testing.T) {
+	for _, c := range []struct {
+		base, over string
+		x          int
+		want       string
+	}{
+		{"abcdefgh", "XY", 3, "abcXYfgh"},
+		{"\x1b[31mabcdefgh\x1b[m", "XY", 3, "abcXYfgh"},
+		{"ab", "XY", 4, "ab  XY"},
+		// A wide character cut by either edge leaves a gap.
+		{"aあいうえ", "XY", 2, "a XY うえ"},
+		{"あいうえ", "XY", 2, "あXYうえ"},
+	} {
+		got := place(c.base, c.over, c.x)
+		if ansi.Strip(got) != c.want || ansi.StringWidth(got) != ansi.StringWidth(c.want) {
+			t.Errorf("place(%q, %q, %d) = %q, want %q", c.base, c.over, c.x, ansi.Strip(got), c.want)
+		}
+	}
+}

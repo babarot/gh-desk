@@ -6,6 +6,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
+	"github.com/charmbracelet/x/ansi"
 
 	"github.com/babarot/gh-triage/internal/keymap"
 	"github.com/babarot/gh-triage/internal/plan"
@@ -81,8 +82,7 @@ func (m *Model) render() string {
 		toast := m.st.border.Render("╭ ") + m.noteIcon(m.toast.icon) + " " + m.st.sub1.Render(m.toast.title) + " " +
 			m.st.dim.Render("· "+m.firstKey("notifications")+" to see") + m.st.border.Render(" ╮")
 		at := len(lines) - 3
-		pad := max(m.width-lipgloss.Width(toast)-1, 0)
-		lines[at] = spaces(pad) + toast
+		lines[at] = place(lines[at], toast, max(m.width-lipgloss.Width(toast)-1, 0))
 	}
 	if len(lines) > m.height {
 		lines = lines[:m.height]
@@ -90,7 +90,8 @@ func (m *Model) render() string {
 	return strings.Join(lines, "\n")
 }
 
-// overlay puts popup over lines from row top, in the middle.
+// overlay puts popup over lines from row top, in the middle, keeping what
+// is left and right of it.
 func overlay(lines, popup []string, top, width int) []string {
 	out := append([]string(nil), lines...)
 	left := 0
@@ -99,10 +100,26 @@ func overlay(lines, popup []string, top, width int) []string {
 	}
 	for i, p := range popup {
 		if top+i < len(out) {
-			out[top+i] = spaces(left) + p
+			out[top+i] = place(out[top+i], p, left)
 		}
 	}
 	return out
+}
+
+// place draws over on top of base from cell x, keeping what is left and
+// right of it. A wide character cut by an edge of over leaves a gap.
+func place(base, over string, x int) string {
+	left := ansi.Truncate(base, x, "")
+	left += spaces(x - ansi.StringWidth(left))
+	end := x + ansi.StringWidth(over)
+	right := ansi.TruncateLeft(base, end, "")
+	// A wide character across over's right edge comes back whole, which
+	// would push the rest of the line a cell right; drop it.
+	if ansi.StringWidth(right) > ansi.StringWidth(base)-end {
+		right = ansi.TruncateLeft(base, end+1, "")
+	}
+	right = spaces(ansi.StringWidth(base)-end-ansi.StringWidth(right)) + right
+	return left + "\x1b[m" + over + "\x1b[m" + right
 }
 
 func (m *Model) renderHeader() string {
