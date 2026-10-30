@@ -40,6 +40,7 @@ const EnvLogLevel = "GH_TRIAGE_LOG_LEVEL"
 const usage = `Usage: gh triage [flags] [command]
 
 Commands:
+  gc         remove the worktrees of pull requests no longer open
   log        print where the log file is
   version    print the version
 
@@ -64,7 +65,7 @@ func Run(args []string, stdout, stderr io.Writer) int {
 		return 2
 	}
 	switch flags.Arg(0) {
-	case "":
+	case "", "gc":
 	case "log":
 		fmt.Fprintln(stdout, logging.DefaultPath())
 		return 0
@@ -101,6 +102,15 @@ func Run(args []string, stdout, stderr io.Writer) int {
 		log.Error("github client", "err", err.Error())
 		fmt.Fprintf(stderr, "gh-triage: %v (is gh logged in? try gh auth login)\n", err)
 		return 1
+	}
+	if flags.Arg(0) == "gc" {
+		ws := &claude.Workspace{Dir: cfg.CacheDir(), Log: log}
+		if err := gc(context.Background(), ws, gh, stdout); err != nil {
+			log.Error("gc", "err", err.Error())
+			fmt.Fprintf(stderr, "gh-triage: gc: %v\n", err)
+			return 1
+		}
+		return 0
 	}
 	set := settings(cfg)
 	ctx, cancel := context.WithCancel(context.Background())
@@ -149,6 +159,44 @@ func Run(args []string, stdout, stderr io.Writer) int {
 		return 1
 	}
 	return 0
+}
+
+// prReader reads pull requests by key.
+type prReader interface {
+	PullRequests(ctx context.Context, keys []model.PRKey) (map[model.PRKey]model.PR, error)
+}
+
+// gc removes the worktrees of pull requests that are no longer open. A
+// pull request GitHub does not return (deleted, or out of reach) is kept.
+func gc(ctx context.Context, ws *claude.Workspace, gh prReader, out io.Writer) error {
+	wts, err := ws.Worktrees()
+	if err != nil {
+		return err
+	}
+	var keys []model.PRKey
+	for _, w := range wts {
+		keys = append(keys, w.Key)
+	}
+	removed := 0
+	for chunk := range slices.Chunk(keys, 50) {
+		prs, err := gh.PullRequests(ctx, chunk)
+		if err != nil {
+			return err
+		}
+		for _, k := range chunk {
+			p, ok := prs[k]
+			if !ok || p.State == model.StateOpen {
+				continue
+			}
+			if err := ws.Remove(ctx, k); err != nil {
+				return fmt.Errorf("%s: %w", k, err)
+			}
+			fmt.Fprintf(out, "removed %s (%s)\n", k, strings.ToLower(string(p.State)))
+			removed++
+		}
+	}
+	fmt.Fprintf(out, "%d removed, %d kept, in %s\n", removed, len(keys)-removed, ws.Dir)
+	return nil
 }
 
 // source is the GitHub client as the TUI asks for it.

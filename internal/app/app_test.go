@@ -2,14 +2,17 @@ package app
 
 import (
 	"bytes"
+	"context"
 	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/babarot/gh-triage/internal/claude"
 	"github.com/babarot/gh-triage/internal/config"
 	"github.com/babarot/gh-triage/internal/logging"
+	"github.com/babarot/gh-triage/internal/model"
 )
 
 func TestKeysTemplateLoadsUncommented(t *testing.T) {
@@ -104,5 +107,42 @@ func TestOnlyReadingToolsForClaude(t *testing.T) {
 	_, _, err := setup(path, false, new(slog.LevelVar), logging.Discard())
 	if err == nil || !strings.Contains(err.Error(), `claude.allowed_tools[1]`) || !strings.Contains(err.Error(), `"Bash"`) {
 		t.Errorf("err = %v", err)
+	}
+}
+
+type fakePRs map[model.PRKey]model.PR
+
+func (f fakePRs) PullRequests(_ context.Context, keys []model.PRKey) (map[model.PRKey]model.PR, error) {
+	out := map[model.PRKey]model.PR{}
+	for _, k := range keys {
+		if p, ok := f[k]; ok {
+			out[k] = p
+		}
+	}
+	return out, nil
+}
+
+func TestGCRemovesClosedOnly(t *testing.T) {
+	dir := t.TempDir()
+	ws := &claude.Workspace{Dir: dir, Log: logging.Discard()}
+	open, merged, gone := model.PRKey{Owner: "acme", Repo: "api", Number: 1}, model.PRKey{Owner: "acme", Repo: "api", Number: 2}, model.PRKey{Owner: "acme", Repo: "web", Number: 3}
+	for _, k := range []model.PRKey{open, merged, gone} {
+		if err := os.MkdirAll(ws.WorktreePath(k), 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	prs := fakePRs{open: {Key: open, State: model.StateOpen}, merged: {Key: merged, State: model.StateMerged}}
+	var out bytes.Buffer
+	if err := gc(context.Background(), ws, prs, &out); err != nil {
+		t.Fatal(err)
+	}
+	for k, want := range map[model.PRKey]bool{open: true, merged: false, gone: true} {
+		_, err := os.Stat(ws.WorktreePath(k))
+		if (err == nil) != want {
+			t.Errorf("%s kept = %v, want %v", k, err == nil, want)
+		}
+	}
+	if !strings.Contains(out.String(), "1 removed, 2 kept") {
+		t.Errorf("out = %s", out.String())
 	}
 }
