@@ -1,0 +1,34 @@
+triage // me   1 review 3  2 mine 1  3 involved 0  4 inbox 2                                       1 to you · 1 via team · 1 bots 
+claude on acme/api#12  claude-opus-5-5 · at aaaaaaa · read-only · $0.40                                                           
+╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌
+you  Review this pull request.                                                                                                    
+                                                                                                                                  
+  ⏺ Read main.go                                                                                                                  
+claude                                                                                                                            
+  Answer 1: the retry loop has no limit.                                                                                          
+                                                                                                                                  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+› i to ask more · D to draft a review                                                                                             
+                                                                                                                                  
+i ask more · D draft review · A approve · O open in claude code · down down · ? keys · esc back                                   

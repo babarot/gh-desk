@@ -99,17 +99,19 @@ const (
 	viewList view = iota
 	viewPR
 	viewCompose
+	viewChat
 )
 
 // Model is the TUI's state.
 type Model struct {
-	src  Source
-	run  Runner
-	keys keymap.Map
-	log  *slog.Logger
-	set  Settings
-	ctx  context.Context
-	st   styles
+	src    Source
+	run    Runner
+	claude Claude
+	keys   keymap.Map
+	log    *slog.Logger
+	set    Settings
+	ctx    context.Context
+	st     styles
 
 	viewer string
 	tabs   []*tab
@@ -148,17 +150,22 @@ type Model struct {
 	prv       prView
 	compose   *compose
 	confirm   *confirm
+	// chats are the conversations with Claude, by pull request; chatKey is
+	// the one on screen.
+	chats   map[model.PRKey]*chat
+	chatKey model.PRKey
 }
 
-// New returns the TUI reading from src and acting through run.
-func New(src Source, run Runner, km keymap.Map, log *slog.Logger, set Settings) *Model {
+// New returns the TUI reading from src, acting through run, and asking cl;
+// a nil cl turns Claude off.
+func New(src Source, run Runner, cl Claude, km keymap.Map, log *slog.Logger, set Settings) *Model {
 	if set.Now == nil {
 		set.Now = time.Now
 	}
 	if log == nil {
 		log = logging.Discard()
 	}
-	m := &Model{src: src, run: run, keys: km, log: log, set: set, ctx: context.Background(), unread: map[model.PRKey]model.Notification{},
+	m := &Model{src: src, run: run, claude: cl, chats: map[model.PRKey]*chat{}, keys: km, log: log, set: set, ctx: context.Background(), unread: map[model.PRKey]model.Notification{},
 		selected: map[model.PRKey]bool{}, progress: map[model.PRKey]progress{}, batches: map[string]*batchState{},
 		merged: map[model.PRKey]bool{}, refreshed: map[int]time.Time{}}
 	m.st = newStyles(mocha)
@@ -175,8 +182,8 @@ func New(src Source, run Runner, km keymap.Map, log *slog.Logger, set Settings) 
 }
 
 // Run shows the TUI until it quits. Quitting stops every batch.
-func Run(ctx context.Context, src Source, run Runner, km keymap.Map, log *slog.Logger, set Settings) error {
-	m := New(src, run, km, log, set)
+func Run(ctx context.Context, src Source, run Runner, cl Claude, km keymap.Map, log *slog.Logger, set Settings) error {
+	m := New(src, run, cl, km, log, set)
 	m.ctx = ctx
 	_, err := tea.NewProgram(m, tea.WithContext(ctx)).Run()
 	return err
@@ -198,6 +205,9 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.width, m.height = msg.Width, msg.Height
 		if m.compose != nil {
 			m.compose.resize(m.width, m.height)
+		}
+		for _, c := range m.chats {
+			c.input.SetWidth(max(m.width-4, 20))
 		}
 		return m, nil
 	case tea.BackgroundColorMsg:
@@ -247,6 +257,8 @@ func (m *Model) key(msg tea.KeyPressMsg) tea.Cmd {
 		return m.filterKey(msg)
 	case m.view == viewCompose:
 		return m.composeKey(msg)
+	case m.view == viewChat && m.chat() != nil && m.chat().typing:
+		return m.chatKeyPress(msg)
 	}
 	if m.keys.Matches("help", k) {
 		m.help = true
@@ -255,6 +267,8 @@ func (m *Model) key(msg tea.KeyPressMsg) tea.Cmd {
 	switch m.view {
 	case viewPR:
 		return m.prKey(k)
+	case viewChat:
+		return m.chatKeyPress(msg)
 	default:
 		return m.listKey(k)
 	}
@@ -267,6 +281,11 @@ func (m *Model) paste(msg tea.PasteMsg) tea.Cmd {
 		m.tab().sel, m.tab().offset = 0, 0
 	case m.view == viewCompose && m.compose != nil:
 		return m.compose.update(msg)
+	case m.view == viewChat && m.chat() != nil && m.chat().typing:
+		c := m.chat()
+		var cmd tea.Cmd
+		c.input, cmd = c.input.Update(msg)
+		return cmd
 	}
 	return nil
 }

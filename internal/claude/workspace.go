@@ -214,3 +214,27 @@ func git(ctx context.Context, dir string, args ...string) (string, error) {
 	}
 	return out.String(), nil
 }
+
+// GhqRoots are the roots ghq keeps clones under (git config ghq.root, or
+// ~/ghq), for Workspace.Borrow.
+func GhqRoots(ctx context.Context) []string {
+	out, _ := git(ctx, "", "config", "--get-all", "ghq.root")
+	var roots []string
+	for _, r := range strings.Split(strings.TrimSpace(out), "\n") {
+		if r == "" {
+			continue
+		}
+		if r == "~" || strings.HasPrefix(r, "~/") {
+			if h, err := os.UserHomeDir(); err == nil {
+				r = filepath.Join(h, r[1:])
+			}
+		}
+		roots = append(roots, r)
+	}
+	if len(roots) == 0 {
+		if h, err := os.UserHomeDir(); err == nil {
+			roots = []string{filepath.Join(h, "ghq")}
+		}
+	}
+	return roots
+}

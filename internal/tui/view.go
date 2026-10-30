@@ -40,6 +40,8 @@ func (m *Model) render() string {
 		m.renderPR(&b, body)
 	case viewCompose:
 		m.renderCompose(&b, body)
+	case viewChat:
+		m.renderChat(&b, body)
 	default:
 		l := m.layout()
 		m.renderList(&b, l.list)
@@ -164,6 +166,7 @@ var ready = map[keymap.Action]bool{
 	"pane_down": true, "pane_up": true, "next_file": true, "prev_file": true, "pane_tab": true, "unfold": true, "toggle_pane": true,
 	"pr_prev_tab": true, "pr_next_tab": true, "pr_approve": true, "pr_comment": true, "pr_request_changes": true, "pr_browse": true,
 	"confirm": true, "next_kind": true, "post": true, "editor": true, "accept": true, "erase": true,
+	"claude": true, "pr_claude": true, "ask_more": true, "draft_review": true, "open_claude": true, "chat_approve": true,
 }
 
 // hints is the key line of what has the focus.
@@ -182,10 +185,14 @@ func (m *Model) hints() string {
 		as = []keymap.Action{"accept"}
 	case m.view == viewCompose:
 		as = []keymap.Action{"next_kind", "post", "editor"}
+	case m.view == viewChat && m.chat() != nil && m.chat().typing:
+		as = []keymap.Action{"accept"}
+	case m.view == viewChat:
+		as = []keymap.Action{"ask_more", "draft_review", "chat_approve", "open_claude", "down", "help"}
 	case m.view == viewPR:
-		as = []keymap.Action{"pr_next_tab", "down", "pr_approve", "pr_merge", "pr_comment", "pr_request_changes", "pr_browse", "help"}
+		as = []keymap.Action{"pr_next_tab", "down", "pr_approve", "pr_merge", "pr_comment", "pr_claude", "pr_browse", "help"}
 	default:
-		as = []keymap.Action{"open", "select", "select_rule", "approve", "merge", "comment", "browse", "pane_tab", "help"}
+		as = []keymap.Action{"open", "select", "select_rule", "approve", "merge", "comment", "claude", "browse", "pane_tab", "help"}
 		if m.tab().inbox {
 			as = append(as[:len(as)-1], "hide", "show_closed", "help")
 		}
@@ -213,7 +220,8 @@ func (m *Model) renderHelp() []string {
 		title string
 	}{
 		{keymap.ScopeGlobal, "anywhere"}, {keymap.ScopeNav, "moving"}, {keymap.ScopeList, "the list and its preview"},
-		{keymap.ScopePR, "a pull request"}, {keymap.ScopePopup, "a confirm popup"}, {keymap.ScopeCompose, "writing a review"},
+		{keymap.ScopePR, "a pull request"}, {keymap.ScopePopup, "a confirm popup"}, {keymap.ScopeChat, "claude"},
+		{keymap.ScopeCompose, "writing a review"},
 	}
 	for _, sc := range scopes {
 		var rows []string

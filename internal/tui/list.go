@@ -167,6 +167,8 @@ func (m *Model) listKey(k string) tea.Cmd {
 		return m.startCompose(p, model.EventRequestChanges)
 	case is("browse"):
 		return m.browse(p)
+	case is("claude"):
+		return m.openChat(p)
 	case is("hide"):
 		return m.hide(p, r.notif)
 	}

@@ -61,6 +61,8 @@ func (m *Model) prKey(k string) tea.Cmd {
 		return m.startCompose(p, model.EventRequestChanges)
 	case is("pr_browse"):
 		return m.browse(p)
+	case is("pr_claude"):
+		return m.openChat(p)
 	}
 	return nil
 }

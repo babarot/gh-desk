@@ -15,9 +15,11 @@ import (
 	"log/slog"
 	"os"
 	"regexp"
+	"slices"
 	"strings"
 	"time"
 
+	"github.com/babarot/gh-triage/internal/claude"
 	"github.com/babarot/gh-triage/internal/config"
 	"github.com/babarot/gh-triage/internal/github"
 	"github.com/babarot/gh-triage/internal/keymap"
@@ -128,8 +130,12 @@ func Run(args []string, stdout, stderr io.Writer) int {
 	rn := runner.New(runnerGitHub{gh}, log, runner.Options{Settings: set.Plan, Viewer: viewer, Store: rstore, CanWait: rstore != nil,
 		ChecksTimeout: config.Duration(cfg.Merge.ChecksTimeout), BlockedTimeout: config.Duration(cfg.Merge.BlockedTimeout),
 		WatchTimeout: config.Duration(cfg.Merge.WatchTimeout)})
+	cl := asker{
+		Claude: claude.New(claude.Options{Model: cfg.Claude.Model, Tools: cfg.Claude.AllowedTools, Instructions: cfg.Claude.Instructions, Log: log}),
+		ws:     &claude.Workspace{Dir: cfg.CacheDir(), Borrow: claude.GhqRoots(ctx), Log: log},
+	}
 	start := time.Now()
-	err = tui.Run(ctx, source{gh}, rn, km, log, set)
+	err = tui.Run(ctx, source{gh}, rn, cl, km, log, set)
 	// Stop the batches and wait for them to stop writing the record before
 	// the lock goes, so another gh-triage never shares it.
 	cancel()
@@ -151,6 +157,16 @@ type source struct{ *github.Client }
 func (s source) SearchPage(ctx context.Context, query string, first int, after string) ([]model.PR, int, string, []string, error) {
 	pg, err := s.Client.SearchPage(ctx, query, first, after)
 	return pg.PRs, pg.Total, pg.Next, pg.Warnings, err
+}
+
+// asker is Claude and its worktrees as the TUI asks for them.
+type asker struct {
+	*claude.Claude
+	ws *claude.Workspace
+}
+
+func (a asker) Prepare(ctx context.Context, key model.PRKey, head string) (string, error) {
+	return a.ws.Prepare(ctx, key, head)
 }
 
 // runnerGitHub is the GitHub client as the runner asks for it.
@@ -225,6 +241,12 @@ func setup(path string, debug bool, level *slog.LevelVar, log *slog.Logger) (con
 		}
 	} else {
 		level.Set(l)
+	}
+	for i, t := range cfg.Claude.AllowedTools {
+		if !slices.Contains(claude.Tools, t) {
+			ps = append(ps, config.Problem{Key: []string{"claude", "allowed_tools"}, Index: i,
+				Message: fmt.Sprintf("claude.allowed_tools[%d] must be one of %q (Claude only reads), got %q", i, claude.Tools, t)})
+		}
 	}
 	km, kps := applyKeys(cfg.Keys)
 	ps = append(ps, kps...)

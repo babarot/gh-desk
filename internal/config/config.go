@@ -40,6 +40,7 @@ type File struct {
 	Bulk     Bulk      `toml:"bulk"`
 	// Select are the rules S offers besides "approved by me".
 	Select []Select `toml:"select"`
+	Claude Claude   `toml:"claude"`
 	// Keys is [keys] as written; the keymap package checks it.
 	Keys Keys `toml:"-"`
 }
@@ -119,6 +120,39 @@ type Select struct {
 	Bot      bool   `toml:"bot"`
 	// Checks is "passing" to require passing checks, or "".
 	Checks string `toml:"checks"`
+}
+
+// Claude configures asking Claude Code.
+type Claude struct {
+	Model string `toml:"model"`
+	// CacheDir holds the clones and worktrees Claude reads; ~ is the home
+	// directory.
+	CacheDir string `toml:"cache_dir"`
+	// AllowedTools are the tools Claude may use; the claude package checks
+	// them.
+	AllowedTools []string `toml:"allowed_tools"`
+	// Instructions are appended to the system prompt of every review.
+	Instructions string `toml:"instructions"`
+	// ReleaseNotesCheck lets Claude read the release notes of the bot pull
+	// requests in a merge popup.
+	ReleaseNotesCheck bool `toml:"release_notes_check"`
+}
+
+// CacheDir is Claude.CacheDir with ~ expanded.
+func (f File) CacheDir() string {
+	d := f.Claude.CacheDir
+	if d == "~" || strings.HasPrefix(d, "~/") {
+		d = filepath.Join(homeDir(), d[1:])
+	}
+	return d
+}
+
+func defaultCacheDir() string {
+	dir := os.Getenv("XDG_CACHE_HOME")
+	if dir == "" {
+		dir = filepath.Join(homeDir(), ".cache")
+	}
+	return filepath.Join(dir, "gh-triage")
 }
 
 // Merge values.
@@ -201,7 +235,8 @@ func Default() File {
 		Diff:    Diff{Collapse: []string{"*.lock", "go.sum", "pnpm-lock.yaml", "package-lock.json", "yarn.lock"}},
 		Merge: Merge{Methods: []string{"merge", "squash", "rebase"}, AutoMerge: true, ChecksTimeout: "6h",
 			BlockedTimeout: "30m", WatchTimeout: "24h", UpdateBranch: "humans"},
-		Bulk: Bulk{AttentionPaths: []string{".github/workflows/*", "CODEOWNERS", ".github/CODEOWNERS", "docs/CODEOWNERS"}},
+		Bulk:   Bulk{AttentionPaths: []string{".github/workflows/*", "CODEOWNERS", ".github/CODEOWNERS", "docs/CODEOWNERS"}},
+		Claude: Claude{Model: "opus", CacheDir: defaultCacheDir(), AllowedTools: []string{"Read", "Grep", "Glob"}, ReleaseNotesCheck: true},
 	}
 }
 
@@ -339,6 +374,24 @@ func Template(keys string) string {
 # the confirm popup.
 # attention_paths = [".github/workflows/*", "CODEOWNERS", ".github/CODEOWNERS", "docs/CODEOWNERS"]
 
+[claude]
+# C asks Claude Code (claude -p, with the account you are signed in with)
+# about the pull request, in a worktree of its head. Claude only reads: no
+# settings files or MCP servers are loaded, its file tools see only the
+# worktree, and it has none that run commands.
+# model = "opus"
+# Where gh-triage keeps its clones and the worktrees (~ is your home); by
+# default $XDG_CACHE_HOME/gh-triage, or ~/.cache/gh-triage.
+# cache_dir = "~/.cache/gh-triage"
+# The tools Claude may use, among "Read", "Grep", "Glob" and "WebFetch".
+# allowed_tools = ["Read", "Grep", "Glob"]
+# Appended to the instructions of every review, such as
+# "Answer in Japanese."
+# instructions = ""
+# Let Claude read the release notes of the bot pull requests in the merge
+# popup, and mark those that need care.
+# release_notes_check = true
+
 [keys]
 # Which keys do what, by action: a key or a list of keys, replacing the
 # action's own, or [] to turn it off. A key given to an action is taken from
@@ -390,8 +443,10 @@ func Load(path string) (File, error) {
 		Merge    Merge          `toml:"merge"`
 		Bulk     Bulk           `toml:"bulk"`
 		Select   []Select       `toml:"select"`
+		Claude   Claude         `toml:"claude"`
 		Keys     map[string]any `toml:"keys"`
-	}{Inbox: cfg.Inbox, Log: cfg.Log, UI: cfg.UI, Refresh: cfg.Refresh, Preview: cfg.Preview, Diff: cfg.Diff, Merge: cfg.Merge, Bulk: cfg.Bulk}
+	}{Inbox: cfg.Inbox, Log: cfg.Log, UI: cfg.UI, Refresh: cfg.Refresh, Preview: cfg.Preview, Diff: cfg.Diff, Merge: cfg.Merge, Bulk: cfg.Bulk,
+		Claude: cfg.Claude}
 	if err := toml.NewDecoder(bytes.NewReader(src)).DisallowUnknownFields().Decode(&doc); err != nil {
 		return File{}, Report(path, decodeProblems(err))
 	}
@@ -400,7 +455,7 @@ func Load(path string) (File, error) {
 		sections = doc.Sections
 	}
 	cfg = File{Sections: sections, Inbox: doc.Inbox, Log: doc.Log, UI: doc.UI, Refresh: doc.Refresh,
-		Preview: doc.Preview, Diff: doc.Diff, Merge: doc.Merge, Bulk: doc.Bulk, Select: doc.Select, Keys: keysFrom(doc.Keys)}
+		Preview: doc.Preview, Diff: doc.Diff, Merge: doc.Merge, Bulk: doc.Bulk, Select: doc.Select, Claude: doc.Claude, Keys: keysFrom(doc.Keys)}
 	ps := checkSections(cfg.Sections)
 	if !slices.Contains(Themes, cfg.UI.Theme) {
 		ps = append(ps, problem("ui.theme", "ui.theme must be one of %s, got %q", quoted(Themes), cfg.UI.Theme))
@@ -433,6 +488,12 @@ func Load(path string) (File, error) {
 		ps = append(ps, problem("merge.update_branch", "merge.update_branch must be one of %s, got %q", quoted(UpdateBranchValues), cfg.Merge.UpdateBranch))
 	}
 	ps = append(ps, checkSelect(cfg.Select)...)
+	if strings.TrimSpace(cfg.Claude.Model) == "" {
+		ps = append(ps, problem("claude.model", "claude.model must not be empty"))
+	}
+	if strings.TrimSpace(cfg.Claude.CacheDir) == "" {
+		ps = append(ps, problem("claude.cache_dir", "claude.cache_dir must not be empty"))
+	}
 	if cfg.Inbox.Limit < 1 || cfg.Inbox.Limit > 1000 {
 		ps = append(ps, problem("inbox.limit", "inbox.limit must be between 1 and 1000, got %d", cfg.Inbox.Limit))
 	}

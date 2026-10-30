@@ -95,3 +95,14 @@ func TestRunSubcommands(t *testing.T) {
 		t.Errorf("unknown command: code %d", code)
 	}
 }
+
+func TestOnlyReadingToolsForClaude(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config.toml")
+	if err := os.WriteFile(path, []byte("[claude]\nallowed_tools = [\"Read\", \"Bash\"]\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	_, _, err := setup(path, false, new(slog.LevelVar), logging.Discard())
+	if err == nil || !strings.Contains(err.Error(), `claude.allowed_tools[1]`) || !strings.Contains(err.Error(), `"Bash"`) {
+		t.Errorf("err = %v", err)
+	}
+}

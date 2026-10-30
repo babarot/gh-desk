@@ -444,6 +444,14 @@ func (m *Model) handleData(msg tea.Msg) tea.Cmd {
 		if msg.err != nil {
 			m.setStatus("could not open the browser: "+msg.err.Error(), true)
 		}
+	case chatStepMsg:
+		return m.chatStep(msg)
+	case chatPreparedMsg:
+		return m.chatPrepared(msg)
+	case chatAnswerMsg:
+		return m.chatAnswer(msg)
+	case claudeExitMsg:
+		return m.claudeExited(msg)
 	case editedMsg:
 		return m.edited(msg)
 	case bulkInfoMsg:

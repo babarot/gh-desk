@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -13,6 +14,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
 
+	"github.com/babarot/gh-triage/internal/claude"
 	"github.com/babarot/gh-triage/internal/keymap"
 	"github.com/babarot/gh-triage/internal/model"
 	"github.com/babarot/gh-triage/internal/plan"
@@ -235,7 +237,7 @@ func startWith(t *testing.T, f *fakeSource, km keymap.Map) (*Model, *fakeRunner)
 		CanWait: true,
 	}
 	r := &fakeRunner{results: map[model.PRKey]runner.Event{}}
-	m := New(f, r, km, nil, set)
+	m := New(f, r, &fakeClaude{}, km, nil, set)
 	m.Update(tea.WindowSizeMsg{Width: 130, Height: 34})
 	run(m, m.Init())
 	return m, r
@@ -600,7 +602,7 @@ func TestResumeAtStart(t *testing.T) {
 		Theme: "mocha", Now: func() time.Time { return now }, CanWait: true,
 		Resume: []model.Pending{{Key: key("acme", "api", 12), ID: "1", Head: "aaaaaaa1", Author: "alice"}}}
 	r := &fakeRunner{results: map[model.PRKey]runner.Event{}}
-	m := New(f, r, keymap.Default(), nil, set)
+	m := New(f, r, &fakeClaude{}, keymap.Default(), nil, set)
 	m.Update(tea.WindowSizeMsg{Width: 130, Height: 34})
 	run(m, m.Init())
 	if len(r.resumed) != 1 || m.progress[key("acme", "api", 12)].result != runner.Merged {
@@ -625,5 +627,81 @@ func TestNoWaitingWithoutTheLock(t *testing.T) {
 	press(m, "y")
 	if len(r.items) != 0 {
 		t.Errorf("a waiting merge started without the lock: %+v", r.items)
+	}
+}
+
+// fakeClaude answers every question at once and keeps what it was asked.
+type fakeClaude struct {
+	asked    []claude.Request
+	prepared []model.PRKey
+}
+
+func (c *fakeClaude) Prepare(_ context.Context, k model.PRKey, head string) (string, error) {
+	c.prepared = append(c.prepared, k)
+	return "/cache/worktrees/" + k.String(), nil
+}
+
+func (c *fakeClaude) Ask(_ context.Context, r claude.Request, progress func(claude.Step)) (claude.Answer, error) {
+	c.asked = append(c.asked, r)
+	progress(claude.Step{Tool: "Read", Arg: "main.go"})
+	if r.Schema != "" {
+		return claude.Answer{Structured: []byte(`{"event":"APPROVE","body":"Looks good: the retry is bounded."}`), Cost: 0.1, Model: "claude-opus-5-5"}, nil
+	}
+	return claude.Answer{Text: fmt.Sprintf("Answer %d: the retry loop has no limit.", len(c.asked)), Cost: 0.4, Model: "claude-opus-5-5"}, nil
+}
+
+func (c *fakeClaude) Interactive(dir, session string) *exec.Cmd { return exec.Command("true") }
+
+func (c *fakeClaude) Once(context.Context, string, string, string) (claude.Answer, error) {
+	return claude.Answer{Structured: []byte(`{"cautions":[]}`)}, nil
+}
+
+func TestClaudeConversation(t *testing.T) {
+	m, _ := startWith(t, fixture(), keymap.Default())
+	fc := m.claude.(*fakeClaude)
+	press(m, "C")
+	if m.view != viewChat || len(fc.asked) != 1 {
+		t.Fatalf("view %v, asked %d", m.view, len(fc.asked))
+	}
+	first := fc.asked[0]
+	if !first.First || !strings.Contains(first.Prompt, "<diff>") || first.Dir == "" {
+		t.Errorf("first request %+v", first)
+	}
+	golden(t, "claude", screen(m))
+
+	press(m, "i", "w", "h", "y", "?", "enter")
+	if len(fc.asked) != 2 {
+		t.Fatalf("asked %d", len(fc.asked))
+	}
+	if r := fc.asked[1]; r.First || r.Session != first.Session || r.Prompt != "why?" || r.Dir != first.Dir {
+		t.Errorf("second request %+v", r)
+	}
+	if len(fc.prepared) != 1 {
+		t.Errorf("the worktree was made %d times", len(fc.prepared))
+	}
+
+	// Leaving and coming back keeps the conversation.
+	press(m, "esc")
+	if m.view != viewList {
+		t.Fatalf("view %v", m.view)
+	}
+	press(m, "C")
+	if len(fc.asked) != 2 || !strings.Contains(screen(m), "Answer 2") {
+		t.Errorf("the conversation was not kept:\n%s", screen(m))
+	}
+}
+
+func TestClaudeDraft(t *testing.T) {
+	m, _ := startWith(t, fixture(), keymap.Default())
+	press(m, "C", "D")
+	if m.view != viewCompose || m.compose == nil {
+		t.Fatalf("view %v", m.view)
+	}
+	if kinds[m.compose.kind] != model.EventApprove || m.compose.ta.Value() != "Looks good: the retry is bounded." {
+		t.Errorf("draft kind %v body %q", kinds[m.compose.kind], m.compose.ta.Value())
+	}
+	press(m, "esc")
+	if m.view != viewChat {
+		t.Errorf("discarding the draft went to %v", m.view)
 	}
 }

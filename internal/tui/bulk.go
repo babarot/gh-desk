@@ -91,6 +91,11 @@ func (m *Model) startBulk(kind runner.Kind) tea.Cmd {
 		}
 		prs = []model.PR{p}
 	}
+	return m.startBulkFor(kind, prs)
+}
+
+// startBulkFor opens the confirm popup for prs.
+func (m *Model) startBulkFor(kind runner.Kind, prs []model.PR) tea.Cmd {
 	if len(prs) == 0 {
 		return nil
 	}
