@@ -32,6 +32,7 @@ var layers = []layer{
 	{"internal/github", 2, []string{"model", "logging"}, []string{"github.com/cli/go-gh/v2"}, "GitHub's GraphQL and REST APIs"},
 	{"internal/state", 2, []string{"model", "logging"}, nil, "The pending-merge record and its lock"},
 	{"internal/claude", 2, []string{"model", "logging"}, nil, "Running claude -p and the pull request worktrees"},
+	{"internal/listcache", 2, []string{"model"}, nil, "The lists last read, kept on disk for the next launch"},
 	{"internal/runner", 3, []string{"model", "logging", "plan"}, nil, "Bulk approve and merge, auto-merge watching, resuming"},
 	{"internal/tui", 4, []string{"model", "logging", "plan", "diff", "keymap", "runner", "claude"},
 		[]string{"charm.land/bubbletea/v2", "charm.land/bubbles/v2", "charm.land/lipgloss/v2", "github.com/charmbracelet/x/ansi", "github.com/alecthomas/chroma/v2"}, "The terminal UI"},
