@@ -159,3 +159,18 @@ func TestEmptyListIsKept(t *testing.T) {
 		t.Errorf("involved kept = %v, %+v", ok, l)
 	}
 }
+
+// The cursor moved on the cached list stays on its pull request when the
+// reading again is put in place.
+func TestCursorStaysAfterTheSwap(t *testing.T) {
+	m := newModel(fixture(), cachedReview())
+	press(m, "j")
+	r, _ := m.current()
+	if r.pr.Key != key("acme", "api", 12) {
+		t.Fatalf("cursor on %v", r.pr.Key)
+	}
+	run(m, m.Init())
+	if r, _ := m.current(); r.pr.Key != key("acme", "api", 12) {
+		t.Errorf("cursor moved to %v", r.pr.Key)
+	}
+}

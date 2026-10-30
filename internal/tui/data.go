@@ -658,6 +658,11 @@ func (m *Model) swap(i int) tea.Cmd {
 	p := t.pend
 	t.pend = nil
 	now := m.set.Now()
+	// The cursor stays on the pull request it is on now, which may not be
+	// the one it was on when the reading started.
+	if rs := m.rows(t); t.sel >= 0 && t.sel < len(rs) && rs[t.sel].kind == rowPR {
+		t.keep = rs[t.sel].pr.Key
+	}
 	old := map[model.PRKey]model.PR{}
 	for _, o := range t.prs {
 		old[o.Key] = o
