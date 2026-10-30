@@ -18,17 +18,17 @@ triage // @me   1 review (3)  2 mine (1)  3 involved (0)  4 inbox (2)           
 
 
 
-╭  diff 2   description  ───────────────────────────────────────────────────────────────────────────────── acme/api#12 · J/K · v ╮
-│ retries → main  @core                                                                                                          │
-│ client.go · go.sum                                                                                                             │
-│ ── client.go  +2 −1                                                                                                            │
-│ @@ -1,3 +1,4 @@ package client                                                                                                 │
-│  import "net/http"                                                                                                             │
-│ -var tries = 1                                                                                                                 │
-│ +var tries = 3                                                                                                                 │
-│ +var wait = time.Second                                                                                                        │
-│ ── go.sum  +1 −1  folded · z to unfold                                                                                         │
-│                                                                                                                                │
+╭  overview   diff 2  ──────────────────────────────────────────────────────────────────────────────────── acme/api#12 · J/K · v ╮
+│ Add retries to the client  alice                                                          │ status    open                     │
+│ ▾ description                                                                             │ requested me @core                 │
+│   What                                                                                    │ checks    ✓1                       │
+│   Retry failed requests.                                                                  │ size      +40 −3 · 2 files         │
+│                                                                                           │ branch    retries                  │
+│ ▾ checks 1  ✓1                                                                            │           → main                   │
+│   ✓ test                                                                                  │ updated   3h ago                   │
+│                                                                                           │                                    │
+│                                                                                           │                                    │
+│                                                                                           │                                    │
 ╰────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
                                                                                                                                   
-enter open · space select · S select by rule · A approve · M merge · c comment · C ask claude · o browser · v diff / description …
+enter open · space select · S select by rule · A approve · M merge · c comment · C ask claude · o browser · v overview / diff · ?…

@@ -77,9 +77,14 @@ type Preview struct {
 	// set with the mouse or keys is kept in the state directory and takes
 	// its place.
 	Height int `toml:"height"`
+	// Tab is the tab the pane opens on: one of PaneTabs.
+	Tab string `toml:"tab"`
 	// Description is how a description is drawn: one of DescriptionStyles.
 	Description string `toml:"description"`
 }
+
+// PaneTabs are the values of preview.tab.
+var PaneTabs = []string{"overview", "diff"}
 
 // DescriptionStyles are the values of preview.description: "rendered"
 // draws the Markdown, "plain" shows it as written.
@@ -241,7 +246,7 @@ func Default() File {
 		Log:     Log{Level: "info"},
 		UI:      UI{Theme: "auto", StaleDays: 30},
 		Refresh: Refresh{Interval: "3m"},
-		Preview: Preview{Height: 14, Description: "rendered"},
+		Preview: Preview{Height: 14, Tab: "overview", Description: "rendered"},
 		Diff:    Diff{Collapse: []string{"*.lock", "go.sum", "pnpm-lock.yaml", "package-lock.json", "yarn.lock"}},
 		Merge: Merge{Methods: []string{"merge", "squash", "rebase"}, AutoMerge: true, ChecksTimeout: "6h",
 			BlockedTimeout: "30m", WatchTimeout: "24h", UpdateBranch: "humans"},
@@ -333,6 +338,9 @@ func Template(keys string) string {
 # with a key. Dragging the pane's top edge, or + and -, changes them, and
 # the lines set that way are kept over this one.
 # height = 14
+# The tab the pane opens on: "overview" (default), the description beside
+# a column of facts, or "diff".
+# tab = "overview"
 # How a description is drawn, in the pane and on the PR screen: "rendered"
 # (default) draws headings, lists, code, quotes and tables; "plain" shows
 # the Markdown as written.
@@ -487,6 +495,9 @@ func Load(path string) (File, error) {
 	}
 	if cfg.Preview.Height < 0 {
 		ps = append(ps, problem("preview.height", "preview.height must be 0 or more, got %d", cfg.Preview.Height))
+	}
+	if !slices.Contains(PaneTabs, cfg.Preview.Tab) {
+		ps = append(ps, problem("preview.tab", "preview.tab must be one of %s, got %q", quoted(PaneTabs), cfg.Preview.Tab))
 	}
 	if !slices.Contains(DescriptionStyles, cfg.Preview.Description) {
 		ps = append(ps, problem("preview.description", "preview.description must be one of %s, got %q", quoted(DescriptionStyles), cfg.Preview.Description))

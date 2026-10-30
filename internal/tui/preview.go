@@ -15,13 +15,14 @@ import (
 
 type paneMode int
 
+// The pane's tabs, in the order it shows them.
 const (
-	paneDiff paneMode = iota
-	paneBody
+	paneOverview paneMode = iota
+	paneDiff
 )
 
-// pane is the preview pane under the list: the diff or the description of
-// the pull request under the cursor.
+// pane is the preview pane under the list: the overview or the diff of the
+// pull request under the cursor.
 type pane struct {
 	on bool
 	// height is the pane's lines, borders left out.
@@ -45,10 +46,10 @@ type link struct {
 }
 
 func (p *pane) toggleMode() {
-	if p.mode == paneDiff {
-		p.mode = paneBody
-	} else {
+	if p.mode == paneOverview {
 		p.mode = paneDiff
+	} else {
+		p.mode = paneOverview
 	}
 	p.scroll = 0
 }
@@ -213,7 +214,7 @@ func (m *Model) jumpFile(dir int) {
 		return
 	}
 	var ls []line
-	if m.pane.mode == paneBody {
+	if m.pane.mode == paneOverview {
 		left, _ := m.descWidths()
 		ls = m.descLines(p, left)
 	} else {
@@ -267,7 +268,7 @@ func (m *Model) renderPane(b *strings.Builder, height int) {
 			}
 			return st.tabPillOff.Render(" " + s + " ")
 		}
-		tabs = pill(diffTab, m.pane.mode == paneDiff) + " " + pill("description", m.pane.mode == paneBody)
+		tabs = pill("overview", m.pane.mode == paneOverview) + " " + pill(diffTab, m.pane.mode == paneDiff)
 		hint = p.Key.String() + " · " + m.firstKey("pane_down") + "/" + m.firstKey("pane_up") + " · " + m.firstKey("pane_tab")
 		body = m.paneBody(p, n, e, files, height-2)
 	}
@@ -295,11 +296,11 @@ func (m *Model) diffTabName(p model.PR) string {
 	return fmt.Sprintf("diff %d", len(e.val))
 }
 
-// paneBody is the pane's lines: the description pane, or what the columns
+// paneBody is the pane's lines: the overview, or what the columns
 // do not say, why the pull request is here, what a bot updates, then the
 // diff, scrolled.
 func (m *Model) paneBody(p model.PR, n *model.Notification, e *entry[[]diff.File], files []diff.File, height int) []string {
-	if m.pane.mode == paneBody {
+	if m.pane.mode == paneOverview {
 		return m.descPane(p, n, height)
 	}
 	st := m.st

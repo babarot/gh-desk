@@ -58,7 +58,6 @@ func TestDescriptionPaneParts(t *testing.T) {
 	d.Body += strings.Repeat("\n\nMore about the retries.", 6)
 	f.details[key("acme", "api", 12)] = d
 	m := start(t, f, keymap.Default())
-	press(m, "v")
 	if s := screen(m); !strings.Contains(s, "▾ description") || !strings.Contains(s, "│ status    open") {
 		t.Fatalf("no parts or facts:\n%s", s)
 	}
@@ -83,7 +82,6 @@ func TestDescriptionPaneParts(t *testing.T) {
 func TestNarrowPaneHasFactsAbove(t *testing.T) {
 	m := start(t, fixture(), keymap.Default())
 	m.Update(tea.WindowSizeMsg{Width: 90, Height: 40})
-	press(m, "v")
 	s := screen(m)
 	if strings.Contains(s, " │ status") {
 		t.Fatalf("a column of facts at 90 cells:\n%s", s)
@@ -99,7 +97,6 @@ func TestClickFactOpensItsPage(t *testing.T) {
 	f := fixture()
 	f.searches["review"][0].Labels = []string{"good first issue"}
 	m := start(t, f, keymap.Default())
-	press(m, "v")
 	click := func(s string) {
 		t.Helper()
 		x, y := lineOf(t, m, s)
@@ -123,7 +120,6 @@ func TestFactsWrapAndCountWhatIsCut(t *testing.T) {
 	f := fixture()
 	f.searches["review"][0].HeadRef = "babarot/fix-the-retry-that-gave-up-too-early"
 	m := start(t, f, keymap.Default())
-	press(m, "v")
 	if s := screen(m); !strings.Contains(s, "branch    babarot/fix-the-retry-th │") || !strings.Contains(s, "│           at-gave-up-too-early ") {
 		t.Fatalf("the branch is not wrapped:\n%s", s)
 	}

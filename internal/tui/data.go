@@ -485,7 +485,7 @@ func (m *Model) ensure() tea.Cmd {
 		return nil
 	}
 	cmds = append(cmds, m.ensureDiff(p))
-	if p.AuthorIsBot || m.pane.mode == paneBody || m.view == viewPR {
+	if p.AuthorIsBot || m.pane.mode == paneOverview || m.view == viewPR {
 		cmds = append(cmds, m.ensureDetail(p.Key))
 	}
 	if n != nil && n.Unread && n.LatestCommentURL != "" {

@@ -142,9 +142,9 @@ func (m *Model) listClick(x, y int) tea.Cmd {
 		// The border carries the pane's tabs; anywhere else on it starts
 		// a resize.
 		if p, _, ok := m.currentPR(); ok {
-			ws := []int{lipgloss.Width(" " + m.diffTabName(p) + " "), lipgloss.Width(" description ")}
+			ws := []int{lipgloss.Width(" overview "), lipgloss.Width(" " + m.diffTabName(p) + " ")}
 			if i := spanAt(ws, 1, x-2); i >= 0 {
-				if mode := []paneMode{paneDiff, paneBody}[i]; mode != m.pane.mode {
+				if mode := []paneMode{paneOverview, paneDiff}[i]; mode != m.pane.mode {
 					m.pane.toggleMode()
 					return m.ensure()
 				}
@@ -154,9 +154,9 @@ func (m *Model) listClick(x, y int) tea.Cmd {
 		m.dragging = true
 		return nil
 	}
-	// In the description pane, a click on a fact opens its page, and one on
+	// In the overview, a click on a fact opens its page, and one on
 	// the header of a part folds it.
-	if top := m.paneTop(l); l.pane > 0 && y > top && m.pane.mode == paneBody {
+	if top := m.paneTop(l); l.pane > 0 && y > top && m.pane.mode == paneOverview {
 		r := y - top - 1
 		if r < len(m.pane.links) {
 			for _, k := range m.pane.links[r] {

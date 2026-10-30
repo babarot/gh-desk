@@ -54,6 +54,7 @@ theme = "latte"
 [refresh]
 interval = "0"
 [preview]
+tab = "diff"
 description = "plain"
 [keys]
 approve = "a"
@@ -66,7 +67,7 @@ language = "Japanese"
 		t.Fatal(err)
 	}
 	if cfg.Log.Level != "debug" || cfg.UI.Theme != "latte" || cfg.RefreshInterval() != 0 || cfg.Claude.Language != "Japanese" ||
-		cfg.Preview.Description != "plain" {
+		cfg.Preview.Tab != "diff" || cfg.Preview.Description != "plain" {
 		t.Errorf("cfg = %+v", cfg)
 	}
 	if got := cfg.Keys["approve"].Keys; len(got) != 1 || got[0] != "a" {

@@ -18,17 +18,17 @@ triage // @me   1 review (3)  2 mine (1)  3 involved (0)  4 inbox (2)           
 
 
 
-╭  diff 1   description  ───────────────────────────────────────────────────────────────────────────────── acme/api#30 · J/K · v ╮
-│ renovate/octo-app → main  carol✓  merge: conflicts                                                                             │
-│ ◆ octo/app minor v0.12.0 → v0.13.2 (pending v0.13.3)                                                                           │
-│ ── deploy.yml  +1 −1                                                                                                           │
-│ @@ -1,1 +1,1 @@                                                                                                                │
-│ -  ref: v0.12.0                                                                                                                │
-│ +  ref: v0.13.2                                                                                                                │
-│                                                                                                                                │
-│                                                                                                                                │
-│                                                                                                                                │
-│                                                                                                                                │
+╭  overview   diff 1  ──────────────────────────────────────────────────────────────────────────────────── acme/api#30 · J/K · v ╮
+│ Update dependency octo/app to v0.13.2  renovate                                           │ status    open                     │
+│ ◆ octo/app minor v0.12.0 → v0.13.2 (pending v0.13.3)                                      │ merge     conflicts                │
+│ ▾ description                                                                             │ reviews   carol✓                   │
+│   Package  │ Update │ Change            │ Pending                                         │ requested me                       │
+│   ─────────┼────────┼───────────────────┼────────                                         │ checks    ✗                        │
+│   octo/app │ minor  │ v0.12.0 → v0.13.2 │ v0.13.3                                         │ size      +1 −1 · 1 files          │
+│                                                                                           │ branch    renovate/octo-app        │
+│                                                                                           │           → main                   │
+│                                                                                           │ updated   20m ago                  │
+│                                                                                           │                                    │
 ╰────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
                                                                                                                                   
 y yes · f include failing · esc back                                                                                              

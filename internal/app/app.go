@@ -276,7 +276,7 @@ func settings(cfg config.File) tui.Settings {
 		HomeOwners: cfg.UI.HomeOwners, StaleDays: cfg.UI.StaleDays, PreviewHeight: cfg.Preview.Height,
 		Collapse: cfg.Diff.Collapse, Theme: cfg.UI.Theme, Editor: cmp.Or(os.Getenv("VISUAL"), os.Getenv("EDITOR")),
 		Refresh: cfg.RefreshInterval(), ReleaseNotes: cfg.Claude.ReleaseNotesCheck, Language: cfg.Claude.Language,
-		PlainDescription: cfg.Preview.Description == "plain",
+		OpenOnDiff: cfg.Preview.Tab == "diff", PlainDescription: cfg.Preview.Description == "plain",
 		Plan: plan.Settings{AutoMerge: cfg.Merge.AutoMerge, UpdateBranch: cfg.Merge.UpdateBranch,
 			ApprovalChecks: cfg.UI.ApprovalChecks, AttentionPaths: cfg.Bulk.AttentionPaths},
 	}

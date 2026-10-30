@@ -363,10 +363,21 @@ func TestReviewTab(t *testing.T) {
 	golden(t, "review-bots", screen(m))
 }
 
-func TestPreviewDescription(t *testing.T) {
+func TestPreviewDiff(t *testing.T) {
 	m := start(t, fixture(), keymap.Default())
 	press(m, "v")
-	golden(t, "preview-description", screen(m))
+	golden(t, "preview-diff", screen(m))
+}
+
+func TestPreviewOpensOnDiff(t *testing.T) {
+	set := testSettings()
+	set.OpenOnDiff = true
+	m := New(fixture(), &fakeRunner{results: map[model.PRKey]runner.Event{}}, &fakeClaude{}, keymap.Default(), nil, set)
+	m.Update(tea.WindowSizeMsg{Width: 130, Height: 34})
+	run(m, m.Init())
+	if m.pane.mode != paneDiff {
+		t.Fatalf("mode = %v; want the diff", m.pane.mode)
+	}
 }
 
 func TestPRScreen(t *testing.T) {
