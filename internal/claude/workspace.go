@@ -197,9 +197,10 @@ func (w *Workspace) Remove(ctx context.Context, k model.PRKey) error {
 
 // git runs git in dir. It asks gh for credentials, so a private repository
 // is read with the account gh is signed in with, whatever git is set up
-// to use.
+// to use. It runs no hooks: with a relative core.hooksPath in the user's
+// config, a checkout would run hooks the pull request adds.
 func git(ctx context.Context, dir string, args ...string) (string, error) {
-	full := append([]string{"-c", "credential.helper=", "-c", "credential.helper=!gh auth git-credential"}, args...)
+	full := append([]string{"-c", "core.hooksPath=/dev/null", "-c", "credential.helper=", "-c", "credential.helper=!gh auth git-credential"}, args...)
 	cmd := exec.CommandContext(ctx, "git", full...)
 	cmd.Dir = dir
 	cmd.Env = append(os.Environ(), "GIT_TERMINAL_PROMPT=0")

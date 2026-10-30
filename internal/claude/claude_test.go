@@ -255,3 +255,33 @@ func TestWorkspaceBorrows(t *testing.T) {
 		t.Errorf("a worktree was added to the user's clone: %s", out)
 	}
 }
+
+// A hook the pull request adds never runs, even when the user's config
+// points core.hooksPath into the checkout.
+func TestWorkspaceRunsNoHooks(t *testing.T) {
+	src, _ := origin(t)
+	gitRun(t, src, "checkout", "-q", "feature")
+	os.MkdirAll(filepath.Join(src, ".githooks"), 0o755)
+	ran := filepath.Join(t.TempDir(), "ran")
+	os.WriteFile(filepath.Join(src, ".githooks", "post-checkout"), []byte("#!/bin/sh\ntouch "+ran+"\n"), 0o755)
+	gitRun(t, src, "add", ".")
+	gitRun(t, src, "commit", "-qm", "hook")
+	head := gitRun(t, src, "rev-parse", "HEAD")
+	gitRun(t, src, "update-ref", "refs/pull/1/head", head)
+	gitRun(t, src, "checkout", "-q", "main")
+
+	global := filepath.Join(t.TempDir(), "gitconfig")
+	os.WriteFile(global, []byte("[core]\n\thooksPath = .githooks\n"), 0o644)
+	t.Setenv("GIT_CONFIG_GLOBAL", global)
+	w := &Workspace{Dir: t.TempDir(), Log: logging.Discard(), Remote: func(string, string) string { return "file://" + src }}
+	k := model.PRKey{Owner: "acme", Repo: "api", Number: 1}
+	if _, err := w.Prepare(context.Background(), k, head); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := w.Prepare(context.Background(), k, head); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(ran); err == nil {
+		t.Error("a hook from the pull request ran")
+	}
+}
