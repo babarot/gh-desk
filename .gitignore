@@ -1,3 +1,4 @@
 /gh-triage
 /.claude/worktrees/
 /dist/
+coverage.out
