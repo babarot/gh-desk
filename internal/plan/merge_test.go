@@ -144,3 +144,11 @@ func TestChecksRunningAndAwaitingApproval(t *testing.T) {
 		t.Error("a running build was missed")
 	}
 }
+
+func TestCancelledRequiredCheckFails(t *testing.T) {
+	mi := info(model.MergeBlocked)
+	mi.Checks = []model.Check{{Name: "test", State: "CANCELLED", Required: true}}
+	if !Failing(mi) {
+		t.Error("a cancelled required check is not failing")
+	}
+}

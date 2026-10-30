@@ -368,6 +368,13 @@ func (m *Model) handleData(msg tea.Msg) tea.Cmd {
 			t.prs, t.warnings = safePRs(msg.prs), msg.warnings
 			m.restoreCursor(t)
 		}
+		// What was read of a pull request's checks is for its head; a new
+		// push makes it stale.
+		for _, p := range msg.prs {
+			if mi, ok := m.cache.info[p.Key]; ok && mi.HeadOID != p.HeadOID {
+				delete(m.cache.info, p.Key)
+			}
+		}
 		m.refreshed[msg.tab] = m.set.Now()
 		if msg.next != "" && len(t.prs) < t.limit {
 			return tea.Batch(m.ensure(), m.searchPage(msg.tab, msg.gen, msg.next, true))

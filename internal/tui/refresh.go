@@ -32,6 +32,8 @@ func (m *Model) autoRefresh() tea.Cmd {
 // refresh is R: read the shown tab and the notifications again, and put
 // away the results on the rows.
 func (m *Model) refresh() tea.Cmd {
+	// Checks read for ◌ and the preview's merge line may have moved on.
+	clear(m.cache.info)
 	n := m.clearResults()
 	if n > 0 {
 		m.setStatus(fmt.Sprintf("refreshing · %d results cleared", n), false)

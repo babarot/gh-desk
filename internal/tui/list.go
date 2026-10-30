@@ -174,6 +174,11 @@ func (m *Model) listKey(k string) tea.Cmd {
 func (m *Model) switchTab(i int) tea.Cmd {
 	m.cur = (i + len(m.tabs)) % len(m.tabs)
 	m.pane.scroll = 0
+	// A tab not read for longer than the refresh interval is read again
+	// when it is opened.
+	if at, ok := m.refreshed[m.cur]; ok && m.set.Refresh > 0 && m.set.Now().Sub(at) > m.set.Refresh && !m.tab().loading {
+		return tea.Batch(m.ensure(), m.loadTab(m.cur))
+	}
 	return m.ensure()
 }
 

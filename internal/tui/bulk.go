@@ -32,12 +32,14 @@ type bulkItem struct {
 	// moved is set when the head is not the one the list read, so the
 	// diff the user looked at is not what would be approved or merged.
 	moved bool
+	// running is set when another batch is still working on it.
+	running bool
 }
 
 // goes reports whether the item is acted on.
 func (it bulkItem) goes(kind runner.Kind) bool {
 	switch {
-	case !it.ok || it.moved:
+	case !it.ok || it.moved || it.running:
 		return false
 	case kind == runner.Approve:
 		return it.d.Approve
@@ -51,6 +53,8 @@ func (it bulkItem) why() string {
 		return "could not read it"
 	case it.moved:
 		return "changed since it was read · R to read again"
+	case it.running:
+		return "already running"
 	}
 	return it.d.Reason
 }
@@ -89,7 +93,8 @@ func (m *Model) startBulk(kind runner.Kind) tea.Cmd {
 	b := &bulk{kind: kind, loading: true}
 	var ids []string
 	for _, p := range prs {
-		b.items = append(b.items, bulkItem{pr: p})
+		pg, inBatch := m.progress[p.Key]
+		b.items = append(b.items, bulkItem{pr: p, running: inBatch && pg.result == runner.Running})
 		if p.ID != "" {
 			ids = append(ids, p.ID)
 		}

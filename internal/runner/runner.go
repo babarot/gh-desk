@@ -247,6 +247,8 @@ func (j *job) approveOnly() {
 	if !ok {
 		return
 	}
+	// Failing checks are let through here: the popup already left them out
+	// unless the user asked to include them.
 	d := plan.ForApprove(mi, j.it.PR, j.r.opt.Viewer, true, j.r.opt.Settings)
 	if !d.Approve {
 		j.say(Skipped, d.Reason)
@@ -405,6 +407,11 @@ func (j *job) watch() {
 			return
 		case mi.MergeState == model.MergeDirty:
 			say(Stopped, "auto-merge stuck: conflicts")
+			return
+		case mi.MergeState == model.MergeBehind:
+			// GitHub's auto-merge does not update a branch; one that must
+			// be up to date waits forever.
+			say(Stopped, "auto-merge stuck: behind its base")
 			return
 		}
 	}

@@ -535,3 +535,16 @@ func TestNotificationsJump(t *testing.T) {
 		t.Errorf("cursor on %+v", r.pr.Key)
 	}
 }
+
+func TestRunningIsNotStartedAgain(t *testing.T) {
+	m, r := startWith(t, fixture(), keymap.Default())
+	m.progress[key("acme", "api", 12)] = progress{text: "waiting for checks", result: runner.Running}
+	press(m, "M")
+	if !strings.Contains(screen(m), "already running") {
+		t.Errorf("popup does not say it is running:\n%s", screen(m))
+	}
+	press(m, "y")
+	if len(r.items) != 0 {
+		t.Errorf("started again: %+v", r.items)
+	}
+}
