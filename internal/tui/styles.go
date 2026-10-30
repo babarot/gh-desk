@@ -2,6 +2,7 @@ package tui
 
 import (
 	"image/color"
+	"strings"
 
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
@@ -76,6 +77,20 @@ func newStyles(p palette) styles {
 		tabPillOff: fg(p.overlay),
 		me:         fg(p.peach).Bold(true),
 	}
+}
+
+// onBackground draws a line whose parts are already colored on the
+// background of bg, w cells wide. Each part ends with a reset, which would
+// also end a background put around the whole line, so the background is
+// set again after every reset.
+func onBackground(line string, bg lipgloss.Style, w int) string {
+	probe := bg.Render("\x00")
+	set := probe[:strings.IndexByte(probe, 0)]
+	line = fit(line, w)
+	for _, reset := range []string{"\x1b[0m", "\x1b[m"} {
+		line = strings.ReplaceAll(line, reset, reset+set)
+	}
+	return set + line + "\x1b[m"
 }
 
 // fit cuts s to w cells, with … when it is cut, and pads it to w.

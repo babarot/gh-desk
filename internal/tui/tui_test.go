@@ -389,3 +389,23 @@ func TestFailedDoneComesBack(t *testing.T) {
 		t.Error("its unread mark did not come back")
 	}
 }
+
+// The cursor's row keeps its background behind every colored cell.
+func TestCursorRowBackground(t *testing.T) {
+	m := start(t, fixture(), keymap.Default())
+	probe := m.st.sel.Render("\x00")
+	set := probe[:strings.IndexByte(probe, 0)]
+	for _, l := range strings.Split(m.render(), "\n") {
+		if !strings.Contains(ansi.Strip(l), "▎ ● api#12") {
+			continue
+		}
+		parts := strings.Split(l, "\x1b[m")
+		for _, p := range parts[:len(parts)-1] {
+			if !strings.HasPrefix(p, set) && !strings.Contains(p, set) {
+				t.Fatalf("a part of the cursor's row lost the background: %q", p)
+			}
+		}
+		return
+	}
+	t.Fatal("cursor row not found")
+}

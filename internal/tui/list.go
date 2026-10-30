@@ -307,7 +307,7 @@ func (m *Model) renderRow(r row, cols []column, sel bool) string {
 		}
 		line := cursor + " " + arrow + " " + m.st.group.Render(groupLabel[r.group]) + " " + m.st.dim.Render(fmt.Sprint(r.count))
 		if sel {
-			return m.st.sel.Render(fit(line, m.width))
+			return onBackground(line, m.st.sel, m.width)
 		}
 		return line
 	}
@@ -321,7 +321,7 @@ func (m *Model) renderRow(r row, cols []column, sel bool) string {
 	}
 	line := strings.Join(cells, "  ")
 	if sel {
-		return m.st.sel.Render(fit(line, m.width))
+		return onBackground(line, m.st.sel, m.width)
 	}
 	return line
 }
