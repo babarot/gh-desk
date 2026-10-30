@@ -83,6 +83,8 @@ var Defaults = []Def{
 	{"pane_tab", ScopeList, []string{"v"}, "diff / description"},
 	{"unfold", ScopeList, []string{"z"}, "unfold lock files"},
 	{"toggle_pane", ScopeList, []string{"p"}, "preview pane"},
+	{"pane_grow", ScopeList, []string{"+"}, "taller pane"},
+	{"pane_shrink", ScopeList, []string{"-"}, "shorter pane"},
 
 	{"pr_prev_tab", ScopePR, []string{"h", "left"}, "previous tab"},
 	{"pr_next_tab", ScopePR, []string{"l", "right"}, "next tab"},

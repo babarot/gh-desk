@@ -12,7 +12,7 @@ gh-triage is split into packages by layer. A package imports only packages of lo
 | 1 | `internal/plan` | Deciding how to merge each pull request; selection rules | `model` | - |
 | 1 | `internal/diff` | Reading patches and the words that changed | - | - |
 | 2 | `internal/github` | GitHub's GraphQL and REST APIs | `model`, `logging` | `github.com/cli/go-gh/v2` |
-| 2 | `internal/state` | The pending-merge record and its lock | `model`, `logging` | - |
+| 2 | `internal/state` | The pending-merge record and its lock; the screen layout kept between launches | `model`, `logging` | - |
 | 2 | `internal/claude` | Running claude -p and the pull request worktrees | `model`, `logging` | - |
 | 2 | `internal/listcache` | The lists last read, kept on disk for the next launch | `model` | - |
 | 3 | `internal/runner` | Bulk approve and merge, auto-merge watching, resuming | `model`, `logging`, `plan` | - |
@@ -32,7 +32,7 @@ Standard library packages that reach outside the process:
 
 ## Rules
 
-- Each part of the outside world has one package. The network is `internal/github`, the `claude` command and `git` are `internal/claude`, the pending-merge record and its lock are `internal/state`, and the terminal is `internal/tui`. The standard library packages that reach outside the process are limited to them in the table above; besides `internal/claude`, `os/exec` is allowed in `internal/github` to open the browser and in `internal/tui` to open `$EDITOR`.
+- Each part of the outside world has one package. The network is `internal/github`, the `claude` command and `git` are `internal/claude`, the pending-merge record and its lock and the screen layout kept between launches are `internal/state`, and the terminal is `internal/tui`. The standard library packages that reach outside the process are limited to them in the table above; besides `internal/claude`, `os/exec` is allowed in `internal/github` to open the browser and in `internal/tui` to open `$EDITOR`.
 - `internal/runner` does not import Bubble Tea. It reports progress as events of its own type; `internal/tui` turns them into messages. This keeps the bulk approve and merge logic testable without a terminal.
 - Interfaces are defined where they are used. `internal/runner` defines the GitHub operations it needs, and `internal/tui` the ones it needs (fetching lists, a diff, a single review, a notification done, the Claude conversation); `internal/app` passes the concrete clients. `internal/github` and `internal/claude` return concrete types.
 - `internal/config` returns plain values. It hands `internal/plan`, `internal/keymap` and `internal/tui` the settings as `internal/model` types or basic Go types, and leaves checks that need another package's knowledge (a log level, a key) to that package, reported as `config.Problem` so every mistake is still shown where it is in the file.

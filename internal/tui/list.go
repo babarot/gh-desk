@@ -20,17 +20,7 @@ func (m *Model) listKey(k string) tea.Cmd {
 	t := m.tab()
 	rs := m.rows(t)
 	is := func(a keymap.Action) bool { return m.keys.Matches(a, k) }
-	move := func(to int) tea.Cmd {
-		if len(rs) == 0 {
-			return nil
-		}
-		to = min(max(to, 0), len(rs)-1)
-		if to != t.sel {
-			t.sel = to
-			m.pane.scroll = 0
-		}
-		return m.ensure()
-	}
+	move := m.moveTo
 	switch {
 	case is("quit"):
 		return tea.Quit
@@ -101,6 +91,10 @@ func (m *Model) listKey(k string) tea.Cmd {
 		}
 	case is("toggle_pane"):
 		m.pane.on = !m.pane.on
+	case is("pane_grow"):
+		return m.resizePane(m.pane.height + 1)
+	case is("pane_shrink"):
+		return m.resizePane(m.pane.height - 1)
 	case is("pane_tab"):
 		m.pane.toggleMode()
 		return m.ensure()
@@ -121,10 +115,11 @@ func (m *Model) listKey(k string) tea.Cmd {
 	if !ok {
 		return nil
 	}
+	if is("open") {
+		return m.openRow(r)
+	}
 	if r.kind == rowGroup {
 		switch {
-		case is("open"):
-			t.folded[r.group] = !t.folded[r.group]
 		case is("select"):
 			// A group's header selects every pull request in it, or clears
 			// them when all are selected.
@@ -157,8 +152,6 @@ func (m *Model) listKey(k string) tea.Cmd {
 			m.selected[p.Key] = true
 		}
 		return move(t.sel + 1)
-	case is("open"):
-		return m.openPR(p)
 	case is("approve"):
 		return m.askApprove(p)
 	case is("comment"):
@@ -173,6 +166,30 @@ func (m *Model) listKey(k string) tea.Cmd {
 		return m.hide(p, r.notif)
 	}
 	return nil
+}
+
+// moveTo puts the cursor on row to of the tab shown.
+func (m *Model) moveTo(to int) tea.Cmd {
+	t := m.tab()
+	rs := m.rows(t)
+	if len(rs) == 0 {
+		return nil
+	}
+	to = min(max(to, 0), len(rs)-1)
+	if to != t.sel {
+		t.sel = to
+		m.pane.scroll = 0
+	}
+	return m.ensure()
+}
+
+// openRow opens a pull request, or folds or unfolds a group.
+func (m *Model) openRow(r row) tea.Cmd {
+	if r.kind == rowGroup {
+		m.tab().folded[r.group] = !m.tab().folded[r.group]
+		return nil
+	}
+	return m.openPR(r.pr)
 }
 
 func (m *Model) switchTab(i int) tea.Cmd {
@@ -243,8 +260,8 @@ func (m *Model) layout() layout {
 		rest--
 	}
 	pane := 0
-	if m.pane.on && m.set.PreviewHeight > 0 {
-		pane = m.set.PreviewHeight + 2
+	if m.pane.on && m.pane.height > 0 {
+		pane = m.pane.height + 2
 		// The list keeps at least a third of the lines; the pane shrinks
 		// first, and goes when it would show fewer than six.
 		if rest-pane < rest/3 {

@@ -128,6 +128,13 @@ func Run(args []string, stdout, stderr io.Writer) int {
 	if !*noCache {
 		set.Lists = openLists(cfg, viewer, log)
 	}
+	layout := state.OpenLayout(state.DefaultDir())
+	set.Layout = layout
+	if h, err := layout.PreviewHeight(); err != nil {
+		log.Warn("could not read the pane's height last set", "err", err.Error())
+	} else {
+		set.PaneHeight = h
+	}
 	// One gh-triage at a time keeps the record of merges it waits for;
 	// another one runs without waiting merges.
 	store, err := state.Open(state.DefaultDir())

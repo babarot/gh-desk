@@ -15,6 +15,8 @@ import (
 func (m *Model) View() tea.View {
 	v := tea.NewView(m.render())
 	v.AltScreen = true
+	// Clicks, the wheel, and dragging the pane's edge; see mouse.go.
+	v.MouseMode = tea.MouseModeCellMotion
 	return v
 }
 
@@ -96,31 +98,40 @@ func overlay(lines, popup []string, top, width int) []string {
 }
 
 func (m *Model) renderHeader() string {
-	st := m.st
 	var tabs []string
-	for i, t := range m.tabs {
-		count := "…"
-		switch {
-		case !m.tabDone(t):
-			count = m.spinner()
-		case t.inbox && t.loaded:
-			count = fmt.Sprint(len(m.unread))
-		case t.loaded && t.err == nil:
-			count = fmt.Sprint(t.total)
-		case t.err != nil:
-			count = "!"
-		}
-		label := fmt.Sprintf("%d %s %s", i+1, t.name, count)
-		if i == m.cur {
-			tabs = append(tabs, st.tabOn.Render(label))
-		} else {
-			tabs = append(tabs, st.tabOff.Render(label))
-		}
+	for i := range m.tabs {
+		tabs = append(tabs, m.tabLabel(i))
 	}
-	left := st.app.Render("triage") + st.dim.Render(" // "+m.viewer) + "   " + strings.Join(tabs, "  ")
+	left := m.headerLead() + strings.Join(tabs, "  ")
 	right := m.headerRight()
 	gap := m.width - lipgloss.Width(left) - lipgloss.Width(right) - 1
-	return st.header.Render(fit(left+spaces(gap)+right, m.width))
+	return m.st.header.Render(fit(left+spaces(gap)+right, m.width))
+}
+
+// headerLead is what the header shows before the tabs.
+func (m *Model) headerLead() string {
+	return m.st.app.Render("triage") + m.st.dim.Render(" // "+m.viewer) + "   "
+}
+
+// tabLabel is tab i as the header shows it.
+func (m *Model) tabLabel(i int) string {
+	t := m.tabs[i]
+	count := "…"
+	switch {
+	case !m.tabDone(t):
+		count = m.spinner()
+	case t.inbox && t.loaded:
+		count = fmt.Sprint(len(m.unread))
+	case t.loaded && t.err == nil:
+		count = fmt.Sprint(t.total)
+	case t.err != nil:
+		count = "!"
+	}
+	label := fmt.Sprintf("%d %s %s", i+1, t.name, count)
+	if i == m.cur {
+		return m.st.tabOn.Render(label)
+	}
+	return m.st.tabOff.Render(label)
 }
 
 func (m *Model) headerRight() string {
@@ -169,7 +180,7 @@ var ready = map[keymap.Action]bool{
 	"notifications": true, "select": true, "select_shown": true, "clear_selection": true, "merge": true, "pr_merge": true,
 	"include_failing": true, "choose": true, "select_rule": true,
 	"toggle_bots": true, "show_closed": true, "filter": true,
-	"pane_down": true, "pane_up": true, "next_file": true, "prev_file": true, "pane_tab": true, "unfold": true, "toggle_pane": true,
+	"pane_down": true, "pane_up": true, "pane_grow": true, "pane_shrink": true, "next_file": true, "prev_file": true, "pane_tab": true, "unfold": true, "toggle_pane": true,
 	"pr_prev_tab": true, "pr_next_tab": true, "pr_approve": true, "pr_comment": true, "pr_request_changes": true, "pr_browse": true,
 	"confirm": true, "next_kind": true, "post": true, "editor": true, "accept": true, "erase": true,
 	"claude": true, "pr_claude": true, "ask_more": true, "draft_review": true, "open_claude": true, "chat_approve": true,
@@ -244,7 +255,11 @@ func (m *Model) renderHelp() []string {
 		}
 	}
 	lines = append(lines, st.group.Render("fixed"), "  "+fit(st.key.Render(keymap.Interrupt), 16)+st.muted.Render("quit"),
-		"  "+fit(st.key.Render(keymap.Back), 16)+st.muted.Render("back"))
+		"  "+fit(st.key.Render(keymap.Back), 16)+st.muted.Render("back"),
+		st.group.Render("mouse"), "  "+fit(st.key.Render("click"), 16)+st.muted.Render("tab, row, pane tab"),
+		"  "+fit(st.key.Render("double click"), 16)+st.muted.Render("open"),
+		"  "+fit(st.key.Render("wheel"), 16)+st.muted.Render("scroll"),
+		"  "+fit(st.key.Render("drag"), 16)+st.muted.Render("the pane's top edge to resize it"))
 	maxLines := max(m.height-3, 5)
 	if len(lines) > maxLines {
 		lines = append(lines[:maxLines-1], st.dim.Render("  …"))

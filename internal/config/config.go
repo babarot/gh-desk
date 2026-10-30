@@ -73,7 +73,9 @@ type Inbox struct {
 
 // Preview configures the pane under the list.
 type Preview struct {
-	// Height is the pane's lines; 0 hides it until it is toggled.
+	// Height is the pane's lines; 0 hides it until it is toggled. A height
+	// set with the mouse or keys is kept in the state directory and takes
+	// its place.
 	Height int `toml:"height"`
 }
 
@@ -320,7 +322,8 @@ func Template(keys string) string {
 
 [preview]
 # Lines of the preview pane under the list; 0 hides it until it is shown
-# with a key.
+# with a key. Dragging the pane's top edge, or + and -, changes them, and
+# the lines set that way are kept over this one.
 # height = 14
 
 [diff]

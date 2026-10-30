@@ -30,7 +30,7 @@ var layers = []layer{
 	{"internal/plan", 1, []string{"model"}, nil, "Deciding how to merge each pull request; selection rules"},
 	{"internal/diff", 1, nil, nil, "Reading patches and the words that changed"},
 	{"internal/github", 2, []string{"model", "logging"}, []string{"github.com/cli/go-gh/v2"}, "GitHub's GraphQL and REST APIs"},
-	{"internal/state", 2, []string{"model", "logging"}, nil, "The pending-merge record and its lock"},
+	{"internal/state", 2, []string{"model", "logging"}, nil, "The pending-merge record and its lock; the screen layout kept between launches"},
 	{"internal/claude", 2, []string{"model", "logging"}, nil, "Running claude -p and the pull request worktrees"},
 	{"internal/listcache", 2, []string{"model"}, nil, "The lists last read, kept on disk for the next launch"},
 	{"internal/runner", 3, []string{"model", "logging", "plan"}, nil, "Bulk approve and merge, auto-merge watching, resuming"},

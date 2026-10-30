@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 
 	"github.com/babarot/gh-triage/internal/keymap"
 	"github.com/babarot/gh-triage/internal/model"
@@ -67,6 +68,27 @@ func (m *Model) prKey(k string) tea.Cmd {
 	return nil
 }
 
+// prTabLabels are the PR screen's tabs as it shows them.
+func (m *Model) prTabLabels() []string {
+	var tabs []string
+	for i, t := range prTabs {
+		if i == m.prv.tab {
+			tabs = append(tabs, m.st.tabOn.Render(t))
+		} else {
+			tabs = append(tabs, m.st.tabOff.Render(t))
+		}
+	}
+	return tabs
+}
+
+func (m *Model) prTabWidths() []int {
+	var ws []int
+	for _, t := range m.prTabLabels() {
+		ws = append(ws, lipgloss.Width(t))
+	}
+	return ws
+}
+
 func (m *Model) renderPR(b *strings.Builder, height int) {
 	st := m.st
 	p, ok := m.knownPR(m.prv.key)
@@ -77,15 +99,7 @@ func (m *Model) renderPR(b *strings.Builder, height int) {
 	head := st.bold.Render(p.Title) + "  " + st.muted.Render(fmt.Sprintf("%s · %s → %s", p.Author, p.HeadRef, p.BaseRef)) +
 		"  " + m.heavyMarks(p)
 	b.WriteString(fit(head, m.width) + "\n")
-	var tabs []string
-	for i, t := range prTabs {
-		if i == m.prv.tab {
-			tabs = append(tabs, st.tabOn.Render(t))
-		} else {
-			tabs = append(tabs, st.tabOff.Render(t))
-		}
-	}
-	b.WriteString(strings.Join(tabs, "   ") + "\n")
+	b.WriteString(strings.Join(m.prTabLabels(), "   ") + "\n")
 	b.WriteString(st.border.Render(strings.Repeat("╌", max(m.width, 0))) + "\n")
 	ls := m.prLines(p)
 	rest := max(height-3, 1)

@@ -42,3 +42,17 @@ func TestStore(t *testing.T) {
 	}
 	s2.Close()
 }
+
+func TestLayout(t *testing.T) {
+	dir := t.TempDir()
+	l := OpenLayout(dir)
+	if h, err := l.PreviewHeight(); err != nil || h != 0 {
+		t.Fatalf("PreviewHeight before any = %d, %v; want 0, nil", h, err)
+	}
+	if err := l.SavePreviewHeight(20); err != nil {
+		t.Fatal(err)
+	}
+	if h, err := OpenLayout(dir).PreviewHeight(); err != nil || h != 20 {
+		t.Fatalf("PreviewHeight = %d, %v; want 20, nil", h, err)
+	}
+}

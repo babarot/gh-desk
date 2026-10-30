@@ -1,0 +1,139 @@
+package tui
+
+import (
+	"strings"
+	"testing"
+
+	tea "charm.land/bubbletea/v2"
+
+	"github.com/babarot/gh-triage/internal/keymap"
+)
+
+func mouseAt(m *Model, msg tea.Msg) {
+	_, cmd := m.Update(msg)
+	run(m, cmd)
+}
+
+// lineOf is the first line of the screen that has s, and where s starts
+// in it.
+func lineOf(t *testing.T, m *Model, s string) (x, y int) {
+	t.Helper()
+	for y, l := range strings.Split(screen(m), "\n") {
+		if i := strings.Index(l, s); i >= 0 {
+			return len([]rune(l[:i])), y
+		}
+	}
+	t.Fatalf("%q is not on the screen:\n%s", s, screen(m))
+	return 0, 0
+}
+
+func TestClickTab(t *testing.T) {
+	m := start(t, fixture(), keymap.Default())
+	x, y := lineOf(t, m, "3 involved")
+	mouseAt(m, tea.MouseClickMsg{X: x + 2, Y: y, Button: tea.MouseLeft})
+	if m.cur != 2 {
+		t.Fatalf("tab = %d, want 2", m.cur)
+	}
+}
+
+func TestClickRowAndDoubleClick(t *testing.T) {
+	m := start(t, fixture(), keymap.Default())
+	x, y := lineOf(t, m, "▸ via team")
+	mouseAt(m, tea.MouseClickMsg{X: x, Y: y, Button: tea.MouseLeft})
+	if r, _ := m.current(); r.kind != rowGroup {
+		t.Fatalf("row = %+v, want the via team group", r)
+	}
+	// A second click on the row unfolds the group.
+	mouseAt(m, tea.MouseClickMsg{X: x, Y: y, Button: tea.MouseLeft})
+	if !strings.Contains(screen(m), "settings") {
+		t.Fatalf("via team did not unfold:\n%s", screen(m))
+	}
+
+	x, y = lineOf(t, m, "api#12")
+	mouseAt(m, tea.MouseClickMsg{X: x, Y: y, Button: tea.MouseLeft})
+	if m.view != viewList {
+		t.Fatal("a single click opened the pull request")
+	}
+	mouseAt(m, tea.MouseClickMsg{X: x, Y: y, Button: tea.MouseLeft})
+	if m.view != viewPR || m.prv.key != key("acme", "api", 12) {
+		t.Fatalf("view = %v, key = %v; want acme/api#12 opened", m.view, m.prv.key)
+	}
+}
+
+func TestClickPaneTab(t *testing.T) {
+	m := start(t, fixture(), keymap.Default())
+	x, y := lineOf(t, m, "description")
+	mouseAt(m, tea.MouseClickMsg{X: x, Y: y, Button: tea.MouseLeft})
+	if m.pane.mode != paneBody || m.dragging {
+		t.Fatalf("mode = %v, dragging = %v; want the description", m.pane.mode, m.dragging)
+	}
+}
+
+type fakeLayout struct{ saved []int }
+
+func (f *fakeLayout) SavePreviewHeight(h int) error {
+	f.saved = append(f.saved, h)
+	return nil
+}
+
+func TestDragPane(t *testing.T) {
+	lay := &fakeLayout{}
+	set := testSettings()
+	set.Layout = lay
+	m := New(fixture(), &fakeRunner{}, &fakeClaude{}, keymap.Default(), nil, set)
+	m.Update(tea.WindowSizeMsg{Width: 130, Height: 34})
+	run(m, m.Init())
+
+	_, y := lineOf(t, m, "╭")
+	mouseAt(m, tea.MouseClickMsg{X: 60, Y: y, Button: tea.MouseLeft})
+	mouseAt(m, tea.MouseMotionMsg{X: 60, Y: y - 4, Button: tea.MouseLeft})
+	mouseAt(m, tea.MouseReleaseMsg{X: 60, Y: y - 4, Button: tea.MouseLeft})
+	if m.pane.height != 14 || len(lay.saved) != 1 || lay.saved[0] != 14 {
+		t.Fatalf("height = %d, saved = %v; want 14 kept", m.pane.height, lay.saved)
+	}
+	if _, top := lineOf(t, m, "╭"); top != y-4 {
+		t.Fatalf("the pane's top is on line %d, want %d", top, y-4)
+	}
+	// The list keeps a third of the lines however far it is dragged.
+	mouseAt(m, tea.MouseClickMsg{X: 60, Y: y - 4, Button: tea.MouseLeft})
+	mouseAt(m, tea.MouseMotionMsg{X: 60, Y: 0, Button: tea.MouseLeft})
+	mouseAt(m, tea.MouseReleaseMsg{X: 60, Y: 0, Button: tea.MouseLeft})
+	if l := m.layout(); l.list < (l.list+l.pane)/3 {
+		t.Fatalf("layout = %+v; the list has less than a third", l)
+	}
+
+	press(m, "-")
+	if got := lay.saved[len(lay.saved)-1]; got != m.pane.height {
+		t.Fatalf("saved %d after -, height is %d", got, m.pane.height)
+	}
+}
+
+func TestWheel(t *testing.T) {
+	m := start(t, fixture(), keymap.Default())
+	sel := m.tab().sel
+	mouseAt(m, tea.MouseWheelMsg{X: 10, Y: 3, Button: tea.MouseWheelDown})
+	if m.tab().sel != sel+1 {
+		t.Fatalf("sel = %d, want %d", m.tab().sel, sel+1)
+	}
+	mouseAt(m, tea.MouseWheelMsg{X: 10, Y: 3, Button: tea.MouseWheelUp})
+	_, y := lineOf(t, m, "╭")
+	mouseAt(m, tea.MouseWheelMsg{X: 10, Y: y + 2, Button: tea.MouseWheelDown})
+	if m.tab().sel != sel || m.pane.scroll != wheelLines {
+		t.Fatalf("sel = %d, pane scroll = %d; want %d, %d", m.tab().sel, m.pane.scroll, sel, wheelLines)
+	}
+}
+
+func TestMouseLeavesPopupsAlone(t *testing.T) {
+	m := start(t, fixture(), keymap.Default())
+	press(m, "S")
+	if m.picker == nil {
+		t.Fatal("S did not open the picker")
+	}
+	sel := m.tab().sel
+	x, y := lineOf(t, m, "3 involved")
+	mouseAt(m, tea.MouseClickMsg{X: x + 2, Y: y, Button: tea.MouseLeft})
+	mouseAt(m, tea.MouseWheelMsg{X: 10, Y: 3, Button: tea.MouseWheelDown})
+	if m.cur != 0 || m.tab().sel != sel || m.picker == nil {
+		t.Fatalf("tab = %d, sel = %d, picker = %v; the click went through the popup", m.cur, m.tab().sel, m.picker)
+	}
+}

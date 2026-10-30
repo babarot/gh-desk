@@ -23,7 +23,9 @@ const (
 // pane is the preview pane under the list: the diff or the description of
 // the pull request under the cursor.
 type pane struct {
-	on     bool
+	on bool
+	// height is the pane's lines, borders left out.
+	height int
 	mode   paneMode
 	scroll int
 	unfold map[model.PRKey]bool
@@ -228,10 +230,7 @@ func (m *Model) renderPane(b *strings.Builder, height int) {
 		if e != nil && !e.loading && e.err == nil {
 			files = e.val
 		}
-		diffTab := "diff"
-		if files != nil {
-			diffTab = fmt.Sprintf("diff %d", len(files))
-		}
+		diffTab := m.diffTabName(p)
 		pill := func(s string, on bool) string {
 			if on {
 				return st.tabPill.Render(" " + s + " ")
@@ -254,6 +253,16 @@ func (m *Model) renderPane(b *strings.Builder, height int) {
 		b.WriteString(st.border.Render("│ ") + fit(s, inner) + st.border.Render(" │") + "\n")
 	}
 	b.WriteString(st.border.Render("╰"+strings.Repeat("─", max(m.width-2, 0))+"╯") + "\n")
+}
+
+// diffTabName is the name of the pane's diff tab, with the count of files
+// once they are read.
+func (m *Model) diffTabName(p model.PR) string {
+	e := m.cache.diffs[diffID(p)]
+	if e == nil || e.loading || e.err != nil {
+		return "diff"
+	}
+	return fmt.Sprintf("diff %d", len(e.val))
 }
 
 // paneBody is the pane's lines: what the columns do not say, why the

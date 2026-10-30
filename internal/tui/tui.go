@@ -4,6 +4,7 @@
 package tui
 
 import (
+	"cmp"
 	"context"
 	"log/slog"
 	"time"
@@ -45,6 +46,12 @@ type Source interface {
 	Heavy(ctx context.Context, ids []string) (map[string]model.Heavy, error)
 }
 
+// Layout keeps how the screen was left, for the next launch. The app
+// package passes the state package's Layout.
+type Layout interface {
+	SavePreviewHeight(h int) error
+}
+
 // Runner approves and merges batches of pull requests.
 type Runner interface {
 	Start(ctx context.Context, kind runner.Kind, items []runner.Item) (string, <-chan runner.Event)
@@ -70,8 +77,16 @@ type Settings struct {
 	DoneAfterReview bool
 	HomeOwners      []string
 	StaleDays       int
-	PreviewHeight   int
-	Collapse        []string
+	// PreviewHeight is the preview pane's lines from the config file; 0
+	// hides it until it is toggled.
+	PreviewHeight int
+	// PaneHeight is the pane's lines last set with the mouse or keys; 0
+	// when none was, and PreviewHeight is taken.
+	PaneHeight int
+	// Layout keeps the pane's height when it is changed; nil keeps it
+	// for this run only.
+	Layout   Layout
+	Collapse []string
 	// Theme is "auto", "mocha" or "latte".
 	Theme string
 	// Editor is the command ctrl+e runs to edit a review, as $EDITOR
@@ -138,6 +153,11 @@ type Model struct {
 	filtering bool
 	filter    string
 
+	// dragging is set while the pane's top edge is held with the mouse,
+	// and lastClick is the row clicked last, to tell a double click.
+	dragging  bool
+	lastClick click
+
 	pane  pane
 	cache cache
 	// sending is the review on its way to GitHub; no other is sent until
@@ -201,7 +221,7 @@ func New(src Source, run Runner, cl Claude, km keymap.Map, log *slog.Logger, set
 		m.tabs = append(m.tabs, newSectionTab(s))
 	}
 	m.tabs = append(m.tabs, newInboxTab(set.HideClosed))
-	m.pane = pane{on: set.PreviewHeight > 0, mode: paneDiff, unfold: map[model.PRKey]bool{}}
+	m.pane = pane{on: set.PreviewHeight > 0, height: cmp.Or(set.PaneHeight, set.PreviewHeight, defaultPaneHeight), mode: paneDiff, unfold: map[model.PRKey]bool{}}
 	m.cache = newCache()
 	m.viewer = set.Viewer
 	m.loadCached()
@@ -276,6 +296,8 @@ func (m *Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, m.heavyRead(msg)
 	case tea.PasteMsg:
 		return m, m.paste(msg)
+	case tea.MouseMsg:
+		return m, m.mouse(msg)
 	}
 	return m, m.handleData(msg)
 }
