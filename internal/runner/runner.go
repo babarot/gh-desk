@@ -157,6 +157,27 @@ type Runner struct {
 	log *slog.Logger
 	// active counts the batches not yet ended, for Wait.
 	active sync.WaitGroup
+	// mu guards busy, the pull requests a job is acting on or watching.
+	// A second job for one of them is skipped, so two jobs never write
+	// the same record.
+	mu   sync.Mutex
+	busy map[model.PRKey]bool
+}
+
+func (r *Runner) claim(k model.PRKey) bool {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.busy[k] {
+		return false
+	}
+	r.busy[k] = true
+	return true
+}
+
+func (r *Runner) release(k model.PRKey) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	delete(r.busy, k)
 }
 
 // Wait waits for every batch to end. After its context is cancelled, a
@@ -165,7 +186,7 @@ func (r *Runner) Wait() { r.active.Wait() }
 
 // New returns a Runner.
 func New(gh GitHub, log *slog.Logger, opt Options) *Runner {
-	return &Runner{gh: gh, opt: opt.withDefaults(), log: log}
+	return &Runner{gh: gh, opt: opt.withDefaults(), log: log, busy: map[model.PRKey]bool{}}
 }
 
 // Start runs a batch and returns its ID and its events. The channel is
@@ -228,6 +249,12 @@ func (r *Runner) run(ctx context.Context, kind Kind, items []Item, resume map[mo
 				}
 				j := &job{r: r, ctx: ctx, log: log.With(logging.KeyPR, it.PR.Key.String()), it: it, head: it.Head, emit: emit, wg: &wg,
 					record: kind == Merge && r.opt.Store != nil}
+				if !r.claim(it.PR.Key) {
+					// Its record belongs to the job already on it.
+					j.record = false
+					j.say(Skipped, "already being merged or watched")
+					continue
+				}
 				switch p, ok := resume[it.PR.Key]; {
 				case ok:
 					j.pend, j.approved = p, p.Approved
@@ -236,6 +263,9 @@ func (r *Runner) run(ctx context.Context, kind Kind, items []Item, resume map[mo
 					j.approveOnly()
 				default:
 					j.merge()
+				}
+				if !j.watching {
+					r.release(it.PR.Key)
 				}
 			}
 		})
@@ -260,6 +290,9 @@ type job struct {
 	wg   *sync.WaitGroup
 	// approved is set once this job sent an approval.
 	approved bool
+	// watching is set once the pull request is handed to watch, which
+	// releases it.
+	watching bool
 	// record keeps pend in the store while the job waits.
 	record bool
 	pend   model.Pending
@@ -286,7 +319,10 @@ func (j *job) say(res Result, text string) {
 // unsure ends the job keeping its record: something failed midway.
 func (j *job) unsure(text string) {
 	j.keep = true
-	j.say(Failed, text+" · goes on at the next launch")
+	if j.record {
+		text += " · goes on at the next launch"
+	}
+	j.say(Failed, text)
 }
 
 // save records where the job is, so the next launch can go on with it. It
@@ -297,7 +333,8 @@ func (j *job) save() bool {
 	}
 	j.pend.Key, j.pend.ID, j.pend.Head = j.it.PR.Key, j.it.PR.ID, j.head
 	j.pend.Author, j.pend.AuthorIsBot = j.it.PR.Author, j.it.PR.AuthorIsBot
-	j.pend.AutoMerge, j.pend.Approved = j.it.AutoMerge, j.approved
+	j.pend.AutoMerge = j.it.AutoMerge
+	j.pend.Approved = j.pend.Approved || j.approved
 	if err := j.r.opt.Store.Put(j.pend); err != nil {
 		j.log.Warn("could not record the pending merge", "err", err.Error())
 		return false
@@ -335,10 +372,7 @@ func (j *job) resume() {
 		j.say(Stopped, "closed meanwhile")
 		return
 	}
-	approved := false
-	for _, r := range mi.Reviews {
-		approved = approved || (r.Author == j.r.opt.Viewer && r.State == model.ReviewApproved)
-	}
+	approved := approvedBy(mi, j.r.opt.Viewer)
 	switch {
 	case j.pend.Approved && !approved:
 		j.say(Stopped, "your approval was dismissed · confirm again")
@@ -354,10 +388,20 @@ func (j *job) resume() {
 		j.say(AutoMergeOn, "auto-merge on")
 		// Watched aside, as after turning auto-merge on, so the next
 		// pull request of the repository does not wait for it.
-		j.wg.Go(j.watch)
+		j.startWatch()
 		return
 	}
 	j.merge()
+}
+
+// approvedBy reports whether login's latest review approves.
+func approvedBy(mi model.MergeInfo, login string) bool {
+	for _, r := range mi.Reviews {
+		if r.Author == login && r.State == model.ReviewApproved {
+			return true
+		}
+	}
+	return false
 }
 
 var resultWord = map[Result]string{Running: "running", Approved: "approved", Merged: "merged", AutoMergeOn: "auto-merge-on",
@@ -467,6 +511,9 @@ func (j *job) merge() {
 		j.say(Skipped, "would wait, and another gh-triage keeps the waiting merges")
 		return
 	}
+	// The user's approval the merge starts with is recorded too, so the
+	// next launch stops if it was dismissed instead of approving again.
+	j.pend.Approved = j.pend.Approved || approvedBy(mi, j.r.opt.Viewer)
 	// Recorded before the first write, so a crash after it is resumed; no
 	// write without a record.
 	if !j.save() {
@@ -546,7 +593,17 @@ func (j *job) autoMerge(method model.MergeMethod) {
 	j.pend.Watching = true
 	j.save()
 	j.say(AutoMergeOn, "auto-merge on")
-	j.wg.Go(j.watch)
+	j.startWatch()
+}
+
+// startWatch watches aside; the watch releases the pull request when it
+// ends.
+func (j *job) startWatch() {
+	j.watching = true
+	j.wg.Go(func() {
+		defer j.r.release(j.it.PR.Key)
+		j.watch()
+	})
 }
 
 // watch follows a pull request put on auto-merge until GitHub merges it,

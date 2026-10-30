@@ -216,7 +216,8 @@ type Pending struct {
 	AutoMerge bool `json:"auto_merge"`
 	// Watching is set once auto-merge is on and it is only followed.
 	Watching bool `json:"watching"`
-	// Approved is set when gh-triage approved it; an approval dismissed
+	// Approved is set when the user's approval was on it, sent by
+	// gh-triage or there before the merge started; an approval dismissed
 	// meanwhile stops it at the next launch.
 	Approved bool `json:"approved"`
 	// Approving is set while an approval is being sent: if gh-triage

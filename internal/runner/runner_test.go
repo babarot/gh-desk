@@ -642,3 +642,75 @@ func TestResumedWatchDoesNotBlock(t *testing.T) {
 		t.Errorf("api#2 merged after %v; it waited for api#1's watch", mergedAt)
 	}
 }
+
+// An approval the user gave before the merge is recorded, so a dismissal
+// while gh-triage was closed stops it instead of approving again.
+func TestApprovalBeforeMergeIsRecorded(t *testing.T) {
+	mi, it := pr("1", "api", 1, "alice")
+	mi.MergeState = model.MergeBlocked
+	mi.Reviews = []model.Review{{Author: "me", State: model.ReviewApproved}}
+	mi.Checks = []model.Check{{Name: "build", State: model.CheckPending, Required: true}}
+	f := newFake(mi)
+	st := newStore()
+	ctx, cancel := context.WithCancel(context.Background())
+	r := newRunner(f, st)
+	_, first := r.Start(ctx, Merge, []Item{it})
+	go func() {
+		for range first {
+		}
+	}()
+	time.Sleep(20 * time.Millisecond)
+	cancel()
+	r.Wait()
+	st.mu.Lock()
+	p, ok := st.now[it.PR.Key]
+	st.mu.Unlock()
+	if !ok || !p.Approved {
+		t.Fatalf("record %+v, kept %v", p, ok)
+	}
+
+	f.prs["1"].Reviews = nil
+	_, ch := newRunner(f, st).Resume(context.Background(), []model.Pending{p})
+	es := drain(t, ch)
+	if e := last(es); e.Result != Stopped || !strings.Contains(e.Text, "dismissed") {
+		t.Errorf("last %+v", e)
+	}
+	for _, c := range f.calls {
+		if strings.HasPrefix(c, "review") {
+			t.Errorf("approved again: %v", f.calls)
+		}
+	}
+}
+
+// A pull request already watched is not taken by a second batch, whose
+// record would be overwritten and removed by the watch.
+func TestOneJobPerPullRequest(t *testing.T) {
+	mi, it := pr("1", "api", 1, "renovate")
+	mi.MergeState, mi.Repo.AutoMerge = model.MergeBlocked, true
+	it.AutoMerge = true
+	f := newFake(mi)
+	st := newStore()
+	r := newRunner(f, st)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	_, first := r.Start(ctx, Merge, []Item{it})
+	for e := range first {
+		if e.Result == AutoMergeOn {
+			break
+		}
+	}
+	go func() {
+		for range first {
+		}
+	}()
+	_, second := r.Start(ctx, Merge, []Item{it})
+	es := drain(t, second)
+	if e := last(es); e.Result != Skipped || !strings.Contains(e.Text, "already") {
+		t.Errorf("second batch: %+v", es)
+	}
+	st.mu.Lock()
+	defer st.mu.Unlock()
+	if p, ok := st.now[it.PR.Key]; !ok || !p.Watching {
+		t.Errorf("record %+v, kept %v", p, ok)
+	}
+}
