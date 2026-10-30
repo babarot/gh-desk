@@ -21,7 +21,7 @@ The actions, applied in order:
 - select: add the pull requests in "keys" to the selection.
 - clear_selection: clear the selection. Put it first when the selection should be made again.
 - cursor: put the cursor on the pull request "key" in the tab shown, unfolding its group.
-- pane: "mode" off hides the preview pane; diff or description shows it with that tab.
+- pane: "mode" off hides the preview pane; overview or diff shows it with that tab.
 - approve, merge: open the confirm popup for the pull requests in "keys". Nothing is sent until the user confirms there. Put at most one, last.
 
 Name pull requests only as their keys in <lists> (owner/repo#number), and only those in <lists>. A field that says unknown has not been read: do not decide on it, and say which pull requests you left out for that. When the request needs something the actions cannot do (sorting, commenting, anything not shown in <lists>), say so in the reply, and plan what the actions can do towards it, if anything.`
@@ -34,7 +34,7 @@ const TriageSchema = `{"type":"object","properties":{` +
 	`"tab":{"type":"string"},"text":{"type":"string"},` +
 	`"group":{"type":"string","enum":["you","team","bots"]},` +
 	`"keys":{"type":"array","items":{"type":"string"}},"key":{"type":"string"},` +
-	`"mode":{"type":"string","enum":["off","diff","description"]}},` +
+	`"mode":{"type":"string","enum":["off","overview","diff"]}},` +
 	`"required":["do"]}}},` +
 	`"required":["reply","actions"]}`
 
@@ -48,7 +48,7 @@ type Snapshot struct {
 	// Cursor is the pull request under the cursor, the zero key when the
 	// cursor is not on one.
 	Cursor model.PRKey
-	// Pane is "off", "diff" or "description".
+	// Pane is "off", "overview" or "diff".
 	Pane string
 }
 

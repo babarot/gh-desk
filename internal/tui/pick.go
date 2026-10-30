@@ -140,7 +140,7 @@ func (m *Model) applyRule(r plan.Rule) tea.Cmd {
 	clear(m.selected)
 	t := m.tab()
 	for _, p := range hits {
-		m.selected[p.Key] = true
+		m.selected[p.Key] = byHand
 		if t.grouped {
 			t.folded[plan.GroupOf(p, m.viewer)] = false
 		}
@@ -150,7 +150,7 @@ func (m *Model) applyRule(r plan.Rule) tea.Cmd {
 		return nil
 	}
 	for i, row := range m.rows(t) {
-		if row.kind == rowPR && m.selected[row.pr.Key] {
+		if row.kind == rowPR && m.isSelected(row.pr.Key) {
 			t.sel = i
 			break
 		}

@@ -174,7 +174,7 @@ type Model struct {
 	// it is back.
 	sending *model.PRKey
 
-	selected map[model.PRKey]bool
+	selected map[model.PRKey]selection
 	bulk     *bulk
 	picker   *pick
 	// progress is each pull request's step or result in a batch, shown on
@@ -195,6 +195,8 @@ type Model struct {
 	// the one on screen.
 	chats   map[model.PRKey]*chat
 	chatKey model.PRKey
+	// triage is the conversation with Claude about the lists, once begun.
+	triage *triage
 	// cautions are what Claude said of release notes, by notesID; empty
 	// when nothing calls for care.
 	cautions map[string]string
@@ -221,7 +223,7 @@ func New(src Source, run Runner, cl Claude, km keymap.Map, log *slog.Logger, set
 		log = logging.Discard()
 	}
 	m := &Model{src: src, run: run, claude: cl, chats: map[model.PRKey]*chat{}, cautions: map[string]string{}, fresh: map[model.PRKey]time.Time{}, keys: km, log: log, set: set, ctx: context.Background(), unread: map[model.PRKey]model.Notification{},
-		selected: map[model.PRKey]bool{}, progress: map[model.PRKey]progress{}, batches: map[string]*batchState{},
+		selected: map[model.PRKey]selection{}, progress: map[model.PRKey]progress{}, batches: map[string]*batchState{},
 		merged: map[model.PRKey]bool{}, refreshed: map[int]time.Time{}}
 	m.st = newStyles(mocha)
 	if set.Theme == "latte" {
@@ -307,6 +309,9 @@ func (m *Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case heavyMsg:
 		return m, m.heavyRead(msg)
+	case triageMsg:
+		m.triageAnswered(msg)
+		return m, nil
 	case tea.PasteMsg:
 		return m, m.paste(msg)
 	case tea.MouseMsg:
@@ -331,6 +336,8 @@ func (m *Model) key(msg tea.KeyPressMsg) tea.Cmd {
 		return m.pickKey(k)
 	case m.confirm != nil:
 		return m.confirmKey(k)
+	case m.triage != nil && m.triage.open:
+		return m.triageKey(msg)
 	case m.help:
 		if k == keymap.Back || m.keys.Matches("help", k) || m.keys.Matches("quit", k) {
 			m.help = false
@@ -362,6 +369,10 @@ func (m *Model) paste(msg tea.PasteMsg) tea.Cmd {
 	case m.filtering:
 		m.filter += msg.Content
 		m.tab().sel, m.tab().offset = 0, 0
+	case m.triage != nil && m.triage.typing:
+		var cmd tea.Cmd
+		m.triage.input, cmd = m.triage.input.Update(msg)
+		return cmd
 	case m.view == viewCompose && m.compose != nil:
 		return m.compose.update(msg)
 	case m.view == viewChat && m.chat() != nil && m.chat().typing:

@@ -27,6 +27,7 @@ const (
 	ScopeList    Scope = "list"
 	ScopePR      Scope = "pr"
 	ScopePopup   Scope = "popup"
+	ScopeTriage  Scope = "triage"
 	ScopeChat    Scope = "chat"
 	ScopeCompose Scope = "compose"
 	ScopeInput   Scope = "input"
@@ -100,6 +101,9 @@ var Defaults = []Def{
 	{"confirm", ScopePopup, []string{"y"}, "yes"},
 	{"choose", ScopePopup, []string{"enter"}, "choose"},
 	{"include_failing", ScopePopup, []string{"f"}, "include failing"},
+
+	{"triage_apply", ScopeTriage, []string{"enter"}, "apply"},
+	{"triage_more", ScopeTriage, []string{"i"}, "ask more"},
 
 	{"ask_more", ScopeChat, []string{"i"}, "ask more"},
 	{"draft_review", ScopeChat, []string{"D"}, "draft review"},

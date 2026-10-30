@@ -97,14 +97,29 @@ type row struct {
 }
 
 // rows are the lines of t as shown: filtered, sorted, grouped and folded.
-func (m *Model) rows(t *tab) []row {
+func (m *Model) rows(t *tab) []row { return m.rowsOf(t, m.filter, t.folded) }
+
+// listed are the pull requests of t in the order its rows show them, with
+// no filter and no group folded; hidden ones are left out.
+func (m *Model) listed(t *tab) []row {
+	var out []row
+	for _, r := range m.rowsOf(t, "", nil) {
+		if r.kind == rowPR {
+			out = append(out, r)
+		}
+	}
+	return out
+}
+
+// rowsOf are the lines of t under filter, with the groups in folded folded.
+func (m *Model) rowsOf(t *tab, filter string, folded map[plan.Group]bool) []row {
 	if t.inbox {
-		rs, _ := m.inboxRows(t)
+		rs, _ := m.inboxRows(t, filter)
 		return rs
 	}
 	var prs []model.PR
 	for _, p := range t.prs {
-		if !t.hidden[p.Key] && m.matches(p) {
+		if !t.hidden[p.Key] && matches(p, filter) {
 			prs = append(prs, p)
 		}
 	}
@@ -133,7 +148,7 @@ func (m *Model) rows(t *tab) []row {
 			}
 		}
 		out = append(out, row{kind: rowGroup, group: g, count: len(in)})
-		if !t.folded[g] {
+		if !folded[g] {
 			for _, p := range in {
 				out = append(out, row{kind: rowPR, pr: p})
 			}
@@ -142,9 +157,9 @@ func (m *Model) rows(t *tab) []row {
 	return out
 }
 
-// inboxRows are the inbox's lines, and how many notifications on merged or
-// closed pull requests they leave out.
-func (m *Model) inboxRows(t *tab) ([]row, int) {
+// inboxRows are the inbox's lines under filter, and how many
+// notifications on merged or closed pull requests they leave out.
+func (m *Model) inboxRows(t *tab, filter string) ([]row, int) {
 	var out []row
 	closed := 0
 	for i := range t.notifs {
@@ -162,7 +177,7 @@ func (m *Model) inboxRows(t *tab) ([]row, int) {
 				continue
 			}
 		}
-		if !m.matches(p) {
+		if !matches(p, filter) {
 			continue
 		}
 		p.Updated = n.Updated
@@ -201,11 +216,13 @@ func (m *Model) updatePR(p model.PR) {
 	}
 }
 
-func (m *Model) matches(p model.PR) bool {
-	if m.filter == "" {
+// matches reports whether p's key, title or author contains filter,
+// ignoring case.
+func matches(p model.PR, filter string) bool {
+	if filter == "" {
 		return true
 	}
-	f := strings.ToLower(m.filter)
+	f := strings.ToLower(filter)
 	return strings.Contains(strings.ToLower(p.Key.String()+" "+p.Title+" "+p.Author), f)
 }
 

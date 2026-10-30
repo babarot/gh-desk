@@ -28,6 +28,9 @@ type bulk struct {
 	// requests to merge, and notesErr why it could not.
 	notes    notesState
 	notesErr string
+	// by is the request Claude picked the pull requests for, empty when
+	// the user picked them.
+	by string
 }
 
 type notesState int
@@ -105,7 +108,7 @@ func (m *Model) startBulk(kind runner.Kind) tea.Cmd {
 	if len(m.selected) > 0 {
 		for _, t := range m.tabs {
 			for _, p := range m.allOf(t) {
-				if m.selected[p.Key] && !containsKey(prs, p.Key) {
+				if m.isSelected(p.Key) && !containsKey(prs, p.Key) {
 					prs = append(prs, p)
 				}
 			}
@@ -382,6 +385,9 @@ func (m *Model) renderBulk() []string {
 		}
 	}
 	var lines []string
+	if b.by != "" {
+		lines = append(lines, st.teal.Render("✧ picked by Claude")+st.muted.Render(": “"+safeLine(firstLine(b.by))+"”"), "")
+	}
 	if b.err != nil {
 		lines = append(lines, st.red.Render("could not read them all: "+b.err.Error()))
 	}

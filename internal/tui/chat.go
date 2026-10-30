@@ -30,6 +30,9 @@ type Claude interface {
 	// Once asks with no tools and no session kept, in dir, or where the
 	// implementation picks when dir is empty.
 	Once(ctx context.Context, dir, prompt, schema string) (claude.Answer, error)
+	// Triage asks for a plan of what to show and select in the lists, in
+	// a session kept where the implementation picks.
+	Triage(ctx context.Context, r claude.Request) (claude.Answer, error)
 }
 
 // chat is a conversation with Claude about one pull request. It stays

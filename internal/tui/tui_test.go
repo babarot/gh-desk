@@ -667,7 +667,7 @@ func TestSelectByRule(t *testing.T) {
 	press(m, "S")
 	golden(t, "select-rule", screen(m))
 	press(m, "j", "enter")
-	if len(m.selected) != 1 || !m.selected[key("acme", "api", 30)] {
+	if len(m.selected) != 1 || m.selected[key("acme", "api", 30)] != byHand {
 		t.Fatalf("selected = %v", m.selected)
 	}
 	if m.tab().folded[plan.GroupBots] {
@@ -720,6 +720,9 @@ type fakeClaude struct {
 	notes []string
 	// fail makes the next question fail.
 	fail bool
+	// plan is what Triage answers, and triaged the requests it was given.
+	plan    string
+	triaged []claude.Request
 }
 
 func (c *fakeClaude) Prepare(_ context.Context, k model.PRKey, head string) (string, error) {
@@ -742,6 +745,11 @@ func (c *fakeClaude) Ask(_ context.Context, r claude.Request, progress func(clau
 
 func (c *fakeClaude) Interactive(dir, session string) *exec.Cmd { return exec.Command("true") }
 
+func (c *fakeClaude) Triage(_ context.Context, r claude.Request) (claude.Answer, error) {
+	c.triaged = append(c.triaged, r)
+	return claude.Answer{Structured: []byte(c.plan)}, nil
+}
+
 func (c *fakeClaude) Once(_ context.Context, _, prompt, _ string) (claude.Answer, error) {
 	c.notes = append(c.notes, prompt)
 	return claude.Answer{Structured: []byte(`{"cautions":[{"key":"acme/api#30","why":"drops support for config v1"}]}`)}, nil
@@ -750,7 +758,7 @@ func (c *fakeClaude) Once(_ context.Context, _, prompt, _ string) (claude.Answer
 func TestClaudeConversation(t *testing.T) {
 	m, _ := startWith(t, fixture(), keymap.Default())
 	fc := m.claude.(*fakeClaude)
-	press(m, "C")
+	press(m, "enter", "C")
 	if m.view != viewChat || len(fc.asked) != 1 {
 		t.Fatalf("view %v, asked %d", m.view, len(fc.asked))
 	}
@@ -773,7 +781,7 @@ func TestClaudeConversation(t *testing.T) {
 
 	// Leaving and coming back keeps the conversation.
 	press(m, "esc")
-	if m.view != viewList {
+	if m.view != viewPR {
 		t.Fatalf("view %v", m.view)
 	}
 	press(m, "C")
@@ -787,7 +795,7 @@ func TestClaudeConversation(t *testing.T) {
 // the row until the conversation is opened.
 func TestClaudeAnsweringElsewhere(t *testing.T) {
 	m, _ := startWith(t, fixture(), keymap.Default())
-	press(m, "C")
+	press(m, "enter", "C")
 	k := m.chatKey
 	c := m.chat()
 	c.running, c.since = true, now.Add(-75*time.Second)
@@ -798,7 +806,7 @@ func TestClaudeAnsweringElsewhere(t *testing.T) {
 		t.Error("the spinner does not turn while Claude answers")
 	}
 
-	press(m, "esc")
+	press(m, "esc", "esc")
 	if s := screen(m); !strings.Contains(s, "Claude is answering on "+k.String()+"…") {
 		t.Errorf("the list does not say Claude is answering:\n%s", s)
 	}
@@ -806,7 +814,7 @@ func TestClaudeAnsweringElsewhere(t *testing.T) {
 	if !c.unseen || strings.Count(screen(m), "✦") != 1 {
 		t.Errorf("the answer that came elsewhere is not marked:\n%s", screen(m))
 	}
-	press(m, "C")
+	press(m, "enter", "C")
 	if c.unseen {
 		t.Error("opening the conversation kept the mark")
 	}
@@ -814,7 +822,7 @@ func TestClaudeAnsweringElsewhere(t *testing.T) {
 
 func TestClaudeDraft(t *testing.T) {
 	m, _ := startWith(t, fixture(), keymap.Default())
-	press(m, "C", "D")
+	press(m, "enter", "C", "D")
 	if m.view != viewCompose || m.compose == nil {
 		t.Fatalf("view %v", m.view)
 	}
@@ -859,7 +867,7 @@ func TestClaudeFirstFailureStartsAgain(t *testing.T) {
 	m, _ := startWith(t, fixture(), keymap.Default())
 	fc := m.claude.(*fakeClaude)
 	fc.fail = true
-	press(m, "C")
+	press(m, "enter", "C")
 	if !strings.Contains(screen(m), "rate limited") {
 		t.Fatalf("no error shown:\n%s", screen(m))
 	}

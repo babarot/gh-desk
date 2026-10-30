@@ -15,6 +15,20 @@ import (
 	"github.com/babarot/gh-triage/internal/runner"
 )
 
+// selection is who selected a pull request: the user, or Claude in a plan
+// the user applied.
+type selection int
+
+const (
+	byHand selection = iota + 1
+	byClaude
+)
+
+func (m *Model) isSelected(k model.PRKey) bool {
+	_, ok := m.selected[k]
+	return ok
+}
+
 // listKey handles a key on the list.
 func (m *Model) listKey(k string) tea.Cmd {
 	t := m.tab()
@@ -66,8 +80,8 @@ func (m *Model) listKey(k string) tea.Cmd {
 		return nil
 	case is("select_shown"):
 		for _, r := range rs {
-			if r.kind == rowPR {
-				m.selected[r.pr.Key] = true
+			if r.kind == rowPR && !m.isSelected(r.pr.Key) {
+				m.selected[r.pr.Key] = byHand
 			}
 		}
 		return nil
@@ -76,6 +90,8 @@ func (m *Model) listKey(k string) tea.Cmd {
 		return nil
 	case is("select_rule"):
 		return m.openPick()
+	case is("claude"):
+		return m.openTriage()
 	case is("approve") && len(m.selected) > 0:
 		return m.startBulk(runner.Approve)
 	case is("merge"):
@@ -131,19 +147,20 @@ func (m *Model) listKey(k string) tea.Cmd {
 			// them when all are selected.
 			var in []model.PRKey
 			for _, p := range t.prs {
-				if !t.hidden[p.Key] && m.matches(p) && plan.GroupOf(p, m.viewer) == r.group {
+				if !t.hidden[p.Key] && matches(p, m.filter) && plan.GroupOf(p, m.viewer) == r.group {
 					in = append(in, p.Key)
 				}
 			}
 			all := len(in) > 0
 			for _, k := range in {
-				all = all && m.selected[k]
+				all = all && m.isSelected(k)
 			}
 			for _, k := range in {
-				if all {
+				switch {
+				case all:
 					delete(m.selected, k)
-				} else {
-					m.selected[k] = true
+				case !m.isSelected(k):
+					m.selected[k] = byHand
 				}
 			}
 		}
@@ -152,10 +169,10 @@ func (m *Model) listKey(k string) tea.Cmd {
 	p := r.pr
 	switch {
 	case is("select"):
-		if m.selected[p.Key] {
+		if m.isSelected(p.Key) {
 			delete(m.selected, p.Key)
 		} else {
-			m.selected[p.Key] = true
+			m.selected[p.Key] = byHand
 		}
 		return move(t.sel + 1)
 	case is("approve"):
@@ -166,8 +183,6 @@ func (m *Model) listKey(k string) tea.Cmd {
 		return m.startCompose(p, model.EventRequestChanges)
 	case is("browse"):
 		return m.browse(p)
-	case is("claude"):
-		return m.openChat(p)
 	case is("hide"):
 		return m.hide(p, r.notif)
 	}
@@ -373,7 +388,7 @@ func (m *Model) renderList(b *strings.Builder, height int) {
 		lines++
 	}
 	if t.inbox && !t.showClosed && lines < height {
-		if _, closed := m.inboxRows(t); closed > 0 && len(rs) < height {
+		if _, closed := m.inboxRows(t, m.filter); closed > 0 && len(rs) < height {
 			noun := "notifications"
 			if closed == 1 {
 				noun = "notification"
@@ -429,12 +444,15 @@ func (m *Model) renderRow(r row, cols []column, sel bool) string {
 		cells = append(cells, fit(s, c.width))
 	}
 	line := strings.Join(cells, "  ")
-	picked := m.selected[r.pr.Key]
-	switch {
-	case sel && picked:
+	switch by := m.selected[r.pr.Key]; {
+	case sel && by == byHand:
 		return onBackground(line, m.st.pickedSel, m.width)
-	case picked:
+	case by == byHand:
 		return onBackground(line, m.st.picked, m.width)
+	case sel && by == byClaude:
+		return onBackground(line, m.st.claudeSel, m.width)
+	case by == byClaude:
+		return onBackground(line, m.st.claude, m.width)
 	case sel:
 		return onBackground(line, m.st.sel, m.width)
 	case m.fresh[r.pr.Key].After(m.set.Now()):
@@ -478,8 +496,10 @@ func (m *Model) cell(id string, r row, sel bool) string {
 			cursor = st.blue.Render("▎")
 		}
 		switch {
-		case m.selected[p.Key]:
+		case m.selected[p.Key] == byHand:
 			mark = st.mauve.Render("✓")
+		case m.selected[p.Key] == byClaude:
+			mark = st.teal.Render("✓")
 		case m.chats[p.Key] != nil && m.chats[p.Key].unseen:
 			mark = st.mauve.Render("✦")
 		case func() bool { _, ok := m.unread[p.Key]; return ok }():
@@ -526,24 +546,12 @@ func (m *Model) cell(id string, r row, sel bool) string {
 		}
 		return s
 	case "why":
-		if r.notif != nil {
-			return st.sub0.Render(strings.TrimSuffix(r.notif.Reason, "_requested"))
-		}
-		if p.RequestedFrom(m.viewer) {
-			return st.me.Render("you")
-		}
-		var teams []string
-		for _, rq := range p.Requested {
-			if rq.Team {
-				teams = append(teams, "@"+rq.Login)
-			}
-		}
-		if len(teams) == 0 {
-			return ""
-		}
-		s := teams[0]
-		if len(teams) > 1 {
-			s += fmt.Sprintf(" +%d", len(teams)-1)
+		s := m.why(r)
+		switch {
+		case r.notif != nil:
+			return st.sub0.Render(s)
+		case s == "you":
+			return st.me.Render(s)
 		}
 		return st.muted.Render(s)
 	case "size":
@@ -615,4 +623,29 @@ func (m *Model) firstKey(a keymap.Action) string {
 		return ks[0]
 	}
 	return "(unbound)"
+}
+
+// why is why a row's pull request is in its list, as the WHY column says:
+// the reason of its notification, you, or the teams asked.
+func (m *Model) why(r row) string {
+	if r.notif != nil {
+		return strings.TrimSuffix(r.notif.Reason, "_requested")
+	}
+	if r.pr.RequestedFrom(m.viewer) {
+		return "you"
+	}
+	var teams []string
+	for _, rq := range r.pr.Requested {
+		if rq.Team {
+			teams = append(teams, "@"+rq.Login)
+		}
+	}
+	if len(teams) == 0 {
+		return ""
+	}
+	s := teams[0]
+	if len(teams) > 1 {
+		s += fmt.Sprintf(" +%d", len(teams)-1)
+	}
+	return s
 }

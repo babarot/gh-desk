@@ -73,6 +73,8 @@ func (m *Model) render() string {
 		lines = overlay(lines, m.renderPick(), 2, m.width)
 	case m.confirm != nil:
 		lines = overlay(lines, m.renderConfirm(), 2, m.width)
+	case m.triage != nil && m.triage.open:
+		lines = overlay(lines, m.renderTriage(), 2, m.width)
 	case m.help:
 		lines = overlay(lines, m.renderHelp(), 1, m.width)
 	case m.toast != nil && len(lines) > 3:
@@ -204,7 +206,7 @@ var ready = map[keymap.Action]bool{
 	"pane_down": true, "pane_up": true, "pane_grow": true, "pane_shrink": true, "next_file": true, "prev_file": true, "pane_tab": true, "unfold": true, "toggle_pane": true,
 	"pr_prev_tab": true, "pr_next_tab": true, "pr_approve": true, "pr_comment": true, "pr_request_changes": true, "pr_browse": true,
 	"confirm": true, "next_kind": true, "post": true, "editor": true, "accept": true, "erase": true,
-	"claude": true, "pr_claude": true, "ask_more": true, "draft_review": true, "open_claude": true, "chat_approve": true,
+	"claude": true, "triage_apply": true, "triage_more": true, "pr_claude": true, "ask_more": true, "draft_review": true, "open_claude": true, "chat_approve": true,
 }
 
 // hints is the key line of what has the focus.
@@ -217,6 +219,16 @@ func (m *Model) hints() string {
 		as = []keymap.Action{"choose"}
 	case m.confirm != nil:
 		as = []keymap.Action{"confirm"}
+	case m.triage != nil && m.triage.open:
+		switch {
+		case m.triage.typing:
+			as = []keymap.Action{"accept"}
+		case m.triage.asking:
+		case m.applicable():
+			as = []keymap.Action{"triage_apply", "triage_more"}
+		default:
+			as = []keymap.Action{"triage_more"}
+		}
 	case m.view == viewList && len(m.selected) > 0:
 		as = []keymap.Action{"select", "select_shown", "clear_selection", "approve", "merge", "pane_tab", "filter", "help"}
 	case m.filtering:
@@ -258,7 +270,8 @@ func (m *Model) renderHelp() []string {
 		title string
 	}{
 		{keymap.ScopeGlobal, "anywhere"}, {keymap.ScopeNav, "moving"}, {keymap.ScopeList, "the list and its preview"},
-		{keymap.ScopePR, "a pull request"}, {keymap.ScopePopup, "a confirm popup"}, {keymap.ScopeChat, "claude"},
+		{keymap.ScopePR, "a pull request"}, {keymap.ScopePopup, "a confirm popup"},
+		{keymap.ScopeTriage, "claude on the list"}, {keymap.ScopeChat, "claude on a pull request"},
 		{keymap.ScopeCompose, "writing a review"},
 	}
 	for _, sc := range scopes {
