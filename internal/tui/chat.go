@@ -4,7 +4,9 @@ import (
 	"context"
 	"fmt"
 	"os/exec"
+	"slices"
 	"strings"
+	"time"
 
 	"charm.land/bubbles/v2/textarea"
 	tea "charm.land/bubbletea/v2"
@@ -45,8 +47,13 @@ type chat struct {
 	running bool
 	steps   []claude.Step
 	cancel  context.CancelFunc
-	cost    float64
-	model   string
+	// since is when the question on its way was asked.
+	since time.Time
+	// unseen is set when an answer came while the screen was elsewhere,
+	// until the conversation is opened.
+	unseen bool
+	cost   float64
+	model  string
 	// scroll is how many lines up from the end the screen shows.
 	scroll int
 	// draft is a review drafted while the screen was elsewhere, opened
@@ -108,7 +115,7 @@ func (m *Model) openChat(p model.PR) tea.Cmd {
 		back = viewList
 	}
 	if c, ok := m.chats[p.Key]; ok {
-		c.back = back
+		c.back, c.unseen = back, false
 		m.chatKey, m.view = p.Key, viewChat
 		if d := c.draft; d != nil {
 			c.draft = nil
@@ -137,7 +144,7 @@ func (m *Model) ask(c *chat, shown, prompt string, draft bool) tea.Cmd {
 		return nil
 	}
 	c.turns = append(c.turns, turn{you: true, text: shown})
-	c.running, c.steps, c.scroll = true, nil, 0
+	c.running, c.steps, c.scroll, c.since = true, nil, 0, m.set.Now()
 	ctx, cancel := context.WithCancel(m.ctx)
 	c.cancel = cancel
 	ch := make(chan tea.Msg, 16)
@@ -204,6 +211,7 @@ func (m *Model) chatAnswer(msg chatAnswerMsg) tea.Cmd {
 		return nil
 	}
 	c.running, c.cancel = false, nil
+	c.unseen = m.view != viewChat || m.chatKey != msg.key
 	if msg.err != nil {
 		if !c.started {
 			// Claude Code may have made the session before failing; the
@@ -393,9 +401,38 @@ func (m *Model) chatLines(c *chat, width int) []string {
 		if c.dir == "" {
 			what = "making the worktree…"
 		}
-		L = append(L, "  "+st.muted.Render(what))
+		L = append(L, "  "+st.mauve.Render(m.spinner())+" "+st.muted.Render(what)+" "+st.dim.Render(elapsed(m.set.Now().Sub(c.since))))
 	}
 	return L
+}
+
+// elapsed is how long a question has waited, as the chat shows it.
+func elapsed(d time.Duration) string {
+	s := int(d.Seconds())
+	if s < 60 {
+		return fmt.Sprintf("%ds", s)
+	}
+	return fmt.Sprintf("%dm%02ds", s/60, s%60)
+}
+
+// claudeStatus is the line under the list while Claude answers about a pull
+// request whose conversation is not shown.
+func (m *Model) claudeStatus() string {
+	var away []model.PRKey
+	for k, c := range m.chats {
+		if c.running && (m.view != viewChat || m.chatKey != k) {
+			away = append(away, k)
+		}
+	}
+	if len(away) == 0 {
+		return ""
+	}
+	slices.SortFunc(away, func(a, b model.PRKey) int { return strings.Compare(a.String(), b.String()) })
+	what := "Claude is answering on " + away[0].String()
+	if n := len(away) - 1; n > 0 {
+		what += fmt.Sprintf(" and %d more", n)
+	}
+	return m.st.mauve.Render(m.spinner()) + " " + m.st.muted.Render(what+"…")
 }
 
 func firstLine(s string) string {

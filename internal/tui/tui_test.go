@@ -771,6 +771,36 @@ func TestClaudeConversation(t *testing.T) {
 	}
 }
 
+// While Claude answers, the chat turns a spinner with the time waited;
+// elsewhere the status line says so, and an answer that came there marks
+// the row until the conversation is opened.
+func TestClaudeAnsweringElsewhere(t *testing.T) {
+	m, _ := startWith(t, fixture(), keymap.Default())
+	press(m, "C")
+	k := m.chatKey
+	c := m.chat()
+	c.running, c.since = true, now.Add(-75*time.Second)
+	if s := screen(m); !strings.Contains(s, "thinking… 1m15s") {
+		t.Errorf("no time waited:\n%s", s)
+	}
+	if !m.reading() {
+		t.Error("the spinner does not turn while Claude answers")
+	}
+
+	press(m, "esc")
+	if s := screen(m); !strings.Contains(s, "Claude is answering on "+k.String()+"…") {
+		t.Errorf("the list does not say Claude is answering:\n%s", s)
+	}
+	m.Update(chatAnswerMsg{key: k, answer: claude.Answer{Text: "Later answer."}})
+	if !c.unseen || strings.Count(screen(m), "✦") != 1 {
+		t.Errorf("the answer that came elsewhere is not marked:\n%s", screen(m))
+	}
+	press(m, "C")
+	if c.unseen {
+		t.Error("opening the conversation kept the mark")
+	}
+}
+
 func TestClaudeDraft(t *testing.T) {
 	m, _ := startWith(t, fixture(), keymap.Default())
 	press(m, "C", "D")

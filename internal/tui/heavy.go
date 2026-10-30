@@ -109,10 +109,15 @@ func (m *Model) heavyRead(msg heavyMsg) tea.Cmd {
 func (m *Model) tabDone(t *tab) bool { return !t.loading && t.heavyLeft == 0 }
 
 // reading reports whether anything is being read that a spinner shows:
-// the lists, or the pull requests of a confirm popup.
+// the lists, the pull requests of a confirm popup, or Claude's answers.
 func (m *Model) reading() bool {
 	if m.bulk != nil && m.bulk.loading {
 		return true
+	}
+	for _, c := range m.chats {
+		if c.running {
+			return true
+		}
 	}
 	for _, t := range m.tabs {
 		if !m.tabDone(t) {

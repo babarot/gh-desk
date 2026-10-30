@@ -55,7 +55,13 @@ func (m *Model) render() string {
 	if m.statusErr {
 		st = m.st.red
 	}
-	b.WriteString(fit(st.Render(m.status), m.width) + "\n")
+	// Claude answering elsewhere takes the line until it is done, unless
+	// the line tells of a failure.
+	if s := m.claudeStatus(); s != "" && !m.statusErr {
+		b.WriteString(fit(s, m.width) + "\n")
+	} else {
+		b.WriteString(fit(st.Render(m.status), m.width) + "\n")
+	}
 	b.WriteString(fit(m.hints(), m.width))
 	lines := strings.Split(b.String(), "\n")
 	switch {

@@ -478,6 +478,8 @@ func (m *Model) cell(id string, r row, sel bool) string {
 		switch {
 		case m.selected[p.Key]:
 			mark = st.mauve.Render("✓")
+		case m.chats[p.Key] != nil && m.chats[p.Key].unseen:
+			mark = st.mauve.Render("✦")
 		case func() bool { _, ok := m.unread[p.Key]; return ok }():
 			mark = st.blue.Render("●")
 		}
