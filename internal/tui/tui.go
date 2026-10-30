@@ -76,6 +76,9 @@ type Settings struct {
 	Editor string
 	// Plan is what deciding a merge takes from the config file.
 	Plan plan.Settings
+	// ReleaseNotes has Claude read the release notes of the bot pull
+	// requests in a merge popup.
+	ReleaseNotes bool
 	// Rules are what S offers besides "approved by me".
 	Rules []plan.Rule
 	// Resume are the merges an earlier run was waiting for.
@@ -154,6 +157,9 @@ type Model struct {
 	// the one on screen.
 	chats   map[model.PRKey]*chat
 	chatKey model.PRKey
+	// cautions are what Claude said of release notes, by notesID; empty
+	// when nothing calls for care.
+	cautions map[string]string
 }
 
 // New returns the TUI reading from src, acting through run, and asking cl;
@@ -165,7 +171,7 @@ func New(src Source, run Runner, cl Claude, km keymap.Map, log *slog.Logger, set
 	if log == nil {
 		log = logging.Discard()
 	}
-	m := &Model{src: src, run: run, claude: cl, chats: map[model.PRKey]*chat{}, keys: km, log: log, set: set, ctx: context.Background(), unread: map[model.PRKey]model.Notification{},
+	m := &Model{src: src, run: run, claude: cl, chats: map[model.PRKey]*chat{}, cautions: map[string]string{}, keys: km, log: log, set: set, ctx: context.Background(), unread: map[model.PRKey]model.Notification{},
 		selected: map[model.PRKey]bool{}, progress: map[model.PRKey]progress{}, batches: map[string]*batchState{},
 		merged: map[model.PRKey]bool{}, refreshed: map[int]time.Time{}}
 	m.st = newStyles(mocha)

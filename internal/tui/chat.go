@@ -25,7 +25,8 @@ type Claude interface {
 	// Interactive is Claude Code resuming a session, to run in the
 	// terminal.
 	Interactive(dir, session string) *exec.Cmd
-	// Once asks with no tools and no session kept.
+	// Once asks with no tools and no session kept, in dir, or where the
+	// implementation picks when dir is empty.
 	Once(ctx context.Context, dir, prompt, schema string) (claude.Answer, error)
 }
 

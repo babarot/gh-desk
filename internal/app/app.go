@@ -169,6 +169,15 @@ func (a asker) Prepare(ctx context.Context, key model.PRKey, head string) (strin
 	return a.ws.Prepare(ctx, key, head)
 }
 
+// Once runs in the cache, away from any repository, so no project's
+// CLAUDE.md is read.
+func (a asker) Once(ctx context.Context, _ string, prompt, schema string) (claude.Answer, error) {
+	if err := os.MkdirAll(a.ws.Dir, 0o755); err != nil {
+		return claude.Answer{}, err
+	}
+	return a.Claude.Once(ctx, a.ws.Dir, prompt, schema)
+}
+
 // runnerGitHub is the GitHub client as the runner asks for it.
 type runnerGitHub struct{ *github.Client }
 
@@ -191,7 +200,7 @@ func settings(cfg config.File) tui.Settings {
 		InboxLimit: cfg.Inbox.Limit, HideClosed: cfg.Inbox.HideClosed, DoneAfterReview: cfg.Inbox.DoneAfterReview,
 		HomeOwners: cfg.UI.HomeOwners, StaleDays: cfg.UI.StaleDays, PreviewHeight: cfg.Preview.Height,
 		Collapse: cfg.Diff.Collapse, Theme: cfg.UI.Theme, Editor: cmp.Or(os.Getenv("VISUAL"), os.Getenv("EDITOR")),
-		Refresh: cfg.RefreshInterval(),
+		Refresh: cfg.RefreshInterval(), ReleaseNotes: cfg.Claude.ReleaseNotesCheck,
 		Plan: plan.Settings{AutoMerge: cfg.Merge.AutoMerge, UpdateBranch: cfg.Merge.UpdateBranch,
 			ApprovalChecks: cfg.UI.ApprovalChecks, AttentionPaths: cfg.Bulk.AttentionPaths},
 	}

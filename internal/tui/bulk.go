@@ -5,6 +5,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
+	"github.com/babarot/gh-triage/internal/claude"
 	"github.com/babarot/gh-triage/internal/keymap"
 	"github.com/babarot/gh-triage/internal/model"
 	"github.com/babarot/gh-triage/internal/plan"
@@ -21,7 +22,20 @@ type bulk struct {
 	err            error
 	offset         int
 	includeFailing bool
+	// notes is how far Claude has read the release notes of the bot pull
+	// requests to merge, and notesErr why it could not.
+	notes    notesState
+	notesErr string
 }
+
+type notesState int
+
+const (
+	notesOff notesState = iota
+	notesReading
+	notesRead
+	notesFailed
+)
 
 type bulkItem struct {
 	pr model.PR
@@ -153,6 +167,78 @@ func (m *Model) bulkInfo(msg bulkInfoMsg) tea.Cmd {
 		}
 	}
 	m.decideBulk()
+	return m.readNotes(b)
+}
+
+// notesID names what Claude said of a pull request's release notes at a
+// head, so another popup does not ask again.
+func notesID(p model.PR) string { return p.Key.String() + "@" + p.HeadOID }
+
+// readNotes has Claude read the release notes of the bot pull requests a
+// merge popup would merge, and mark those that need care. It only marks:
+// what is merged is still the user's choice.
+func (m *Model) readNotes(b *bulk) tea.Cmd {
+	if b.kind != runner.Merge || !m.set.ReleaseNotes || m.claude == nil {
+		return nil
+	}
+	var ask []model.PR
+	for _, it := range b.items {
+		if _, known := m.cautions[notesID(it.pr)]; it.goes(b.kind) && it.pr.AuthorIsBot && !known {
+			ask = append(ask, it.pr)
+		}
+	}
+	if len(ask) == 0 {
+		for _, it := range b.items {
+			if _, known := m.cautions[notesID(it.pr)]; known {
+				b.notes = notesRead
+			}
+		}
+		return nil
+	}
+	b.notes = notesReading
+	return func() tea.Msg {
+		var ids []string
+		for _, p := range ask {
+			ids = append(ids, p.ID)
+		}
+		bodies, err := m.src.Bodies(m.ctx, ids)
+		if err != nil {
+			return notesMsg{b: b, err: err}
+		}
+		var ns []claude.Notes
+		for _, p := range ask {
+			ns = append(ns, claude.Notes{Key: p.Key, Title: p.Title, Body: bodies[p.ID]})
+		}
+		a, err := m.claude.Once(m.ctx, "", claude.NotesPrompt(ns), claude.NotesSchema)
+		if err != nil {
+			return notesMsg{b: b, err: err}
+		}
+		cs, err := claude.ParseCautions(a, ns)
+		return notesMsg{b: b, asked: ask, cautions: cs, err: err}
+	}
+}
+
+type notesMsg struct {
+	b        *bulk
+	asked    []model.PR
+	cautions []claude.Caution
+	err      error
+}
+
+func (m *Model) notesRead(msg notesMsg) tea.Cmd {
+	if msg.err != nil {
+		m.log.Warn("release notes", "err", msg.err.Error())
+		msg.b.notes, msg.b.notesErr = notesFailed, msg.err.Error()
+		return nil
+	}
+	why := map[model.PRKey]string{}
+	for _, c := range msg.cautions {
+		why[c.Key] = c.Why
+	}
+	for _, p := range msg.asked {
+		m.cautions[notesID(p)] = why[p.Key]
+	}
+	msg.b.notes = notesRead
 	return nil
 }
 
@@ -288,8 +374,30 @@ func (m *Model) renderBulk() []string {
 		}
 		name := fit(st.sub1.Render(it.pr.Key.Repository())+st.muted.Render(fmt.Sprintf("#%d", it.pr.Key.Number)), 30)
 		lines = append(lines, mark+" "+name+" "+fit(title, max(w-80, 20))+"  "+what)
+		// On a line of its own: the reason is what to read before merging.
+		if why := m.cautions[notesID(it.pr)]; why != "" && it.goes(b.kind) {
+			lines = append(lines, "  "+st.peach.Render("⚑ "+safeLine(why)))
+		}
 	}
 	lines = append(lines, "")
+	switch b.notes {
+	case notesReading:
+		lines = append(lines, st.dim.Render("Claude is reading the release notes of the bot pull requests…"))
+	case notesRead:
+		n := 0
+		for _, it := range b.items {
+			if m.cautions[notesID(it.pr)] != "" && it.goes(b.kind) {
+				n++
+			}
+		}
+		text := "Claude read the release notes: nothing calls for care."
+		if n > 0 {
+			text = fmt.Sprintf("Claude read the release notes: %d marked ⚑ call for care.", n)
+		}
+		lines = append(lines, st.dim.Render(text))
+	case notesFailed:
+		lines = append(lines, st.yellow.Render("Claude could not read the release notes: "+safeLine(b.notesErr)))
+	}
 	if auto {
 		lines = append(lines, st.dim.Render("Auto-merge also merges commits pushed after it is on, as GitHub does."))
 	}

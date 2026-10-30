@@ -634,6 +634,8 @@ func TestNoWaitingWithoutTheLock(t *testing.T) {
 type fakeClaude struct {
 	asked    []claude.Request
 	prepared []model.PRKey
+	// notes are the prompts Once was given.
+	notes []string
 }
 
 func (c *fakeClaude) Prepare(_ context.Context, k model.PRKey, head string) (string, error) {
@@ -652,8 +654,9 @@ func (c *fakeClaude) Ask(_ context.Context, r claude.Request, progress func(clau
 
 func (c *fakeClaude) Interactive(dir, session string) *exec.Cmd { return exec.Command("true") }
 
-func (c *fakeClaude) Once(context.Context, string, string, string) (claude.Answer, error) {
-	return claude.Answer{Structured: []byte(`{"cautions":[]}`)}, nil
+func (c *fakeClaude) Once(_ context.Context, _, prompt, _ string) (claude.Answer, error) {
+	c.notes = append(c.notes, prompt)
+	return claude.Answer{Structured: []byte(`{"cautions":[{"key":"acme/api#30","why":"drops support for config v1"}]}`)}, nil
 }
 
 func TestClaudeConversation(t *testing.T) {
@@ -703,5 +706,31 @@ func TestClaudeDraft(t *testing.T) {
 	press(m, "esc")
 	if m.view != viewChat {
 		t.Errorf("discarding the draft went to %v", m.view)
+	}
+}
+
+func TestReleaseNotesMarkBotPullRequests(t *testing.T) {
+	f := fixture()
+	f.info = map[model.PRKey]func(*model.MergeInfo){
+		key("acme", "api", 30): func(mi *model.MergeInfo) { mi.Rollup = model.CheckSuccess },
+	}
+	m, r := startWith(t, f, keymap.Default())
+	m.set.ReleaseNotes = true
+	fc := m.claude.(*fakeClaude)
+	press(m, "b", "space", "j", "j", "space", "M")
+	if len(fc.notes) != 1 || !strings.Contains(fc.notes[0], "acme/api#30") || strings.Contains(fc.notes[0], "acme/api#12") {
+		t.Fatalf("asked about %q", fc.notes)
+	}
+	if s := screen(m); !strings.Contains(s, "⚑ drops support for config v1") || !strings.Contains(s, "1 marked ⚑") {
+		t.Errorf("no mark:\n%s", s)
+	}
+	// Marked, not left out: what is merged is still the user's choice.
+	press(m, "esc", "M")
+	if len(fc.notes) != 1 {
+		t.Errorf("asked again for the same heads: %d", len(fc.notes))
+	}
+	press(m, "y")
+	if len(r.items) != 1 || len(r.items[0]) != 2 {
+		t.Errorf("batches = %+v", r.items)
 	}
 }
