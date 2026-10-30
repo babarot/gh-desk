@@ -451,7 +451,7 @@ func (m *Model) renderBulk() []string {
 	if auto {
 		lines = append(lines, st.dim.Render("Auto-merge also merges commits pushed after it is on, as GitHub does."))
 	}
-	if b.kind == runner.Approve && failing > 0 {
+	if b.kind == runner.Approve && failing > 0 && !b.loading {
 		state := "left out"
 		if b.includeFailing {
 			state = "included"
