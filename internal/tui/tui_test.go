@@ -122,7 +122,7 @@ func (r *fakeRunner) Start(_ context.Context, kind runner.Kind, items []runner.I
 	for _, it := range items {
 		ev, ok := r.results[it.PR.Key]
 		if !ok {
-			ev = runner.Event{Result: runner.Merged, Text: "merged merge"}
+			ev = runner.Event{Result: runner.Merged, Text: "merged", Method: model.MethodMerge}
 			if kind == runner.Approve {
 				ev = runner.Event{Result: runner.Approved, Text: "approved", Approved: true}
 			}
@@ -492,6 +492,9 @@ func TestBulkMerge(t *testing.T) {
 	golden(t, "bulk-progress", screen(m))
 	if m.unseen() != 1 || !strings.Contains(m.notes[0].title, "merged 1, 1 skipped") {
 		t.Errorf("notes = %+v", m.notes)
+	}
+	if got := m.notes[0].items[0].text; got != "merged (merge commit)" {
+		t.Errorf("the note says %q", got)
 	}
 	press(m, "R")
 	if len(m.progress) != 0 || len(m.rows(m.tab())) == 0 {

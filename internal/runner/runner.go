@@ -130,6 +130,8 @@ type Event struct {
 	Text string
 	// Approved is set when an approval was sent.
 	Approved bool
+	// Method is how it was merged, on a Merged event gh-triage made.
+	Method model.MergeMethod
 	// Watch is set on events of a pull request put on auto-merge, after
 	// its batch has ended.
 	Watch bool
@@ -347,7 +349,8 @@ func (j *job) mergeNow(method model.MergeMethod) bool {
 	j.say(Running, "merging")
 	err := j.r.gh.Merge(j.ctx, j.it.PR.Key, j.it.PR.ID, j.head, method)
 	if err == nil {
-		j.say(Merged, "merged "+strings.ToLower(string(method)))
+		j.emit(Event{Key: j.it.PR.Key, Result: Merged, Text: "merged", Approved: j.approved, Method: method})
+		j.log.Info("pr end", logging.KeyStep, resultWord[Merged], "method", string(method))
 		return true
 	}
 	// A refused merge is read again to tell why: the head moved, it was

@@ -80,7 +80,12 @@ func (m *Model) event(msg eventMsg) tea.Cmd {
 		return tea.Batch(cmds...)
 	}
 	if ev.Result.Final() {
-		bs.done[ev.Key] = m.progress[ev.Key]
+		p := m.progress[ev.Key]
+		if ev.Method != "" {
+			// The row says merged; the notification says how.
+			p.text += " (" + methodWord(ev.Method) + ")"
+		}
+		bs.done[ev.Key] = p
 	}
 	if !bs.noted && len(bs.done) == len(bs.goes) {
 		bs.noted = true
@@ -146,6 +151,19 @@ func (m *Model) noteBatch(bs *batchState) tea.Cmd {
 	}
 	verb := map[runner.Kind]string{runner.Approve: "approve", runner.Merge: "merge"}[bs.kind]
 	return m.pushNote(icon, verb+" done: "+strings.Join(parts, ", "), items)
+}
+
+// methodWord names a merge method as people say it.
+func methodWord(m model.MergeMethod) string {
+	switch m {
+	case model.MethodMerge:
+		return "merge commit"
+	case model.MethodSquash:
+		return "squash"
+	case model.MethodRebase:
+		return "rebase"
+	}
+	return strings.ToLower(string(m))
 }
 
 // note is an in-app notification: kept for the session, so a result that

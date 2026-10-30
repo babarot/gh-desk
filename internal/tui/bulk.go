@@ -2,7 +2,6 @@ package tui
 
 import (
 	"fmt"
-	"strings"
 
 	tea "charm.land/bubbletea/v2"
 
@@ -265,7 +264,7 @@ func (m *Model) renderBulk() []string {
 				if it.d.Approve {
 					what = st.green.Render("approve") + st.dim.Render(" → ")
 				}
-				what += m.stepStyle(it.d.Step).Render(it.d.Reason) + " " + st.dim.Render("("+strings.ToLower(string(it.d.Method))+")")
+				what += m.stepStyle(it.d.Step).Render(it.d.Reason) + " " + st.dim.Render("("+methodWord(it.d.Method)+")")
 			}
 		} else {
 			what = st.dim.Render("skip · ") + st.red.Render(it.why())

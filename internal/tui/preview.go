@@ -270,7 +270,7 @@ func (m *Model) paneBody(p model.PR, n *model.Notification, e *entry[[]diff.File
 		d := plan.ForMerge(mi, p, m.viewer, m.set.Plan)
 		how := d.Reason
 		if d.Method != "" {
-			how += " (" + strings.ToLower(string(d.Method)) + ")"
+			how += " (" + methodWord(d.Method) + ")"
 		}
 		meta += "  " + st.muted.Render("merge:") + " " + m.stepStyle(d.Step).Render(how)
 	}
