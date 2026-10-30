@@ -2,6 +2,7 @@ package config
 
 import (
 	"os"
+	"reflect"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -39,8 +40,8 @@ func TestTemplateLoadsAsDefault(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if cfg.UI != Default().UI || cfg.Refresh != Default().Refresh || cfg.Keys != nil {
-		t.Errorf("cfg = %+v", cfg)
+	if !reflect.DeepEqual(cfg, Default()) {
+		t.Errorf("cfg = %+v\nwant %+v", cfg, Default())
 	}
 }
 
@@ -99,5 +100,31 @@ func TestReportPlacesKeyProblems(t *testing.T) {
 	err := Report(path, Problems{{Key: []string{"keys", "approve"}, Index: 1, Message: "never read"}})
 	if !strings.Contains(err.Error(), "config.toml:2:17: never read") || !strings.Contains(err.Error(), "^~~~~~~~~") {
 		t.Errorf("report = %v", err)
+	}
+}
+
+func TestSections(t *testing.T) {
+	cfg, err := Load(write(t, `
+[[sections]]
+name = "bots"
+query = "is:open is:pr author:app/renovate"
+`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(cfg.Sections) != 1 || cfg.Sections[0].Sort != "updated" || cfg.Sections[0].Limit != 100 {
+		t.Errorf("sections = %+v", cfg.Sections)
+	}
+	_, err = Load(write(t, `
+[[sections]]
+name = "inbox"
+query = ""
+group = "teams"
+folded = ["robots"]
+`))
+	for _, want := range []string{`name "inbox" is used twice`, "query must not be empty", `group must be "requested"`, `got "robots"`} {
+		if err == nil || !strings.Contains(err.Error(), want) {
+			t.Errorf("err = %v; want one containing %q", err, want)
+		}
 	}
 }

@@ -27,12 +27,63 @@ var Themes = []string{"auto", "mocha", "latte"}
 
 // File is the config file.
 type File struct {
-	Log     Log     `toml:"log"`
-	UI      UI      `toml:"ui"`
-	Refresh Refresh `toml:"refresh"`
+	// Sections are the tabs before the inbox, each a GitHub search. Given
+	// in the file, they replace the default ones.
+	Sections []Section `toml:"sections"`
+	Inbox    Inbox     `toml:"inbox"`
+	Log      Log       `toml:"log"`
+	UI       UI        `toml:"ui"`
+	Refresh  Refresh   `toml:"refresh"`
+	Preview  Preview   `toml:"preview"`
+	Diff     Diff      `toml:"diff"`
 	// Keys is [keys] as written; the keymap package checks it.
 	Keys Keys `toml:"-"`
 }
+
+// Section is a tab of pull requests found by a GitHub search.
+type Section struct {
+	Name  string `toml:"name"`
+	Query string `toml:"query"`
+	// Group is "requested" to split rows into you, team and bots, or "".
+	Group string `toml:"group"`
+	// Folded are the groups folded at start.
+	Folded []string `toml:"folded"`
+	// Sort is "updated" or "drafts_last".
+	Sort string `toml:"sort"`
+	// Limit is how many pull requests to read.
+	Limit int `toml:"limit"`
+}
+
+// Inbox configures the notifications tab.
+type Inbox struct {
+	// HideClosed hides notifications whose pull request is merged or
+	// closed until they are shown with a key.
+	HideClosed bool `toml:"hide_closed"`
+	// DoneAfterReview marks a pull request's notification done after a
+	// review is sent from gh-triage.
+	DoneAfterReview bool `toml:"done_after_review"`
+	// Limit is how many notifications to read.
+	Limit int `toml:"limit"`
+}
+
+// Preview configures the pane under the list.
+type Preview struct {
+	// Height is the pane's lines; 0 hides it until it is toggled.
+	Height int `toml:"height"`
+}
+
+// Diff configures how diffs are shown.
+type Diff struct {
+	// Collapse are glob patterns of files shown folded to one line.
+	Collapse []string `toml:"collapse"`
+}
+
+// Section groupings, sorts and groups.
+var (
+	SectionGroups = []string{"", "requested"}
+	SectionSorts  = []string{"updated", "drafts_last"}
+	GroupNames    = []string{"you", "team", "bots"}
+)
 
 // Log configures the log file.
 type Log struct {
@@ -45,6 +96,10 @@ type Log struct {
 type UI struct {
 	// Theme is one of Themes.
 	Theme string `toml:"theme"`
+	// HomeOwners are owners whose name is left out of the PR column.
+	HomeOwners []string `toml:"home_owners"`
+	// StaleDays is the age, in days, past which AGE is marked.
+	StaleDays int `toml:"stale_days"`
 }
 
 // Refresh configures the automatic refresh of the shown tab.
@@ -74,9 +129,17 @@ type KeyList struct {
 // Default is the config with every setting at its default.
 func Default() File {
 	return File{
+		Sections: []Section{
+			{Name: "review", Query: "is:open is:pr review-requested:@me archived:false", Group: "requested", Folded: []string{"team", "bots"}, Sort: "updated", Limit: 100},
+			{Name: "mine", Query: "is:open is:pr author:@me archived:false", Sort: "drafts_last", Limit: 100},
+			{Name: "involved", Query: "is:open is:pr involves:@me -author:@me -review-requested:@me archived:false", Sort: "updated", Limit: 100},
+		},
+		Inbox:   Inbox{HideClosed: true, DoneAfterReview: true, Limit: 100},
 		Log:     Log{Level: "info"},
-		UI:      UI{Theme: "auto"},
+		UI:      UI{Theme: "auto", StaleDays: 30},
 		Refresh: Refresh{Interval: "3m"},
+		Preview: Preview{Height: 14},
+		Diff:    Diff{Collapse: []string{"*.lock", "go.sum", "pnpm-lock.yaml", "package-lock.json", "yarn.lock"}},
 	}
 }
 
@@ -104,6 +167,36 @@ func FilePath() string {
 func Template(keys string) string {
 	return `# gh-triage settings. Uncomment a line to change it.
 
+# The tabs before the inbox, each a GitHub search. Tabs given here replace
+# all three below. group = "requested" splits a tab into requests to you,
+# requests to your teams, and pull requests opened by bots; folded are the
+# groups folded at start. sort is "updated" (default) or "drafts_last".
+# limit is how many pull requests to read (at most 1000).
+#
+# [[sections]]
+# name = "review"
+# query = "is:open is:pr review-requested:@me archived:false"
+# group = "requested"
+# folded = ["team", "bots"]
+#
+# [[sections]]
+# name = "mine"
+# query = "is:open is:pr author:@me archived:false"
+# sort = "drafts_last"
+#
+# [[sections]]
+# name = "involved"
+# query = "is:open is:pr involves:@me -author:@me -review-requested:@me archived:false"
+
+[inbox]
+# Hide notifications whose pull request is merged or closed until they are
+# shown with a key.
+# hide_closed = true
+# Mark a pull request's notification done after you review it here.
+# done_after_review = true
+# How many notifications to read.
+# limit = 100
+
 [log]
 # How much goes to the log file: "debug", "info" (default), "warn" or
 # "error". --debug and GH_TRIAGE_LOG_LEVEL take precedence. gh triage log
@@ -114,11 +207,25 @@ func Template(keys string) string {
 # Color scheme: "auto" (default) picks mocha on a dark terminal and latte on a
 # light one; or "mocha", "latte".
 # theme = "auto"
+# Owners whose name is left out of the PR column, such as your company.
+# home_owners = []
+# Mark AGE when a pull request has not been updated for this many days.
+# stale_days = 30
 
 [refresh]
 # Refresh the shown tab this often, as a Go duration such as "3m" or "90s";
 # "0" refreshes only when R is pressed.
 # interval = "3m"
+
+[preview]
+# Lines of the preview pane under the list; 0 hides it until it is shown
+# with a key.
+# height = 14
+
+[diff]
+# Files shown folded, as their name and line counts, until unfolded: glob
+# patterns, matched against the base name unless they have a slash.
+# collapse = ["*.lock", "go.sum", "pnpm-lock.yaml", "package-lock.json", "yarn.lock"]
 
 [keys]
 # Which keys do what, by action: a key or a list of keys, replacing the
@@ -161,26 +268,91 @@ func Load(path string) (File, error) {
 	cfg := Default()
 	// [keys] is read as it is and checked by the keymap.
 	doc := struct {
-		Log     Log            `toml:"log"`
-		UI      UI             `toml:"ui"`
-		Refresh Refresh        `toml:"refresh"`
-		Keys    map[string]any `toml:"keys"`
-	}{Log: cfg.Log, UI: cfg.UI, Refresh: cfg.Refresh}
+		Sections []Section      `toml:"sections"`
+		Inbox    Inbox          `toml:"inbox"`
+		Log      Log            `toml:"log"`
+		UI       UI             `toml:"ui"`
+		Refresh  Refresh        `toml:"refresh"`
+		Preview  Preview        `toml:"preview"`
+		Diff     Diff           `toml:"diff"`
+		Keys     map[string]any `toml:"keys"`
+	}{Inbox: cfg.Inbox, Log: cfg.Log, UI: cfg.UI, Refresh: cfg.Refresh, Preview: cfg.Preview, Diff: cfg.Diff}
 	if err := toml.NewDecoder(bytes.NewReader(src)).DisallowUnknownFields().Decode(&doc); err != nil {
 		return File{}, Report(path, decodeProblems(err))
 	}
-	cfg = File{Log: doc.Log, UI: doc.UI, Refresh: doc.Refresh, Keys: keysFrom(doc.Keys)}
-	var ps Problems
+	sections := cfg.Sections
+	if doc.Sections != nil {
+		sections = doc.Sections
+	}
+	cfg = File{Sections: sections, Inbox: doc.Inbox, Log: doc.Log, UI: doc.UI, Refresh: doc.Refresh,
+		Preview: doc.Preview, Diff: doc.Diff, Keys: keysFrom(doc.Keys)}
+	ps := checkSections(cfg.Sections)
 	if !slices.Contains(Themes, cfg.UI.Theme) {
 		ps = append(ps, problem("ui.theme", "ui.theme must be one of %s, got %q", quoted(Themes), cfg.UI.Theme))
 	}
 	if d, err := time.ParseDuration(cfg.Refresh.Interval); err != nil || d < 0 {
 		ps = append(ps, problem("refresh.interval", `refresh.interval must be a duration such as "3m", or "0", got %q`, cfg.Refresh.Interval))
 	}
+	if cfg.UI.StaleDays < 0 {
+		ps = append(ps, problem("ui.stale_days", "ui.stale_days must be 0 or more, got %d", cfg.UI.StaleDays))
+	}
+	if cfg.Preview.Height < 0 {
+		ps = append(ps, problem("preview.height", "preview.height must be 0 or more, got %d", cfg.Preview.Height))
+	}
+	if cfg.Inbox.Limit < 1 || cfg.Inbox.Limit > 1000 {
+		ps = append(ps, problem("inbox.limit", "inbox.limit must be between 1 and 1000, got %d", cfg.Inbox.Limit))
+	}
 	if len(ps) > 0 {
 		return File{}, Report(path, ps)
 	}
 	return cfg, nil
+}
+
+// checkSections reports what is wrong with the tabs, and fills in the
+// defaults of the keys left out of each.
+func checkSections(ss []Section) Problems {
+	var ps Problems
+	bad := func(i int, format string, args ...any) {
+		ps = append(ps, Problem{Key: []string{"sections"}, Index: -1, Message: fmt.Sprintf("sections[%d]: ", i) + fmt.Sprintf(format, args...)})
+	}
+	if len(ss) == 0 {
+		ps = append(ps, Problem{Key: []string{"sections"}, Index: -1, Message: "sections: at least one tab is needed"})
+	}
+	seen := map[string]bool{"inbox": true}
+	for i := range ss {
+		s := &ss[i]
+		if s.Sort == "" {
+			s.Sort = "updated"
+		}
+		if s.Limit == 0 {
+			s.Limit = 100
+		}
+		switch {
+		case strings.TrimSpace(s.Name) == "":
+			bad(i, "name must not be empty")
+		case seen[s.Name]:
+			bad(i, "name %q is used twice (inbox is taken)", s.Name)
+		}
+		seen[s.Name] = true
+		if strings.TrimSpace(s.Query) == "" {
+			bad(i, "query must not be empty")
+		}
+		if !slices.Contains(SectionGroups, s.Group) {
+			bad(i, `group must be "requested" or left out, got %q`, s.Group)
+		}
+		if !slices.Contains(SectionSorts, s.Sort) {
+			bad(i, "sort must be one of %s, got %q", quoted(SectionSorts), s.Sort)
+		}
+		for _, g := range s.Folded {
+			if !slices.Contains(GroupNames, g) {
+				bad(i, "folded must name groups among %s, got %q", quoted(GroupNames), g)
+			}
+		}
+		if s.Limit < 1 || s.Limit > 1000 {
+			bad(i, "limit must be between 1 and 1000, got %d", s.Limit)
+		}
+	}
+	return ps
 }
 
 // keysFrom reads [keys] as decoded.
