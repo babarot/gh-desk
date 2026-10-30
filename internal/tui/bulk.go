@@ -16,9 +16,11 @@ import (
 // or of every one selected. It reads each pull request again, decides what
 // to do with it, and lists that, with the reason for every one it skips.
 type bulk struct {
-	kind           runner.Kind
-	items          []bulkItem
+	kind  runner.Kind
+	items []bulkItem
+	// loading is set until every read is back; left counts them.
 	loading        bool
+	left           int
 	err            error
 	offset         int
 	includeFailing bool
@@ -40,8 +42,10 @@ const (
 type bulkItem struct {
 	pr model.PR
 	mi model.MergeInfo
-	ok bool
-	d  plan.Decision
+	// read is set once its read is back, and ok when it found it.
+	read bool
+	ok   bool
+	d    plan.Decision
 	// moved is set when the head is not the one the list read, so the
 	// diff the user looked at is not what would be approved or merged.
 	moved bool
@@ -79,9 +83,17 @@ func (it bulkItem) why() string {
 
 type bulkInfoMsg struct {
 	b   *bulk
+	ids []string
 	got map[string]model.MergeInfo
 	err error
 }
+
+// The popup reads its pull requests again a few at a time, side by side,
+// so the rows fill in as they come and the whole is sooner than one read.
+const (
+	bulkBatch    = 5
+	bulkInFlight = 10
+)
 
 // startBulk opens the popup for the selected pull requests, or for the one
 // under the cursor when none is selected.
@@ -123,10 +135,27 @@ func (m *Model) startBulkFor(kind runner.Kind, prs []model.PR) tea.Cmd {
 		}
 	}
 	m.bulk = b
-	return func() tea.Msg {
-		got, err := m.src.MergeInfo(m.ctx, ids, true)
-		return bulkInfoMsg{b, got, err}
+	// Many selected: bigger batches, so no more than bulkInFlight reads
+	// are on their way at once.
+	size := max(bulkBatch, (len(ids)+bulkInFlight-1)/bulkInFlight)
+	var cmds []tea.Cmd
+	for len(ids) > 0 {
+		n := min(size, len(ids))
+		part := ids[:n]
+		ids = ids[n:]
+		b.left++
+		cmds = append(cmds, func() tea.Msg {
+			got, err := m.src.MergeInfo(m.ctx, part, true)
+			return bulkInfoMsg{b, part, got, err}
+		})
 	}
+	if b.left == 0 {
+		b.loading = false
+		for i := range b.items {
+			b.items[i].read = true
+		}
+	}
+	return tea.Batch(cmds...)
 }
 
 func containsKey(prs []model.PR, k model.PRKey) bool {
@@ -157,14 +186,34 @@ func (m *Model) bulkInfo(msg bulkInfoMsg) tea.Cmd {
 	if m.bulk != b {
 		return nil
 	}
-	b.loading, b.err = false, msg.err
+	b.left--
+	b.loading = b.left > 0
+	if msg.err != nil {
+		b.err = msg.err
+	}
+	asked := map[string]bool{}
+	for _, id := range msg.ids {
+		asked[id] = true
+	}
 	for i := range b.items {
 		it := &b.items[i]
+		if !asked[it.pr.ID] {
+			continue
+		}
+		it.read = true
 		it.mi, it.ok = msg.got[it.pr.ID]
 		if it.ok {
 			m.cache.info[it.pr.Key] = it.mi
 			it.moved = it.mi.State == model.StateOpen && it.mi.HeadOID != it.pr.HeadOID
 		}
+	}
+	if b.loading {
+		m.decideBulk()
+		return nil
+	}
+	// A pull request with no ID is never read.
+	for i := range b.items {
+		b.items[i].read = true
 	}
 	m.decideBulk()
 	return m.readNotes(b)
@@ -333,9 +382,6 @@ func (m *Model) renderBulk() []string {
 		}
 	}
 	var lines []string
-	if b.loading {
-		return box(st, verb, []string{st.dim.Render(fmt.Sprintf("reading %d pull requests…", len(b.items)))}, w)
-	}
 	if b.err != nil {
 		lines = append(lines, st.red.Render("could not read them all: "+b.err.Error()))
 	}
@@ -355,7 +401,11 @@ func (m *Model) renderBulk() []string {
 	for _, it := range b.items[b.offset:end] {
 		mark, title := st.dim.Render("·"), st.dim.Render(it.pr.Title)
 		var what string
-		if it.goes(b.kind) {
+		switch {
+		case !it.read:
+			// Shown from the list until it is read again.
+			mark, title, what = st.dim.Render(m.spinner()), st.muted.Render(it.pr.Title), st.dim.Render("reading…")
+		case it.goes(b.kind):
 			mark, title = st.mauve.Render("✓"), st.sub1.Render(it.pr.Title)
 			switch {
 			case b.kind == runner.Approve:
@@ -366,7 +416,7 @@ func (m *Model) renderBulk() []string {
 				}
 				what += m.stepStyle(it.d.Step).Render(it.d.Reason) + " " + st.dim.Render("("+methodWord(it.d.Method)+")")
 			}
-		} else {
+		default:
 			what = st.dim.Render("skip · ") + st.red.Render(it.why())
 		}
 		if len(it.d.Notes) > 0 && it.goes(b.kind) {
@@ -408,7 +458,9 @@ func (m *Model) renderBulk() []string {
 		}
 		lines = append(lines, st.dim.Render(fmt.Sprintf("%d with failing checks are %s · %s to change", failing, state, m.firstKey("include_failing"))))
 	}
-	lines = append(lines, st.dim.Render("GitHub cannot take an approval or a merge back. Each acts only on the head shown when it was read."))
+	if !b.loading {
+		lines = append(lines, st.dim.Render("GitHub cannot take an approval or a merge back. Each acts only on the head shown when it was read."))
+	}
 	hint := fmt.Sprintf("%s %d of %d? ", verb, goes, len(b.items))
 	if len(b.items) == 1 {
 		hint = verb + " this pull request? "
@@ -419,6 +471,26 @@ func (m *Model) renderBulk() []string {
 	scroll := ""
 	if len(b.items) > bulkRows {
 		scroll = st.dim.Render(fmt.Sprintf("  %d–%d of %d · %s/%s", b.offset+1, end, len(b.items), m.firstKey("down"), m.firstKey("up")))
+	}
+	if b.loading {
+		// Nothing can be confirmed until every pull request is read again.
+		read := 0
+		for _, it := range b.items {
+			if it.read {
+				read++
+			}
+		}
+		what := "reading the pull request again…"
+		if len(b.items) > 1 {
+			what = fmt.Sprintf("reading %d pull requests again… %d of %d read", len(b.items), read, len(b.items))
+		}
+		lines = append(lines, st.mauve.Render(m.spinner())+" "+st.muted.Render(what)+
+			st.dim.Render(" · ")+st.key.Render(keymap.Back)+" "+st.muted.Render("cancel")+scroll)
+		title := verb + " " + m.spinner()
+		if len(b.items) > 1 {
+			title = fmt.Sprintf("%s %s of %d", verb, m.spinner(), len(b.items))
+		}
+		return box(st, title, lines, w)
 	}
 	lines = append(lines, "", st.sub0.Render(hint)+st.key.Render(m.firstKey("confirm"))+" "+st.muted.Render("yes")+
 		st.dim.Render(" · ")+st.key.Render(keymap.Back)+" "+st.muted.Render("no")+scroll)

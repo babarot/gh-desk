@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -173,4 +174,53 @@ func TestCursorStaysAfterTheSwap(t *testing.T) {
 	if r, _ := m.current(); r.pr.Key != key("acme", "api", 12) {
 		t.Errorf("cursor moved to %v", r.pr.Key)
 	}
+}
+
+// The merge popup lists its pull requests at once, reads them again five at
+// a time, fills in each as it comes, and takes y only when all are read.
+func TestPopupFillsInAsItReads(t *testing.T) {
+	m, r := startWith(t, fixture(), keymap.Default())
+	var prs []model.PR
+	for _, tt := range m.tabs {
+		prs = append(prs, tt.prs...)
+	}
+	for i := len(prs); i < 7; i++ {
+		prs = append(prs, model.PR{ID: fmt.Sprintf("x%d", i), Key: key("acme", "extra", i), Title: fmt.Sprintf("Extra %d", i), HeadOID: "e"})
+	}
+	cmd := m.startBulkFor(runner.Merge, prs)
+	parts := flatten(cmd)
+	if len(parts) != 2 {
+		t.Fatalf("%d reads, want 2 of 5 and 2", len(parts))
+	}
+	if s := screen(m); !strings.Contains(s, "Add retries to the client") || !strings.Contains(s, "reading…") || !strings.Contains(s, "again… 0 of 7 read") {
+		t.Errorf("rows are not listed before they are read:\n%s", s)
+	}
+	m.Update(parts[0]())
+	if s := screen(m); !strings.Contains(s, "5 of 7 read") || !strings.Contains(s, "merge now") {
+		t.Errorf("the first five did not fill in:\n%s", s)
+	}
+	press(m, "y")
+	if len(r.items) != 0 || m.bulk == nil {
+		t.Fatalf("y went through before every pull request was read: %v", r.items)
+	}
+	m.Update(parts[1]())
+	if m.bulk.loading || !strings.Contains(screen(m), "? y yes") {
+		t.Errorf("not ready after the last read:\n%s", screen(m))
+	}
+}
+
+// flatten is the commands of a batch, each to run alone.
+func flatten(cmd tea.Cmd) []tea.Cmd {
+	if cmd == nil {
+		return nil
+	}
+	msg := cmd()
+	if b, ok := msg.(tea.BatchMsg); ok {
+		var out []tea.Cmd
+		for _, c := range b {
+			out = append(out, flatten(c)...)
+		}
+		return out
+	}
+	return []tea.Cmd{func() tea.Msg { return msg }}
 }
