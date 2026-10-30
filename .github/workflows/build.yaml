@@ -43,7 +43,9 @@ jobs:
   test:
     strategy:
       matrix:
-        os: ['ubuntu-latest', 'macos-latest']
+        # Add macos-latest once the repository is public: while it is private,
+        # a minute on macOS uses ten of the free Actions minutes
+        os: ['ubuntu-latest']
     runs-on: ${{ matrix.os }}
     timeout-minutes: 15
     permissions:
