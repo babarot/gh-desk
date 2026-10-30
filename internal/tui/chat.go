@@ -49,6 +49,9 @@ type chat struct {
 	model   string
 	// scroll is how many lines up from the end the screen shows.
 	scroll int
+	// draft is a review drafted while the screen was elsewhere, opened
+	// when it is shown again.
+	draft  *claude.Draft
 	typing bool
 	input  textarea.Model
 	back   view
@@ -107,6 +110,10 @@ func (m *Model) openChat(p model.PR) tea.Cmd {
 	if c, ok := m.chats[p.Key]; ok {
 		c.back = back
 		m.chatKey, m.view = p.Key, viewChat
+		if d := c.draft; d != nil {
+			c.draft = nil
+			return m.draftCompose(c, *d)
+		}
 		return nil
 	}
 	ta := textarea.New()
@@ -198,6 +205,12 @@ func (m *Model) chatAnswer(msg chatAnswerMsg) tea.Cmd {
 	}
 	c.running, c.cancel = false, nil
 	if msg.err != nil {
+		if !c.started {
+			// Claude Code may have made the session before failing; the
+			// next question starts a new one, as a session ID is taken
+			// once.
+			c.session = claude.NewSession()
+		}
 		if m.ctx.Err() == nil {
 			c.turns = append(c.turns, turn{text: msg.err.Error(), steps: c.steps, err: true})
 		}
@@ -220,6 +233,7 @@ func (m *Model) chatAnswer(msg chatAnswerMsg) tea.Cmd {
 		c.turns = append(c.turns, turn{text: "Drafted a review (" + kindWords[d.Event] + ").", steps: c.steps})
 		c.steps = nil
 		if m.view != viewChat || m.chatKey != msg.key {
+			c.draft = &d
 			m.setStatus(fmt.Sprintf("the review of %s is drafted; open Claude to see it", msg.key), false)
 			return nil
 		}

@@ -636,6 +636,8 @@ type fakeClaude struct {
 	prepared []model.PRKey
 	// notes are the prompts Once was given.
 	notes []string
+	// fail makes the next question fail.
+	fail bool
 }
 
 func (c *fakeClaude) Prepare(_ context.Context, k model.PRKey, head string) (string, error) {
@@ -645,6 +647,10 @@ func (c *fakeClaude) Prepare(_ context.Context, k model.PRKey, head string) (str
 
 func (c *fakeClaude) Ask(_ context.Context, r claude.Request, progress func(claude.Step)) (claude.Answer, error) {
 	c.asked = append(c.asked, r)
+	if c.fail {
+		c.fail = false
+		return claude.Answer{}, fmt.Errorf("claude: rate limited")
+	}
 	progress(claude.Step{Tool: "Read", Arg: "main.go"})
 	if r.Schema != "" {
 		return claude.Answer{Structured: []byte(`{"event":"APPROVE","body":"Looks good: the retry is bounded."}`), Cost: 0.1, Model: "claude-opus-5-5"}, nil
@@ -732,5 +738,24 @@ func TestReleaseNotesMarkBotPullRequests(t *testing.T) {
 	press(m, "y")
 	if len(r.items) != 1 || len(r.items[0]) != 2 {
 		t.Errorf("batches = %+v", r.items)
+	}
+}
+
+// A failed first question does not leave the session ID taken: the next
+// one starts a new session.
+func TestClaudeFirstFailureStartsAgain(t *testing.T) {
+	m, _ := startWith(t, fixture(), keymap.Default())
+	fc := m.claude.(*fakeClaude)
+	fc.fail = true
+	press(m, "C")
+	if !strings.Contains(screen(m), "rate limited") {
+		t.Fatalf("no error shown:\n%s", screen(m))
+	}
+	press(m, "i", "o", "k", "enter")
+	if len(fc.asked) != 2 {
+		t.Fatalf("asked %d", len(fc.asked))
+	}
+	if r := fc.asked[1]; !r.First || r.Session == fc.asked[0].Session {
+		t.Errorf("retry %+v after %+v", r, fc.asked[0])
 	}
 }

@@ -94,19 +94,29 @@ func (w *Workspace) Prepare(ctx context.Context, k model.PRKey, head string) (st
 	}
 	wt := w.WorktreePath(k)
 	if _, err := os.Stat(wt); err == nil {
-		// Claude only reads, so the worktree has nothing to keep.
-		if _, err := git(ctx, wt, "checkout", "--quiet", "--force", "--detach", head); err != nil {
-			return "", err
+		// Claude only reads, so the worktree has nothing to keep. One left
+		// half done (a lock of a checkout cut short) is made again.
+		if _, err := git(ctx, wt, "checkout", "--quiet", "--force", "--detach", head); err == nil {
+			log.Debug("worktree ready", "head", head, logging.KeyDurationMS, time.Since(start).Milliseconds())
+			return wt, nil
 		}
-	} else {
-		if err := os.MkdirAll(filepath.Dir(wt), 0o755); err != nil {
-			return "", err
+		if ctx.Err() != nil {
+			return "", ctx.Err()
 		}
-		// A worktree removed by hand leaves its entry behind.
-		_, _ = git(ctx, repo, "worktree", "prune")
-		if _, err := git(ctx, repo, "worktree", "add", "--quiet", "--detach", wt, head); err != nil {
-			return "", err
+		log.Info("making the worktree again")
+		if _, err := git(ctx, repo, "worktree", "remove", "--force", wt); err != nil {
+			if err := os.RemoveAll(wt); err != nil {
+				return "", err
+			}
 		}
+	}
+	if err := os.MkdirAll(filepath.Dir(wt), 0o755); err != nil {
+		return "", err
+	}
+	// A worktree removed by hand leaves its entry behind.
+	_, _ = git(ctx, repo, "worktree", "prune")
+	if _, err := git(ctx, repo, "worktree", "add", "--quiet", "--detach", wt, head); err != nil {
+		return "", err
 	}
 	log.Debug("worktree ready", "head", head, logging.KeyDurationMS, time.Since(start).Milliseconds())
 	return wt, nil
@@ -123,8 +133,14 @@ func (w *Workspace) clone(ctx context.Context, k model.PRKey, dir string) error 
 	if err := os.MkdirAll(filepath.Dir(dir), 0o755); err != nil {
 		return err
 	}
-	tmp := dir + ".partial"
-	_ = os.RemoveAll(tmp)
+	// A directory of its own, so two gh-triage cloning at once do not
+	// write into one.
+	parent, err := os.MkdirTemp(filepath.Dir(dir), "."+filepath.Base(dir)+"-")
+	if err != nil {
+		return err
+	}
+	defer os.RemoveAll(parent)
+	tmp := filepath.Join(parent, "clone")
 	args := []string{"clone", "--quiet", "--filter=blob:none", "--no-checkout"}
 	for _, root := range w.Borrow {
 		mine := filepath.Join(root, "github.com", k.Owner, k.Repo)
@@ -139,10 +155,16 @@ func (w *Workspace) clone(ctx context.Context, k model.PRKey, dir string) error 
 	}
 	args = append(args, url, tmp)
 	if _, err := git(ctx, "", args...); err != nil {
-		_ = os.RemoveAll(tmp)
 		return err
 	}
-	return os.Rename(tmp, dir)
+	if err := os.Rename(tmp, dir); err != nil {
+		// Another gh-triage cloned it first.
+		if _, serr := os.Stat(filepath.Join(dir, ".git")); serr == nil {
+			return nil
+		}
+		return err
+	}
+	return nil
 }
 
 // Worktree is a pull request's worktree in the cache.
@@ -204,6 +226,9 @@ func git(ctx context.Context, dir string, args ...string) (string, error) {
 	cmd := exec.CommandContext(ctx, "git", full...)
 	cmd.Dir = dir
 	cmd.Env = append(os.Environ(), "GIT_TERMINAL_PROMPT=0")
+	// Stopped by an interrupt, not killed, so git removes its locks.
+	cmd.Cancel = func() error { return cmd.Process.Signal(os.Interrupt) }
+	cmd.WaitDelay = 5 * time.Second
 	var out, stderr bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &out, &stderr
 	if err := cmd.Run(); err != nil {

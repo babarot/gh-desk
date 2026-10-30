@@ -285,3 +285,26 @@ func TestWorkspaceRunsNoHooks(t *testing.T) {
 		t.Error("a hook from the pull request ran")
 	}
 }
+
+// A checkout cut short leaves its lock; the next Prepare makes the
+// worktree again.
+func TestWorkspaceRecoversFromALock(t *testing.T) {
+	src, head := origin(t)
+	w := &Workspace{Dir: t.TempDir(), Log: logging.Discard(), Remote: func(string, string) string { return "file://" + src }}
+	k := model.PRKey{Owner: "acme", Repo: "api", Number: 1}
+	wt, err := w.Prepare(context.Background(), k, head)
+	if err != nil {
+		t.Fatal(err)
+	}
+	gitDir := gitRun(t, wt, "rev-parse", "--absolute-git-dir")
+	if err := os.WriteFile(filepath.Join(gitDir, "index.lock"), nil, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	base := gitRun(t, src, "rev-parse", "main")
+	if _, err := w.Prepare(context.Background(), k, base); err != nil {
+		t.Fatal(err)
+	}
+	if got := read(t, filepath.Join(wt, "a.txt")); got != "one\n" {
+		t.Errorf("a.txt = %q", got)
+	}
+}
