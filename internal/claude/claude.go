@@ -1,5 +1,6 @@
-// Package claude asks Claude Code about pull requests and keeps the
-// worktrees it reads them in.
+// Package claude asks Claude Code about pull requests, and for plans of
+// what to show and select in the lists, and keeps the worktrees it reads
+// pull requests in.
 //
 // It runs Claude Code itself, `claude -p`, so it uses the account the user
 // is signed in with and no API key. Everything in a pull request was written
@@ -39,7 +40,8 @@ type Options struct {
 	Tools []string
 	// Language is what Claude answers in.
 	Language string
-	// Instructions are appended to the system prompt of every review.
+	// Instructions are appended to the system prompt of every review and
+	// triage.
 	Instructions string
 	Log          *slog.Logger
 }
@@ -98,7 +100,9 @@ func (c *Claude) restricted(tools []string) []string {
 
 // Request is one question in a session.
 type Request struct {
-	// Dir is the worktree Claude works in.
+	// Dir is where Claude runs: the worktree of a review, or a directory
+	// away from any repository for a triage. A session is resumed only from
+	// the directory it started in.
 	Dir string
 	// Session is the conversation; First starts it.
 	Session string
@@ -108,13 +112,30 @@ type Request struct {
 	Schema string
 }
 
-// Ask asks Claude in a session kept by Claude Code, so it can be resumed,
-// here or in Claude Code. progress hears of each tool Claude uses.
+// Ask asks Claude about a pull request in a session kept by Claude Code,
+// so it can be resumed, here or in Claude Code. progress hears of each
+// tool Claude uses.
 func (c *Claude) Ask(ctx context.Context, r Request, progress func(Step)) (Answer, error) {
+	args := c.session(r, reviewInstructions, c.opt.Tools)
+	args = append(args, "--allowedTools", strings.Join(c.opt.Tools, ","))
+	return c.run(ctx, c.opt.Log.With(logging.KeyClaude, r.Session), r.Dir, args, r.Prompt, progress)
+}
+
+// Triage asks Claude for a plan of what to show and select in the lists,
+// as TriageSchema, in a session kept by Claude Code. It has no tools:
+// everything Claude needs is in the prompt.
+func (c *Claude) Triage(ctx context.Context, r Request) (Answer, error) {
+	r.Schema = TriageSchema
+	args := c.session(r, triageInstructions, nil)
+	return c.run(ctx, c.opt.Log.With(logging.KeyClaude, r.Session), r.Dir, args, r.Prompt, func(Step) {})
+}
+
+// session are the arguments of a question in a session, with tools and
+// instructions as the system prompt.
+func (c *Claude) session(r Request, instructions string, tools []string) []string {
 	args := []string{"-p", "--model", c.opt.Model, "--output-format", "stream-json", "--verbose"}
-	args = append(args, c.restricted(c.opt.Tools)...)
-	args = append(args, "--allowedTools", strings.Join(c.opt.Tools, ","),
-		"--append-system-prompt", reviewInstructions+"\n\nAnswer in "+c.opt.Language+"."+c.extra())
+	args = append(args, c.restricted(tools)...)
+	args = append(args, "--append-system-prompt", c.system(instructions))
 	if r.First {
 		args = append(args, "--session-id", r.Session)
 	} else {
@@ -123,15 +144,17 @@ func (c *Claude) Ask(ctx context.Context, r Request, progress func(Step)) (Answe
 	if r.Schema != "" {
 		args = append(args, "--json-schema", r.Schema)
 	}
-	log := c.opt.Log.With(logging.KeyClaude, r.Session)
-	return c.run(ctx, log, r.Dir, args, r.Prompt, progress)
+	return args
 }
 
-func (c *Claude) extra() string {
-	if strings.TrimSpace(c.opt.Instructions) == "" {
-		return ""
+// system is the system prompt: instructions, the language to answer in,
+// and what the config file adds.
+func (c *Claude) system(instructions string) string {
+	s := instructions + "\n\nAnswer in " + c.opt.Language + "."
+	if strings.TrimSpace(c.opt.Instructions) != "" {
+		s += "\n\n" + c.opt.Instructions
 	}
-	return "\n\n" + c.opt.Instructions
+	return s
 }
 
 // Once asks a question with no tools and no session kept, from dir.

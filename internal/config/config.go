@@ -146,7 +146,8 @@ type Claude struct {
 	AllowedTools []string `toml:"allowed_tools"`
 	// Language is what Claude answers in, such as "Japanese".
 	Language string `toml:"language"`
-	// Instructions are appended to the system prompt of every review.
+	// Instructions are appended to the system prompt of every review and
+	// triage.
 	Instructions string `toml:"instructions"`
 	// ReleaseNotesCheck lets Claude read the release notes of the bot pull
 	// requests in a merge popup.
@@ -412,7 +413,7 @@ func Template(keys string) string {
 # The language Claude answers in, such as "Japanese". A review drafted with
 # D is written in the language of the pull request instead.
 # language = "English"
-# Appended to the instructions of every review, such as
+# Appended to the instructions of every review and triage, such as
 # "Point out changes that have no tests."
 # instructions = ""
 # Let Claude read the release notes of the bot pull requests in the merge

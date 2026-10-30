@@ -253,6 +253,16 @@ func (a asker) Once(ctx context.Context, _ string, prompt, schema string) (claud
 	return a.Claude.Once(ctx, a.ws.Dir, prompt, schema)
 }
 
+// Triage runs in the cache too: a triage is about no repository, and its
+// session is resumed from there.
+func (a asker) Triage(ctx context.Context, r claude.Request) (claude.Answer, error) {
+	if err := os.MkdirAll(a.ws.Dir, 0o755); err != nil {
+		return claude.Answer{}, err
+	}
+	r.Dir = a.ws.Dir
+	return a.Claude.Triage(ctx, r)
+}
+
 // runnerGitHub is the GitHub client as the runner asks for it.
 type runnerGitHub struct{ *github.Client }
 
