@@ -132,6 +132,59 @@ type Notification struct {
 type Check struct {
 	Name  string
 	State CheckState
+	// Required is whether the base branch's rules require it to pass.
+	Required bool
+}
+
+// MergeState is GitHub's mergeStateStatus: whether a pull request can be
+// merged now, and if not, why.
+type MergeState string
+
+const (
+	MergeClean    MergeState = "CLEAN"
+	MergeUnstable MergeState = "UNSTABLE"
+	MergeHasHooks MergeState = "HAS_HOOKS"
+	MergeBehind   MergeState = "BEHIND"
+	MergeBlocked  MergeState = "BLOCKED"
+	MergeDirty    MergeState = "DIRTY"
+	MergeDraft    MergeState = "DRAFT"
+	MergeUnknown  MergeState = "UNKNOWN"
+)
+
+// MergeMethod is how a pull request is merged.
+type MergeMethod string
+
+const (
+	MethodMerge  MergeMethod = "MERGE"
+	MethodSquash MergeMethod = "SQUASH"
+	MethodRebase MergeMethod = "REBASE"
+)
+
+// RepoMerge is what a repository allows when merging.
+type RepoMerge struct {
+	Methods   []MergeMethod
+	AutoMerge bool
+}
+
+// MergeInfo is what deciding and following a merge needs about one pull
+// request, read fresh before each step.
+type MergeInfo struct {
+	Key        PRKey
+	ID         string
+	State      PRState
+	Draft      bool
+	HeadOID    string
+	MergeState MergeState
+	Decision   ReviewDecision
+	// AutoMerge is whether auto-merge is on.
+	AutoMerge bool
+	Rollup    CheckState
+	// Checks and Files are read only when asked for; nil otherwise.
+	Checks []Check
+	Files  []string
+	Repo   RepoMerge
+	// Reviews are the latest review of each reviewer.
+	Reviews []Review
 }
 
 // Comment is a comment on a pull request.

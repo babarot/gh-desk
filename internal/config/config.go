@@ -36,6 +36,8 @@ type File struct {
 	Refresh  Refresh   `toml:"refresh"`
 	Preview  Preview   `toml:"preview"`
 	Diff     Diff      `toml:"diff"`
+	Merge    Merge     `toml:"merge"`
+	Bulk     Bulk      `toml:"bulk"`
 	// Keys is [keys] as written; the keymap package checks it.
 	Keys Keys `toml:"-"`
 }
@@ -78,6 +80,41 @@ type Diff struct {
 	Collapse []string `toml:"collapse"`
 }
 
+// Merge configures merging.
+type Merge struct {
+	// Methods is the order of preference among the methods a repository
+	// allows: "merge", "squash", "rebase".
+	Methods []string `toml:"methods"`
+	// AutoMerge uses GitHub's auto-merge where the repository allows it.
+	AutoMerge bool `toml:"auto_merge"`
+	// ChecksTimeout, BlockedTimeout and WatchTimeout are Go durations.
+	ChecksTimeout  string `toml:"checks_timeout"`
+	BlockedTimeout string `toml:"blocked_timeout"`
+	WatchTimeout   string `toml:"watch_timeout"`
+	// UpdateBranch is who gets their branch updated when behind: "humans",
+	// "all" or "never".
+	UpdateBranch string `toml:"update_branch"`
+}
+
+// Bulk configures approving and merging many at once.
+type Bulk struct {
+	// AttentionPaths are glob patterns of files that put a mark on a pull
+	// request in the confirm popup.
+	AttentionPaths []string `toml:"attention_paths"`
+}
+
+// Merge values.
+var (
+	MergeMethods  = []string{"merge", "squash", "rebase"}
+	UpdateBranchValues = []string{"humans", "all", "never"}
+)
+
+// Duration reads a duration setting Load has checked.
+func Duration(s string) time.Duration {
+	d, _ := time.ParseDuration(s)
+	return d
+}
+
 // Section groupings, sorts and groups.
 var (
 	SectionGroups = []string{"", "requested"}
@@ -100,6 +137,10 @@ type UI struct {
 	HomeOwners []string `toml:"home_owners"`
 	// StaleDays is the age, in days, past which AGE is marked.
 	StaleDays int `toml:"stale_days"`
+	// ApprovalChecks are glob patterns of checks that pass only after an
+	// approval, such as a policy bot's; while only they are pending, a pull
+	// request is shown as waiting for an approval, and counts as passing.
+	ApprovalChecks []string `toml:"approval_checks"`
 }
 
 // Refresh configures the automatic refresh of the shown tab.
@@ -140,6 +181,9 @@ func Default() File {
 		Refresh: Refresh{Interval: "3m"},
 		Preview: Preview{Height: 14},
 		Diff:    Diff{Collapse: []string{"*.lock", "go.sum", "pnpm-lock.yaml", "package-lock.json", "yarn.lock"}},
+		Merge: Merge{Methods: []string{"merge", "squash", "rebase"}, AutoMerge: true, ChecksTimeout: "6h",
+			BlockedTimeout: "30m", WatchTimeout: "24h", UpdateBranch: "humans"},
+		Bulk: Bulk{AttentionPaths: []string{".github/workflows/*", "CODEOWNERS", ".github/CODEOWNERS", "docs/CODEOWNERS"}},
 	}
 }
 
@@ -211,6 +255,10 @@ func Template(keys string) string {
 # home_owners = []
 # Mark AGE when a pull request has not been updated for this many days.
 # stale_days = 30
+# Checks that pass only after an approval, such as a policy bot's: glob
+# patterns of check names. While only they are pending, CI shows ◌, and the
+# checks count as passing when deciding a merge.
+# approval_checks = []
 
 [refresh]
 # Refresh the shown tab this often, as a Go duration such as "3m" or "90s";
@@ -226,6 +274,32 @@ func Template(keys string) string {
 # Files shown folded, as their name and line counts, until unfolded: glob
 # patterns, matched against the base name unless they have a slash.
 # collapse = ["*.lock", "go.sum", "pnpm-lock.yaml", "package-lock.json", "yarn.lock"]
+
+[merge]
+# The order of preference among the methods a repository allows: "merge",
+# "squash", "rebase". The first one the repository allows is used.
+# methods = ["merge", "squash", "rebase"]
+# Use GitHub's auto-merge where the repository allows it; elsewhere
+# gh-triage waits for the checks and merges when they pass. Commits pushed
+# after auto-merge is turned on are merged too, as GitHub does.
+# auto_merge = true
+# How long to wait for required checks still running.
+# checks_timeout = "6h"
+# Give up on a pull request still blocked this long after its required
+# checks finished, as blocked by another rule (a second approval, code
+# owners).
+# blocked_timeout = "30m"
+# Stop watching a pull request put on auto-merge after this long.
+# watch_timeout = "24h"
+# Whose branch is updated when it is behind its base: "humans" (default),
+# "all" or "never". Bots rebase their own branches, and some (renovate) stop
+# updating a branch someone else committed to.
+# update_branch = "humans"
+
+[bulk]
+# Pull requests changing files that match these glob patterns get a mark in
+# the confirm popup.
+# attention_paths = [".github/workflows/*", "CODEOWNERS", ".github/CODEOWNERS", "docs/CODEOWNERS"]
 
 [keys]
 # Which keys do what, by action: a key or a list of keys, replacing the
@@ -275,8 +349,10 @@ func Load(path string) (File, error) {
 		Refresh  Refresh        `toml:"refresh"`
 		Preview  Preview        `toml:"preview"`
 		Diff     Diff           `toml:"diff"`
+		Merge    Merge          `toml:"merge"`
+		Bulk     Bulk           `toml:"bulk"`
 		Keys     map[string]any `toml:"keys"`
-	}{Inbox: cfg.Inbox, Log: cfg.Log, UI: cfg.UI, Refresh: cfg.Refresh, Preview: cfg.Preview, Diff: cfg.Diff}
+	}{Inbox: cfg.Inbox, Log: cfg.Log, UI: cfg.UI, Refresh: cfg.Refresh, Preview: cfg.Preview, Diff: cfg.Diff, Merge: cfg.Merge, Bulk: cfg.Bulk}
 	if err := toml.NewDecoder(bytes.NewReader(src)).DisallowUnknownFields().Decode(&doc); err != nil {
 		return File{}, Report(path, decodeProblems(err))
 	}
@@ -285,7 +361,7 @@ func Load(path string) (File, error) {
 		sections = doc.Sections
 	}
 	cfg = File{Sections: sections, Inbox: doc.Inbox, Log: doc.Log, UI: doc.UI, Refresh: doc.Refresh,
-		Preview: doc.Preview, Diff: doc.Diff, Keys: keysFrom(doc.Keys)}
+		Preview: doc.Preview, Diff: doc.Diff, Merge: doc.Merge, Bulk: doc.Bulk, Keys: keysFrom(doc.Keys)}
 	ps := checkSections(cfg.Sections)
 	if !slices.Contains(Themes, cfg.UI.Theme) {
 		ps = append(ps, problem("ui.theme", "ui.theme must be one of %s, got %q", quoted(Themes), cfg.UI.Theme))
@@ -298,6 +374,24 @@ func Load(path string) (File, error) {
 	}
 	if cfg.Preview.Height < 0 {
 		ps = append(ps, problem("preview.height", "preview.height must be 0 or more, got %d", cfg.Preview.Height))
+	}
+	if len(cfg.Merge.Methods) == 0 {
+		ps = append(ps, problem("merge.methods", "merge.methods must name at least one of %s", quoted(MergeMethods)))
+	}
+	for i, m := range cfg.Merge.Methods {
+		if !slices.Contains(MergeMethods, m) {
+			ps = append(ps, Problem{Key: []string{"merge", "methods"}, Index: i, Message: fmt.Sprintf("merge.methods[%d] must be one of %s, got %q", i, quoted(MergeMethods), m)})
+		}
+	}
+	for _, d := range []struct{ key, val string }{
+		{"merge.checks_timeout", cfg.Merge.ChecksTimeout}, {"merge.blocked_timeout", cfg.Merge.BlockedTimeout}, {"merge.watch_timeout", cfg.Merge.WatchTimeout},
+	} {
+		if v, err := time.ParseDuration(d.val); err != nil || v <= 0 {
+			ps = append(ps, problem(d.key, `%s must be a duration such as "30m", got %q`, d.key, d.val))
+		}
+	}
+	if !slices.Contains(UpdateBranchValues, cfg.Merge.UpdateBranch) {
+		ps = append(ps, problem("merge.update_branch", "merge.update_branch must be one of %s, got %q", quoted(UpdateBranchValues), cfg.Merge.UpdateBranch))
 	}
 	if cfg.Inbox.Limit < 1 || cfg.Inbox.Limit > 1000 {
 		ps = append(ps, problem("inbox.limit", "inbox.limit must be between 1 and 1000, got %d", cfg.Inbox.Limit))
