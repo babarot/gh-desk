@@ -105,11 +105,18 @@ var Defaults = []Def{
 	{"editor", ScopeCompose, []string{"ctrl+e"}, "$EDITOR"},
 }
 
-// Fixed keys are read before any action and cannot be bound: ctrl+c quits
-// from anywhere and esc steps back one level everywhere.
+// The fixed keys are read before any action and cannot be bound.
+const (
+	// Interrupt quits from anywhere.
+	Interrupt = "ctrl+c"
+	// Back steps back one level everywhere, and quits from the top.
+	Back = "esc"
+)
+
+// Fixed are the fixed keys and what each does.
 var Fixed = map[string]string{
-	"ctrl+c": "quits from anywhere",
-	"esc":    "steps back one level everywhere",
+	Interrupt: "quits from anywhere",
+	Back:      "steps back one level everywhere",
 }
 
 // Map is the keys of every action, after the config file.

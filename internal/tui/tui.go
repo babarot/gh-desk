@@ -51,9 +51,9 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 // key handles a key press, as Bubble Tea writes it.
 func (m *Model) key(k string) (tea.Model, tea.Cmd) {
 	switch {
-	case k == "ctrl+c":
+	case k == keymap.Interrupt:
 		return m, tea.Quit
-	case k == "esc":
+	case k == keymap.Back:
 		if m.help {
 			m.help = false
 			return m, nil

@@ -27,7 +27,7 @@ func TestQuitFollowsTheKeymap(t *testing.T) {
 	if cmd := press(m, "x"); cmd == nil {
 		t.Error("x did not quit")
 	}
-	if cmd := press(m, "ctrl+c"); cmd == nil {
+	if cmd := press(m, keymap.Interrupt); cmd == nil {
 		t.Error("ctrl+c did not quit")
 	}
 }
@@ -42,7 +42,7 @@ func TestHelpListsBoundKeys(t *testing.T) {
 			t.Errorf("help does not show %q", want)
 		}
 	}
-	press(m, "esc")
+	press(m, keymap.Back)
 	if m.help {
 		t.Error("esc did not close help")
 	}
