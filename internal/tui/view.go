@@ -135,11 +135,14 @@ func (m *Model) tabLabel(i int) string {
 	case t.err != nil:
 		count = "!"
 	}
-	label := fmt.Sprintf("%d %s %s", i+1, t.name, count)
+	// The key is dim and the count in its own color, so neither reads
+	// as part of the name.
+	st := m.st
+	name, num := st.tabOff, st.teal
 	if i == m.cur {
-		return m.st.tabOn.Render(label)
+		name, num = st.tabOn, st.teal.Bold(true).Underline(true)
 	}
-	return m.st.tabOff.Render(label)
+	return st.dim.Render(fmt.Sprint(i+1)) + " " + name.Render(t.name) + name.Render(" ") + num.Render(count)
 }
 
 func (m *Model) headerRight() string {
