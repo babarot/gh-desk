@@ -3,6 +3,7 @@ package tui
 import (
 	"fmt"
 	"net/url"
+	"slices"
 	"strings"
 
 	"charm.land/lipgloss/v2"
@@ -51,7 +52,7 @@ func (m *Model) descPane(p model.PR, n *model.Notification, height int) []string
 	st := m.st
 	left, right := m.descWidths()
 	d := m.cache.details[p.Key]
-	top := []string{st.text.Bold(true).Render(p.Title) + "  " + st.sub0.Render(p.Author)}
+	top := []string{m.titleLine(p, left)}
 	if s, ok := m.unreadLine(n); ok {
 		top = append(top, s)
 	}
@@ -113,6 +114,15 @@ func (m *Model) descPane(p model.PR, n *model.Notification, height int) []string
 	return out
 }
 
+// titleLine is the pull request's number and title, with its author at
+// the right edge, width cells wide.
+func (m *Model) titleLine(p model.PR, width int) string {
+	st := m.st
+	author := st.sub0.Render(p.Author)
+	room := max(width-lipgloss.Width(author)-2, 1)
+	return fit(st.dim.Render(fmt.Sprintf("#%d", p.Key.Number))+" "+st.text.Bold(true).Render(p.Title), room) + "  " + author
+}
+
 // descLines are the parts of the description pane, width cells wide, with
 // the facts above them when the pane has no column for them.
 func (m *Model) descLines(p model.PR, width int) []line {
@@ -122,29 +132,36 @@ func (m *Model) descLines(p model.PR, width int) []line {
 		out = append(out, m.facts(p, m.cache.details[p.Key], width)...)
 		out = append(out, line{})
 	}
+	// A part's header runs to the edge with a rule; the lines of an
+	// unfolded part have a gutter, closed under its last line.
 	head := func(part, rest string) bool {
 		mark := "▾ "
 		if m.pane.folded[part] {
 			mark = "▸ "
 		}
-		out = append(out, line{text: st.sub0.Render(mark) + st.group.Render(part) + rest, head: true, part: part})
+		s := st.blue.Render(mark) + st.blue.Bold(true).Render(part) + rest + " "
+		s += st.border.Render(strings.Repeat("─", max(width-lipgloss.Width(s), 0)))
+		out = append(out, line{text: s, head: true, part: part})
 		return !m.pane.folded[part]
 	}
+	gutter := st.border.Render("│ ")
+	end := func() { out = append(out, line{text: st.border.Render("╵")}) }
 	indent := func(ls []line, by string) {
 		for _, l := range ls {
-			out = append(out, line{text: by + l.text})
+			out = append(out, line{text: gutter + by + l.text})
 		}
 	}
 	d := m.cache.details[p.Key]
 	if head(partDescription, "") {
 		switch {
 		case d == nil || d.loading:
-			out = append(out, line{text: "  " + st.dim.Render("reading the description…")})
+			out = append(out, line{text: gutter + st.dim.Render("reading the description…")})
 		case d.err != nil:
-			out = append(out, line{text: "  " + st.red.Render(d.err.Error())})
+			out = append(out, line{text: gutter + st.red.Render(d.err.Error())})
 		default:
-			indent(m.bodyLines(d.val.Body, width-2), "  ")
+			indent(m.bodyLines(d.val.Body, width-2), "")
 		}
+		end()
 	}
 	if d == nil || d.loading || d.err != nil {
 		return out
@@ -152,14 +169,24 @@ func (m *Model) descLines(p model.PR, width int) []line {
 	if cs := d.val.Checks; len(cs) > 0 {
 		out = append(out, line{})
 		if head(partChecks, st.dim.Render(fmt.Sprintf(" %d  ", len(cs)))+m.checkCounts(cs)) {
+			// Failed checks first, then running ones, names lined up.
 			required := m.requiredChecks(p)
+			w := 0
 			for _, c := range cs {
-				s := "  " + m.ciMark(c.State) + " " + st.sub1.Render(c.Name)
+				w = max(w, ansi.StringWidth(c.Name))
+			}
+			for _, c := range checkOrder(cs) {
+				name := st.sub1
+				if checkFailed(c.State) {
+					name = st.red
+				}
+				s := gutter + m.ciMark(c.State) + " " + name.Render(c.Name)
 				if required[c.Name] {
-					s += st.dim.Render("  required")
+					s += spaces(w-ansi.StringWidth(c.Name)) + st.dim.Render("  required")
 				}
 				out = append(out, line{text: s})
 			}
+			end()
 		}
 	}
 	if cs := d.val.Comments; len(cs) > 0 {
@@ -167,18 +194,40 @@ func (m *Model) descLines(p model.PR, width int) []line {
 		if head(partComments, st.dim.Render(fmt.Sprintf(" %d", len(cs)))) {
 			for i, c := range cs {
 				if i > 0 {
-					out = append(out, line{})
+					out = append(out, line{text: gutter})
 				}
-				s := "  " + st.sub0.Render(c.Author)
+				s := gutter + st.peach.Render("● ") + st.sub0.Bold(true).Render(c.Author)
 				if !c.Created.IsZero() {
 					s += "  " + st.dim.Render(shortAge(m.set.Now().Sub(c.Created))+" ago")
 				}
 				out = append(out, line{text: s})
-				indent(m.bodyLines(c.Body, width-4), "    ")
+				indent(m.bodyLines(c.Body, width-4), "  ")
 			}
+			end()
 		}
 	}
 	return out
+}
+
+// checkOrder are the checks with the failed ones first, then the running
+// ones, each kind in the order given.
+func checkOrder(cs []model.Check) []model.Check {
+	rank := func(s model.CheckState) int {
+		switch {
+		case checkFailed(s):
+			return 0
+		case s == model.CheckPending || s == model.CheckExpected:
+			return 1
+		}
+		return 2
+	}
+	out := slices.Clone(cs)
+	slices.SortStableFunc(out, func(a, b model.Check) int { return rank(a.State) - rank(b.State) })
+	return out
+}
+
+func checkFailed(s model.CheckState) bool {
+	return s == model.CheckFailure || s == model.CheckError
 }
 
 // checkCounts writes how many checks passed, failed and are running.

@@ -163,7 +163,7 @@ func (m *Model) markdownLines(body string, width int) []line {
 		}
 		if g := mdQuote.FindStringSubmatch(l); g != nil {
 			for _, w := range wrapSpans(m.inline(g[1], st.sub0), max(width-2, 1), 0) {
-				out = append(out, line{text: st.dim.Render("│ ") + renderSpans(w)})
+				out = append(out, line{text: st.dim.Render("┃ ") + renderSpans(w)})
 			}
 			continue
 		}

@@ -8,6 +8,7 @@ import (
 	"github.com/charmbracelet/x/ansi"
 
 	"github.com/babarot/gh-triage/internal/keymap"
+	"github.com/babarot/gh-triage/internal/model"
 )
 
 func TestMarkdownLines(t *testing.T) {
@@ -29,7 +30,7 @@ func TestMarkdownLines(t *testing.T) {
 		"☑ tests pass",
 		"☐ tried on staging",
 		"",
-		"│ quoted",
+		"┃ quoted",
 		"",
 		" wait := time.Second  go ",
 		"",
@@ -127,5 +128,22 @@ func TestFactsWrapAndCountWhatIsCut(t *testing.T) {
 	press(m, "-", "-", "-", "-", "-", "-")
 	if s := screen(m); !strings.Contains(s, "│ +1 more") {
 		t.Errorf("no count of the facts cut:\n%s", s)
+	}
+}
+
+func TestCheckOrderPutsFailedFirst(t *testing.T) {
+	cs := []model.Check{
+		{Name: "test", State: model.CheckSuccess},
+		{Name: "CodeQL", State: model.CheckPending},
+		{Name: "lint", State: model.CheckFailure},
+		{Name: "build", State: model.CheckSuccess},
+		{Name: "deploy", State: model.CheckError},
+	}
+	var got []string
+	for _, c := range checkOrder(cs) {
+		got = append(got, c.Name)
+	}
+	if want := "lint deploy CodeQL test build"; strings.Join(got, " ") != want {
+		t.Errorf("order = %q, want %q", strings.Join(got, " "), want)
 	}
 }
