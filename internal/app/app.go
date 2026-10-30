@@ -5,6 +5,8 @@
 package app
 
 import (
+	"cmp"
+	"context"
 	"errors"
 	"flag"
 	"fmt"
@@ -16,8 +18,10 @@ import (
 	"time"
 
 	"github.com/babarot/gh-triage/internal/config"
+	"github.com/babarot/gh-triage/internal/github"
 	"github.com/babarot/gh-triage/internal/keymap"
 	"github.com/babarot/gh-triage/internal/logging"
+	"github.com/babarot/gh-triage/internal/model"
 	"github.com/babarot/gh-triage/internal/tui"
 )
 
@@ -84,16 +88,44 @@ func Run(args []string, stdout, stderr io.Writer) int {
 		return 1
 	}
 	log.Info("start", logging.KeyVersion, Version, "config", *configPath, "log", logging.DefaultPath(),
-		"level", level.Level().String(), "refresh", cfg.RefreshInterval().String())
+		"log_level", level.Level().String(), "refresh", cfg.RefreshInterval().String())
 
+	gh, err := github.New(log, github.Options{})
+	if err != nil {
+		log.Error("github client", "err", err.Error())
+		fmt.Fprintf(stderr, "gh-triage: %v (is gh logged in? try gh auth login)\n", err)
+		return 1
+	}
 	start := time.Now()
-	err = tui.Run(km, log)
+	err = tui.Run(source{gh}, km, log, settings(cfg))
 	log.Info("exit", logging.KeyDurationMS, time.Since(start).Milliseconds(), "err", errString(err))
 	if err != nil {
 		fmt.Fprintf(stderr, "gh-triage: %v (run %s)\n", err, run)
 		return 1
 	}
 	return 0
+}
+
+// source is the GitHub client as the TUI asks for it.
+type source struct{ *github.Client }
+
+func (s source) SearchPage(ctx context.Context, query string, first int, after string) ([]model.PR, int, string, []string, error) {
+	pg, err := s.Client.SearchPage(ctx, query, first, after)
+	return pg.PRs, pg.Total, pg.Next, pg.Warnings, err
+}
+
+// settings are the config values the TUI uses.
+func settings(cfg config.File) tui.Settings {
+	set := tui.Settings{
+		InboxLimit: cfg.Inbox.Limit, HideClosed: cfg.Inbox.HideClosed, DoneAfterReview: cfg.Inbox.DoneAfterReview,
+		HomeOwners: cfg.UI.HomeOwners, StaleDays: cfg.UI.StaleDays, PreviewHeight: cfg.Preview.Height,
+		Collapse: cfg.Diff.Collapse, Theme: cfg.UI.Theme, Editor: cmp.Or(os.Getenv("VISUAL"), os.Getenv("EDITOR")),
+	}
+	for _, s := range cfg.Sections {
+		set.Sections = append(set.Sections, tui.Section{Name: s.Name, Query: s.Query, Grouped: s.Group == "requested",
+			Folded: s.Folded, DraftsLast: s.Sort == "drafts_last", Limit: s.Limit})
+	}
+	return set
 }
 
 // setup writes the config file on first run, reads it, sets the log level,
@@ -182,6 +214,7 @@ var scopeWords = map[keymap.Scope]string{
 	keymap.ScopePopup:   "A confirm popup",
 	keymap.ScopeChat:    "The Claude screen",
 	keymap.ScopeCompose: "Writing a review",
+	keymap.ScopeInput:   "Typing in the filter",
 }
 
 // keysValue writes keys as TOML: a string for one key, an array otherwise.

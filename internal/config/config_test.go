@@ -2,8 +2,8 @@ package config
 
 import (
 	"os"
-	"reflect"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 	"time"

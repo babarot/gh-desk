@@ -1,0 +1,206 @@
+package tui
+
+import (
+	"fmt"
+	"strings"
+
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
+
+	"github.com/babarot/gh-triage/internal/keymap"
+	"github.com/babarot/gh-triage/internal/plan"
+)
+
+// View draws the screen.
+func (m *Model) View() tea.View {
+	v := tea.NewView(m.render())
+	v.AltScreen = true
+	return v
+}
+
+func (m *Model) render() string {
+	if m.width == 0 || m.height == 0 {
+		return ""
+	}
+	var b strings.Builder
+	b.WriteString(m.renderHeader() + "\n")
+	if m.filtering || m.filter != "" {
+		cursor := ""
+		if m.filtering {
+			cursor = "▏"
+		}
+		b.WriteString(m.st.yellow.Render("/ "+m.filter+cursor) + "\n")
+	}
+	body := m.height - 3
+	if m.filtering || m.filter != "" {
+		body--
+	}
+	switch m.view {
+	case viewPR:
+		m.renderPR(&b, body)
+	case viewCompose:
+		m.renderCompose(&b, body)
+	default:
+		l := m.layout()
+		m.renderList(&b, l.list)
+		if l.pane > 0 {
+			m.renderPane(&b, l.pane)
+		}
+	}
+	st := m.st.muted
+	if m.statusErr {
+		st = m.st.red
+	}
+	b.WriteString(fit(st.Render(m.status), m.width) + "\n")
+	b.WriteString(fit(m.hints(), m.width))
+	lines := strings.Split(b.String(), "\n")
+	switch {
+	case m.confirm != nil:
+		lines = overlay(lines, m.renderConfirm(), 2, m.width)
+	case m.help:
+		lines = overlay(lines, m.renderHelp(), 1, m.width)
+	}
+	if len(lines) > m.height {
+		lines = lines[:m.height]
+	}
+	return strings.Join(lines, "\n")
+}
+
+// overlay puts popup over lines from row top, in the middle.
+func overlay(lines, popup []string, top, width int) []string {
+	out := append([]string(nil), lines...)
+	left := 0
+	if len(popup) > 0 {
+		left = max((width-lipgloss.Width(popup[0]))/2, 0)
+	}
+	for i, p := range popup {
+		if top+i < len(out) {
+			out[top+i] = spaces(left) + p
+		}
+	}
+	return out
+}
+
+func (m *Model) renderHeader() string {
+	st := m.st
+	var tabs []string
+	for i, t := range m.tabs {
+		count := "…"
+		switch {
+		case t.inbox && t.loaded:
+			count = fmt.Sprint(len(m.unread))
+		case t.loaded && t.err == nil:
+			count = fmt.Sprint(t.total)
+		case t.err != nil:
+			count = "!"
+		}
+		label := fmt.Sprintf("%d %s %s", i+1, t.name, count)
+		if i == m.cur {
+			tabs = append(tabs, st.tabOn.Render(label))
+		} else {
+			tabs = append(tabs, st.tabOff.Render(label))
+		}
+	}
+	left := st.app.Render("triage") + st.dim.Render(" // "+m.viewer) + "   " + strings.Join(tabs, "  ")
+	right := m.headerRight()
+	gap := m.width - lipgloss.Width(left) - lipgloss.Width(right) - 1
+	return st.header.Render(fit(left+spaces(gap)+right, m.width))
+}
+
+func (m *Model) headerRight() string {
+	t, st := m.tab(), m.st
+	var parts []string
+	if t.grouped && t.loaded {
+		n := map[plan.Group]int{}
+		for _, p := range t.prs {
+			n[plan.GroupOf(p, m.viewer)]++
+		}
+		parts = append(parts, fmt.Sprintf("%d to you · %d via team · %d bots", n[plan.GroupYou], n[plan.GroupTeam], n[plan.GroupBots]))
+	}
+	if t.loaded && t.total > len(t.prs) && !t.inbox {
+		parts = append(parts, fmt.Sprintf("showing %d of %d", len(t.prs), t.total))
+	}
+	if len(t.warnings) > 0 {
+		parts = append(parts, st.yellow.Render("⚠ read in part"))
+	}
+	return st.sub0.Render(strings.Join(parts, " · "))
+}
+
+// ready are the actions this version does; the hints and the ? list show
+// only these.
+var ready = map[keymap.Action]bool{
+	"quit": true, "help": true, "refresh": true,
+	"up": true, "down": true, "top": true, "bottom": true, "page_up": true, "page_down": true,
+	"next_tab": true, "prev_tab": true, "tab_1": true, "tab_2": true, "tab_3": true, "tab_4": true,
+	"open": true, "approve": true, "comment": true, "request_changes": true, "browse": true, "hide": true,
+	"toggle_bots": true, "show_closed": true, "filter": true,
+	"pane_down": true, "pane_up": true, "next_file": true, "prev_file": true, "pane_tab": true, "unfold": true, "toggle_pane": true,
+	"pr_prev_tab": true, "pr_next_tab": true, "pr_approve": true, "pr_comment": true, "pr_request_changes": true, "pr_browse": true,
+	"confirm": true, "next_kind": true, "post": true, "editor": true, "accept": true, "erase": true,
+}
+
+// hints is the key line of what has the focus.
+func (m *Model) hints() string {
+	var as []keymap.Action
+	switch {
+	case m.confirm != nil:
+		as = []keymap.Action{"confirm"}
+	case m.filtering:
+		as = []keymap.Action{"accept"}
+	case m.view == viewCompose:
+		as = []keymap.Action{"next_kind", "post", "editor"}
+	case m.view == viewPR:
+		as = []keymap.Action{"pr_next_tab", "down", "pr_approve", "pr_comment", "pr_request_changes", "pr_browse", "help"}
+	default:
+		as = []keymap.Action{"open", "approve", "comment", "request_changes", "browse", "pane_tab", "filter", "help"}
+		if m.tab().inbox {
+			as = append(as[:len(as)-1], "hide", "show_closed", "help")
+		}
+		if p, _, ok := m.currentPR(); ok && m.own(p) {
+			as = []keymap.Action{"open", "comment", "browse", "pane_tab", "filter", "help"}
+		}
+	}
+	var parts []string
+	for _, a := range as {
+		if ks := m.keys.Keys(a); len(ks) > 0 {
+			parts = append(parts, m.st.key.Render(ks[0])+" "+m.st.muted.Render(m.keys.Help(a)))
+		}
+	}
+	parts = append(parts, m.st.key.Render(keymap.Back)+" "+m.st.muted.Render("back"))
+	return strings.Join(parts, m.st.dim.Render(" · "))
+}
+
+// renderHelp is the ? popup: every action this version does, with its
+// keys, scope by scope.
+func (m *Model) renderHelp() []string {
+	st := m.st
+	var lines []string
+	scopes := []struct {
+		s     keymap.Scope
+		title string
+	}{
+		{keymap.ScopeGlobal, "anywhere"}, {keymap.ScopeNav, "moving"}, {keymap.ScopeList, "the list and its preview"},
+		{keymap.ScopePR, "a pull request"}, {keymap.ScopePopup, "a confirm popup"}, {keymap.ScopeCompose, "writing a review"},
+	}
+	for _, sc := range scopes {
+		var rows []string
+		for _, a := range m.keys.Actions(sc.s) {
+			ks := m.keys.Keys(a)
+			if !ready[a] || len(ks) == 0 {
+				continue
+			}
+			rows = append(rows, "  "+fit(st.key.Render(strings.Join(ks, " ")), 16)+st.muted.Render(m.keys.Help(a)))
+		}
+		if len(rows) > 0 {
+			lines = append(lines, st.group.Render(sc.title))
+			lines = append(lines, rows...)
+		}
+	}
+	lines = append(lines, st.group.Render("fixed"), "  "+fit(st.key.Render(keymap.Interrupt), 16)+st.muted.Render("quit"),
+		"  "+fit(st.key.Render(keymap.Back), 16)+st.muted.Render("back"))
+	maxLines := max(m.height-3, 5)
+	if len(lines) > maxLines {
+		lines = append(lines[:maxLines-1], st.dim.Render("  …"))
+	}
+	return box(st, "keys", lines, min(max(m.width-8, 30), 70))
+}

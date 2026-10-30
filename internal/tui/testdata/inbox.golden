@@ -1,0 +1,34 @@
+triage // me   1 review 3  2 mine 1  3 involved 0  4 inbox 2                                                                      
+    PR                        TITLE                                  AUTHOR          CI  REVIEW   WHY         SIZE          AGE
+▎ ● api#12                    Add retries to the client              alice           ✓   ○        review      +40 −3         3h   
+  1 notification on merged or closed pull requests hidden · a to show
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+╭  diff 2   description  ───────────────────────────────────────────────────────────────────────────────── acme/api#12 · J/K · v ╮
+│ retries → main  @core                                                                                                          │
+│ client.go · go.sum                                                                                                             │
+│ ── client.go  +2 −1                                                                                                            │
+│ @@ -1,3 +1,4 @@ package client                                                                                                 │
+│  import "net/http"                                                                                                             │
+│ -var tries = 1                                                                                                                 │
+│ +var tries = 3                                                                                                                 │
+│ +var wait = time.Second                                                                                                        │
+│ ── go.sum  +1 −1  folded · z to unfold                                                                                         │
+│                                                                                                                                │
+╰────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+                                                                                                                                  
+enter open · A approve · c comment · X request changes · o browser · v diff / description · / filter · d hide / done · a closed ·…

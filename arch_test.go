@@ -34,7 +34,7 @@ var layers = []layer{
 	{"internal/claude", 2, []string{"model", "logging"}, nil, "Running claude -p and the pull request worktrees"},
 	{"internal/runner", 3, []string{"model", "logging", "plan"}, nil, "Bulk approve and merge, auto-merge watching, resuming"},
 	{"internal/tui", 4, []string{"model", "logging", "plan", "diff", "keymap", "runner"},
-		[]string{"charm.land/bubbletea/v2", "charm.land/bubbles/v2", "charm.land/lipgloss/v2", "github.com/alecthomas/chroma/v2"}, "The terminal UI"},
+		[]string{"charm.land/bubbletea/v2", "charm.land/bubbles/v2", "charm.land/lipgloss/v2", "github.com/charmbracelet/x/ansi", "github.com/alecthomas/chroma/v2"}, "The terminal UI"},
 	{"internal/app", 5, []string{"model", "logging", "config", "keymap", "plan", "diff", "github", "state", "claude", "runner", "tui"}, nil, "Putting it together: flags, config, log, and starting the TUI"},
 	{"", 6, []string{"app"}, nil, "Calls app.Run"},
 }

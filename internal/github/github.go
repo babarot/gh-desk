@@ -116,9 +116,9 @@ type prNode struct {
 		Login    string
 		Typename string `json:"__typename"`
 	}
-	Repository struct{ NameWithOwner string }
-	Labels     struct{ Nodes []struct{ Name string } }
-	Comments   struct{ TotalCount int }
+	Repository     struct{ NameWithOwner string }
+	Labels         struct{ Nodes []struct{ Name string } }
+	Comments       struct{ TotalCount int }
 	ReviewRequests struct {
 		Nodes []struct {
 			RequestedReviewer *struct {
@@ -202,42 +202,75 @@ type Result struct {
 	Warnings []string
 }
 
-// Search returns up to limit pull requests matching query, a GitHub search.
+// Page is one page of a search: its pull requests, how many match in all,
+// and the cursor of the next page, empty after the last.
+type Page struct {
+	PRs      []model.PR
+	Total    int
+	Next     string
+	Warnings []string
+}
+
+// SearchPage reads first pull requests matching query, a GitHub search,
+// after the cursor after (empty for the first page). GitHub's search takes
+// longer the more it returns, so a caller showing results reads a small
+// first page and larger ones after it.
+func (c *Client) SearchPage(ctx context.Context, query string, first int, after string) (Page, error) {
+	vars := map[string]any{"q": query, "first": min(max(first, 1), 100), "after": nil}
+	if after != "" {
+		vars["after"] = after
+	}
+	var resp struct {
+		RateLimit rateLimit
+		Search    struct {
+			IssueCount int
+			PageInfo   struct {
+				HasNextPage bool
+				EndCursor   string
+			}
+			Nodes []prNode
+		}
+	}
+	var out Page
+	if err := c.query(ctx, "search", searchQuery, vars, &resp, &resp.RateLimit); err != nil {
+		var gqlErr *api.GraphQLError
+		if !errors.As(err, &gqlErr) {
+			return out, err
+		}
+		for _, e := range gqlErr.Errors {
+			out.Warnings = append(out.Warnings, e.Message)
+		}
+		c.log.Warn("search read in part", "query", query, "err", err.Error())
+	}
+	out.Total = resp.Search.IssueCount
+	for _, n := range resp.Search.Nodes {
+		if p, ok := n.toModel(); ok {
+			out.PRs = append(out.PRs, p)
+		}
+	}
+	if resp.Search.PageInfo.HasNextPage {
+		out.Next = resp.Search.PageInfo.EndCursor
+	}
+	return out, nil
+}
+
+// Search returns up to limit pull requests matching query, reading them in
+// pages of 50.
 func (c *Client) Search(ctx context.Context, query string, limit int) (Result, error) {
 	var out Result
-	vars := map[string]any{"q": query, "first": min(limit, 50), "after": nil}
+	after := ""
 	for len(out.PRs) < limit {
-		var resp struct {
-			RateLimit rateLimit
-			Search    struct {
-				IssueCount int
-				PageInfo   struct {
-					HasNextPage bool
-					EndCursor   string
-				}
-				Nodes []prNode
-			}
+		pg, err := c.SearchPage(ctx, query, min(limit-len(out.PRs), 50), after)
+		if err != nil {
+			return out, err
 		}
-		if err := c.query(ctx, "search", searchQuery, vars, &resp, &resp.RateLimit); err != nil {
-			var gqlErr *api.GraphQLError
-			if !errors.As(err, &gqlErr) {
-				return out, err
-			}
-			for _, e := range gqlErr.Errors {
-				out.Warnings = append(out.Warnings, e.Message)
-			}
-			c.log.Warn("search read in part", "query", query, "err", err.Error())
-		}
-		out.Total = resp.Search.IssueCount
-		for _, n := range resp.Search.Nodes {
-			if p, ok := n.toModel(); ok && len(out.PRs) < limit {
-				out.PRs = append(out.PRs, p)
-			}
-		}
-		if !resp.Search.PageInfo.HasNextPage {
+		out.Total = pg.Total
+		out.PRs = append(out.PRs, pg.PRs...)
+		out.Warnings = append(out.Warnings, pg.Warnings...)
+		if pg.Next == "" {
 			break
 		}
-		vars["after"] = resp.Search.PageInfo.EndCursor
+		after = pg.Next
 	}
 	return out, nil
 }

@@ -29,6 +29,7 @@ const (
 	ScopePopup   Scope = "popup"
 	ScopeChat    Scope = "chat"
 	ScopeCompose Scope = "compose"
+	ScopeInput   Scope = "input"
 )
 
 // Def is an action with its default keys and the words the key hints show.
@@ -103,6 +104,9 @@ var Defaults = []Def{
 	{"next_kind", ScopeCompose, []string{"tab"}, "kind"},
 	{"post", ScopeCompose, []string{"ctrl+s"}, "post"},
 	{"editor", ScopeCompose, []string{"ctrl+e"}, "$EDITOR"},
+
+	{"accept", ScopeInput, []string{"enter"}, "accept"},
+	{"erase", ScopeInput, []string{"backspace"}, "erase"},
 }
 
 // The fixed keys are read before any action and cannot be bound.

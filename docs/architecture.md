@@ -15,7 +15,7 @@ gh-triage is split into packages by layer. A package imports only packages of lo
 | 2 | `internal/state` | The pending-merge record and its lock | `model`, `logging` | - |
 | 2 | `internal/claude` | Running claude -p and the pull request worktrees | `model`, `logging` | - |
 | 3 | `internal/runner` | Bulk approve and merge, auto-merge watching, resuming | `model`, `logging`, `plan` | - |
-| 4 | `internal/tui` | The terminal UI | `model`, `logging`, `plan`, `diff`, `keymap`, `runner` | `charm.land/bubbletea/v2`, `charm.land/bubbles/v2`, `charm.land/lipgloss/v2`, `github.com/alecthomas/chroma/v2` |
+| 4 | `internal/tui` | The terminal UI | `model`, `logging`, `plan`, `diff`, `keymap`, `runner` | `charm.land/bubbletea/v2`, `charm.land/bubbles/v2`, `charm.land/lipgloss/v2`, `github.com/charmbracelet/x/ansi`, `github.com/alecthomas/chroma/v2` |
 | 5 | `internal/app` | Putting it together: flags, config, log, and starting the TUI | `model`, `logging`, `config`, `keymap`, `plan`, `diff`, `github`, `state`, `claude`, `runner`, `tui` | - |
 | 6 | `main` | Calls app.Run | `app` | - |
 
