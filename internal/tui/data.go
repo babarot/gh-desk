@@ -471,9 +471,8 @@ func (m *Model) ensureDiff(p model.PR) tea.Cmd {
 		return nil
 	}
 	m.cache.diffs[id] = &entry[[]diff.File]{loading: true}
-	key := p.Key
 	return func() tea.Msg {
-		b, err := m.src.Diff(m.ctx, key)
+		b, err := m.src.Diff(m.ctx, p)
 		return diffMsg{id, diff.Parse(b), err}
 	}
 }

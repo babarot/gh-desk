@@ -139,9 +139,12 @@ func TestReviewSendsTheHeadItWasReadAt(t *testing.T) {
 	}
 }
 
-func TestDiffAsksForTheDiffFormat(t *testing.T) {
-	f := &fake{rules: []rule{{func(r *http.Request, _ string) bool { return r.URL.Path == "/repos/acme/tool/pulls/7" }, "diff --git a/x b/x\n"}}}
-	b, err := newClient(t, f, logging.Discard()).Diff(context.Background(), model.PRKey{Owner: "acme", Repo: "tool", Number: 7})
+// The diff is pinned to the head the list read, not whatever the head is
+// now.
+func TestDiffAsksForTheDiffFormatAtTheHead(t *testing.T) {
+	f := &fake{rules: []rule{{func(r *http.Request, _ string) bool { return r.URL.Path == "/repos/acme/tool/compare/main...abc123" }, "diff --git a/x b/x\n"}}}
+	pr := model.PR{Key: model.PRKey{Owner: "acme", Repo: "tool", Number: 7}, HeadOID: "abc123", BaseRef: "main"}
+	b, err := newClient(t, f, logging.Discard()).Diff(context.Background(), pr)
 	if err != nil || !strings.HasPrefix(string(b), "diff --git") {
 		t.Fatalf("diff = %q, %v", b, err)
 	}

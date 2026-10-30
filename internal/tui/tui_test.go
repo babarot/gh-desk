@@ -121,8 +121,8 @@ func (f *fakeSource) PullRequests(_ context.Context, keys []model.PRKey) (map[mo
 func (f *fakeSource) Detail(_ context.Context, k model.PRKey) (model.Detail, error) {
 	return f.details[k], nil
 }
-func (f *fakeSource) Diff(_ context.Context, k model.PRKey) ([]byte, error) {
-	return []byte(f.diffs[k]), nil
+func (f *fakeSource) Diff(_ context.Context, p model.PR) ([]byte, error) {
+	return []byte(f.diffs[p.Key]), nil
 }
 func (f *fakeSource) Comment(_ context.Context, url string) (model.Comment, error) {
 	return f.comments[url], nil

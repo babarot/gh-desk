@@ -43,7 +43,11 @@ func New(log *slog.Logger, o Options) (*Client, error) {
 	if next == nil {
 		next = http.DefaultTransport
 	}
-	opts := api.ClientOptions{Host: o.Host, AuthToken: o.AuthToken, Transport: transport{next: next, log: log}, Timeout: 30 * time.Second}
+	// LogIgnoreEnv: GH_DEBUG=api would make go-gh print request and
+	// response bodies (reviews, descriptions, comments) to stderr, over
+	// the TUI. Requests are logged by transport instead, without bodies.
+	opts := api.ClientOptions{Host: o.Host, AuthToken: o.AuthToken, Transport: transport{next: next, log: log},
+		Timeout: 30 * time.Second, LogIgnoreEnv: true}
 	gql, err := api.NewGraphQLClient(opts)
 	if err != nil {
 		return nil, err
@@ -477,9 +481,18 @@ func (c *Client) Detail(ctx context.Context, key model.PRKey) (model.Detail, err
 	return d, nil
 }
 
-// Diff reads a pull request's diff, as git diff writes it.
-func (c *Client) Diff(ctx context.Context, key model.PRKey) ([]byte, error) {
-	resp, err := c.diff.RequestWithContext(ctx, http.MethodGet, fmt.Sprintf("repos/%s/%s/pulls/%d", key.Owner, key.Repo, key.Number), nil)
+// Diff reads a pull request's diff at the head it was read at
+// (pr.HeadOID), as git diff writes it: the comparison of that commit with
+// its merge base on the base branch, which is what GitHub shows as the
+// pull request's diff. Asking by the pull request's number would give the
+// diff of whatever the head is now, which may be a commit pushed after the
+// list was read and so not the one a review is sent for.
+func (c *Client) Diff(ctx context.Context, pr model.PR) ([]byte, error) {
+	if pr.HeadOID == "" || pr.BaseRef == "" {
+		return nil, fmt.Errorf("%s: no head or base to compare", pr.Key)
+	}
+	path := fmt.Sprintf("repos/%s/%s/compare/%s...%s", pr.Key.Owner, pr.Key.Repo, url.PathEscape(pr.BaseRef), pr.HeadOID)
+	resp, err := c.diff.RequestWithContext(ctx, http.MethodGet, path, nil)
 	if err != nil {
 		return nil, err
 	}

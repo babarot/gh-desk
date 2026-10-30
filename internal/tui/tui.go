@@ -27,7 +27,8 @@ type Source interface {
 	Notifications(ctx context.Context, limit int) ([]model.Notification, error)
 	PullRequests(ctx context.Context, keys []model.PRKey) (map[model.PRKey]model.PR, error)
 	Detail(ctx context.Context, key model.PRKey) (model.Detail, error)
-	Diff(ctx context.Context, key model.PRKey) ([]byte, error)
+	// Diff is a pull request's diff at its HeadOID.
+	Diff(ctx context.Context, pr model.PR) ([]byte, error)
 	Comment(ctx context.Context, apiURL string) (model.Comment, error)
 	Review(ctx context.Context, pr model.PR, event model.ReviewEvent, body string) error
 	MarkDone(ctx context.Context, n model.Notification) error
