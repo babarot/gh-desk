@@ -329,8 +329,13 @@ func (m *Model) renderList(b *strings.Builder, height int) {
 	lines := 0
 	switch {
 	case !t.loaded && t.loading:
-		b.WriteString(m.st.muted.Render("  reading "+t.name+"…") + "\n")
-		lines++
+		// No group heads yet: their counts are not known, and a 0 there
+		// looks like the list stopped.
+		b.WriteString("  " + m.st.mauve.Render(m.spinner()) + " " + m.st.muted.Render("reading "+t.name+"… GitHub's search takes a few seconds") + "\n")
+		for lines = 1; lines < height; lines++ {
+			b.WriteString("\n")
+		}
+		return
 	case t.err != nil:
 		b.WriteString(m.st.red.Render("  "+t.err.Error()) + "\n")
 		lines++
@@ -407,6 +412,8 @@ func (m *Model) renderRow(r row, cols []column, sel bool) string {
 		return onBackground(line, m.st.picked, m.width)
 	case sel:
 		return onBackground(line, m.st.sel, m.width)
+	case m.fresh[r.pr.Key].After(m.set.Now()):
+		return onBackground(line, m.st.fresh, m.width)
 	}
 	return line
 }
@@ -467,6 +474,12 @@ func (m *Model) cell(id string, r row, sel bool) string {
 			return st.dim.Render(p.Author)
 		}
 		return st.sub0.Render(p.Author)
+	case "ci", "review", "size":
+		if !p.HeavyRead() {
+			return st.dim.Render(m.spinner())
+		}
+	}
+	switch id {
 	case "ci":
 		if mi, ok := m.cache.info[p.Key]; ok && (p.Checks == model.CheckPending || p.Checks == model.CheckExpected) &&
 			plan.AwaitingApproval(mi.Checks, m.set.Plan.ApprovalChecks) {

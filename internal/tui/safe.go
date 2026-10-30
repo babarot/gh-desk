@@ -42,11 +42,16 @@ func safePR(p model.PR) model.PR {
 	for i := range p.Reviews {
 		p.Reviews[i].Author = safeLine(p.Reviews[i].Author)
 	}
-	p.Labels = append([]string(nil), p.Labels...)
-	for i := range p.Labels {
-		p.Labels[i] = safeLine(p.Labels[i])
-	}
+	p.Labels = safeLabels(p.Labels)
 	return p
+}
+
+func safeLabels(ls []string) []string {
+	out := append([]string(nil), ls...)
+	for i := range out {
+		out[i] = safeLine(out[i])
+	}
+	return out
 }
 
 func safePRs(ps []model.PR) []model.PR {

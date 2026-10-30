@@ -18,6 +18,12 @@ type pick struct {
 	loading bool
 }
 
+// ready reports whether the rules can be matched: the bodies they read are
+// in, and the tab's heavy fields, which max_files and checks look at.
+func (m *Model) pickReady() bool {
+	return m.picker != nil && !m.picker.loading && m.tabDone(m.tab())
+}
+
 type bodiesMsg struct {
 	got map[model.PRKey]string
 	err error
@@ -96,6 +102,12 @@ func (m *Model) ruleMatches(r plan.Rule) []model.PR {
 		if mi, ok := m.cache.info[p.Key]; ok {
 			f.AwaitingApproval = plan.AwaitingApproval(mi.Checks, m.set.Plan.ApprovalChecks)
 		}
+		// A rule on the size or the checks does not pick a pull request
+		// whose heavy fields are not read for its head: unread, they look
+		// like 0 files and no checks, which would pass.
+		if (r.MaxFiles > 0 || r.ChecksPassing) && !p.HeavyRead() {
+			continue
+		}
 		if r.Match(p, m.viewer, f) {
 			out = append(out, p)
 		}
@@ -114,7 +126,7 @@ func (m *Model) pickKey(k string) tea.Cmd {
 		v.sel = min(v.sel+1, len(rs)-1)
 	case is("up"):
 		v.sel = max(v.sel-1, 0)
-	case is("choose") && !v.loading:
+	case is("choose") && m.pickReady():
 		m.picker = nil
 		return m.applyRule(rs[v.sel])
 	}
@@ -169,8 +181,12 @@ func (m *Model) renderPick() []string {
 		lines = append(lines, line)
 	}
 	lines = append(lines, "", st.group.Render("matches"))
-	if v.loading {
-		lines = append(lines, st.dim.Render("  reading descriptions…"))
+	if !m.pickReady() {
+		what := "descriptions"
+		if !m.tabDone(m.tab()) {
+			what = "checks and sizes"
+		}
+		lines = append(lines, "  "+st.mauve.Render(m.spinner())+" "+st.dim.Render("reading "+what+"…"))
 	} else {
 		hits := m.ruleMatches(rs[v.sel])
 		if len(hits) == 0 {

@@ -14,6 +14,7 @@ import (
 	"io/fs"
 	"log/slog"
 	"os"
+	"path/filepath"
 	"regexp"
 	"slices"
 	"strings"
@@ -23,6 +24,7 @@ import (
 	"github.com/babarot/gh-triage/internal/config"
 	"github.com/babarot/gh-triage/internal/github"
 	"github.com/babarot/gh-triage/internal/keymap"
+	"github.com/babarot/gh-triage/internal/listcache"
 	"github.com/babarot/gh-triage/internal/logging"
 	"github.com/babarot/gh-triage/internal/model"
 	"github.com/babarot/gh-triage/internal/plan"
@@ -54,6 +56,7 @@ func Run(args []string, stdout, stderr io.Writer) int {
 	flags.SetOutput(stderr)
 	configPath := flags.String("config", config.FilePath(), "the config file")
 	debug := flags.Bool("debug", false, "log at debug level")
+	noCache := flags.Bool("no-cache", false, "neither show nor keep the lists last read")
 	flags.Usage = func() {
 		fmt.Fprint(stderr, usage)
 		flags.PrintDefaults()
@@ -121,6 +124,10 @@ func Run(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintf(stderr, "gh-triage: could not read who you are on GitHub: %v\n", err)
 		return 1
 	}
+	set.Viewer = viewer
+	if !*noCache {
+		set.Lists = openLists(cfg, viewer, log)
+	}
 	// One gh-triage at a time keeps the record of merges it waits for;
 	// another one runs without waiting merges.
 	store, err := state.Open(state.DefaultDir())
@@ -159,6 +166,18 @@ func Run(args []string, stdout, stderr io.Writer) int {
 		return 1
 	}
 	return 0
+}
+
+// openLists opens the lists last read by this account on this host. The
+// viewer is the one just read, never the cached one: the lists of another
+// account are not shown, and nothing is done in its name.
+func openLists(cfg config.File, viewer string, log *slog.Logger) tui.Lists {
+	path := filepath.Join(cfg.CacheDir(), "lists.json")
+	c, err := listcache.Open(path, github.DefaultHost(), viewer)
+	if err != nil {
+		log.Warn("could not read the lists last read", "err", err.Error())
+	}
+	return c
 }
 
 // prReader reads pull requests by key.

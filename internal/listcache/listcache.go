@@ -14,6 +14,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"sync"
 	"time"
 
 	"github.com/babarot/gh-triage/internal/model"
@@ -45,9 +46,11 @@ type file struct {
 	Inbox   *Inbox `json:"inbox,omitempty"`
 }
 
-// Cache is the file for one account.
+// Cache is the file for one account. Its methods may be called from
+// several goroutines.
 type Cache struct {
 	path, host, viewer string
+	mu                 sync.Mutex
 	got                file
 }
 
@@ -87,6 +90,8 @@ func read(path string) (file, error) {
 
 // List is the list last read for query.
 func (c *Cache) List(query string) (List, bool) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
 	for _, l := range c.got.Lists {
 		if l.Query == query {
 			return l, true
@@ -97,6 +102,8 @@ func (c *Cache) List(query string) (List, bool) {
 
 // Inbox is the inbox last read.
 func (c *Cache) Inbox() (Inbox, bool) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
 	if c.got.Inbox == nil {
 		return Inbox{}, false
 	}
@@ -126,6 +133,8 @@ func (c *Cache) PutInbox(in Inbox) error {
 // each other's half-written file. One of another account is replaced, not
 // changed, so no list of that account is left on disk.
 func (c *Cache) update(change func(*file)) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
 	f, err := read(c.path)
 	if err != nil || !c.own(f) {
 		f = file{Version: version, Host: c.host, Viewer: c.viewer}

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"slices"
 	"strings"
+	"time"
 
 	tea "charm.land/bubbletea/v2"
 
@@ -42,6 +43,27 @@ type tab struct {
 	sel, offset int
 	// keep is the pull request the cursor was on when a reading started.
 	keep model.PRKey
+
+	// readAt is when the rows were read, and asOf the same while they are
+	// not what GitHub has now: from the cache until read again, or after a
+	// reading again failed. Zero asOf is live.
+	readAt, asOf time.Time
+	// pend gathers a reading again of a tab that has rows, page by page,
+	// to put in place at once when every page is in; nil otherwise.
+	pend *pending
+	// heavyLeft is how many reads of heavy fields of the reading gen are
+	// not back.
+	heavyLeft int
+	// kept are the rows a reading again no longer had, kept to show their
+	// results until R.
+	kept map[model.PRKey]bool
+}
+
+// pending is a reading again of a tab, gathered.
+type pending struct {
+	prs      []model.PR
+	total    int
+	warnings []string
 }
 
 func newSectionTab(s Section) *tab {
@@ -149,12 +171,13 @@ func (m *Model) inboxRows(t *tab) ([]row, int) {
 	return out, closed
 }
 
-// knownPR finds a pull request in any tab.
+// knownPR finds a pull request in any tab: in the inbox first, which reads
+// every field at once, then in the lists, whose heavy fields come later.
 func (m *Model) knownPR(k model.PRKey) (model.PR, bool) {
+	if p, ok := m.inboxTab().inboxPRs[k]; ok {
+		return p, true
+	}
 	for _, t := range m.tabs {
-		if p, ok := t.inboxPRs[k]; ok {
-			return p, true
-		}
 		for _, p := range t.prs {
 			if p.Key == k {
 				return p, true
@@ -318,6 +341,11 @@ func (m *Model) loadTab(i int) tea.Cmd {
 		}
 	}
 	t.gen++
+	t.heavyLeft = 0
+	t.pend = nil
+	if len(t.prs) > 0 {
+		t.pend = &pending{}
+	}
 	return m.searchPage(i, t.gen, "", false)
 }
 
@@ -332,7 +360,7 @@ func (m *Model) searchPage(i, gen int, after string, more bool) tea.Cmd {
 	t := m.tabs[i]
 	query, n := t.query, min(firstPage, t.limit)
 	if more {
-		n = min(morePage, t.limit-len(t.prs))
+		n = min(morePage, t.limit-t.reading())
 	}
 	return func() tea.Msg {
 		prs, total, next, warnings, err := m.src.SearchPage(m.ctx, query, n, after)
@@ -352,75 +380,39 @@ func (m *Model) handleData(msg tea.Msg) tea.Cmd {
 		m.viewer = msg.login
 		return tea.Batch(m.loadAll())
 	case tabMsg:
-		t := m.tabs[msg.tab]
-		if msg.gen != t.gen {
-			return nil
-		}
-		if msg.err != nil {
-			t.loading, t.loaded, t.err = false, true, msg.err
-			m.log.Error("search", "tab", t.name, "err", msg.err.Error())
-			return nil
-		}
-		t.loaded, t.err, t.total = true, nil, msg.total
-		if msg.more {
-			t.prs = append(t.prs, safePRs(msg.prs)...)
-			t.warnings = append(t.warnings, msg.warnings...)
-		} else {
-			t.prs, t.warnings = safePRs(msg.prs), msg.warnings
-			m.restoreCursor(t)
-		}
-		// What was read of a pull request's checks is for its head; a new
-		// push makes it stale.
-		for _, p := range msg.prs {
-			if mi, ok := m.cache.info[p.Key]; ok && mi.HeadOID != p.HeadOID {
-				delete(m.cache.info, p.Key)
-			}
-		}
-		m.refreshed[msg.tab] = m.set.Now()
-		if msg.next != "" && len(t.prs) < t.limit {
-			return tea.Batch(m.ensure(), m.searchPage(msg.tab, msg.gen, msg.next, true))
-		}
-		t.loading = false
-		return tea.Batch(m.ensure(), m.ensureChecks(t.prs), m.dropGone(t))
+		return m.tabRead(msg)
 	case notifsMsg:
 		t := m.inboxTab()
-		t.loading = false
 		if msg.err != nil {
-			t.loaded, t.err = true, msg.err
+			t.loading = false
 			m.log.Error("notifications", "err", msg.err.Error())
+			if len(t.notifs) > 0 {
+				t.asOf = t.readAt
+				return nil
+			}
+			t.loaded, t.err = true, msg.err
 			return nil
 		}
-		t.notifs = make([]model.Notification, len(msg.notifs))
-		for i, n := range msg.notifs {
-			t.notifs[i] = safeNotification(n)
-		}
-		// What GitHub says now replaces what was put away here: a thread
-		// with new activity is unread again.
-		t.hidden = map[model.PRKey]bool{}
-		m.unread = map[model.PRKey]model.Notification{}
-		var keys []model.PRKey
-		for _, n := range t.notifs {
-			if n.Unread {
-				m.unread[n.Key] = n
-			}
-			if !slices.Contains(keys, n.Key) {
-				keys = append(keys, n.Key)
-			}
-		}
+		keys := m.setNotifs(t, msg.notifs)
 		return func() tea.Msg {
 			prs, err := m.src.PullRequests(m.ctx, keys)
 			return inboxPRsMsg{prs, err}
 		}
 	case inboxPRsMsg:
+		// The inbox is read once its pull requests are.
 		t := m.inboxTab()
-		t.loaded, t.err = true, msg.err
+		t.loading, t.loaded, t.err = false, true, msg.err
 		if msg.prs != nil {
 			t.inboxPRs = map[model.PRKey]model.PR{}
 			for k, p := range msg.prs {
 				t.inboxPRs[k] = safePR(p)
 			}
 		}
-		return m.ensure()
+		if msg.err != nil {
+			return m.ensure()
+		}
+		t.asOf, t.readAt = time.Time{}, m.set.Now()
+		return tea.Batch(m.ensure(), m.saveInbox(t))
 	case diffMsg:
 		e := m.cache.diffs[msg.id]
 		e.loading, e.err, e.val = false, msg.err, safeFiles(msg.files)
@@ -583,4 +575,152 @@ func (m *Model) ensureChecks(prs []model.PR) tea.Cmd {
 		}
 		return checksMsg{out}
 	}
+}
+
+// reading is how many pull requests the tab's reading has so far.
+func (t *tab) reading() int {
+	if t.pend != nil {
+		return len(t.pend.prs)
+	}
+	return len(t.prs)
+}
+
+// tabRead takes in a page of a tab's search. A tab with no rows shows each
+// page as it comes; one with rows keeps them until every page of the new
+// reading is in, so a list of 98 never drops to the 50 of a first page.
+func (m *Model) tabRead(msg tabMsg) tea.Cmd {
+	t := m.tabs[msg.tab]
+	if msg.gen != t.gen {
+		return nil
+	}
+	now := m.set.Now()
+	if msg.err != nil {
+		t.loading = false
+		m.log.Error("search", "tab", t.name, "err", msg.err.Error())
+		if t.pend != nil {
+			// The rows stay, as of when they were read.
+			t.pend = nil
+			t.asOf = t.readAt
+			if t == m.tab() {
+				m.setStatus(fmt.Sprintf("could not update: %s · showing the list as of %s · %s to try again",
+					short80(msg.err), t.readAt.Local().Format("15:04"), m.firstKey("refresh")), true)
+			}
+			return nil
+		}
+		t.loaded, t.err = true, msg.err
+		return nil
+	}
+	// What was read of a pull request's checks is for its head; a new
+	// push makes it stale.
+	for _, p := range msg.prs {
+		if mi, ok := m.cache.info[p.Key]; ok && mi.HeadOID != p.HeadOID {
+			delete(m.cache.info, p.Key)
+		}
+	}
+	prs := safePRs(msg.prs)
+	if t.pend != nil {
+		t.pend.prs = append(t.pend.prs, prs...)
+		t.pend.total = msg.total
+		t.pend.warnings = append(t.pend.warnings, msg.warnings...)
+		if msg.next != "" && len(t.pend.prs) < t.limit {
+			return m.searchPage(msg.tab, msg.gen, msg.next, true)
+		}
+		return m.swap(msg.tab)
+	}
+	t.loaded, t.err, t.total, t.asOf = true, nil, msg.total, time.Time{}
+	if msg.more {
+		t.prs = append(t.prs, prs...)
+		t.warnings = append(t.warnings, msg.warnings...)
+	} else {
+		t.prs, t.warnings, t.kept = prs, msg.warnings, nil
+		m.restoreCursor(t)
+	}
+	cmds := []tea.Cmd{m.ensure(), m.queueHeavy(msg.tab, msg.gen, prs)}
+	if msg.next != "" && len(t.prs) < t.limit {
+		return tea.Batch(append(cmds, m.searchPage(msg.tab, msg.gen, msg.next, true))...)
+	}
+	t.loading, t.readAt = false, now
+	m.refreshed[msg.tab] = now
+	return tea.Batch(append(cmds, m.dropGone(t))...)
+}
+
+// swap puts a reading again in place of the rows. A row of the same pull
+// request at the same head keeps its heavy fields until they are read
+// again; rows added or changed are marked for a moment; rows that still
+// show a result stay until R.
+func (m *Model) swap(i int) tea.Cmd {
+	t := m.tabs[i]
+	p := t.pend
+	t.pend = nil
+	now := m.set.Now()
+	old := map[model.PRKey]model.PR{}
+	for _, o := range t.prs {
+		old[o.Key] = o
+	}
+	in := map[model.PRKey]bool{}
+	fresh := false
+	for j := range p.prs {
+		n := &p.prs[j]
+		in[n.Key] = true
+		o, ok := old[n.Key]
+		if ok && o.HeadOID == n.HeadOID && o.HeavyRead() {
+			n.SetHeavy(o.Heavy())
+		}
+		if !ok || !o.Updated.Equal(n.Updated) {
+			m.fresh[n.Key] = now.Add(freshFor)
+			fresh = true
+		}
+	}
+	rows := p.prs
+	t.kept = nil
+	for _, o := range t.prs {
+		if _, shown := m.progress[o.Key]; shown && !in[o.Key] {
+			if t.kept == nil {
+				t.kept = map[model.PRKey]bool{}
+			}
+			t.kept[o.Key] = true
+			rows = append(rows, o)
+		}
+	}
+	t.prs, t.total, t.warnings = rows, p.total, p.warnings
+	t.loading, t.loaded, t.err, t.asOf, t.readAt = false, true, nil, time.Time{}, now
+	m.refreshed[i] = now
+	m.restoreCursor(t)
+	cmds := []tea.Cmd{m.ensure(), m.queueHeavy(i, t.gen, p.prs), m.dropGone(t)}
+	if fresh {
+		m.freshGen++
+		gen := m.freshGen
+		cmds = append(cmds, tea.Tick(freshFor, func(time.Time) tea.Msg { return freshMsg{gen} }))
+	}
+	return tea.Batch(cmds...)
+}
+
+func short80(err error) string {
+	s, _, _ := strings.Cut(err.Error(), "\n")
+	if len(s) > 80 {
+		s = s[:79] + "…"
+	}
+	return s
+}
+
+// setNotifs shows notifications and returns their pull requests. What
+// GitHub says replaces what was put away here: a thread with new activity
+// is unread again.
+func (m *Model) setNotifs(t *tab, ns []model.Notification) []model.PRKey {
+	t.notifs = make([]model.Notification, len(ns))
+	for i, n := range ns {
+		t.notifs[i] = safeNotification(n)
+	}
+	t.hidden = map[model.PRKey]bool{}
+	m.unread = map[model.PRKey]model.Notification{}
+	var keys []model.PRKey
+	for _, n := range t.notifs {
+		if n.Unread {
+			m.unread[n.Key] = n
+		}
+		if !slices.Contains(keys, n.Key) {
+			keys = append(keys, n.Key)
+		}
+	}
+	return keys
 }

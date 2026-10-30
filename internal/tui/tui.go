@@ -40,6 +40,9 @@ type Source interface {
 	MergeInfo(ctx context.Context, ids []string, details bool) (map[string]model.MergeInfo, error)
 	// Bodies reads descriptions by node ID, for rules that read them.
 	Bodies(ctx context.Context, ids []string) (map[string]string, error)
+	// Heavy reads the fields a list's search leaves out, by node ID, each
+	// for the head it has now.
+	Heavy(ctx context.Context, ids []string) (map[string]model.Heavy, error)
 }
 
 // Runner approves and merges batches of pull requests.
@@ -90,6 +93,11 @@ type Settings struct {
 	// StoreProblem says why the record could not be opened, when it was
 	// not another gh-triage holding it.
 	StoreProblem string
+	// Viewer is the login the app read before starting, which the cached
+	// lists are of; empty has the TUI read it.
+	Viewer string
+	// Lists are the lists last read; nil keeps none.
+	Lists Lists
 	// Refresh is how often the shown tab is read again; zero turns it off.
 	Refresh time.Duration
 	// Now is the clock, for tests; nil is time.Now.
@@ -160,6 +168,17 @@ type Model struct {
 	// cautions are what Claude said of release notes, by notesID; empty
 	// when nothing calls for care.
 	cautions map[string]string
+
+	// heavyQueue are the reads of heavy fields not sent yet, and heavyBusy
+	// how many are on their way.
+	heavyQueue []heavyJob
+	heavyBusy  int
+	// spinning is set while a spinner tick is on its way.
+	spinning bool
+	// fresh are the rows a reading again added or changed, marked until
+	// the time given; freshGen tells the last mark's end from earlier ones.
+	fresh    map[model.PRKey]time.Time
+	freshGen int
 }
 
 // New returns the TUI reading from src, acting through run, and asking cl;
@@ -171,7 +190,7 @@ func New(src Source, run Runner, cl Claude, km keymap.Map, log *slog.Logger, set
 	if log == nil {
 		log = logging.Discard()
 	}
-	m := &Model{src: src, run: run, claude: cl, chats: map[model.PRKey]*chat{}, cautions: map[string]string{}, keys: km, log: log, set: set, ctx: context.Background(), unread: map[model.PRKey]model.Notification{},
+	m := &Model{src: src, run: run, claude: cl, chats: map[model.PRKey]*chat{}, cautions: map[string]string{}, fresh: map[model.PRKey]time.Time{}, keys: km, log: log, set: set, ctx: context.Background(), unread: map[model.PRKey]model.Notification{},
 		selected: map[model.PRKey]bool{}, progress: map[model.PRKey]progress{}, batches: map[string]*batchState{},
 		merged: map[model.PRKey]bool{}, refreshed: map[int]time.Time{}}
 	m.st = newStyles(mocha)
@@ -184,6 +203,8 @@ func New(src Source, run Runner, cl Claude, km keymap.Map, log *slog.Logger, set
 	m.tabs = append(m.tabs, newInboxTab(set.HideClosed))
 	m.pane = pane{on: set.PreviewHeight > 0, mode: paneDiff, unfold: map[model.PRKey]bool{}}
 	m.cache = newCache()
+	m.viewer = set.Viewer
+	m.loadCached()
 	return m
 }
 
@@ -197,15 +218,26 @@ func Run(ctx context.Context, src Source, run Runner, cl Claude, km keymap.Map, 
 
 // Init asks for the terminal's background, the viewer, and every tab.
 func (m *Model) Init() tea.Cmd {
-	cmds := []tea.Cmd{m.loadViewer(), m.tick(), m.resume()}
+	cmds := []tea.Cmd{m.tick(), m.resume()}
+	if m.viewer == "" {
+		cmds = append(cmds, m.loadViewer())
+	} else {
+		cmds = append(cmds, m.loadAll())
+	}
 	if m.set.Theme == "auto" {
 		cmds = append(cmds, tea.RequestBackgroundColor)
 	}
 	return tea.Batch(cmds...)
 }
 
-// Update handles a message.
+// Update handles a message, and keeps the spinner turning while anything
+// is read.
 func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	_, cmd := m.update(msg)
+	return m, tea.Batch(cmd, m.spin())
+}
+
+func (m *Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.width, m.height = msg.Width, msg.Height
@@ -232,6 +264,16 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.toast = nil
 		}
 		return m, nil
+	case spinMsg:
+		m.spinning = false
+		return m, nil
+	case freshMsg:
+		if msg.gen == m.freshGen {
+			clear(m.fresh)
+		}
+		return m, nil
+	case heavyMsg:
+		return m, m.heavyRead(msg)
 	case tea.PasteMsg:
 		return m, m.paste(msg)
 	}

@@ -14,8 +14,9 @@ type palette struct {
 	base, surface0, surface1, overlay, subtext0, subtext1, text, dim color.Color
 	blue, mauve, green, yellow, peach, red, teal                     color.Color
 	// pick and pickSel are the backgrounds of a selected row, and of a
-	// selected row under the cursor.
-	pick, pickSel color.Color
+	// selected row under the cursor; fresh is that of a row a reading
+	// again added or changed.
+	pick, pickSel, fresh color.Color
 }
 
 var (
@@ -25,7 +26,7 @@ var (
 		text: lipgloss.Color("#e0e4f0"), dim: lipgloss.Color("#706f87"),
 		blue: lipgloss.Color("#96bfff"), mauve: lipgloss.Color("#d4b0ff"), green: lipgloss.Color("#b5f0b0"),
 		yellow: lipgloss.Color("#ffe5a0"), peach: lipgloss.Color("#ffc49a"), red: lipgloss.Color("#f5a3b5"), teal: lipgloss.Color("#94e2d5"),
-		pick: lipgloss.Color("#3a3150"), pickSel: lipgloss.Color("#4d4068"),
+		pick: lipgloss.Color("#3a3150"), pickSel: lipgloss.Color("#4d4068"), fresh: lipgloss.Color("#26324a"),
 	}
 	latte = palette{
 		base: lipgloss.Color("#eff1f5"), surface0: lipgloss.Color("#ccd0da"), surface1: lipgloss.Color("#bcc0cc"),
@@ -33,7 +34,7 @@ var (
 		text: lipgloss.Color("#4c4f69"), dim: lipgloss.Color("#9ca0b0"),
 		blue: lipgloss.Color("#1e66f5"), mauve: lipgloss.Color("#8839ef"), green: lipgloss.Color("#40a02b"),
 		yellow: lipgloss.Color("#df8e1d"), peach: lipgloss.Color("#fe640b"), red: lipgloss.Color("#d20f39"), teal: lipgloss.Color("#179299"),
-		pick: lipgloss.Color("#e6dcf7"), pickSel: lipgloss.Color("#d6c6f2"),
+		pick: lipgloss.Color("#e6dcf7"), pickSel: lipgloss.Color("#d6c6f2"), fresh: lipgloss.Color("#dce6fb"),
 	}
 )
 
@@ -45,7 +46,7 @@ type styles struct {
 	blue, mauve, green, yellow, peach, red   lipgloss.Style
 	teal, key, border, title, group, add     lipgloss.Style
 	del, hunk, file, tabPill, tabPillOff, me lipgloss.Style
-	picked, pickedSel                        lipgloss.Style
+	picked, pickedSel, fresh                 lipgloss.Style
 }
 
 func newStyles(p palette) styles {
@@ -84,6 +85,7 @@ func newStyles(p palette) styles {
 		me:         fg(p.peach).Bold(true),
 		picked:     lipgloss.NewStyle().Background(p.pick),
 		pickedSel:  lipgloss.NewStyle().Background(p.pickSel),
+		fresh:      lipgloss.NewStyle().Background(p.fresh),
 	}
 }
 

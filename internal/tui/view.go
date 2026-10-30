@@ -101,6 +101,8 @@ func (m *Model) renderHeader() string {
 	for i, t := range m.tabs {
 		count := "…"
 		switch {
+		case !m.tabDone(t):
+			count = m.spinner()
 		case t.inbox && t.loaded:
 			count = fmt.Sprint(len(m.unread))
 		case t.loaded && t.err == nil:
@@ -124,6 +126,10 @@ func (m *Model) renderHeader() string {
 func (m *Model) headerRight() string {
 	t, st := m.tab(), m.st
 	var parts []string
+	// The rows are from the cache, or a reading again failed.
+	if !t.asOf.IsZero() {
+		parts = append(parts, st.yellow.Render("as of "+t.asOf.Local().Format("15:04")))
+	}
 	if n := m.unseen(); n > 0 {
 		parts = append(parts, st.mauve.Render(fmt.Sprintf("✦%d", n))+" "+st.dim.Render(m.firstKey("notifications")))
 	}

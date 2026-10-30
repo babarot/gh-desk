@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/cli/go-gh/v2/pkg/api"
+	"github.com/cli/go-gh/v2/pkg/auth"
 	"github.com/cli/go-gh/v2/pkg/browser"
 
 	"github.com/babarot/gh-triage/internal/logging"
@@ -35,6 +36,13 @@ type Options struct {
 	Transport http.RoundTripper
 	// AuthToken is for tests; empty uses gh's login.
 	AuthToken string
+}
+
+// DefaultHost is the host gh uses when none is given: GH_HOST, or the one
+// gh is logged in to.
+func DefaultHost() string {
+	h, _ := auth.DefaultHost()
+	return h
 }
 
 // New returns a client for the host gh is logged in to.

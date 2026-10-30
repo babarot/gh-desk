@@ -86,6 +86,9 @@ type fakeSource struct {
 	done    []string
 	// info overrides what MergeInfo says of a pull request, by key.
 	info map[model.PRKey]func(*model.MergeInfo)
+	// noHeavy has Heavy return nothing, and searchErr fails every search.
+	noHeavy   bool
+	searchErr error
 }
 
 func (f *fakeSource) MergeInfo(_ context.Context, ids []string, _ bool) (map[string]model.MergeInfo, error) {
@@ -103,6 +106,27 @@ func (f *fakeSource) MergeInfo(_ context.Context, ids []string, _ bool) (map[str
 					fn(&mi)
 				}
 				out[id] = mi
+			}
+		}
+	}
+	return out, nil
+}
+
+// Heavy reads the heavy fields from the pull requests as the fixture has
+// them.
+func (f *fakeSource) Heavy(_ context.Context, ids []string) (map[string]model.Heavy, error) {
+	out := map[string]model.Heavy{}
+	if f.noHeavy {
+		// GitHub returned none of them.
+		return out, nil
+	}
+	for _, prs := range f.searches {
+		for _, p := range prs {
+			for _, id := range ids {
+				if p.ID == id {
+					p.HeavyHead = p.HeadOID
+					out[id] = p.Heavy()
+				}
 			}
 		}
 	}
@@ -165,6 +189,9 @@ func (f *fakeSource) Viewer(context.Context) (string, error) { return "me", nil 
 // SearchPage pages through a search two at a time, so tests cover the
 // later pages.
 func (f *fakeSource) SearchPage(_ context.Context, q string, first int, after string) ([]model.PR, int, string, []string, error) {
+	if f.searchErr != nil {
+		return nil, 0, "", nil, f.searchErr
+	}
 	prs := f.searches[q]
 	from := 0
 	if after != "" {
@@ -193,6 +220,11 @@ func (f *fakeSource) PullRequests(_ context.Context, keys []model.PRKey) (map[mo
 				}
 			}
 		}
+	}
+	// As the real client does, every field is read.
+	for k, p := range out {
+		p.HeavyHead = p.HeadOID
+		out[k] = p
 	}
 	return out, nil
 }
@@ -223,7 +255,16 @@ func start(t *testing.T, f *fakeSource, km keymap.Map) *Model {
 
 func startWith(t *testing.T, f *fakeSource, km keymap.Map) (*Model, *fakeRunner) {
 	t.Helper()
-	set := Settings{
+	r := &fakeRunner{results: map[model.PRKey]runner.Event{}}
+	m := New(f, r, &fakeClaude{}, km, nil, testSettings())
+	m.Update(tea.WindowSizeMsg{Width: 130, Height: 34})
+	run(m, m.Init())
+	return m, r
+}
+
+// testSettings are the settings of the tests' TUI.
+func testSettings() Settings {
+	return Settings{
 		Sections: []Section{
 			{Name: "review", Query: "review", Grouped: true, Folded: []string{"team", "bots"}, Limit: 100},
 			{Name: "mine", Query: "mine", DraftsLast: true, Limit: 100},
@@ -236,11 +277,6 @@ func startWith(t *testing.T, f *fakeSource, km keymap.Map) (*Model, *fakeRunner)
 		Rules:   []plan.Rule{{Name: "octo bumps", Author: "renovate", Packages: []string{"octo/app"}}},
 		CanWait: true,
 	}
-	r := &fakeRunner{results: map[model.PRKey]runner.Event{}}
-	m := New(f, r, &fakeClaude{}, km, nil, set)
-	m.Update(tea.WindowSizeMsg{Width: 130, Height: 34})
-	run(m, m.Init())
-	return m, r
 }
 
 // run carries out cmd and every command its messages lead to, at once.
@@ -254,7 +290,7 @@ func run(m *Model, cmd tea.Cmd) {
 		}
 		msg := c()
 		switch msg := msg.(type) {
-		case nil, tickMsg, toastMsg:
+		case nil, tickMsg, toastMsg, spinMsg, freshMsg:
 		case tea.BatchMsg:
 			queue = append(queue, msg...)
 		case tea.QuitMsg:

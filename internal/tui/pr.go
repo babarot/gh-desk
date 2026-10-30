@@ -75,8 +75,7 @@ func (m *Model) renderPR(b *strings.Builder, height int) {
 		return
 	}
 	head := st.bold.Render(p.Title) + "  " + st.muted.Render(fmt.Sprintf("%s · %s → %s", p.Author, p.HeadRef, p.BaseRef)) +
-		"  " + m.ciMark(p.Checks) + " " + m.decisionMark(p.Decision) + "  " +
-		st.green.Render(fmt.Sprintf("+%d", p.Additions)) + " " + st.red.Render(fmt.Sprintf("−%d", p.Deletions))
+		"  " + m.heavyMarks(p)
 	b.WriteString(fit(head, m.width) + "\n")
 	var tabs []string
 	for i, t := range prTabs {
@@ -167,4 +166,15 @@ func (m *Model) prLines(p model.PR) []line {
 		return append(out, line{text: st.muted.Render("reviews: ") + strings.Join(reviews, "  ")})
 	}
 	return nil
+}
+
+// heavyMarks are the checks, the review decision and the line counts, or a
+// spinner while they are read.
+func (m *Model) heavyMarks(p model.PR) string {
+	st := m.st
+	if !p.HeavyRead() {
+		return st.dim.Render(m.spinner())
+	}
+	return m.ciMark(p.Checks) + " " + m.decisionMark(p.Decision) + "  " +
+		st.green.Render(fmt.Sprintf("+%d", p.Additions)) + " " + st.red.Render(fmt.Sprintf("−%d", p.Deletions))
 }
