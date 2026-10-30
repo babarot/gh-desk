@@ -18,11 +18,12 @@ GitHub's search is also slow: its response time grows with the number of results
 - Each tab before the inbox is a GitHub search, defined in `[[sections]]` of the config file (`review`, `mine` and `involved` by default). A tab with `group = "requested"` splits its rows into requests to the viewer, requests only to their teams, and pull requests opened by bots, with the last two folded at start.
 - Notifications are read for two things only: an unread mark (●) on the rows of every tab, and the inbox tab, which lists them with the reason and hides those whose pull request is merged or closed until asked. The inbox reads the state of its pull requests in one GraphQL query with an alias per pull request.
 - A search is read in pages: a first page of 20 so the tab appears in a few seconds, then pages of 50 appended as they arrive, up to the tab's `limit`.
-- What only one pull request needs (its body, its checks, its comments, its diff) is read when it is under the cursor or opened, and cached; the diffs of the rows next to the cursor are read ahead.
+- What only one pull request needs (its body, its comments, its diff) is read when it is under the cursor or opened, and cached; the diffs of the rows next to the cursor are read ahead. The single checks are read for every row whose checks are pending, in one query, once the list's checks are known, so the CI column can tell the rows waiting only for an approval check (◌).
+- Since ADR-011, the search reads only the light fields of each pull request, and the heavy ones (checks, review decision, line counts) are read after it.
 
 ## Consequences
 
 - A tab shows what is open now, with its state, in one query per page.
 - A review sent from gh-triage can mark the pull request's notification done (`[inbox] done_after_review`), so the inbox empties as the work is done.
 - The first page of a large tab is visible after a few seconds, and the rest fills in; the count in the tab's title is GitHub's total from the first page.
-- Showing whether only approval checks are pending (a separate mark in the CI column) needs each check of each pull request, which the list does not read; it is left to the stage that handles required checks.
+- Showing whether only approval checks are pending (◌ in the CI column) needs each check of each pull request with pending checks, one more query per list.

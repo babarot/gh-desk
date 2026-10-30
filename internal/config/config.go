@@ -380,7 +380,8 @@ func Template(keys string) string {
 # settings files or MCP servers are loaded, its file tools see only the
 # worktree, and it has none that run commands.
 # model = "opus"
-# Where gh-triage keeps its clones and the worktrees (~ is your home); by
+# Where gh-triage keeps its clones, the worktrees, and the lists last read
+# (lists.json, shown at once at the next launch) (~ is your home); by
 # default $XDG_CACHE_HOME/gh-triage, or ~/.cache/gh-triage.
 # cache_dir = "~/.cache/gh-triage"
 # The tools Claude may use, among "Read", "Grep", "Glob" and "WebFetch".
