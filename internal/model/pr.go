@@ -218,7 +218,10 @@ type Pending struct {
 	Watching bool `json:"watching"`
 	// Approved is set when gh-triage approved it; an approval dismissed
 	// meanwhile stops it at the next launch.
-	Approved      bool          `json:"approved"`
+	Approved bool `json:"approved"`
+	// Approving is set while an approval is being sent: if gh-triage
+	// stops then, whether it reached GitHub is not known.
+	Approving     bool          `json:"approving"`
 	ChecksWaited  time.Duration `json:"checks_waited"`
 	BlockedWaited time.Duration `json:"blocked_waited"`
 	Watched       time.Duration `json:"watched"`

@@ -57,7 +57,12 @@ type Store interface {
 
 // Options configure a Runner.
 type Options struct {
-	Store    Store
+	Store Store
+	// CanWait allows merges that wait (for checks, a branch update,
+	// auto-merge). It is set when this gh-triage holds the record of
+	// pending merges; without it nothing would go on with them after
+	// quitting, so they are skipped.
+	CanWait  bool
 	Settings plan.Settings
 	Viewer   string
 	// ChecksTimeout is how long to wait for required checks still running.
@@ -150,7 +155,13 @@ type Runner struct {
 	gh  GitHub
 	opt Options
 	log *slog.Logger
+	// active counts the batches not yet ended, for Wait.
+	active sync.WaitGroup
 }
+
+// Wait waits for every batch to end. After its context is cancelled, a
+// batch ends once its jobs have stopped writing to the record.
+func (r *Runner) Wait() { r.active.Wait() }
 
 // New returns a Runner.
 func New(gh GitHub, log *slog.Logger, opt Options) *Runner {
@@ -197,6 +208,7 @@ func (r *Runner) run(ctx context.Context, kind Kind, items []Item, resume map[mo
 	}
 	log.Info("batch start", "kind", verb, "prs", len(items), "repos", len(repos))
 	var wg sync.WaitGroup
+	r.active.Add(1)
 	emit := func(e Event) {
 		e.Batch = batch
 		select {
@@ -232,6 +244,7 @@ func (r *Runner) run(ctx context.Context, kind Kind, items []Item, resume map[mo
 		wg.Wait()
 		log.Info("batch end")
 		close(events)
+		r.active.Done()
 	}()
 	return batch, events
 }
@@ -250,29 +263,52 @@ type job struct {
 	// record keeps pend in the store while the job waits.
 	record bool
 	pend   model.Pending
+	// keep is set when the job ends without knowing how the pull request
+	// stands (a read or a write failed): its record stays, so the next
+	// launch reads it again and goes on.
+	keep bool
 }
 
 func (j *job) say(res Result, text string) {
 	j.emit(Event{Key: j.it.PR.Key, Result: res, Text: text, Approved: j.approved})
-	if res.Final() {
-		j.log.Info("pr end", logging.KeyStep, resultWord[res], "why", text)
-		if res != AutoMergeOn {
-			j.forget()
-		}
+	if !res.Final() {
+		return
+	}
+	j.log.Info("pr end", logging.KeyStep, resultWord[res], "why", text)
+	// The record goes only with an end that is known: not when gh-triage
+	// is quitting, not when a read or a write failed midway, and not when
+	// GitHub's auto-merge is left to watch.
+	if res != AutoMergeOn && !j.keep && j.ctx.Err() == nil {
+		j.forget()
 	}
 }
 
-// save records where the job is, so the next launch can go on with it.
-func (j *job) save() {
+// unsure ends the job keeping its record: something failed midway.
+func (j *job) unsure(text string) {
+	j.keep = true
+	j.say(Failed, text+" · goes on at the next launch")
+}
+
+// save records where the job is, so the next launch can go on with it. It
+// reports false when the record could not be written.
+func (j *job) save() bool {
 	if !j.record {
-		return
+		return true
 	}
 	j.pend.Key, j.pend.ID, j.pend.Head = j.it.PR.Key, j.it.PR.ID, j.head
 	j.pend.Author, j.pend.AuthorIsBot = j.it.PR.Author, j.it.PR.AuthorIsBot
 	j.pend.AutoMerge, j.pend.Approved = j.it.AutoMerge, j.approved
 	if err := j.r.opt.Store.Put(j.pend); err != nil {
 		j.log.Warn("could not record the pending merge", "err", err.Error())
+		return false
 	}
+	return true
+}
+
+// waits reports whether a step waits after this run's first write, which
+// only a gh-triage holding the record may start.
+func waits(s plan.Step) bool {
+	return s == plan.StepWait || s == plan.StepUpdate || s == plan.StepAutoMerge
 }
 
 func (j *job) forget() {
@@ -299,19 +335,26 @@ func (j *job) resume() {
 		j.say(Stopped, "closed meanwhile")
 		return
 	}
-	if j.pend.Approved {
-		approved := false
-		for _, r := range mi.Reviews {
-			approved = approved || (r.Author == j.r.opt.Viewer && r.State == model.ReviewApproved)
-		}
-		if !approved {
-			j.say(Stopped, "your approval was dismissed · confirm again")
-			return
-		}
+	approved := false
+	for _, r := range mi.Reviews {
+		approved = approved || (r.Author == j.r.opt.Viewer && r.State == model.ReviewApproved)
+	}
+	switch {
+	case j.pend.Approved && !approved:
+		j.say(Stopped, "your approval was dismissed · confirm again")
+		return
+	case j.pend.Approving && !approved:
+		// It may have reached GitHub and been dismissed since.
+		j.say(Stopped, "whether the approval was sent is not known · confirm again")
+		return
+	case j.pend.Approving:
+		j.approved, j.pend.Approving = true, false
 	}
 	if j.pend.Watching {
 		j.say(AutoMergeOn, "auto-merge on")
-		j.watch()
+		// Watched aside, as after turning auto-merge on, so the next
+		// pull request of the repository does not wait for it.
+		j.wg.Go(j.watch)
 		return
 	}
 	j.merge()
@@ -324,12 +367,12 @@ var resultWord = map[Result]string{Running: "running", Approved: "approved", Mer
 func (j *job) read(details bool) (model.MergeInfo, bool) {
 	got, err := j.r.gh.MergeInfo(j.ctx, []string{j.it.PR.ID}, details)
 	if err != nil {
-		j.say(Failed, "could not read it: "+short(err))
+		j.unsure("could not read it: " + short(err))
 		return model.MergeInfo{}, false
 	}
 	mi, ok := got[j.it.PR.ID]
 	if !ok {
-		j.say(Failed, "could not read it")
+		j.unsure("could not read it")
 		return model.MergeInfo{}, false
 	}
 	if mi.State == model.StateOpen && mi.HeadOID != j.head {
@@ -358,13 +401,22 @@ func (j *job) approveOnly() {
 
 func (j *job) sendApproval() bool {
 	j.say(Running, "approving")
+	// Recorded as on its way first: should gh-triage stop before the
+	// result is recorded, the next launch does not know whether the
+	// approval reached GitHub, and stops unless it finds it there.
+	j.pend.Approving = true
+	if !j.save() {
+		j.say(Failed, "could not record the pending merge; nothing was sent")
+		return false
+	}
 	pr := j.it.PR
 	pr.HeadOID = j.head
 	if err := j.r.gh.Review(j.ctx, pr, model.EventApprove, ""); err != nil {
-		j.say(Failed, "approve failed: "+short(err))
+		j.unsure("approve failed: " + short(err))
 		return false
 	}
-	j.approved = true
+	j.approved, j.pend.Approving = true, false
+	j.save()
 	return true
 }
 
@@ -406,8 +458,21 @@ func (j *job) merge() {
 		j.say(Skipped, d.Reason)
 		return
 	}
-	// Recorded before the first write, so a crash after it is resumed.
-	j.save()
+	if d.Step == plan.StepAutoMerge && !j.it.AutoMerge {
+		// The popup did not say this one goes to auto-merge: merging it
+		// here, on the confirmed head, is what the user agreed to.
+		d.Step = plan.StepWait
+	}
+	if waits(d.Step) && !j.r.opt.CanWait {
+		j.say(Skipped, "would wait, and another gh-triage keeps the waiting merges")
+		return
+	}
+	// Recorded before the first write, so a crash after it is resumed; no
+	// write without a record.
+	if !j.save() {
+		j.say(Failed, "could not record the pending merge; nothing was sent")
+		return
+	}
 	if d.Approve {
 		if !j.sendApproval() {
 			return
@@ -420,11 +485,13 @@ func (j *job) merge() {
 			j.say(Skipped, d.Reason)
 			return
 		}
-	}
-	if d.Step == plan.StepAutoMerge && !j.it.AutoMerge {
-		// The popup did not say this one goes to auto-merge: merging it
-		// here, on the confirmed head, is what the user agreed to.
-		d.Step = plan.StepWait
+		if d.Step == plan.StepAutoMerge && !j.it.AutoMerge {
+			d.Step = plan.StepWait
+		}
+		if waits(d.Step) && !j.r.opt.CanWait {
+			j.say(Skipped, "approved; would wait, and another gh-triage keeps the waiting merges")
+			return
+		}
 	}
 	switch d.Step {
 	case plan.StepMerge:
@@ -473,7 +540,7 @@ func (j *job) autoMerge(method model.MergeMethod) {
 		return
 	}
 	if err != nil {
-		j.say(Failed, "auto-merge failed: "+short(err))
+		j.unsure("auto-merge failed: " + short(err))
 		return
 	}
 	j.pend.Watching = true
@@ -538,7 +605,7 @@ func (j *job) updateBranch(base string) bool {
 	}
 	j.say(Running, "updating the branch")
 	if err := j.r.gh.UpdateBranch(j.ctx, j.it.PR.Key, j.it.PR.ID, j.head); err != nil {
-		j.say(Failed, "update failed: "+short(err))
+		j.unsure("update failed: " + short(err))
 		return false
 	}
 	deadline := time.Now().Add(j.r.opt.RecheckFor)

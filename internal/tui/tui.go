@@ -84,6 +84,9 @@ type Settings struct {
 	// pending merges. Without it, merges that wait are left out, since
 	// nothing would go on with them after quitting.
 	CanWait bool
+	// StoreProblem says why the record could not be opened, when it was
+	// not another gh-triage holding it.
+	StoreProblem string
 	// Refresh is how often the shown tab is read again; zero turns it off.
 	Refresh time.Duration
 	// Now is the clock, for tests; nil is time.Now.

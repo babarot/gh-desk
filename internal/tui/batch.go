@@ -51,6 +51,9 @@ func listen(batch string, ch <-chan runner.Event) tea.Cmd {
 
 // resume goes on with the merges the last run was waiting for.
 func (m *Model) resume() tea.Cmd {
+	if m.set.StoreProblem != "" {
+		m.setStatus("merges that wait are off: "+m.set.StoreProblem, true)
+	}
 	if len(m.set.Resume) == 0 {
 		return nil
 	}

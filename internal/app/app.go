@@ -114,10 +114,10 @@ func Run(args []string, stdout, stderr io.Writer) int {
 	store, err := state.Open(state.DefaultDir())
 	if err != nil {
 		log.Warn("could not open the record of pending merges", "err", err.Error())
+		set.StoreProblem = "could not open " + state.DefaultDir() + ": " + err.Error()
 	}
 	var rstore runner.Store
 	if store != nil {
-		defer store.Close()
 		rstore = store
 		set.CanWait = true
 		set.Resume = store.Pending()
@@ -125,11 +125,18 @@ func Run(args []string, stdout, stderr io.Writer) int {
 	} else {
 		log.Info("another gh-triage holds the record of pending merges")
 	}
-	rn := runner.New(runnerGitHub{gh}, log, runner.Options{Settings: set.Plan, Viewer: viewer, Store: rstore,
+	rn := runner.New(runnerGitHub{gh}, log, runner.Options{Settings: set.Plan, Viewer: viewer, Store: rstore, CanWait: rstore != nil,
 		ChecksTimeout: config.Duration(cfg.Merge.ChecksTimeout), BlockedTimeout: config.Duration(cfg.Merge.BlockedTimeout),
 		WatchTimeout: config.Duration(cfg.Merge.WatchTimeout)})
 	start := time.Now()
 	err = tui.Run(ctx, source{gh}, rn, km, log, set)
+	// Stop the batches and wait for them to stop writing the record before
+	// the lock goes, so another gh-triage never shares it.
+	cancel()
+	rn.Wait()
+	if store != nil {
+		store.Close()
+	}
 	log.Info("exit", logging.KeyDurationMS, time.Since(start).Milliseconds(), "err", errString(err))
 	if err != nil {
 		fmt.Fprintf(stderr, "gh-triage: %v (run %s)\n", err, run)

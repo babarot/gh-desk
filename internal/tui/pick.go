@@ -178,7 +178,7 @@ func (m *Model) renderPick() []string {
 		}
 		for i, p := range hits {
 			if i == 8 {
-				lines = append(lines, st.dim.Render(fmt.Sprintf("  … %d more", len(hits)-8)))
+				lines = append(lines, st.dim.Render(fmt.Sprintf("  … %d more; the approve and merge popups list them all", len(hits)-8)))
 				break
 			}
 			name := st.sub1.Render(p.Key.Repository()) + st.muted.Render(fmt.Sprintf("#%d", p.Key.Number))

@@ -28,7 +28,11 @@ type fakeGH struct {
 
 func (f *fakeGH) log(s string) { f.calls = append(f.calls, s) }
 
-func (f *fakeGH) MergeInfo(_ context.Context, ids []string, _ bool) (map[string]model.MergeInfo, error) {
+func (f *fakeGH) MergeInfo(ctx context.Context, ids []string, _ bool) (map[string]model.MergeInfo, error) {
+	// As the real client does, a cancelled read fails.
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	out := map[string]model.MergeInfo{}
@@ -108,7 +112,7 @@ func pr(id, repo string, n int, author string) (model.MergeInfo, Item) {
 
 func runBatch(t *testing.T, f *fakeGH, kind Kind, items ...Item) map[model.PRKey][]Event {
 	t.Helper()
-	r := New(f, logging.Discard(), Options{Settings: settings, Viewer: "me",
+	r := New(f, logging.Discard(), Options{Settings: settings, Viewer: "me", CanWait: true,
 		ChecksTimeout: time.Second, BlockedTimeout: 40 * time.Millisecond, WatchTimeout: time.Second,
 		PollFast: 5 * time.Millisecond, PollSlow: 5 * time.Millisecond, Recheck: 2 * time.Millisecond, RecheckFor: 50 * time.Millisecond})
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -332,7 +336,7 @@ func TestWatchEndsWhenReadsFail(t *testing.T) {
 	it.AutoMerge = true
 	mi.MergeState, mi.Repo.AutoMerge = model.MergeBlocked, true
 	f := newFake(mi)
-	r := New(failingReads{f}, logging.Discard(), Options{Settings: settings, Viewer: "me", ChecksTimeout: time.Second,
+	r := New(failingReads{f}, logging.Discard(), Options{Settings: settings, Viewer: "me", CanWait: true, ChecksTimeout: time.Second,
 		BlockedTimeout: time.Second, WatchTimeout: 30 * time.Millisecond, PollFast: 5 * time.Millisecond, PollSlow: 5 * time.Millisecond,
 		Recheck: 2 * time.Millisecond, RecheckFor: 50 * time.Millisecond})
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
@@ -401,7 +405,7 @@ func (s *memStore) Remove(k model.PRKey) error {
 }
 
 func newRunner(f GitHub, st Store) *Runner {
-	return New(f, logging.Discard(), Options{Settings: settings, Viewer: "me", Store: st,
+	return New(f, logging.Discard(), Options{Settings: settings, Viewer: "me", Store: st, CanWait: true,
 		ChecksTimeout: time.Second, BlockedTimeout: 40 * time.Millisecond, WatchTimeout: time.Second,
 		PollFast: 5 * time.Millisecond, PollSlow: 5 * time.Millisecond, Recheck: 2 * time.Millisecond, RecheckFor: 50 * time.Millisecond})
 }
@@ -506,5 +510,135 @@ func TestResumeKeepsTimeWaited(t *testing.T) {
 	}
 	if time.Since(start) > 35*time.Millisecond {
 		t.Errorf("waited %v; the time already waited was not kept", time.Since(start))
+	}
+}
+
+// A failed read keeps the record, so the next launch goes on.
+func TestFailedReadKeepsTheRecord(t *testing.T) {
+	mi, it := pr("1", "api", 1, "alice")
+	mi.MergeState = model.MergeBlocked
+	mi.Checks = []model.Check{{Name: "build", State: model.CheckPending, Required: true}}
+	f := newFake(mi)
+	st := newStore()
+	_, ch := newRunner(missingAfter{f, 3}, st).Start(context.Background(), Merge, []Item{it})
+	drain(t, ch)
+	if _, ok := st.now[it.PR.Key]; !ok {
+		t.Errorf("the record went with a failed read: %v", st.now)
+	}
+}
+
+// missingAfter stops returning the pull request after n reads.
+type missingAfter struct {
+	*fakeGH
+	n int
+}
+
+func (f missingAfter) MergeInfo(ctx context.Context, ids []string, details bool) (map[string]model.MergeInfo, error) {
+	got, err := f.fakeGH.MergeInfo(ctx, ids, details)
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.reads[ids[0]] > f.n {
+		return map[string]model.MergeInfo{}, err
+	}
+	return got, err
+}
+
+// A record that cannot be written stops the job before any write.
+func TestNoWriteWithoutARecord(t *testing.T) {
+	mi, it := pr("1", "api", 1, "alice")
+	f := newFake(mi)
+	_, ch := newRunner(f, failingStore{}).Start(context.Background(), Merge, []Item{it})
+	es := drain(t, ch)
+	if e := last(es); e.Result != Failed || len(f.calls) != 0 {
+		t.Errorf("last %+v, calls %v", e, f.calls)
+	}
+}
+
+type failingStore struct{}
+
+func (failingStore) Put(model.Pending) error  { return fmt.Errorf("disk full") }
+func (failingStore) Remove(model.PRKey) error { return nil }
+
+// Without the record's lock, a merge that turns out to wait is skipped.
+func TestNoWaitWithoutTheLock(t *testing.T) {
+	mi, it := pr("1", "api", 1, "alice")
+	mi.MergeState = model.MergeBlocked
+	f := newFake(mi)
+	r := New(f, logging.Discard(), Options{Settings: settings, Viewer: "me", PollFast: time.Millisecond,
+		Recheck: time.Millisecond, RecheckFor: 10 * time.Millisecond})
+	_, ch := r.Start(context.Background(), Merge, []Item{it})
+	es := drain(t, ch)
+	if e := last(es); e.Result != Skipped || len(f.calls) != 0 {
+		t.Errorf("last %+v, calls %v", e, f.calls)
+	}
+}
+
+// An approval whose result was not recorded is not sent again on resume.
+func TestResumeUnknownApproval(t *testing.T) {
+	mi, _ := pr("1", "api", 1, "alice")
+	mi.MergeState = model.MergeBlocked
+	f := newFake(mi)
+	p := model.Pending{Key: mi.Key, ID: "1", Head: "h-1", Author: "alice", Approving: true}
+	_, ch := newRunner(f, newStore()).Resume(context.Background(), []model.Pending{p})
+	es := drain(t, ch)
+	if e := last(es); e.Result != Stopped || !strings.Contains(e.Text, "not known") || len(f.calls) != 0 {
+		t.Errorf("last %+v, calls %v", e, f.calls)
+	}
+}
+
+// Quitting keeps the record, and Wait returns once the batch has ended.
+func TestWaitAfterCancel(t *testing.T) {
+	mi, it := pr("1", "api", 1, "alice")
+	mi.MergeState = model.MergeBlocked
+	mi.Checks = []model.Check{{Name: "build", State: model.CheckPending, Required: true}}
+	f := newFake(mi)
+	st := newStore()
+	r := newRunner(f, st)
+	ctx, cancel := context.WithCancel(context.Background())
+	_, ch := r.Start(ctx, Merge, []Item{it})
+	go func() {
+		for range ch {
+		}
+	}()
+	time.Sleep(20 * time.Millisecond)
+	cancel()
+	done := make(chan struct{})
+	go func() { r.Wait(); close(done) }()
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+		t.Fatal("Wait did not return")
+	}
+	st.mu.Lock()
+	defer st.mu.Unlock()
+	if _, ok := st.now[it.PR.Key]; !ok {
+		t.Errorf("quitting dropped the record: %v", st.now)
+	}
+}
+
+// A resumed watch does not hold back the next pull request of its
+// repository.
+func TestResumedWatchDoesNotBlock(t *testing.T) {
+	a, _ := pr("1", "api", 1, "renovate")
+	a.MergeState, a.AutoMerge = model.MergeBlocked, true
+	b, _ := pr("2", "api", 2, "alice")
+	f := newFake(a, b)
+	ps := []model.Pending{
+		{Key: a.Key, ID: "1", Head: "h-1", Author: "renovate", AuthorIsBot: true, AutoMerge: true, Watching: true},
+		{Key: b.Key, ID: "2", Head: "h-2", Author: "alice"},
+	}
+	r := New(f, logging.Discard(), Options{Settings: settings, Viewer: "me", Store: newStore(), CanWait: true,
+		ChecksTimeout: time.Second, BlockedTimeout: time.Second, WatchTimeout: 300 * time.Millisecond,
+		PollFast: 5 * time.Millisecond, PollSlow: 5 * time.Millisecond, Recheck: 2 * time.Millisecond, RecheckFor: 50 * time.Millisecond})
+	start := time.Now()
+	_, ch := r.Resume(context.Background(), ps)
+	var mergedAt time.Duration
+	for e := range ch {
+		if e.Key == b.Key && e.Result == Merged {
+			mergedAt = time.Since(start)
+		}
+	}
+	if mergedAt == 0 || mergedAt > 200*time.Millisecond {
+		t.Errorf("api#2 merged after %v; it waited for api#1's watch", mergedAt)
 	}
 }
