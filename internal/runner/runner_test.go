@@ -101,7 +101,7 @@ var settings = plan.Settings{Methods: []model.MergeMethod{model.MethodMerge, mod
 
 func pr(id, repo string, n int, author string) (model.MergeInfo, Item) {
 	k := model.PRKey{Owner: "acme", Repo: repo, Number: n}
-	mi := model.MergeInfo{Key: k, ID: id, State: model.StateOpen, HeadOID: "h-" + id, MergeState: model.MergeClean,
+	mi := model.MergeInfo{Key: k, ID: id, State: model.StateOpen, HeadOID: "h-" + id, BaseOID: "base", MergeState: model.MergeClean,
 		Repo: model.RepoMerge{Methods: []model.MergeMethod{model.MethodMerge}}, Checks: []model.Check{}}
 	return mi, Item{PR: model.PR{ID: id, Key: k, Author: author, HeadOID: "h-" + id}, Head: "h-" + id}
 }
@@ -356,4 +356,20 @@ func (f failingReads) MergeInfo(ctx context.Context, ids []string, details bool)
 		return nil, fmt.Errorf("401 Bad credentials")
 	}
 	return f.fakeGH.MergeInfo(ctx, ids, details)
+}
+
+// A merge commit of the confirmed head with something other than the base
+// read before the update is not taken, even when GitHub made it.
+func TestOldMergeCommitIsNotTaken(t *testing.T) {
+	mi, it := pr("1", "api", 1, "alice")
+	mi.MergeState = model.MergeBehind
+	f := newFake(mi)
+	f.commits["h-1-updated"] = Commit{Parents: []string{"h-1", "old-base"}, ViaWeb: true, Author: "me"}
+	evs := runBatch(t, f, Merge, it)
+	if e := last(evs[it.PR.Key]); e.Result != Stopped {
+		t.Errorf("last event = %+v (calls %v)", e, f.calls)
+	}
+	if strings.Contains(strings.Join(f.calls, ","), "merge acme") {
+		t.Errorf("merged: %v", f.calls)
+	}
 }

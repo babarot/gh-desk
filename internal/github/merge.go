@@ -14,7 +14,7 @@ import (
 )
 
 const infoFields = `
-  id number state isDraft headRefOid mergeStateStatus reviewDecision
+  id number state isDraft headRefOid baseRefOid mergeStateStatus reviewDecision
   autoMergeRequest { enabledAt }
   repository { nameWithOwner mergeCommitAllowed squashMergeAllowed rebaseMergeAllowed autoMergeAllowed }
   latestReviews(first: 20) { nodes { author { login } state } }
@@ -49,6 +49,7 @@ type infoNode struct {
 	State            string
 	IsDraft          bool
 	HeadRefOid       string
+	BaseRefOid       string
 	MergeStateStatus string
 	ReviewDecision   string
 	AutoMergeRequest *struct{ EnabledAt time.Time }
@@ -73,7 +74,7 @@ func (n infoNode) toModel() model.MergeInfo {
 	owner, repo, _ := strings.Cut(n.Repository.NameWithOwner, "/")
 	mi := model.MergeInfo{
 		Key: model.PRKey{Owner: owner, Repo: repo, Number: n.Number}, ID: n.ID, State: model.PRState(n.State),
-		Draft: n.IsDraft, HeadOID: n.HeadRefOid, MergeState: model.MergeState(n.MergeStateStatus),
+		Draft: n.IsDraft, HeadOID: n.HeadRefOid, BaseOID: n.BaseRefOid, MergeState: model.MergeState(n.MergeStateStatus),
 		Decision: model.ReviewDecision(n.ReviewDecision), AutoMerge: n.AutoMergeRequest != nil,
 		Repo: model.RepoMerge{AutoMerge: n.Repository.AutoMergeAllowed},
 	}

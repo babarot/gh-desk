@@ -301,7 +301,7 @@ func (j *job) decide() (model.MergeInfo, plan.Decision, bool) {
 }
 
 func (j *job) merge() {
-	_, d, ok := j.decide()
+	mi, d, ok := j.decide()
 	if !ok {
 		return
 	}
@@ -314,7 +314,7 @@ func (j *job) merge() {
 			return
 		}
 		// Read again: the approval can change what is next.
-		if _, d, ok = j.decide(); !ok {
+		if mi, d, ok = j.decide(); !ok {
 			return
 		}
 		if d.Step == plan.StepSkip {
@@ -333,7 +333,7 @@ func (j *job) merge() {
 	case plan.StepAutoMerge:
 		j.autoMerge(d.Method)
 	case plan.StepUpdate:
-		if j.updateBranch() {
+		if j.updateBranch(mi.BaseOID) {
 			j.wait()
 		}
 	case plan.StepWait:
@@ -418,10 +418,16 @@ func (j *job) watch() {
 }
 
 // updateBranch merges the base into the branch and takes the new head as
-// the confirmed one, after checking it is the commit GitHub made for the
-// update: two parents, one the confirmed head, made by GitHub, authored by
-// the viewer. Anything else (a push in between) stops the pull request.
-func (j *job) updateBranch() bool {
+// the confirmed one, after checking it is the commit GitHub made for this
+// update: its parents are exactly the confirmed head and base, the head of
+// the base branch read just before, and GitHub made it, authored by the
+// viewer. Anything else (a push in between, the base moving) stops the
+// pull request.
+func (j *job) updateBranch(base string) bool {
+	if base == "" {
+		j.say(Stopped, "could not read the base branch")
+		return false
+	}
 	j.say(Running, "updating the branch")
 	if err := j.r.gh.UpdateBranch(j.ctx, j.it.PR.Key, j.it.PR.ID, j.head); err != nil {
 		j.say(Failed, "update failed: "+short(err))
@@ -433,7 +439,8 @@ func (j *job) updateBranch() bool {
 		mi, ok := got[j.it.PR.ID]
 		if err == nil && ok && mi.HeadOID != j.head {
 			c, err := j.r.gh.CommitInfo(j.ctx, j.it.PR.Key, mi.HeadOID)
-			if err != nil || len(c.Parents) != 2 || !slices.Contains(c.Parents, j.head) || !c.ViaWeb || c.Author != j.r.opt.Viewer {
+			if err != nil || len(c.Parents) != 2 || !slices.Contains(c.Parents, j.head) || !slices.Contains(c.Parents, base) ||
+				!c.ViaWeb || c.Author != j.r.opt.Viewer {
 				j.log.Info("not the update's commit", "head", mi.HeadOID, "parents", len(c.Parents), "via_web", c.ViaWeb)
 				j.say(Stopped, "head changed · confirm again")
 				return false

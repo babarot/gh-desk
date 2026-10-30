@@ -169,11 +169,13 @@ type RepoMerge struct {
 // MergeInfo is what deciding and following a merge needs about one pull
 // request, read fresh before each step.
 type MergeInfo struct {
-	Key        PRKey
-	ID         string
-	State      PRState
-	Draft      bool
-	HeadOID    string
+	Key     PRKey
+	ID      string
+	State   PRState
+	Draft   bool
+	HeadOID string
+	// BaseOID is the head of the base branch.
+	BaseOID    string
 	MergeState MergeState
 	Decision   ReviewDecision
 	// AutoMerge is whether auto-merge is on.
