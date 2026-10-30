@@ -399,10 +399,13 @@ func Template(keys string) string {
 # attention_paths = [".github/workflows/*", "CODEOWNERS", ".github/CODEOWNERS", "docs/CODEOWNERS"]
 
 [claude]
-# C asks Claude Code (claude -p, with the account you are signed in with)
-# about the pull request, in a worktree of its head. Claude only reads: no
-# settings files or MCP servers are loaded, its file tools see only the
-# worktree, and it has none that run commands.
+# C asks Claude Code (claude -p, with the account you are signed in with).
+# On a pull request's screen, it reviews that pull request in a worktree of
+# its head. On the list, it plans what to show and select from the lists,
+# with no tools; enter applies the plan, and an approve or a merge in it
+# opens the confirm popup. Claude only reads: no settings files or MCP
+# servers are loaded, its file tools see only the worktree, and it has none
+# that run commands.
 # model = "opus"
 # Where gh-triage keeps its clones, the worktrees, and the lists last read
 # (lists.json, shown at once at the next launch) (~ is your home); by
