@@ -135,14 +135,14 @@ func (m *Model) tabLabel(i int) string {
 	case t.err != nil:
 		count = "!"
 	}
-	// The key is dim and the count in its own color, so neither reads
-	// as part of the name.
+	// The key is dim, and so is the count in parentheses except on the
+	// tab shown, so neither reads as part of the name.
 	st := m.st
-	name, num := st.tabOff, st.teal
+	name, num := st.tabOff, st.dim
 	if i == m.cur {
-		name, num = st.tabOn, st.teal.Bold(true).Underline(true)
+		name, num = st.tabOn, st.tabOn
 	}
-	label := name.Render(t.name) + name.Render(" ") + num.Render(count)
+	label := name.Render(t.name) + name.Render(" ") + num.Render("("+count+")")
 	if ks := m.keys.Keys(keymap.Action(fmt.Sprintf("tab_%d", i+1))); len(ks) > 0 {
 		label = st.dim.Render(ks[0]) + " " + label
 	}

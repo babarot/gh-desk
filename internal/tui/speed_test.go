@@ -126,7 +126,7 @@ func TestUnreadHeavyFields(t *testing.T) {
 	}
 	// While heavy reads are on their way, the tab spins and S waits.
 	m.tabs[0].heavyLeft = 1
-	if !strings.Contains(screen(m), "1 review "+m.spinner()) {
+	if !strings.Contains(screen(m), "1 review ("+m.spinner()+")") {
 		t.Errorf("no spinner on the tab:\n%s", screen(m))
 	}
 	m.picker = &pick{}
