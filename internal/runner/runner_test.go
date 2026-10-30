@@ -23,7 +23,7 @@ type fakeGH struct {
 	onRead       func(id string, mi *model.MergeInfo, reads int)
 	reads        map[string]int
 	autoMergeErr error
-	parents      map[string][]string
+	commits      map[string]Commit
 }
 
 func (f *fakeGH) log(s string) { f.calls = append(f.calls, s) }
@@ -83,12 +83,12 @@ func (f *fakeGH) UpdateBranch(_ context.Context, k model.PRKey, id, head string)
 	return nil
 }
 
-func (f *fakeGH) Parents(_ context.Context, _ model.PRKey, oid string) ([]string, error) {
-	return f.parents[oid], nil
+func (f *fakeGH) CommitInfo(_ context.Context, _ model.PRKey, oid string) (Commit, error) {
+	return f.commits[oid], nil
 }
 
 func newFake(mis ...model.MergeInfo) *fakeGH {
-	f := &fakeGH{prs: map[string]*model.MergeInfo{}, reads: map[string]int{}, parents: map[string][]string{}}
+	f := &fakeGH{prs: map[string]*model.MergeInfo{}, reads: map[string]int{}, commits: map[string]Commit{}}
 	for i := range mis {
 		mi := mis[i]
 		f.prs[mi.ID] = &mi
@@ -140,6 +140,7 @@ func TestMergeNowApprovesFirst(t *testing.T) {
 
 func TestAutoMergeAndWatch(t *testing.T) {
 	mi, it := pr("1", "api", 1, "renovate")
+	it.AutoMerge = true
 	mi.MergeState, mi.Repo.AutoMerge = model.MergeBlocked, true
 	f := newFake(mi)
 	f.onRead = func(_ string, mi *model.MergeInfo, n int) {
@@ -160,6 +161,7 @@ func TestAutoMergeAndWatch(t *testing.T) {
 
 func TestCleanStatusMergesDirectly(t *testing.T) {
 	mi, it := pr("1", "api", 1, "renovate")
+	it.AutoMerge = true
 	mi.MergeState, mi.Repo.AutoMerge = model.MergeBlocked, true
 	f := newFake(mi)
 	f.autoMergeErr = fmt.Errorf("%w: GitHub said so", ErrCleanStatus)
@@ -260,7 +262,7 @@ func TestUpdateBranchThenMerge(t *testing.T) {
 	mi, it := pr("1", "api", 1, "alice")
 	mi.MergeState = model.MergeBehind
 	f := newFake(mi)
-	f.parents["h-1-updated"] = []string{"h-1", "base"}
+	f.commits["h-1-updated"] = Commit{Parents: []string{"h-1", "base"}, ViaWeb: true, Author: "me"}
 	f.onRead = func(_ string, mi *model.MergeInfo, n int) {
 		if mi.HeadOID == "h-1-updated" && n > 8 {
 			mi.MergeState = model.MergeClean
@@ -279,7 +281,8 @@ func TestUpdatedHeadWithOtherCommitsStops(t *testing.T) {
 	mi, it := pr("1", "api", 1, "alice")
 	mi.MergeState = model.MergeBehind
 	f := newFake(mi)
-	f.parents["h-1-updated"] = []string{"someone-else"}
+	// A push on top of the confirmed head, not GitHub's merge of the base.
+	f.commits["h-1-updated"] = Commit{Parents: []string{"h-1"}, Author: "alice"}
 	evs := runBatch(t, f, Merge, it)
 	if e := last(evs[it.PR.Key]); e.Result != Stopped {
 		t.Errorf("last event = %+v", e)
@@ -301,4 +304,56 @@ func TestApproveOnly(t *testing.T) {
 	if strings.Contains(strings.Join(f.calls, ","), "merge") {
 		t.Errorf("approve merged: %v", f.calls)
 	}
+}
+
+// A pull request confirmed as one to merge directly is not put on
+// auto-merge when it turns out blocked when the runner gets to it.
+func TestNoAutoMergeWithoutConsent(t *testing.T) {
+	mi, it := pr("1", "api", 1, "renovate")
+	mi.MergeState, mi.Repo.AutoMerge = model.MergeBlocked, true
+	f := newFake(mi)
+	f.onRead = func(_ string, mi *model.MergeInfo, n int) {
+		if n > 4 {
+			mi.MergeState = model.MergeClean
+		}
+	}
+	evs := runBatch(t, f, Merge, it)
+	if strings.Contains(strings.Join(f.calls, ","), "auto-merge") {
+		t.Errorf("auto-merge turned on without consent: %v", f.calls)
+	}
+	if e := last(evs[it.PR.Key]); e.Result != Merged {
+		t.Errorf("last event = %+v", e)
+	}
+}
+
+// A watch whose reads keep failing still ends at its time limit.
+func TestWatchEndsWhenReadsFail(t *testing.T) {
+	mi, it := pr("1", "api", 1, "renovate")
+	it.AutoMerge = true
+	mi.MergeState, mi.Repo.AutoMerge = model.MergeBlocked, true
+	f := newFake(mi)
+	r := New(failingReads{f}, logging.Discard(), Options{Settings: settings, Viewer: "me", ChecksTimeout: time.Second,
+		BlockedTimeout: time.Second, WatchTimeout: 30 * time.Millisecond, PollFast: 5 * time.Millisecond, PollSlow: 5 * time.Millisecond,
+		Recheck: 2 * time.Millisecond, RecheckFor: 50 * time.Millisecond})
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	_, events := r.Start(ctx, Merge, []Item{it})
+	for range events {
+	}
+	if ctx.Err() != nil {
+		t.Fatal("the watch did not end")
+	}
+}
+
+// failingReads fails every read after auto-merge is on.
+type failingReads struct{ *fakeGH }
+
+func (f failingReads) MergeInfo(ctx context.Context, ids []string, details bool) (map[string]model.MergeInfo, error) {
+	f.mu.Lock()
+	on := f.prs[ids[0]].AutoMerge
+	f.mu.Unlock()
+	if on {
+		return nil, fmt.Errorf("401 Bad credentials")
+	}
+	return f.fakeGH.MergeInfo(ctx, ids, details)
 }

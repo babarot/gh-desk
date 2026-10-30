@@ -31,7 +31,16 @@ type GitHub interface {
 	Merge(ctx context.Context, key model.PRKey, id, head string, method model.MergeMethod) error
 	EnableAutoMerge(ctx context.Context, key model.PRKey, id, head string, method model.MergeMethod) error
 	UpdateBranch(ctx context.Context, key model.PRKey, id, head string) error
-	Parents(ctx context.Context, key model.PRKey, oid string) ([]string, error)
+	CommitInfo(ctx context.Context, key model.PRKey, oid string) (Commit, error)
+}
+
+// Commit is what tells a commit gh-triage made by updating a branch from
+// one someone pushed.
+type Commit struct {
+	Parents []string
+	// ViaWeb is set on a commit GitHub made, not one pushed.
+	ViaWeb bool
+	Author string
 }
 
 // ErrCleanStatus is what EnableAutoMerge returns when the pull request can
@@ -89,6 +98,10 @@ const (
 type Item struct {
 	PR   model.PR
 	Head string
+	// AutoMerge is set when the user was told this pull request goes to
+	// auto-merge, which also merges commits pushed later. Without it the
+	// runner never turns auto-merge on: it waits and merges itself.
+	AutoMerge bool
 }
 
 // Result is where a pull request ended, or Running while it has not.
@@ -307,6 +320,11 @@ func (j *job) merge() {
 			return
 		}
 	}
+	if d.Step == plan.StepAutoMerge && !j.it.AutoMerge {
+		// The popup did not say this one goes to auto-merge: merging it
+		// here, on the confirmed head, is what the user agreed to.
+		d.Step = plan.StepWait
+	}
 	switch d.Step {
 	case plan.StepMerge:
 		j.mergeNow(d.Method)
@@ -371,6 +389,9 @@ func (j *job) watch() {
 			j.log.Info("watch end", logging.KeyStep, resultWord[res], "why", text)
 		}
 		switch {
+		case time.Now().After(until):
+			say(Stopped, "auto-merge not done in "+j.r.opt.WatchTimeout.String())
+			return
 		case err != nil || !ok:
 			continue
 		case mi.State == model.StateMerged:
@@ -385,16 +406,14 @@ func (j *job) watch() {
 		case mi.MergeState == model.MergeDirty:
 			say(Stopped, "auto-merge stuck: conflicts")
 			return
-		case time.Now().After(until):
-			say(Stopped, "auto-merge not done in "+j.r.opt.WatchTimeout.String())
-			return
 		}
 	}
 }
 
 // updateBranch merges the base into the branch and takes the new head as
-// the confirmed one, after checking it is the confirmed head with the base
-// merged in and nothing else.
+// the confirmed one, after checking it is the commit GitHub made for the
+// update: two parents, one the confirmed head, made by GitHub, authored by
+// the viewer. Anything else (a push in between) stops the pull request.
 func (j *job) updateBranch() bool {
 	j.say(Running, "updating the branch")
 	if err := j.r.gh.UpdateBranch(j.ctx, j.it.PR.Key, j.it.PR.ID, j.head); err != nil {
@@ -406,8 +425,9 @@ func (j *job) updateBranch() bool {
 		got, err := j.r.gh.MergeInfo(j.ctx, []string{j.it.PR.ID}, false)
 		mi, ok := got[j.it.PR.ID]
 		if err == nil && ok && mi.HeadOID != j.head {
-			parents, err := j.r.gh.Parents(j.ctx, j.it.PR.Key, mi.HeadOID)
-			if err != nil || !slices.Contains(parents, j.head) {
+			c, err := j.r.gh.CommitInfo(j.ctx, j.it.PR.Key, mi.HeadOID)
+			if err != nil || len(c.Parents) != 2 || !slices.Contains(c.Parents, j.head) || !c.ViaWeb || c.Author != j.r.opt.Viewer {
+				j.log.Info("not the update's commit", "head", mi.HeadOID, "parents", len(c.Parents), "via_web", c.ViaWeb)
 				j.say(Stopped, "head changed · confirm again")
 				return false
 			}

@@ -233,28 +233,46 @@ func (c *Client) UpdateBranch(ctx context.Context, key model.PRKey, id, head str
 }`, map[string]any{"id": id, "head": head})
 }
 
-// Parents are the parents of a commit, to tell that a new head is the
-// recorded head with the base merged in.
-func (c *Client) Parents(ctx context.Context, key model.PRKey, oid string) ([]string, error) {
+// Commit is what tells a commit gh-triage made by updating a branch from
+// one someone pushed.
+type Commit struct {
+	Parents []string
+	// ViaWeb is set on a commit GitHub made (the web, or an API such as
+	// updatePullRequestBranch), not one pushed.
+	ViaWeb bool
+	Author string
+}
+
+// CommitInfo reads a commit's parents, whether GitHub made it, and its
+// author.
+func (c *Client) CommitInfo(ctx context.Context, key model.PRKey, oid string) (Commit, error) {
 	var resp struct {
 		Repository struct {
 			Object *struct {
-				Parents struct{ Nodes []struct{ Oid string } }
+				Parents         struct{ Nodes []struct{ Oid string } }
+				CommittedViaWeb bool
+				Author          struct{ User *struct{ Login string } }
 			}
 		}
 	}
-	err := c.query(ctx, "parents", `query($owner: String!, $name: String!, $oid: GitObjectID!) {
-  repository(owner: $owner, name: $name) { object(oid: $oid) { ... on Commit { parents(first: 5) { nodes { oid } } } } }
+	err := c.query(ctx, "commit", `query($owner: String!, $name: String!, $oid: GitObjectID!) {
+  repository(owner: $owner, name: $name) { object(oid: $oid) { ... on Commit {
+    parents(first: 5) { nodes { oid } } committedViaWeb author { user { login } }
+  } } }
 }`, map[string]any{"owner": key.Owner, "name": key.Repo, "oid": oid}, &resp, nil)
 	if err != nil {
-		return nil, err
+		return Commit{}, err
 	}
-	if resp.Repository.Object == nil {
-		return nil, fmt.Errorf("%s: commit %s not found", key, oid)
+	o := resp.Repository.Object
+	if o == nil {
+		return Commit{}, fmt.Errorf("%s: commit %s not found", key, oid)
 	}
-	var out []string
-	for _, p := range resp.Repository.Object.Parents.Nodes {
-		out = append(out, p.Oid)
+	out := Commit{ViaWeb: o.CommittedViaWeb}
+	if o.Author.User != nil {
+		out.Author = o.Author.User.Login
+	}
+	for _, p := range o.Parents.Nodes {
+		out.Parents = append(out.Parents, p.Oid)
 	}
 	return out, nil
 }

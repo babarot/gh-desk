@@ -187,7 +187,7 @@ func (m *Model) runBulk() tea.Cmd {
 	bs := &batchState{kind: b.kind, goes: map[model.PRKey]bool{}, done: map[model.PRKey]progress{}}
 	for _, it := range b.items {
 		if it.goes(b.kind) {
-			items = append(items, runner.Item{PR: it.pr, Head: it.mi.HeadOID})
+			items = append(items, runner.Item{PR: it.pr, Head: it.mi.HeadOID, AutoMerge: it.d.Step == plan.StepAutoMerge})
 			bs.goes[it.pr.Key] = true
 			bs.order = append(bs.order, it.pr.Key)
 			continue

@@ -139,6 +139,11 @@ func (g runnerGitHub) EnableAutoMerge(ctx context.Context, key model.PRKey, id, 
 	return err
 }
 
+func (g runnerGitHub) CommitInfo(ctx context.Context, key model.PRKey, oid string) (runner.Commit, error) {
+	c, err := g.Client.CommitInfo(ctx, key, oid)
+	return runner.Commit(c), err
+}
+
 // settings are the config values the TUI uses.
 func settings(cfg config.File) tui.Settings {
 	set := tui.Settings{
