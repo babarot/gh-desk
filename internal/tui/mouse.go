@@ -7,6 +7,8 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
+
+	"github.com/babarot/gh-triage/internal/model"
 )
 
 // The mouse points: it picks a tab or a row, opens a row with a double
@@ -152,9 +154,19 @@ func (m *Model) listClick(x, y int) tea.Cmd {
 		m.dragging = true
 		return nil
 	}
-	// A click on the header of a part of the description pane folds it.
+	// In the description pane, a click on a fact opens its page, and one on
+	// the header of a part folds it.
 	if top := m.paneTop(l); l.pane > 0 && y > top && m.pane.mode == paneBody {
-		if r := y - top - 1; r < len(m.pane.heads) && m.pane.heads[r] != "" {
+		r := y - top - 1
+		if r < len(m.pane.links) {
+			for _, k := range m.pane.links[r] {
+				// The pane's border and a space come before its lines.
+				if spanAt([]int{k.w}, 0, x-2-k.x) == 0 {
+					return m.browseURL(k.url)
+				}
+			}
+		}
+		if r < len(m.pane.heads) && m.pane.heads[r] != "" {
 			m.pane.folded[m.pane.heads[r]] = !m.pane.folded[m.pane.heads[r]]
 		}
 		return nil
@@ -196,7 +208,7 @@ func (m *Model) linkAt(i, x int) string {
 			// The cursor and the mark come before the name.
 			name := fmt.Sprintf("%s#%d", m.repoName(p), p.Key.Number)
 			if spanAt([]int{min(lipgloss.Width(name), c.width-4)}, 0, x-at-4) == 0 {
-				return cmp.Or(p.URL, m.webURL(fmt.Sprintf("%s/pull/%d", p.Key.Repository(), p.Key.Number)))
+				return m.prURL(p)
 			}
 		case "author":
 			if p.Author == "" {
@@ -212,6 +224,11 @@ func (m *Model) linkAt(i, x int) string {
 		at += c.width + 2
 	}
 	return ""
+}
+
+// prURL is a pull request's web page.
+func (m *Model) prURL(p model.PR) string {
+	return cmp.Or(p.URL, m.webURL(fmt.Sprintf("%s/pull/%d", p.Key.Repository(), p.Key.Number)))
 }
 
 // webURL is a page on the GitHub host.

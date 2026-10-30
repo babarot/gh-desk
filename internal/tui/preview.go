@@ -32,8 +32,16 @@ type pane struct {
 	// folded are the parts of the description pane folded, by name.
 	folded map[string]bool
 	// heads are the parts whose headers the description pane last drew,
-	// by its lines, for a click to fold them.
+	// by its lines, for a click to fold them; links are the pages a click
+	// on each line opens.
 	heads []string
+	links [][]link
+}
+
+// link is a page a click on cells x to x+w of a line opens.
+type link struct {
+	x, w int
+	url  string
 }
 
 func (p *pane) toggleMode() {
@@ -53,6 +61,8 @@ type line struct {
 	file int
 	head bool
 	part string
+	// links are the pages clicks on the line open.
+	links []link
 }
 
 // diffLines are a diff's lines as the pane and the PR screen show them.

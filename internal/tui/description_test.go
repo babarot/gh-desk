@@ -94,3 +94,42 @@ func TestNarrowPaneHasFactsAbove(t *testing.T) {
 		t.Errorf("the facts are under the parts:\n%s", s)
 	}
 }
+
+func TestClickFactOpensItsPage(t *testing.T) {
+	f := fixture()
+	f.searches["review"][0].Labels = []string{"good first issue"}
+	m := start(t, f, keymap.Default())
+	press(m, "v")
+	click := func(s string) {
+		t.Helper()
+		x, y := lineOf(t, m, s)
+		mouseAt(m, tea.MouseClickMsg{X: x + 1, Y: y, Button: tea.MouseLeft})
+	}
+	click("@core")
+	click("good first issue")
+	click("+40 −3 · 2 files")
+	click("status") // has no page
+	want := []string{
+		"https://github.com/orgs/acme/teams/core",
+		`https://github.com/acme/api/pulls?q=is%3Apr+is%3Aopen+label%3A%22good+first+issue%22`,
+		"https://github.com/acme/api/pull/12/files",
+	}
+	if strings.Join(f.browsed, " ") != strings.Join(want, " ") {
+		t.Fatalf("browsed %q, want %q", f.browsed, want)
+	}
+}
+
+func TestFactsWrapAndCountWhatIsCut(t *testing.T) {
+	f := fixture()
+	f.searches["review"][0].HeadRef = "babarot/fix-the-retry-that-gave-up-too-early"
+	m := start(t, f, keymap.Default())
+	press(m, "v")
+	if s := screen(m); !strings.Contains(s, "branch    babarot/fix-the-retry-th │") || !strings.Contains(s, "│           at-gave-up-too-early ") {
+		t.Fatalf("the branch is not wrapped:\n%s", s)
+	}
+	// Six lines left in the pane: the last says what is cut.
+	press(m, "-", "-", "-", "-", "-", "-")
+	if s := screen(m); !strings.Contains(s, "│ +1 more") {
+		t.Errorf("no count of the facts cut:\n%s", s)
+	}
+}

@@ -2,9 +2,11 @@ package tui
 
 import (
 	"fmt"
+	"net/url"
 	"strings"
 
 	"charm.land/lipgloss/v2"
+	"github.com/charmbracelet/x/ansi"
 
 	"github.com/babarot/gh-triage/internal/model"
 	"github.com/babarot/gh-triage/internal/plan"
@@ -42,7 +44,9 @@ func (m *Model) descWidths() (left, facts int) {
 	return inner - factsWidth - 3, factsWidth
 }
 
-// descPane is the description pane's lines, height of them.
+// descPane is the description pane's lines, height of them. It records
+// what a click on each line finds: the header of a part, and the facts'
+// links.
 func (m *Model) descPane(p model.PR, n *model.Notification, height int) []string {
 	st := m.st
 	left, right := m.descWidths()
@@ -54,32 +58,57 @@ func (m *Model) descPane(p model.PR, n *model.Notification, height int) []string
 	if s, ok := m.bumpsLine(p, d); ok {
 		top = append(top, s)
 	}
-	var facts []string
-	if right > 0 {
-		facts = m.facts(p, d, right)
-	}
 	ls := m.descLines(p, left)
 	rest := max(height-len(top), 1)
 	m.pane.scroll = min(m.pane.scroll, max(len(ls)-rest, 0))
 	shown := ls[m.pane.scroll:min(len(ls), m.pane.scroll+rest)]
 	m.pane.heads = make([]string, len(top), height)
+	m.pane.links = make([][]link, len(top), height)
 	for _, l := range shown {
 		top = append(top, l.text)
-		m.pane.heads = append(m.pane.heads, l.part)
+		part := ""
+		if l.head {
+			part = l.part
+		}
+		m.pane.heads = append(m.pane.heads, part)
+		m.pane.links = append(m.pane.links, l.links)
 	}
 	if right == 0 {
 		return top
 	}
+	facts := m.facts(p, d, right)
+	if len(facts) > height {
+		// What does not fit is counted on the last line.
+		hidden := 0
+		for _, f := range facts[height-1:] {
+			if f.part != "" {
+				hidden++
+			}
+		}
+		more := "…"
+		if hidden > 0 {
+			more = fmt.Sprintf("+%d more", hidden)
+		}
+		facts = append(facts[:height-1], line{text: st.dim.Render(more)})
+	}
 	out := make([]string, height)
+	for len(m.pane.links) < height {
+		m.pane.links = append(m.pane.links, nil)
+	}
 	for i := range out {
-		var l, f string
+		var l string
 		if i < len(top) {
 			l = top[i]
 		}
+		var f line
 		if i < len(facts) {
 			f = facts[i]
 		}
-		out[i] = fit(l, left) + st.border.Render(" │ ") + f
+		out[i] = fit(l, left) + st.border.Render(" │ ") + f.text
+		for _, k := range f.links {
+			k.x += left + 3
+			m.pane.links[i] = append(m.pane.links[i], k)
+		}
 	}
 	return out
 }
@@ -90,9 +119,7 @@ func (m *Model) descLines(p model.PR, width int) []line {
 	st := m.st
 	var out []line
 	if _, right := m.descWidths(); right == 0 {
-		for _, f := range m.facts(p, m.cache.details[p.Key], width) {
-			out = append(out, line{text: f})
-		}
+		out = append(out, m.facts(p, m.cache.details[p.Key], width)...)
 		out = append(out, line{})
 	}
 	head := func(part, rest string) bool {
@@ -194,49 +221,81 @@ func (m *Model) requiredChecks(p model.PR) map[string]bool {
 	return out
 }
 
+// fact is a value of a fact, and the page a click on it opens.
+type fact struct {
+	text, url string
+}
+
 // facts are what the list's columns leave out, a fact a line, width cells
-// wide: a fact whose values do not fit on one line goes on over the next.
-func (m *Model) facts(p model.PR, d *entry[model.Detail], width int) []string {
+// wide: a fact whose values do not fit on one line goes on over the next,
+// and a value longer than a line is broken. The first line of a fact is
+// named by its part.
+func (m *Model) facts(p model.PR, d *entry[model.Detail], width int) []line {
 	st := m.st
-	var out []string
-	fact := func(name string, values ...string) {
+	var out []line
+	add := func(name string, values ...fact) {
 		if len(values) == 0 {
 			return
 		}
+		room := width - factKey
 		key := st.muted.Render(name + spaces(factKey-len(name)))
-		cur, n := "", 0
-		for _, v := range values {
-			w := lipgloss.Width(v)
-			if n > 0 && n+1+w > width-factKey {
-				out = append(out, fit(key+cur, width))
-				key, cur, n = spaces(factKey), "", 0
-			}
-			if n > 0 {
-				cur += " "
-				n++
-			}
-			cur += v
-			n += w
+		cur, n, part := "", 0, name
+		var links []link
+		flush := func() {
+			out = append(out, line{text: fit(key+cur, width), part: part, links: links})
+			key, cur, n, part, links = spaces(factKey), "", 0, "", nil
 		}
-		out = append(out, fit(key+cur, width))
+		for _, v := range values {
+			pieces := []string{v.text}
+			if w := lipgloss.Width(v.text); w > room {
+				pieces = nil
+				for at := 0; at < w; at += room {
+					pieces = append(pieces, ansi.Cut(v.text, at, min(at+room, w)))
+				}
+			}
+			for _, s := range pieces {
+				w := lipgloss.Width(s)
+				if n > 0 && n+1+w > room {
+					flush()
+				}
+				if n > 0 {
+					cur += " "
+					n++
+				}
+				if v.url != "" {
+					links = append(links, link{x: factKey + n, w: w, url: v.url})
+				}
+				cur += s
+				n += w
+			}
+		}
+		flush()
 	}
-	words := func(s string, style styleFn) []string {
-		var out []string
-		for _, w := range strings.Fields(s) {
-			out = append(out, style.Render(w))
+	plain := func(ss ...string) []fact {
+		var out []fact
+		for _, s := range ss {
+			out = append(out, fact{text: s})
 		}
 		return out
 	}
+	words := func(s string, style styleFn) []fact {
+		var out []fact
+		for _, w := range strings.Fields(s) {
+			out = append(out, fact{text: style.Render(w)})
+		}
+		return out
+	}
+	pr := m.prURL(p)
 
 	switch {
 	case p.State == model.StateMerged:
-		fact("status", st.mauve.Render("merged"))
+		add("status", plain(st.mauve.Render("merged"))...)
 	case p.State == model.StateClosed:
-		fact("status", st.red.Render("closed"))
+		add("status", plain(st.red.Render("closed"))...)
 	case p.Draft:
-		fact("status", st.dim.Render("draft"))
+		add("status", plain(st.dim.Render("draft"))...)
 	default:
-		fact("status", st.green.Render("open"))
+		add("status", plain(st.green.Render("open"))...)
 	}
 	if mi, ok := m.cache.info[p.Key]; ok && p.State == model.StateOpen {
 		dec := plan.ForMerge(mi, p, m.viewer, m.set.Plan)
@@ -244,50 +303,51 @@ func (m *Model) facts(p model.PR, d *entry[model.Detail], width int) []string {
 		if dec.Method != "" {
 			how += " (" + methodWord(dec.Method) + ")"
 		}
-		fact("merge", words(how, m.stepStyle(dec.Step))...)
+		add("merge", words(how, m.stepStyle(dec.Step))...)
 	}
-	var reviews []string
+	var reviews []fact
 	for _, r := range p.Reviews {
 		if r.Author != m.viewer {
-			reviews = append(reviews, reviewerStyle(st, r.State).Render(r.Author+reviewMark[r.State]))
+			reviews = append(reviews, fact{text: reviewerStyle(st, r.State).Render(r.Author + reviewMark[r.State]), url: m.webURL(r.Author)})
 		}
 	}
-	fact("reviews", reviews...)
-	var requested []string
+	add("reviews", reviews...)
+	var requested []fact
 	for _, r := range p.Requested {
 		if r.Team {
-			requested = append(requested, st.teal.Render("@"+r.Login))
+			requested = append(requested, fact{text: st.teal.Render("@" + r.Login), url: m.webURL("orgs/" + p.Key.Owner + "/teams/" + r.Login)})
 		} else {
-			requested = append(requested, st.sub0.Render(r.Login))
+			requested = append(requested, fact{text: st.sub0.Render(r.Login), url: m.webURL(r.Login)})
 		}
 	}
-	fact("requested", requested...)
+	add("requested", requested...)
 	switch {
 	case d != nil && !d.loading && d.err == nil && len(d.val.Checks) > 0:
-		fact("checks", m.checkCounts(d.val.Checks))
+		add("checks", fact{text: m.checkCounts(d.val.Checks), url: pr + "/checks"})
 	case p.Checks != "":
-		fact("checks", m.ciMark(p.Checks))
+		add("checks", fact{text: m.ciMark(p.Checks), url: pr + "/checks"})
 	}
 	if p.HeavyHead != "" {
-		var labels []string
+		var labels []fact
 		for _, l := range p.Labels {
-			labels = append(labels, st.teal.Render(l))
+			q := url.QueryEscape(`is:pr is:open label:"` + l + `"`)
+			labels = append(labels, fact{text: st.teal.Render(l), url: m.webURL(p.Key.Repository() + "/pulls?q=" + q)})
 		}
-		fact("labels", labels...)
-		fact("size", st.green.Render(fmt.Sprintf("+%d", p.Additions)), st.red.Render(fmt.Sprintf("−%d", p.Deletions)),
-			st.muted.Render(fmt.Sprintf("· %d files", p.ChangedFiles)))
+		add("labels", labels...)
+		add("size", fact{text: st.green.Render(fmt.Sprintf("+%d", p.Additions)) + " " + st.red.Render(fmt.Sprintf("−%d", p.Deletions)) +
+			" " + st.muted.Render(fmt.Sprintf("· %d files", p.ChangedFiles)), url: pr + "/files"})
 	}
 	if p.HeadRef != "" {
-		fact("branch", st.sub0.Render(p.HeadRef))
+		add("branch", plain(st.sub0.Render(p.HeadRef))...)
 		if p.BaseRef != "" {
-			fact("", st.dim.Render("→ "+p.BaseRef))
+			add("", plain(st.dim.Render("→ "+p.BaseRef))...)
 		}
 	}
 	if !p.Created.IsZero() {
-		fact("opened", st.sub0.Render(shortAge(m.set.Now().Sub(p.Created))+" ago"))
+		add("opened", plain(st.sub0.Render(shortAge(m.set.Now().Sub(p.Created))+" ago"))...)
 	}
 	if !p.Updated.IsZero() {
-		fact("updated", st.sub0.Render(shortAge(m.set.Now().Sub(p.Updated))+" ago"))
+		add("updated", plain(st.sub0.Render(shortAge(m.set.Now().Sub(p.Updated))+" ago"))...)
 	}
 	return out
 }
