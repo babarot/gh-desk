@@ -714,3 +714,22 @@ func TestOneJobPerPullRequest(t *testing.T) {
 		t.Errorf("record %+v, kept %v", p, ok)
 	}
 }
+
+// An approval dismissed between the reads of a resumed merge stops it too.
+func TestDismissedBetweenReads(t *testing.T) {
+	mi, _ := pr("1", "api", 1, "alice")
+	mi.MergeState = model.MergeBlocked
+	mi.Reviews = []model.Review{{Author: "me", State: model.ReviewApproved}}
+	f := newFake(mi)
+	f.onRead = func(_ string, mi *model.MergeInfo, n int) {
+		if n > 1 {
+			mi.Reviews = nil
+		}
+	}
+	p := model.Pending{Key: mi.Key, ID: "1", Head: "h-1", Author: "alice", Approved: true}
+	_, ch := newRunner(f, newStore()).Resume(context.Background(), []model.Pending{p})
+	es := drain(t, ch)
+	if e := last(es); e.Result != Stopped || !strings.Contains(e.Text, "dismissed") || len(f.calls) != 0 {
+		t.Errorf("last %+v, calls %v", e, f.calls)
+	}
+}

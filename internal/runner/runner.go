@@ -502,6 +502,9 @@ func (j *job) merge() {
 		j.say(Skipped, d.Reason)
 		return
 	}
+	if j.dismissed(d) {
+		return
+	}
 	if d.Step == plan.StepAutoMerge && !j.it.AutoMerge {
 		// The popup did not say this one goes to auto-merge: merging it
 		// here, on the confirmed head, is what the user agreed to.
@@ -532,6 +535,9 @@ func (j *job) merge() {
 			j.say(Skipped, d.Reason)
 			return
 		}
+		if j.dismissed(d) {
+			return
+		}
 		if d.Step == plan.StepAutoMerge && !j.it.AutoMerge {
 			d.Step = plan.StepWait
 		}
@@ -554,6 +560,17 @@ func (j *job) merge() {
 	default:
 		j.say(Skipped, d.Reason)
 	}
+}
+
+// dismissed stops the job when a decision asks to approve although the
+// user's approval was recorded: it was dismissed, and approving again
+// would undo whoever dismissed it.
+func (j *job) dismissed(d plan.Decision) bool {
+	if !d.Approve || !(j.pend.Approved || j.approved) {
+		return false
+	}
+	j.say(Stopped, "your approval was dismissed · confirm again")
+	return true
 }
 
 func (j *job) mergeNow(method model.MergeMethod) bool {
