@@ -1,0 +1,103 @@
+package config
+
+import (
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+	"time"
+)
+
+func write(t *testing.T, body string) string {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), "config.toml")
+	if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	return path
+}
+
+func TestLoadMissingFileIsDefault(t *testing.T) {
+	cfg, err := Load(filepath.Join(t.TempDir(), "none.toml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.UI.Theme != "auto" || cfg.RefreshInterval() != 3*time.Minute || cfg.Log.Level != "info" {
+		t.Errorf("cfg = %+v", cfg)
+	}
+}
+
+func TestTemplateLoadsAsDefault(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "gh-triage", "config.toml")
+	if err := WriteTemplate(path, "# approve = \"A\"\n"); err != nil {
+		t.Fatal(err)
+	}
+	if err := WriteTemplate(path, ""); err == nil {
+		t.Error("WriteTemplate overwrote an existing file")
+	}
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.UI != Default().UI || cfg.Refresh != Default().Refresh || cfg.Keys != nil {
+		t.Errorf("cfg = %+v", cfg)
+	}
+}
+
+func TestLoadValues(t *testing.T) {
+	cfg, err := Load(write(t, `
+[log]
+level = "debug"
+[ui]
+theme = "latte"
+[refresh]
+interval = "0"
+[keys]
+approve = "a"
+merge = ["m", "M"]
+claude = 1
+`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Log.Level != "debug" || cfg.UI.Theme != "latte" || cfg.RefreshInterval() != 0 {
+		t.Errorf("cfg = %+v", cfg)
+	}
+	if got := cfg.Keys["approve"].Keys; len(got) != 1 || got[0] != "a" {
+		t.Errorf("approve = %v", got)
+	}
+	if got := cfg.Keys["merge"].Keys; len(got) != 2 {
+		t.Errorf("merge = %v", got)
+	}
+	if cfg.Keys["claude"].Err == nil {
+		t.Error("claude = 1 should be kept as an error")
+	}
+}
+
+func TestLoadReportsWhereTheMistakeIs(t *testing.T) {
+	tests := []struct {
+		name, body, want string
+	}{
+		{"unknown key", "[ui]\nthme = \"auto\"\n", `config.toml:2:1: "ui.thme" is not a setting`},
+		{"bad theme", "[ui]\ntheme = \"dark\"\n", `config.toml:2:9: ui.theme must be one of "auto", "mocha", "latte", got "dark"`},
+		{"bad interval", "[refresh]\ninterval = \"soon\"\n", `config.toml:2:12: refresh.interval must be a duration`},
+		{"wrong type", "[ui]\ntheme = 3\n", "ui.theme must be a string, got integer"},
+		{"does not parse", "[ui\n", "config.toml:1:"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := Load(write(t, tt.body))
+			if err == nil || !strings.Contains(err.Error(), tt.want) {
+				t.Errorf("err = %v; want one containing %q", err, tt.want)
+			}
+		})
+	}
+}
+
+func TestReportPlacesKeyProblems(t *testing.T) {
+	path := write(t, "[keys]\napprove = [\"x\", \"shift+a\"]\n")
+	err := Report(path, Problems{{Key: []string{"keys", "approve"}, Index: 1, Message: "never read"}})
+	if !strings.Contains(err.Error(), "config.toml:2:17: never read") || !strings.Contains(err.Error(), "^~~~~~~~~") {
+		t.Errorf("report = %v", err)
+	}
+}
