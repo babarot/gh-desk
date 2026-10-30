@@ -47,6 +47,9 @@ type styles struct {
 	teal, key, border, title, group, add     lipgloss.Style
 	del, hunk, file, tabPill, tabPillOff, me lipgloss.Style
 	picked, pickedSel, fresh                 lipgloss.Style
+	// code is inline code in a description; block a code block, and
+	// blockLang its language.
+	code, block, blockLang lipgloss.Style
 }
 
 func newStyles(p palette) styles {
@@ -86,6 +89,9 @@ func newStyles(p palette) styles {
 		picked:     lipgloss.NewStyle().Background(p.pick),
 		pickedSel:  lipgloss.NewStyle().Background(p.pickSel),
 		fresh:      lipgloss.NewStyle().Background(p.fresh),
+		code:       lipgloss.NewStyle().Background(p.surface0).Foreground(p.peach),
+		block:      lipgloss.NewStyle().Background(p.surface0).Foreground(p.subtext1),
+		blockLang:  lipgloss.NewStyle().Background(p.surface0).Foreground(p.overlay),
 	}
 }
 

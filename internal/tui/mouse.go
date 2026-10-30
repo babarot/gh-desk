@@ -152,6 +152,13 @@ func (m *Model) listClick(x, y int) tea.Cmd {
 		m.dragging = true
 		return nil
 	}
+	// A click on the header of a part of the description pane folds it.
+	if top := m.paneTop(l); l.pane > 0 && y > top && m.pane.mode == paneBody {
+		if r := y - top - 1; r < len(m.pane.heads) && m.pane.heads[r] != "" {
+			m.pane.folded[m.pane.heads[r]] = !m.pane.folded[m.pane.heads[r]]
+		}
+		return nil
+	}
 	i, ok := m.rowAt(y, l)
 	if !ok {
 		return nil

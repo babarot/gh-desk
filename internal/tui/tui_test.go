@@ -863,6 +863,7 @@ func TestClaudeFirstFailureStartsAgain(t *testing.T) {
 
 func TestDescriptionWraps(t *testing.T) {
 	m := start(t, fixture(), keymap.Default())
+	m.set.PlainDescription = true
 	prose := strings.Repeat("長い段落は端で折り返す。", 5)
 	table := "| " + strings.Repeat("column ", 10) + "|"
 	code := strings.Repeat("x", 40)

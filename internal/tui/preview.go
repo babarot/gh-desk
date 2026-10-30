@@ -29,6 +29,11 @@ type pane struct {
 	mode   paneMode
 	scroll int
 	unfold map[model.PRKey]bool
+	// folded are the parts of the description pane folded, by name.
+	folded map[string]bool
+	// heads are the parts whose headers the description pane last drew,
+	// by its lines, for a click to fold them.
+	heads []string
 }
 
 func (p *pane) toggleMode() {
@@ -41,10 +46,13 @@ func (p *pane) toggleMode() {
 }
 
 // line is a line of the pane's scrolled part, with the file it belongs to.
+// A head is a file's header, or that of a part of the description pane,
+// named by part.
 type line struct {
 	text string
 	file int
 	head bool
+	part string
 }
 
 // diffLines are a diff's lines as the pane and the PR screen show them.
@@ -143,17 +151,22 @@ var (
 	zeroWidth   = strings.NewReplacer("&#8203;", "", "​", "")
 )
 
-// bodyLines are a description as plain lines width cells wide: links keep
-// their text, HTML comments and tags go, headings stand out. Prose wraps at
-// the edge; tables and code blocks are cut instead, as wrapping would break
-// their columns.
+// bodyLines are a description in lines width cells wide: links keep their
+// text, HTML comments and tags go. It is drawn from its Markdown, or, when
+// the config asks for it as written, headings stand out and prose wraps at
+// the edge, while tables and code blocks are cut instead, as wrapping would
+// break their columns.
 func (m *Model) bodyLines(body string, width int) []line {
 	if strings.TrimSpace(body) == "" {
 		return []line{{text: m.st.dim.Render("no description")}}
 	}
 	body = htmlTag.ReplaceAllString(htmlComment.ReplaceAllString(body, ""), "")
 	body = zeroWidth.Replace(mdLinkRe.ReplaceAllString(body, "$1"))
+	body = strings.ReplaceAll(body, "\r", "")
 	width = max(width, 10)
+	if !m.set.PlainDescription {
+		return m.markdownLines(body, width)
+	}
 	var out []line
 	wrapped := func(l string, style lipgloss.Style) {
 		for _, w := range strings.Split(ansi.Wrap(l, width, " "), "\n") {
@@ -161,7 +174,7 @@ func (m *Model) bodyLines(body string, width int) []line {
 		}
 	}
 	code := false
-	for _, l := range strings.Split(strings.ReplaceAll(body, "\r", ""), "\n") {
+	for _, l := range strings.Split(body, "\n") {
 		fence := strings.HasPrefix(strings.TrimSpace(l), "```")
 		switch {
 		case fence || code:
@@ -182,17 +195,24 @@ func (m *Model) bodyLines(body string, width int) []line {
 
 var mdLinkRe = regexp.MustCompile(`\[([^\]]*)\]\([^)]*\)`)
 
-// jumpFile scrolls the pane to the next or previous file's header.
+// jumpFile scrolls the pane to the next or previous file's header, or
+// that of a part of the description pane.
 func (m *Model) jumpFile(dir int) {
 	p, _, ok := m.currentPR()
-	if !ok || m.pane.mode != paneDiff {
+	if !ok {
 		return
 	}
-	e := m.cache.diffs[diffID(p)]
-	if e == nil || e.loading {
-		return
+	var ls []line
+	if m.pane.mode == paneBody {
+		left, _ := m.descWidths()
+		ls = m.descLines(p, left)
+	} else {
+		e := m.cache.diffs[diffID(p)]
+		if e == nil || e.loading {
+			return
+		}
+		ls = m.diffLines(e.val, m.pane.unfold[p.Key])
 	}
-	ls := m.diffLines(e.val, m.pane.unfold[p.Key])
 	if dir > 0 {
 		for i := m.pane.scroll + 1; i < len(ls); i++ {
 			if ls[i].head {
@@ -265,10 +285,13 @@ func (m *Model) diffTabName(p model.PR) string {
 	return fmt.Sprintf("diff %d", len(e.val))
 }
 
-// paneBody is the pane's lines: what the columns do not say, why the
-// pull request is here, what a bot updates, then the diff or the
-// description, scrolled.
+// paneBody is the pane's lines: the description pane, or what the columns
+// do not say, why the pull request is here, what a bot updates, then the
+// diff, scrolled.
 func (m *Model) paneBody(p model.PR, n *model.Notification, e *entry[[]diff.File], files []diff.File, height int) []string {
+	if m.pane.mode == paneBody {
+		return m.descPane(p, n, height)
+	}
 	st := m.st
 	meta := st.sub0.Render(p.HeadRef)
 	if p.BaseRef != "" {
@@ -300,59 +323,15 @@ func (m *Model) paneBody(p model.PR, n *model.Notification, e *entry[[]diff.File
 		meta += "  " + st.muted.Render("merge:") + " " + m.stepStyle(d.Step).Render(how)
 	}
 	top := []string{meta}
-	if n != nil && n.Unread && n.LatestCommentURL != "" {
-		c := m.cache.comments[n.LatestCommentURL]
-		switch {
-		case c == nil || c.loading:
-			top = append(top, st.peach.Render("❝ ")+st.dim.Render("reading the comment…"))
-		case c.err == nil:
-			first := ""
-			for _, l := range strings.Split(c.val.Body, "\n") {
-				if strings.TrimSpace(l) != "" {
-					first = strings.TrimSpace(l)
-					break
-				}
-			}
-			top = append(top, st.peach.Render("❝ ")+st.sub0.Render(c.val.Author)+" "+st.dim.Render(n.Reason)+"  "+st.sub1.Render(first))
-		}
+	if s, ok := m.unreadLine(n); ok {
+		top = append(top, s)
 	}
-	d := m.cache.details[p.Key]
-	if p.AuthorIsBot && d != nil && !d.loading && d.err == nil {
-		if bs := plan.Bumps(d.val.Body); len(bs) > 0 {
-			var parts []string
-			for _, bp := range bs[:min(len(bs), 2)] {
-				s := st.teal.Render("◆ ") + st.sub1.Render(bp.Package)
-				if bp.Update != "" {
-					s += " " + st.dim.Render(bp.Update)
-				}
-				change := bp.To
-				if bp.From != "" {
-					change = bp.From + " → " + bp.To
-				}
-				s += " " + st.yellow.Render(change)
-				if bp.Pending != "" {
-					s += " " + st.dim.Render("(pending "+bp.Pending+")")
-				}
-				parts = append(parts, s)
-			}
-			if len(bs) > 2 {
-				parts = append(parts, st.dim.Render(fmt.Sprintf("+%d", len(bs)-2)))
-			}
-			top = append(top, strings.Join(parts, "   "))
-		}
+	if s, ok := m.bumpsLine(p, m.cache.details[p.Key]); ok {
+		top = append(top, s)
 	}
 
 	var ls []line
 	switch {
-	case m.pane.mode == paneBody:
-		switch {
-		case d == nil || d.loading:
-			ls = []line{{text: st.dim.Render("reading the description…")}}
-		case d.err != nil:
-			ls = []line{{text: st.red.Render(d.err.Error())}}
-		default:
-			ls = m.bodyLines(d.val.Body, max(m.width-4, 10))
-		}
 	case e == nil || e.loading:
 		ls = []line{{text: st.dim.Render("reading the diff…")}}
 	case e.err != nil:
@@ -361,7 +340,7 @@ func (m *Model) paneBody(p model.PR, n *model.Notification, e *entry[[]diff.File
 		ls = m.diffLines(files, m.pane.unfold[p.Key])
 	}
 	rest := max(height-len(top), 1)
-	strip := m.pane.mode == paneDiff && len(files) > 1
+	strip := len(files) > 1
 	if strip {
 		rest--
 	}
@@ -387,6 +366,62 @@ func (m *Model) paneBody(p model.PR, n *model.Notification, e *entry[[]diff.File
 		top = append(top, l.text)
 	}
 	return top
+}
+
+// unreadLine is the first line of the unread comment a notification is
+// about, if it has one.
+func (m *Model) unreadLine(n *model.Notification) (string, bool) {
+	st := m.st
+	if n == nil || !n.Unread || n.LatestCommentURL == "" {
+		return "", false
+	}
+	c := m.cache.comments[n.LatestCommentURL]
+	switch {
+	case c == nil || c.loading:
+		return st.peach.Render("❝ ") + st.dim.Render("reading the comment…"), true
+	case c.err == nil:
+		first := ""
+		for _, l := range strings.Split(c.val.Body, "\n") {
+			if strings.TrimSpace(l) != "" {
+				first = strings.TrimSpace(l)
+				break
+			}
+		}
+		return st.peach.Render("❝ ") + st.sub0.Render(c.val.Author) + " " + st.dim.Render(n.Reason) + "  " + st.sub1.Render(first), true
+	}
+	return "", false
+}
+
+// bumpsLine is what a bot's pull request updates, read from its body.
+func (m *Model) bumpsLine(p model.PR, d *entry[model.Detail]) (string, bool) {
+	st := m.st
+	if !p.AuthorIsBot || d == nil || d.loading || d.err != nil {
+		return "", false
+	}
+	bs := plan.Bumps(d.val.Body)
+	if len(bs) == 0 {
+		return "", false
+	}
+	var parts []string
+	for _, bp := range bs[:min(len(bs), 2)] {
+		s := st.teal.Render("◆ ") + st.sub1.Render(bp.Package)
+		if bp.Update != "" {
+			s += " " + st.dim.Render(bp.Update)
+		}
+		change := bp.To
+		if bp.From != "" {
+			change = bp.From + " → " + bp.To
+		}
+		s += " " + st.yellow.Render(change)
+		if bp.Pending != "" {
+			s += " " + st.dim.Render("(pending "+bp.Pending+")")
+		}
+		parts = append(parts, s)
+	}
+	if len(bs) > 2 {
+		parts = append(parts, st.dim.Render(fmt.Sprintf("+%d", len(bs)-2)))
+	}
+	return strings.Join(parts, "   "), true
 }
 
 func reviewerStyle(st styles, s model.ReviewState) lipgloss.Style {

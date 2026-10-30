@@ -83,6 +83,9 @@ type Settings struct {
 	// PaneHeight is the pane's lines last set with the mouse or keys; 0
 	// when none was, and PreviewHeight is taken.
 	PaneHeight int
+	// PlainDescription shows a description's Markdown as written instead of
+	// drawing it.
+	PlainDescription bool
 	// Layout keeps the pane's height when it is changed; nil keeps it
 	// for this run only.
 	Layout   Layout
@@ -226,7 +229,7 @@ func New(src Source, run Runner, cl Claude, km keymap.Map, log *slog.Logger, set
 		m.tabs = append(m.tabs, newSectionTab(s))
 	}
 	m.tabs = append(m.tabs, newInboxTab(set.HideClosed))
-	m.pane = pane{on: set.PreviewHeight > 0, height: cmp.Or(set.PaneHeight, set.PreviewHeight, defaultPaneHeight), mode: paneDiff, unfold: map[model.PRKey]bool{}}
+	m.pane = pane{on: set.PreviewHeight > 0, height: cmp.Or(set.PaneHeight, set.PreviewHeight, defaultPaneHeight), mode: paneDiff, unfold: map[model.PRKey]bool{}, folded: map[string]bool{}}
 	m.cache = newCache()
 	m.viewer = set.Viewer
 	m.loadCached()

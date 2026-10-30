@@ -53,6 +53,8 @@ level = "debug"
 theme = "latte"
 [refresh]
 interval = "0"
+[preview]
+description = "plain"
 [keys]
 approve = "a"
 merge = ["m", "M"]
@@ -63,7 +65,8 @@ language = "Japanese"
 	if err != nil {
 		t.Fatal(err)
 	}
-	if cfg.Log.Level != "debug" || cfg.UI.Theme != "latte" || cfg.RefreshInterval() != 0 || cfg.Claude.Language != "Japanese" {
+	if cfg.Log.Level != "debug" || cfg.UI.Theme != "latte" || cfg.RefreshInterval() != 0 || cfg.Claude.Language != "Japanese" ||
+		cfg.Preview.Description != "plain" {
 		t.Errorf("cfg = %+v", cfg)
 	}
 	if got := cfg.Keys["approve"].Keys; len(got) != 1 || got[0] != "a" {
@@ -84,6 +87,7 @@ func TestLoadReportsWhereTheMistakeIs(t *testing.T) {
 		{"unknown key", "[ui]\nthme = \"auto\"\n", `config.toml:2:1: "ui.thme" is not a setting`},
 		{"bad theme", "[ui]\ntheme = \"dark\"\n", `config.toml:2:9: ui.theme must be one of "auto", "mocha", "latte", got "dark"`},
 		{"bad interval", "[refresh]\ninterval = \"soon\"\n", `config.toml:2:12: refresh.interval must be a duration`},
+		{"bad description", "[preview]\ndescription = \"markdown\"\n", `config.toml:2:15: preview.description must be one of "rendered", "plain", got "markdown"`},
 		{"wrong type", "[ui]\ntheme = 3\n", "ui.theme must be a string, got integer"},
 		{"does not parse", "[ui\n", "config.toml:1:"},
 	}

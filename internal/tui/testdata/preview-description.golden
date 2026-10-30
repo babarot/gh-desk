@@ -19,16 +19,16 @@ triage // @me   1 review (3)  2 mine (1)  3 involved (0)  4 inbox (2)           
 
 
 ╭  diff 2   description  ───────────────────────────────────────────────────────────────────────────────── acme/api#12 · J/K · v ╮
-│ retries → main  @core                                                                                                          │
-│ ## What                                                                                                                        │
-│                                                                                                                                │
-│ Retry failed requests.                                                                                                         │
-│                                                                                                                                │
-│                                                                                                                                │
-│                                                                                                                                │
-│                                                                                                                                │
-│                                                                                                                                │
-│                                                                                                                                │
+│ Add retries to the client  alice                                                          │ status    open                     │
+│ ▾ description                                                                             │ requested me @core                 │
+│   What                                                                                    │ checks    ✓1                       │
+│   Retry failed requests.                                                                  │ size      +40 −3 · 2 files         │
+│                                                                                           │ branch    retries                  │
+│ ▾ checks 1  ✓1                                                                            │           → main                   │
+│   ✓ test                                                                                  │ updated   3h ago                   │
+│                                                                                           │                                    │
+│                                                                                           │                                    │
+│                                                                                           │                                    │
 ╰────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
                                                                                                                                   
 enter open · space select · S select by rule · A approve · M merge · c comment · C ask claude · o browser · v diff / description …
