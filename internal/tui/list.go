@@ -240,11 +240,13 @@ func (m *Model) hide(p model.PR, n *model.Notification) tea.Cmd {
 	return tea.Batch(m.ensure(), func() tea.Msg { return doneMsg{note, m.src.MarkDone(m.ctx, note)} })
 }
 
-func (m *Model) browse(p model.PR) tea.Cmd {
-	if p.URL == "" {
+func (m *Model) browse(p model.PR) tea.Cmd { return m.browseURL(p.URL) }
+
+// browseURL opens a page in the browser.
+func (m *Model) browseURL(url string) tea.Cmd {
+	if url == "" {
 		return nil
 	}
-	url := p.URL
 	return func() tea.Msg { return browseMsg{m.src.Browse(url)} }
 }
 
@@ -452,6 +454,15 @@ var groupLabel = map[plan.Group]string{
 	plan.GroupBots: "bots",
 }
 
+// repoName is a pull request's repository as the PR column shows it:
+// without the owner for the home owners.
+func (m *Model) repoName(p model.PR) string {
+	if slices.Contains(m.set.HomeOwners, p.Key.Owner) {
+		return p.Key.Repo
+	}
+	return p.Key.Repository()
+}
+
 func (m *Model) cell(id string, r row, sel bool) string {
 	p, st := r.pr, m.st
 	switch id {
@@ -466,10 +477,7 @@ func (m *Model) cell(id string, r row, sel bool) string {
 		case func() bool { _, ok := m.unread[p.Key]; return ok }():
 			mark = st.blue.Render("●")
 		}
-		repo := p.Key.Repository()
-		if slices.Contains(m.set.HomeOwners, p.Key.Owner) {
-			repo = p.Key.Repo
-		}
+		repo := m.repoName(p)
 		name, num := st.sub1, st.muted
 		if p.Draft {
 			name, num = st.dim, st.dim

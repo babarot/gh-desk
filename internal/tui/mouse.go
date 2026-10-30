@@ -1,6 +1,8 @@
 package tui
 
 import (
+	"cmp"
+	"fmt"
 	"time"
 
 	tea "charm.land/bubbletea/v2"
@@ -8,8 +10,9 @@ import (
 )
 
 // The mouse points: it picks a tab or a row, opens a row with a double
-// click, scrolls, and resizes the preview pane by its top edge. Nothing
-// that writes to GitHub is done with it. See ADR-012.
+// click, opens a profile or a pull request in the browser, scrolls, and
+// resizes the preview pane by its top edge. Nothing that writes to GitHub
+// is done with it. See ADR-012.
 
 const (
 	// defaultPaneHeight is the pane's lines when neither the config nor
@@ -119,6 +122,10 @@ func (m *Model) paneTop(l layout) int { return m.top() + 1 + l.list }
 
 func (m *Model) listClick(x, y int) tea.Cmd {
 	if y == 0 {
+		lead := lipgloss.Width(m.st.app.Render("triage") + m.st.dim.Render(" // "))
+		if name := m.viewerName(); name != "" && spanAt([]int{lipgloss.Width(name)}, 0, x-lead) == 0 {
+			return m.browseURL(m.webURL(m.viewer))
+		}
 		var ws []int
 		for i := range m.tabs {
 			ws = append(ws, lipgloss.Width(m.tabLabel(i)))
@@ -149,6 +156,10 @@ func (m *Model) listClick(x, y int) tea.Cmd {
 	if !ok {
 		return nil
 	}
+	if url := m.linkAt(i, x); url != "" {
+		m.lastClick = click{}
+		return tea.Batch(m.moveTo(i), m.browseURL(url))
+	}
 	now := m.set.Now()
 	double := m.lastClick.tab == m.cur && m.lastClick.row == i && now.Sub(m.lastClick.at) < doubleClick
 	m.lastClick = click{tab: m.cur, row: i, at: now}
@@ -160,6 +171,45 @@ func (m *Model) listClick(x, y int) tea.Cmd {
 		}
 	}
 	return cmd
+}
+
+// linkAt is the web page of what row i shows at x: its pull request's name
+// or its author, as the PR and AUTHOR columns draw them; empty elsewhere.
+func (m *Model) linkAt(i, x int) string {
+	t := m.tab()
+	rs := m.rows(t)
+	if i >= len(rs) || rs[i].kind != rowPR {
+		return ""
+	}
+	p := rs[i].pr
+	at := 0
+	for _, c := range m.columns(t) {
+		switch c.id {
+		case "pr":
+			// The cursor and the mark come before the name.
+			name := fmt.Sprintf("%s#%d", m.repoName(p), p.Key.Number)
+			if spanAt([]int{min(lipgloss.Width(name), c.width-4)}, 0, x-at-4) == 0 {
+				return cmp.Or(p.URL, m.webURL(fmt.Sprintf("%s/pull/%d", p.Key.Repository(), p.Key.Number)))
+			}
+		case "author":
+			if p.Author == "" {
+				return ""
+			}
+			if spanAt([]int{min(lipgloss.Width(p.Author), c.width)}, 0, x-at) == 0 {
+				if p.AuthorIsBot {
+					return m.webURL("apps/" + p.Author)
+				}
+				return m.webURL(p.Author)
+			}
+		}
+		at += c.width + 2
+	}
+	return ""
+}
+
+// webURL is a page on the GitHub host.
+func (m *Model) webURL(path string) string {
+	return "https://" + cmp.Or(m.set.Host, "github.com") + "/" + path
 }
 
 // rowAt is the row of the list on line y, as renderList draws it.

@@ -110,7 +110,15 @@ func (m *Model) renderHeader() string {
 
 // headerLead is what the header shows before the tabs.
 func (m *Model) headerLead() string {
-	return m.st.app.Render("triage") + m.st.dim.Render(" // "+m.viewer) + "   "
+	return m.st.app.Render("triage") + m.st.dim.Render(" // ") + m.st.sub0.Render(m.viewerName()) + "   "
+}
+
+// viewerName is the viewer as the header shows it, which a click opens.
+func (m *Model) viewerName() string {
+	if m.viewer == "" {
+		return ""
+	}
+	return "@" + m.viewer
 }
 
 // tabLabel is tab i as the header shows it.
@@ -258,6 +266,7 @@ func (m *Model) renderHelp() []string {
 		"  "+fit(st.key.Render(keymap.Back), 16)+st.muted.Render("back"),
 		st.group.Render("mouse"), "  "+fit(st.key.Render("click"), 16)+st.muted.Render("tab, row, pane tab"),
 		"  "+fit(st.key.Render("double click"), 16)+st.muted.Render("open"),
+		"  "+fit(st.key.Render("click"), 16)+st.muted.Render("@you, an author or a PR name: browser"),
 		"  "+fit(st.key.Render("wheel"), 16)+st.muted.Render("scroll"),
 		"  "+fit(st.key.Render("drag"), 16)+st.muted.Render("the pane's top edge to resize it"))
 	maxLines := max(m.height-3, 5)

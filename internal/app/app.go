@@ -125,6 +125,7 @@ func Run(args []string, stdout, stderr io.Writer) int {
 		return 1
 	}
 	set.Viewer = viewer
+	set.Host = github.DefaultHost()
 	if !*noCache {
 		set.Lists = openLists(cfg, viewer, log)
 	}

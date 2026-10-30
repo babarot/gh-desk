@@ -49,7 +49,7 @@ func TestClickRowAndDoubleClick(t *testing.T) {
 		t.Fatalf("via team did not unfold:\n%s", screen(m))
 	}
 
-	x, y = lineOf(t, m, "api#12")
+	x, y = lineOf(t, m, "Add retries")
 	mouseAt(m, tea.MouseClickMsg{X: x, Y: y, Button: tea.MouseLeft})
 	if m.view != viewList {
 		t.Fatal("a single click opened the pull request")
@@ -135,5 +135,28 @@ func TestMouseLeavesPopupsAlone(t *testing.T) {
 	mouseAt(m, tea.MouseWheelMsg{X: 10, Y: 3, Button: tea.MouseWheelDown})
 	if m.cur != 0 || m.tab().sel != sel || m.picker == nil {
 		t.Fatalf("tab = %d, sel = %d, picker = %v; the click went through the popup", m.cur, m.tab().sel, m.picker)
+	}
+}
+
+func TestClickOpensInTheBrowser(t *testing.T) {
+	f := fixture()
+	m := start(t, f, keymap.Default())
+	m.set.Host = "github.example.com"
+	click := func(s string) {
+		t.Helper()
+		x, y := lineOf(t, m, s)
+		mouseAt(m, tea.MouseClickMsg{X: x + 1, Y: y, Button: tea.MouseLeft})
+	}
+	click("@me")
+	press(m, "b") // unfold the bots
+	click("api#30")
+	click("renovate")
+	click("alice")
+	want := []string{"https://github.example.com/me", "https://github.example.com/acme/api/pull/30", "https://github.example.com/apps/renovate", "https://github.example.com/alice"}
+	if strings.Join(f.browsed, " ") != strings.Join(want, " ") {
+		t.Fatalf("browsed %q, want %q", f.browsed, want)
+	}
+	if m.view != viewList {
+		t.Fatal("a click on a link opened the pull request")
 	}
 }

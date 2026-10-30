@@ -85,6 +85,7 @@ type fakeSource struct {
 
 	reviews []string
 	done    []string
+	browsed []string
 	// info overrides what MergeInfo says of a pull request, by key.
 	info map[model.PRKey]func(*model.MergeInfo)
 	// noHeavy has Heavy return nothing, and searchErr fails every search.
@@ -246,7 +247,10 @@ func (f *fakeSource) MarkDone(_ context.Context, n model.Notification) error {
 	f.done = append(f.done, n.Key.String())
 	return nil
 }
-func (f *fakeSource) Browse(string) error { return nil }
+func (f *fakeSource) Browse(url string) error {
+	f.browsed = append(f.browsed, url)
+	return nil
+}
 
 // start makes the TUI over f, sized, with every tab read.
 func start(t *testing.T, f *fakeSource, km keymap.Map) *Model {

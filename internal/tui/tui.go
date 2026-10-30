@@ -108,6 +108,9 @@ type Settings struct {
 	// StoreProblem says why the record could not be opened, when it was
 	// not another gh-triage holding it.
 	StoreProblem string
+	// Host is the GitHub host the profiles and pull requests are on, for
+	// their web pages; empty is github.com.
+	Host string
 	// Viewer is the login the app read before starting, which the cached
 	// lists are of; empty has the TUI read it.
 	Viewer string
