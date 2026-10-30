@@ -87,18 +87,32 @@ func (c *Client) Viewer(ctx context.Context) (string, error) {
 	return resp.Viewer.Login, nil
 }
 
-const prFields = `
-fragment pr on PullRequest {
+// The fields of a pull request come in two parts. GitHub works out the
+// heavy ones (the review decision, the checks' rollup, the line counts)
+// for each pull request, which makes a search of 50 take seconds longer, so
+// a list's search reads only the light ones and the heavy ones are read
+// after, by node ID (Heavy).
+const lightFields = `
+fragment light on PullRequest {
   id number title url state isDraft createdAt updatedAt
-  headRefName headRefOid baseRefName additions deletions changedFiles reviewDecision
+  headRefName headRefOid baseRefName
   author { login __typename }
   repository { nameWithOwner }
-  labels(first: 5) { nodes { name } }
-  comments { totalCount }
   reviewRequests(first: 10) { nodes { requestedReviewer { __typename ... on User { login } ... on Team { slug } } } }
   latestReviews(first: 10) { nodes { author { login } state } }
+}`
+
+const heavyFields = `
+fragment heavy on PullRequest {
+  headRefOid additions deletions changedFiles reviewDecision
+  labels(first: 5) { nodes { name } }
+  comments { totalCount }
   commits(last: 1) { nodes { commit { statusCheckRollup { state } } } }
 }`
+
+// prFields are every field, for reads of a few pull requests.
+const prFields = `
+fragment pr on PullRequest { ...light ...heavy }` + lightFields + heavyFields
 
 type prNode struct {
 	ID             string
@@ -147,7 +161,8 @@ type prNode struct {
 	}
 }
 
-func (n prNode) toModel() (model.PR, bool) {
+// toModel makes the pull request; heavy says the heavy fields were read.
+func (n prNode) toModel(heavy bool) (model.PR, bool) {
 	if n.Number == 0 {
 		return model.PR{}, false // not a pull request
 	}
@@ -184,6 +199,9 @@ func (n prNode) toModel() (model.PR, bool) {
 	if len(n.Commits.Nodes) > 0 && n.Commits.Nodes[0].Commit.StatusCheckRollup != nil {
 		p.Checks = model.CheckState(n.Commits.Nodes[0].Commit.StatusCheckRollup.State)
 	}
+	if heavy {
+		p.HeavyHead = n.HeadRefOid
+	}
 	return p, true
 }
 
@@ -192,9 +210,9 @@ const searchQuery = `query($q: String!, $first: Int!, $after: String) {
   search(query: $q, type: ISSUE, first: $first, after: $after) {
     issueCount
     pageInfo { hasNextPage endCursor }
-    nodes { ...pr }
+    nodes { ...light }
   }
-}` + prFields
+}` + lightFields
 
 // Result is a search: the pull requests read, and how many there are in
 // all, which can be more. Warnings are the errors GitHub gave for the parts
@@ -248,12 +266,44 @@ func (c *Client) SearchPage(ctx context.Context, query string, first int, after 
 	}
 	out.Total = resp.Search.IssueCount
 	for _, n := range resp.Search.Nodes {
-		if p, ok := n.toModel(); ok {
+		if p, ok := n.toModel(false); ok {
 			out.PRs = append(out.PRs, p)
 		}
 	}
 	if resp.Search.PageInfo.HasNextPage {
 		out.Next = resp.Search.PageInfo.EndCursor
+	}
+	return out, nil
+}
+
+const heavyQuery = `query($ids: [ID!]!) {
+  rateLimit { cost remaining }
+  nodes(ids: $ids) { ... on PullRequest { id ...heavy } }
+}` + heavyFields
+
+// Heavy reads the heavy fields of pull requests by node ID, each for the
+// head it has now. A node GitHub cannot return is left out.
+func (c *Client) Heavy(ctx context.Context, ids []string) (map[string]model.Heavy, error) {
+	out := map[string]model.Heavy{}
+	if len(ids) == 0 {
+		return out, nil
+	}
+	var resp struct {
+		RateLimit rateLimit
+		Nodes     []*prNode
+	}
+	err := c.query(ctx, "heavy", heavyQuery, map[string]any{"ids": ids}, &resp, &resp.RateLimit)
+	var gqlErr *api.GraphQLError
+	if err != nil && !errors.As(err, &gqlErr) {
+		return out, err
+	}
+	for _, n := range resp.Nodes {
+		if n == nil || n.ID == "" {
+			continue
+		}
+		p, _ := prNode{HeadRefOid: n.HeadRefOid, Additions: n.Additions, Deletions: n.Deletions, ChangedFiles: n.ChangedFiles,
+			ReviewDecision: n.ReviewDecision, Labels: n.Labels, Comments: n.Comments, Commits: n.Commits, Number: 1}.toModel(true)
+		out[n.ID] = p.Heavy()
 	}
 	return out, nil
 }
@@ -303,7 +353,7 @@ func (c *Client) PullRequests(ctx context.Context, keys []model.PRKey) (map[mode
 		if decode(raw, &repo) != nil || repo.PullRequest == nil {
 			continue
 		}
-		if p, ok := repo.PullRequest.toModel(); ok {
+		if p, ok := repo.PullRequest.toModel(true); ok {
 			out[p.Key] = p
 		}
 	}
