@@ -184,7 +184,7 @@ var ready = map[keymap.Action]bool{
 	"quit": true, "help": true, "refresh": true,
 	"up": true, "down": true, "top": true, "bottom": true, "page_up": true, "page_down": true,
 	"next_tab": true, "prev_tab": true, "tab_1": true, "tab_2": true, "tab_3": true, "tab_4": true,
-	"open": true, "approve": true, "comment": true, "request_changes": true, "browse": true, "hide": true,
+	"open": true, "expand": true, "collapse": true, "approve": true, "comment": true, "request_changes": true, "browse": true, "hide": true,
 	"notifications": true, "select": true, "select_shown": true, "clear_selection": true, "merge": true, "pr_merge": true,
 	"include_failing": true, "choose": true, "select_rule": true,
 	"toggle_bots": true, "show_closed": true, "filter": true,

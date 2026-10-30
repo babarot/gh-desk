@@ -62,6 +62,8 @@ var Defaults = []Def{
 	{"tab_3", ScopeList, []string{"3"}, "tab 3"},
 	{"tab_4", ScopeList, []string{"4"}, "tab 4"},
 	{"open", ScopeList, []string{"enter"}, "open"},
+	{"expand", ScopeList, []string{"l", "right"}, "unfold group"},
+	{"collapse", ScopeList, []string{"h", "left"}, "fold group"},
 	{"select", ScopeList, []string{"space"}, "select"},
 	{"select_shown", ScopeList, []string{"V"}, "select shown"},
 	{"select_rule", ScopeList, []string{"S"}, "select by rule"},

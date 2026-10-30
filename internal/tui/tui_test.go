@@ -621,6 +621,36 @@ func TestRunningIsNotStartedAgain(t *testing.T) {
 	}
 }
 
+func TestFoldGroupByKey(t *testing.T) {
+	m := start(t, fixture(), keymap.Default())
+	if !m.tab().folded[plan.GroupBots] {
+		t.Fatal("the bots group is not folded at start")
+	}
+	for r, _ := m.current(); r.kind != rowGroup || r.group != plan.GroupBots; r, _ = m.current() {
+		press(m, "j")
+	}
+	press(m, "l")
+	if m.tab().folded[plan.GroupBots] {
+		t.Fatal("l did not unfold the group")
+	}
+	press(m, "j")
+	if r, _ := m.current(); r.kind != rowPR {
+		t.Fatalf("row = %+v, want a pull request in the group", r)
+	}
+	press(m, "h")
+	if m.tab().folded[plan.GroupBots] {
+		t.Fatal("h on a pull request folded its group")
+	}
+	press(m, "k", "h")
+	if !m.tab().folded[plan.GroupBots] {
+		t.Fatal("h did not fold the group")
+	}
+	press(m, "right", "left")
+	if !m.tab().folded[plan.GroupBots] {
+		t.Fatal("left did not fold the group")
+	}
+}
+
 func TestSelectByRule(t *testing.T) {
 	m := start(t, fixture(), keymap.Default())
 	press(m, "S")

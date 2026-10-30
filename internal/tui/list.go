@@ -120,6 +120,10 @@ func (m *Model) listKey(k string) tea.Cmd {
 	}
 	if r.kind == rowGroup {
 		switch {
+		case is("expand"):
+			t.folded[r.group] = false
+		case is("collapse"):
+			t.folded[r.group] = true
 		case is("select"):
 			// A group's header selects every pull request in it, or clears
 			// them when all are selected.
