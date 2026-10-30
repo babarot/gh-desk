@@ -507,8 +507,12 @@ const reviewMutation = `mutation($id: ID!, $event: PullRequestReviewEvent!, $bod
 }`
 
 // Review sends a review of the pull request at the head it was read at
-// (pr.HeadOID), so a review is never of a commit pushed after the user saw
-// it. GitHub refuses a review whose commit is no longer the head.
+// (pr.HeadOID), so the review is recorded against the commit the user saw.
+// GitHub does not refuse it when the head has moved since: the review is
+// kept against that commit, and whether an approval still counts for the
+// newer head depends on the repository dismissing stale approvals. A
+// merge that must not take unseen commits has to pass expectedHeadOid
+// itself.
 func (c *Client) Review(ctx context.Context, pr model.PR, event model.ReviewEvent, body string) error {
 	ctx, reqID := withRequestID(ctx)
 	vars := map[string]any{"id": pr.ID, "event": string(event), "body": body, "commit": pr.HeadOID}

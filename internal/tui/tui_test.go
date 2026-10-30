@@ -328,3 +328,64 @@ func TestReboundKeys(t *testing.T) {
 		t.Error("a does not approve")
 	}
 }
+
+func TestSafeRemovesEscapes(t *testing.T) {
+	in := "ok\x1b]0;owned\x07 \x1b[2Jtitle\r\tend\nnext"
+	if got := safe(in); got != "ok title    end\nnext" {
+		t.Errorf("safe = %q", got)
+	}
+}
+
+func TestTitleEscapesNeverReachTheScreen(t *testing.T) {
+	f := fixture()
+	f.searches["review"][0].Title = "evil \x1b]0;pwned\x07title"
+	m := start(t, f, keymap.Default())
+	if s := m.render(); strings.Contains(s, "pwned\x07") || strings.Contains(s, "\x1b]0;") {
+		t.Error("an escape sequence from a title reached the screen")
+	}
+}
+
+func TestOneReviewAtATime(t *testing.T) {
+	f := fixture()
+	m := start(t, f, keymap.Default())
+	press(m, "c")
+	run(m, m.paste(tea.PasteMsg{Content: "once"}))
+	// y without running the command: the review is still on its way.
+	press(m, "ctrl+s")
+	_, cmd := m.Update(keyMsg("y"))
+	press(m, "ctrl+s")
+	if m.confirm != nil || !strings.Contains(m.status, "being sent") {
+		t.Errorf("a second review was asked for while one was on its way: %q", m.status)
+	}
+	run(m, cmd)
+	if len(f.reviews) != 1 {
+		t.Errorf("reviews = %q", f.reviews)
+	}
+}
+
+func TestReviewOfAnotherPRKeepsTheDraft(t *testing.T) {
+	m := start(t, fixture(), keymap.Default())
+	press(m, "c")
+	m.handleData(reviewMsg{pr: model.PR{Key: key("acme", "web", 7)}, event: model.EventApprove})
+	if m.view != viewCompose || m.compose == nil {
+		t.Error("a review of another pull request closed the draft")
+	}
+}
+
+type failingDone struct{ *fakeSource }
+
+func (f failingDone) MarkDone(context.Context, model.Notification) error {
+	return fmt.Errorf("network down")
+}
+
+func TestFailedDoneComesBack(t *testing.T) {
+	m := start(t, fixture(), keymap.Default())
+	m.src = failingDone{fixture()}
+	press(m, "4", "d")
+	if m.inboxTab().hidden[key("acme", "api", 12)] {
+		t.Error("a notification whose done failed stayed hidden")
+	}
+	if _, ok := m.unread[key("acme", "api", 12)]; !ok {
+		t.Error("its unread mark did not come back")
+	}
+}

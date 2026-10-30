@@ -357,10 +357,10 @@ func (m *Model) handleData(msg tea.Msg) tea.Cmd {
 		}
 		t.loaded, t.err, t.total = true, nil, msg.total
 		if msg.more {
-			t.prs = append(t.prs, msg.prs...)
+			t.prs = append(t.prs, safePRs(msg.prs)...)
 			t.warnings = append(t.warnings, msg.warnings...)
 		} else {
-			t.prs, t.warnings = msg.prs, msg.warnings
+			t.prs, t.warnings = safePRs(msg.prs), msg.warnings
 			m.toFirstPR(t)
 		}
 		if msg.next != "" && len(t.prs) < t.limit {
@@ -376,10 +376,16 @@ func (m *Model) handleData(msg tea.Msg) tea.Cmd {
 			m.log.Error("notifications", "err", msg.err.Error())
 			return nil
 		}
-		t.notifs = msg.notifs
+		t.notifs = make([]model.Notification, len(msg.notifs))
+		for i, n := range msg.notifs {
+			t.notifs[i] = safeNotification(n)
+		}
+		// What GitHub says now replaces what was put away here: a thread
+		// with new activity is unread again.
+		t.hidden = map[model.PRKey]bool{}
 		m.unread = map[model.PRKey]model.Notification{}
 		var keys []model.PRKey
-		for _, n := range msg.notifs {
+		for _, n := range t.notifs {
 			if n.Unread {
 				m.unread[n.Key] = n
 			}
@@ -395,23 +401,30 @@ func (m *Model) handleData(msg tea.Msg) tea.Cmd {
 		t := m.inboxTab()
 		t.loaded, t.err = true, msg.err
 		if msg.prs != nil {
-			t.inboxPRs = msg.prs
+			t.inboxPRs = map[model.PRKey]model.PR{}
+			for k, p := range msg.prs {
+				t.inboxPRs[k] = safePR(p)
+			}
 		}
 		return m.ensure()
 	case diffMsg:
 		e := m.cache.diffs[msg.id]
-		e.loading, e.err, e.val = false, msg.err, msg.files
+		e.loading, e.err, e.val = false, msg.err, safeFiles(msg.files)
 	case detailMsg:
 		e := m.cache.details[msg.key]
-		e.loading, e.err, e.val = false, msg.err, msg.d
+		e.loading, e.err, e.val = false, msg.err, safeDetail(msg.d)
 	case commentMsg:
 		e := m.cache.comments[msg.url]
-		e.loading, e.err, e.val = false, msg.err, msg.c
+		e.loading, e.err, e.val = false, msg.err, safeComment(msg.c)
 	case reviewMsg:
 		return m.reviewed(msg)
 	case doneMsg:
 		if msg.err != nil {
 			m.setStatus(fmt.Sprintf("could not mark %s done: %v", msg.n.Key, msg.err), true)
+			delete(m.inboxTab().hidden, msg.n.Key)
+			if msg.n.Unread {
+				m.unread[msg.n.Key] = msg.n
+			}
 		}
 	case browseMsg:
 		if msg.err != nil {

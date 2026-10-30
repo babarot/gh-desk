@@ -55,7 +55,20 @@ type confirm struct {
 
 func (m *Model) own(p model.PR) bool { return m.viewer != "" && p.Author == m.viewer }
 
+// busy refuses a review while one is on its way, so a second key press
+// does not send it twice.
+func (m *Model) busy() bool {
+	if m.sending == nil {
+		return false
+	}
+	m.setStatus(fmt.Sprintf("a review of %s is being sent; wait for it", *m.sending), true)
+	return true
+}
+
 func (m *Model) askApprove(p model.PR) tea.Cmd {
+	if m.busy() {
+		return nil
+	}
 	if m.own(p) {
 		m.setStatus("you cannot approve your own pull request", true)
 		return nil
@@ -97,6 +110,9 @@ func (m *Model) composeKey(msg tea.KeyPressMsg) tea.Cmd {
 		}
 		return nil
 	case m.keys.Matches("post", k):
+		if m.busy() {
+			return nil
+		}
 		ev := kinds[c.kind]
 		body := strings.TrimSpace(c.ta.Value())
 		if body == "" && ev != model.EventApprove {
@@ -163,6 +179,8 @@ func (m *Model) confirmKey(k string) tea.Cmd {
 	switch {
 	case m.keys.Matches("confirm", k):
 		m.confirm = nil
+		key := c.pr.Key
+		m.sending = &key
 		m.setStatus(fmt.Sprintf("sending %s to %s…", kindWords[c.event], c.pr.Key), false)
 		return func() tea.Msg { return reviewMsg{c.pr, c.event, m.src.Review(m.ctx, c.pr, c.event, c.body)} }
 	case k == keymap.Back:
@@ -175,11 +193,12 @@ func (m *Model) confirmKey(k string) tea.Cmd {
 // reviewed takes in a sent review: the row shows it, the writing screen
 // closes, and the notification is marked done when the settings say so.
 func (m *Model) reviewed(msg reviewMsg) tea.Cmd {
+	m.sending = nil
 	if msg.err != nil {
 		m.setStatus(fmt.Sprintf("%s on %s failed: %v", kindWords[msg.event], msg.pr.Key, msg.err), true)
 		return nil
 	}
-	if m.view == viewCompose && m.compose != nil {
+	if m.view == viewCompose && m.compose != nil && m.compose.pr.Key == msg.pr.Key {
 		m.view, m.compose = m.compose.back, nil
 	}
 	state := map[model.ReviewEvent]model.ReviewState{

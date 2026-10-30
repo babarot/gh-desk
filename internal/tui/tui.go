@@ -96,8 +96,11 @@ type Model struct {
 	filtering bool
 	filter    string
 
-	pane    pane
-	cache   cache
+	pane  pane
+	cache cache
+	// sending is the review on its way to GitHub; no other is sent until
+	// it is back.
+	sending *model.PRKey
 	prv     prView
 	compose *compose
 	confirm *confirm
