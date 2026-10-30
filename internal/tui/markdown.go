@@ -231,7 +231,7 @@ func (m *Model) table(rows []string, width int) []line {
 		r = strings.TrimSpace(r)
 		r = strings.TrimSuffix(strings.TrimPrefix(r, "|"), "|")
 		var cs []string
-		for _, c := range strings.Split(r, "|") {
+		for c := range strings.SplitSeq(r, "|") {
 			cs = append(cs, strings.NewReplacer("`", "", "**", "").Replace(strings.TrimSpace(c)))
 		}
 		cells = append(cells, cs)

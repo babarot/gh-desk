@@ -218,7 +218,7 @@ func (c *Claude) run(ctx context.Context, log *slog.Logger, dir string, args []s
 			msg = msg[i+1:]
 		}
 		log.Warn("claude failed", "err", waitErr.Error(), logging.KeyDurationMS, elapsed)
-		return Answer{}, fmt.Errorf("claude: %v %s", waitErr, msg)
+		return Answer{}, fmt.Errorf("claude: %w %s", waitErr, msg)
 	}
 	log.Info("claude answered", "model", answer.Model, "cost_usd", answer.Cost, logging.KeyDurationMS, elapsed)
 	return answer, nil

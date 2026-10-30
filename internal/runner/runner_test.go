@@ -29,7 +29,7 @@ type fakeGH struct {
 func (f *fakeGH) log(s string) { f.calls = append(f.calls, s) }
 
 func (f *fakeGH) MergeInfo(ctx context.Context, ids []string, _ bool) (map[string]model.MergeInfo, error) {
-	// As the real client does, a cancelled read fails.
+	// As the real client does, a canceled read fails.
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
@@ -456,7 +456,9 @@ func TestResumeWatching(t *testing.T) {
 	}
 	st := newStore()
 	p := model.Pending{Key: mi.Key, ID: "1", Head: "h-1", Author: "renovate", AuthorIsBot: true, AutoMerge: true, Watching: true}
-	st.Put(p)
+	if err := st.Put(p); err != nil {
+		t.Fatal(err)
+	}
 	_, ch := newRunner(f, st).Resume(context.Background(), []model.Pending{p})
 	es := drain(t, ch)
 	if e := last(es); !e.Watch || e.Result != Merged || len(st.now) != 0 {
@@ -691,8 +693,7 @@ func TestOneJobPerPullRequest(t *testing.T) {
 	f := newFake(mi)
 	st := newStore()
 	r := newRunner(f, st)
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 	_, first := r.Start(ctx, Merge, []Item{it})
 	for e := range first {
 		if e.Result == AutoMergeOn {

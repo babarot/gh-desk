@@ -366,7 +366,7 @@ func (m *Model) chatLines(c *chat, width int) []string {
 	st := m.st
 	wrap := func(s string) []string {
 		var out []string
-		for _, l := range strings.Split(ansi.Wrap(safe(s), max(width-2, 10), " "), "\n") {
+		for l := range strings.SplitSeq(ansi.Wrap(safe(s), max(width-2, 10), " "), "\n") {
 			out = append(out, "  "+l)
 		}
 		return out
@@ -466,7 +466,7 @@ func (m *Model) renderChat(b *strings.Builder, height int) {
 	L := m.chatLines(c, m.width)
 	c.scroll = min(c.scroll, max(len(L)-bodyH, 0))
 	start := max(len(L)-bodyH-c.scroll, 0)
-	for i := 0; i < bodyH; i++ {
+	for i := range bodyH {
 		if start+i < len(L) {
 			b.WriteString(fit(L[start+i], m.width))
 		}

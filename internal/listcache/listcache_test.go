@@ -47,7 +47,9 @@ func TestPutAndOpen(t *testing.T) {
 func TestAnotherAccountIsNotUsed(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "lists.json")
 	a, _ := Open(path, "github.com", "alice")
-	a.PutList(List{Query: "q", PRs: []model.PR{{Key: model.PRKey{Owner: "acme", Repo: "api", Number: 1}, Title: "alice's"}}})
+	if err := a.PutList(List{Query: "q", PRs: []model.PR{{Key: model.PRKey{Owner: "acme", Repo: "api", Number: 1}, Title: "alice's"}}}); err != nil {
+		t.Fatal(err)
+	}
 	b, err := Open(path, "github.com", "bob")
 	if err != nil {
 		t.Fatal(err)
@@ -59,7 +61,9 @@ func TestAnotherAccountIsNotUsed(t *testing.T) {
 		t.Error("another host sees the list")
 	}
 	// bob's write replaces the file whole: nothing of alice's stays.
-	b.PutList(List{Query: "other"})
+	if err := b.PutList(List{Query: "other"}); err != nil {
+		t.Fatal(err)
+	}
 	a2, _ := Open(path, "github.com", "alice")
 	if _, ok := a2.List("q"); ok {
 		t.Error("alice's list was kept in bob's file")
@@ -72,8 +76,12 @@ func TestWriteKeepsOtherLists(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "lists.json")
 	one, _ := Open(path, "github.com", "me")
 	two, _ := Open(path, "github.com", "me")
-	one.PutList(List{Query: "a"})
-	two.PutList(List{Query: "b"})
+	if err := one.PutList(List{Query: "a"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := two.PutList(List{Query: "b"}); err != nil {
+		t.Fatal(err)
+	}
 	c, _ := Open(path, "github.com", "me")
 	_, okA := c.List("a")
 	_, okB := c.List("b")
@@ -84,7 +92,9 @@ func TestWriteKeepsOtherLists(t *testing.T) {
 
 func TestBrokenFile(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "lists.json")
-	os.WriteFile(path, []byte("{not json"), 0o600)
+	if err := os.WriteFile(path, []byte("{not json"), 0o600); err != nil {
+		t.Fatal(err)
+	}
 	c, err := Open(path, "github.com", "me")
 	if err == nil {
 		t.Error("a broken file gave no error")

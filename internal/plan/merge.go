@@ -70,10 +70,11 @@ func Failing(mi model.MergeInfo) bool {
 }
 
 // failed reports whether a check ended without passing: failed, errored,
-// cancelled, timed out, or waiting on an action it will not get.
+// canceled, timed out, or waiting on an action it will not get.
 func failed(s model.CheckState) bool {
 	switch s {
-	case model.CheckFailure, model.CheckError, "CANCELLED", "TIMED_OUT", "ACTION_REQUIRED", "STARTUP_FAILURE", "STALE":
+	// GitHub spells the state with two Ls
+	case model.CheckFailure, model.CheckError, "CANCELLED", "TIMED_OUT", "ACTION_REQUIRED", "STARTUP_FAILURE", "STALE": //nolint:misspell
 		return true
 	}
 	return false

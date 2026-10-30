@@ -679,8 +679,7 @@ func quoted(ss []string) string {
 // that are no setting, or a file that does not parse or has a value of the
 // wrong type, where the decoder says it is.
 func decodeProblems(err error) Problems {
-	var strict *toml.StrictMissingError
-	if errors.As(err, &strict) {
+	if strict, ok := errors.AsType[*toml.StrictMissingError](err); ok {
 		var ps Problems
 		for _, e := range strict.Errors {
 			key := []string(e.Key())
@@ -688,8 +687,7 @@ func decodeProblems(err error) Problems {
 		}
 		return ps
 	}
-	var de *toml.DecodeError
-	if errors.As(err, &de) {
+	if de, ok := errors.AsType[*toml.DecodeError](err); ok {
 		msg := strings.TrimPrefix(de.Error(), "toml: ")
 		if m := wrongType.FindStringSubmatch(msg); m != nil && len(de.Key()) > 0 {
 			setting := strings.Join(de.Key(), ".")

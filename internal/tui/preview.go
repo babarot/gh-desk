@@ -159,7 +159,7 @@ func marked(s string, spans []diff.Span, style lipgloss.Style) string {
 var (
 	htmlComment = regexp.MustCompile(`(?s)<!--.*?-->`)
 	htmlTag     = regexp.MustCompile(`</?(details|summary|p|br|img|sub|sup|div|span)[^>]*>`)
-	zeroWidth   = strings.NewReplacer("&#8203;", "", "​", "")
+	zeroWidth   = strings.NewReplacer("&#8203;", "", "\u200b", "")
 )
 
 // bodyLines are a description in lines width cells wide: links keep their
@@ -180,12 +180,12 @@ func (m *Model) bodyLines(body string, width int) []line {
 	}
 	var out []line
 	wrapped := func(l string, style lipgloss.Style) {
-		for _, w := range strings.Split(ansi.Wrap(l, width, " "), "\n") {
+		for w := range strings.SplitSeq(ansi.Wrap(l, width, " "), "\n") {
 			out = append(out, line{text: style.Render(w)})
 		}
 	}
 	code := false
-	for _, l := range strings.Split(body, "\n") {
+	for l := range strings.SplitSeq(body, "\n") {
 		fence := strings.HasPrefix(strings.TrimSpace(l), "```")
 		switch {
 		case fence || code:
@@ -392,7 +392,7 @@ func (m *Model) unreadLine(n *model.Notification) (string, bool) {
 		return st.peach.Render("❝ ") + st.dim.Render("reading the comment…"), true
 	case c.err == nil:
 		first := ""
-		for _, l := range strings.Split(c.val.Body, "\n") {
+		for l := range strings.SplitSeq(c.val.Body, "\n") {
 			if strings.TrimSpace(l) != "" {
 				first = strings.TrimSpace(l)
 				break

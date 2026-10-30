@@ -246,7 +246,7 @@ func git(ctx context.Context, dir string, args ...string) (string, error) {
 func GhqRoots(ctx context.Context) []string {
 	out, _ := git(ctx, "", "config", "--get-all", "ghq.root")
 	var roots []string
-	for _, r := range strings.Split(strings.TrimSpace(out), "\n") {
+	for r := range strings.SplitSeq(strings.TrimSpace(out), "\n") {
 		if r == "" {
 			continue
 		}

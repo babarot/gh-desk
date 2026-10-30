@@ -350,7 +350,7 @@ func (m *Model) facts(p model.PR, d *entry[model.Detail], width int) []line {
 	}
 	words := func(s string, style styleFn) []fact {
 		var out []fact
-		for _, w := range strings.Fields(s) {
+		for w := range strings.FieldsSeq(s) {
 			out = append(out, fact{text: style.Render(w)})
 		}
 		return out

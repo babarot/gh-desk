@@ -14,7 +14,7 @@ import (
 func startTriage(t *testing.T, plan string, tab ...string) (*Model, *fakeClaude) {
 	t.Helper()
 	m, _ := startWith(t, fixture(), keymap.Default())
-	fc := m.claude.(*fakeClaude)
+	fc := fakeClaudeOf(t, m)
 	fc.plan = plan
 	press(m, tab...)
 	press(m, "C", "b", "o", "t", "s", "enter")
@@ -60,7 +60,7 @@ func TestTriagePlanApplied(t *testing.T) {
 // does not fall back on the selection or the cursor.
 func TestTriageWriteNeedsItsOwnPullRequests(t *testing.T) {
 	m, _ := startWith(t, fixture(), keymap.Default())
-	fc := m.claude.(*fakeClaude)
+	fc := fakeClaudeOf(t, m)
 	fc.plan = `{"reply":"Approving.","actions":[{"do":"select","keys":["acme/api#99"]},{"do":"approve","keys":["acme/api#99"]}]}`
 	press(m, "space", "C", "g", "o", "enter")
 	if s := screen(m); strings.Count(s, "✗ acme/api#99 not in this tab") != 2 || strings.Contains(s, "enter apply") {
@@ -95,7 +95,7 @@ func TestTriageGivesUnreadFieldsAsUnknown(t *testing.T) {
 	f := fixture()
 	f.noHeavy = true
 	m, _ := startWith(t, f, keymap.Default())
-	fc := m.claude.(*fakeClaude)
+	fc := fakeClaudeOf(t, m)
 	fc.plan = `{"reply":"","actions":[]}`
 	press(m, "C", "x", "enter")
 	if p := fc.triaged[0].Prompt; !strings.Contains(p, "ci=unknown review=unknown size=unknown") {
@@ -164,4 +164,14 @@ func TestTriageIsAboutTheTabShown(t *testing.T) {
 	if !m.isSelected(key("acme", "api", 12)) || m.isSelected(key("me", "tool", 3)) {
 		t.Errorf("selected = %v", m.selected)
 	}
+}
+
+// fakeClaudeOf is the fake Claude that startWith gave m.
+func fakeClaudeOf(t *testing.T, m *Model) *fakeClaude {
+	t.Helper()
+	fc, ok := m.claude.(*fakeClaude)
+	if !ok {
+		t.Fatalf("m.claude is %T, not *fakeClaude", m.claude)
+	}
+	return fc
 }

@@ -147,8 +147,8 @@ func TestChecksRunningAndAwaitingApproval(t *testing.T) {
 
 func TestCancelledRequiredCheckFails(t *testing.T) {
 	mi := info(model.MergeBlocked)
-	mi.Checks = []model.Check{{Name: "test", State: "CANCELLED", Required: true}}
+	mi.Checks = []model.Check{{Name: "test", State: "CANCELLED", Required: true}} //nolint:misspell // GitHub's spelling
 	if !Failing(mi) {
-		t.Error("a cancelled required check is not failing")
+		t.Error("a canceled required check is not failing")
 	}
 }

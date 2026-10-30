@@ -492,15 +492,16 @@ func (m *Model) stepLine(i int, s step) string {
 	if s.skip != "" {
 		words = st.dim.Render(m.stepWords(s))
 	}
-	line := st.dim.Render(fmt.Sprintf("%d ", i+1)) + words
+	var line strings.Builder
+	line.WriteString(st.dim.Render(fmt.Sprintf("%d ", i+1)) + words)
 	for _, g := range s.gone {
-		line += "  " + st.red.Render("✗ "+safeLine(g.key)) + " " + st.muted.Render(g.why)
+		line.WriteString("  " + st.red.Render("✗ "+safeLine(g.key)) + " " + st.muted.Render(g.why))
 	}
 	// With nothing left, the keys left out already say why.
 	if s.skip != "" && (s.skip != noneLeft || len(s.gone) == 0) {
-		line += "  " + st.red.Render("✗ "+s.skip)
+		line.WriteString("  " + st.red.Render("✗ "+s.skip))
 	}
-	return line
+	return line.String()
 }
 
 // stepWords says what a step does.

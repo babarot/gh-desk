@@ -360,8 +360,8 @@ func (m *Model) progressText(p progress) string {
 	icon := map[runner.Result]string{runner.Running: "◌", runner.Approved: "✓", runner.Merged: "✓", runner.AutoMergeOn: "⧗",
 		runner.Skipped: "–", runner.Stopped: "✗", runner.Failed: "✗"}[p.result]
 	text := p.text
-	if strings.HasPrefix(text, "– ") {
-		text = strings.TrimPrefix(text, "– ")
+	if after, ok := strings.CutPrefix(text, "– "); ok {
+		text = after
 	}
 	return m.resultStyle(p.result).Render(icon + " " + text)
 }

@@ -105,7 +105,7 @@ func Bumps(body string) []Bump {
 func renovateTable(body string) []Bump {
 	var head []string
 	var out []Bump
-	for _, line := range strings.Split(body, "\n") {
+	for line := range strings.SplitSeq(body, "\n") {
 		line = strings.TrimSpace(line)
 		if !strings.HasPrefix(line, "|") {
 			if head != nil && len(out) > 0 {

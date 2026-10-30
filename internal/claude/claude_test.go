@@ -182,11 +182,15 @@ func gitRun(t *testing.T, dir string, args ...string) string {
 func origin(t *testing.T) (string, string) {
 	dir := t.TempDir()
 	gitRun(t, dir, "init", "-q", "-b", "main")
-	os.WriteFile(filepath.Join(dir, "a.txt"), []byte("one\n"), 0o644)
+	if err := os.WriteFile(filepath.Join(dir, "a.txt"), []byte("one\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	gitRun(t, dir, "add", ".")
 	gitRun(t, dir, "commit", "-qm", "one")
 	gitRun(t, dir, "checkout", "-qb", "feature")
-	os.WriteFile(filepath.Join(dir, "a.txt"), []byte("two\n"), 0o644)
+	if err := os.WriteFile(filepath.Join(dir, "a.txt"), []byte("two\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	gitRun(t, dir, "commit", "-qam", "two")
 	head := gitRun(t, dir, "rev-parse", "HEAD")
 	gitRun(t, dir, "update-ref", "refs/pull/1/head", head)
@@ -209,7 +213,9 @@ func TestWorkspace(t *testing.T) {
 
 	// A new push: the worktree moves to it.
 	gitRun(t, src, "checkout", "-q", "feature")
-	os.WriteFile(filepath.Join(src, "a.txt"), []byte("three\n"), 0o644)
+	if err := os.WriteFile(filepath.Join(src, "a.txt"), []byte("three\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	gitRun(t, src, "commit", "-qam", "three")
 	head2 := gitRun(t, src, "rev-parse", "HEAD")
 	gitRun(t, src, "update-ref", "refs/pull/1/head", head2)
@@ -261,9 +267,13 @@ func TestWorkspaceBorrows(t *testing.T) {
 func TestWorkspaceRunsNoHooks(t *testing.T) {
 	src, _ := origin(t)
 	gitRun(t, src, "checkout", "-q", "feature")
-	os.MkdirAll(filepath.Join(src, ".githooks"), 0o755)
+	if err := os.MkdirAll(filepath.Join(src, ".githooks"), 0o755); err != nil {
+		t.Fatal(err)
+	}
 	ran := filepath.Join(t.TempDir(), "ran")
-	os.WriteFile(filepath.Join(src, ".githooks", "post-checkout"), []byte("#!/bin/sh\ntouch "+ran+"\n"), 0o755)
+	if err := os.WriteFile(filepath.Join(src, ".githooks", "post-checkout"), []byte("#!/bin/sh\ntouch "+ran+"\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
 	gitRun(t, src, "add", ".")
 	gitRun(t, src, "commit", "-qm", "hook")
 	head := gitRun(t, src, "rev-parse", "HEAD")
@@ -271,7 +281,9 @@ func TestWorkspaceRunsNoHooks(t *testing.T) {
 	gitRun(t, src, "checkout", "-q", "main")
 
 	global := filepath.Join(t.TempDir(), "gitconfig")
-	os.WriteFile(global, []byte("[core]\n\thooksPath = .githooks\n"), 0o644)
+	if err := os.WriteFile(global, []byte("[core]\n\thooksPath = .githooks\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	t.Setenv("GIT_CONFIG_GLOBAL", global)
 	w := &Workspace{Dir: t.TempDir(), Log: logging.Discard(), Remote: func(string, string) string { return "file://" + src }}
 	k := model.PRKey{Owner: "acme", Repo: "api", Number: 1}

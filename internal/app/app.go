@@ -269,7 +269,7 @@ type runnerGitHub struct{ *github.Client }
 func (g runnerGitHub) EnableAutoMerge(ctx context.Context, key model.PRKey, id, head string, method model.MergeMethod) error {
 	err := g.Client.EnableAutoMerge(ctx, key, id, head, method)
 	if errors.Is(err, github.ErrCleanStatus) {
-		return fmt.Errorf("%w: %v", runner.ErrCleanStatus, err)
+		return fmt.Errorf("%w: %w", runner.ErrCleanStatus, err)
 	}
 	return err
 }

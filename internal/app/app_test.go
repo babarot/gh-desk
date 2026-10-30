@@ -19,7 +19,7 @@ func TestKeysTemplateLoadsUncommented(t *testing.T) {
 	// Every line of the [keys] template, uncommented, is a valid setting
 	// that changes nothing.
 	var lines []string
-	for _, l := range strings.Split(KeysTemplate(), "\n") {
+	for l := range strings.SplitSeq(KeysTemplate(), "\n") {
 		if strings.HasPrefix(l, "# ") && strings.Contains(l, " = ") {
 			lines = append(lines, strings.TrimPrefix(l, "# "))
 		}

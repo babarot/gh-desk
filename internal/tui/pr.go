@@ -104,7 +104,7 @@ func (m *Model) renderPR(b *strings.Builder, height int) {
 	ls := m.prLines(p)
 	rest := max(height-3, 1)
 	m.prv.scroll = min(m.prv.scroll, max(len(ls)-rest, 0))
-	for i := 0; i < rest; i++ {
+	for i := range rest {
 		s := ""
 		if j := m.prv.scroll + i; j < len(ls) {
 			s = ls[j].text
@@ -165,7 +165,7 @@ func (m *Model) prLines(p model.PR) []line {
 		var out []line
 		for _, c := range d.val.Comments {
 			out = append(out, line{text: st.sub0.Render(c.Author) + " " + st.dim.Render(shortAge(m.set.Now().Sub(c.Created))+" ago")})
-			for _, l := range strings.Split(strings.TrimSpace(htmlComment.ReplaceAllString(c.Body, "")), "\n") {
+			for l := range strings.SplitSeq(strings.TrimSpace(htmlComment.ReplaceAllString(c.Body, "")), "\n") {
 				out = append(out, line{text: "  " + st.muted.Render(l)})
 			}
 			out = append(out, line{})

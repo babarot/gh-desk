@@ -86,7 +86,7 @@ func TestApply(t *testing.T) {
 				t.Fatalf("problems = %+v", ps)
 			}
 			for a, want := range tt.check {
-				if got := m.Keys(a); !slices.Equal(got, want) && !(len(got) == 0 && len(want) == 0) {
+				if got := m.Keys(a); !slices.Equal(got, want) && (len(got) != 0 || len(want) != 0) {
 					t.Errorf("Keys(%s) = %q; want %q", a, got, want)
 				}
 			}

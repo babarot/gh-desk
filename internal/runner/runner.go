@@ -180,7 +180,7 @@ func (r *Runner) release(k model.PRKey) {
 	delete(r.busy, k)
 }
 
-// Wait waits for every batch to end. After its context is cancelled, a
+// Wait waits for every batch to end. After its context is canceled, a
 // batch ends once its jobs have stopped writing to the record.
 func (r *Runner) Wait() { r.active.Wait() }
 
@@ -191,7 +191,7 @@ func New(gh GitHub, log *slog.Logger, opt Options) *Runner {
 
 // Start runs a batch and returns its ID and its events. The channel is
 // closed when every pull request has a final result and every auto-merge
-// it turned on is no longer watched. Cancelling ctx stops it all.
+// it turned on is no longer watched. Canceling ctx stops it all.
 func (r *Runner) Start(ctx context.Context, kind Kind, items []Item) (string, <-chan Event) {
 	return r.run(ctx, kind, items, nil)
 }
@@ -364,11 +364,11 @@ func (j *job) resume() {
 	if !ok {
 		return
 	}
-	switch {
-	case mi.State == model.StateMerged:
+	switch mi.State {
+	case model.StateMerged:
 		j.say(Merged, "merged meanwhile")
 		return
-	case mi.State == model.StateClosed:
+	case model.StateClosed:
 		j.say(Stopped, "closed meanwhile")
 		return
 	}
@@ -564,7 +564,7 @@ func (j *job) merge() {
 // user's approval was recorded: it was dismissed, and approving again
 // would undo whoever dismissed it.
 func (j *job) dismissed(d plan.Decision) bool {
-	if !d.Approve || !(j.pend.Approved || j.approved) {
+	if !d.Approve || (!j.pend.Approved && !j.approved) {
 		return false
 	}
 	j.say(Stopped, "your approval was dismissed · confirm again")
@@ -764,7 +764,7 @@ func (j *job) wait() {
 	}
 }
 
-// sleep waits d, or returns false when the batch is cancelled.
+// sleep waits d, or returns false when the batch is canceled.
 func (j *job) sleep(d time.Duration) bool {
 	t := time.NewTimer(d)
 	defer t.Stop()

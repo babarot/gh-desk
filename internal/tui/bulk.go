@@ -321,7 +321,7 @@ func (m *Model) bulkKey(k string) tea.Cmd {
 	switch {
 	case k == keymap.Back:
 		m.bulk = nil
-		m.setStatus("cancelled", false)
+		m.setStatus("canceled", false)
 	case is("down"):
 		b.offset = min(b.offset+1, max(len(b.items)-bulkRows, 0))
 	case is("up"):
@@ -413,8 +413,8 @@ func (m *Model) renderBulk() []string {
 			mark, title, what = st.dim.Render(m.spinner()), st.muted.Render(it.pr.Title), st.dim.Render("reading…")
 		case it.goes(b.kind):
 			mark, title = st.mauve.Render("✓"), st.sub1.Render(it.pr.Title)
-			switch {
-			case b.kind == runner.Approve:
+			switch b.kind {
+			case runner.Approve:
 				what = st.green.Render("approve")
 			default:
 				if it.d.Approve {

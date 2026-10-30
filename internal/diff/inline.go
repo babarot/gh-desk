@@ -1,6 +1,7 @@
 package diff
 
 import (
+	"slices"
 	"unicode"
 	"unicode/utf8"
 )
@@ -114,9 +115,9 @@ func lcs(a, b []word) (keepA, keepB []bool) {
 	// n[i][j] is the length of the subsequence of a[i:] and b[j:]
 	w := len(b) + 1
 	n := make([]int, (len(a)+1)*w)
-	for i := len(a) - 1; i >= 0; i-- {
-		for j := len(b) - 1; j >= 0; j-- {
-			if a[i].text == b[j].text {
+	for i, x := range slices.Backward(a) {
+		for j, y := range slices.Backward(b) {
+			if x.text == y.text {
 				n[i*w+j] = n[(i+1)*w+j+1] + 1
 			} else {
 				n[i*w+j] = max(n[(i+1)*w+j], n[i*w+j+1])
@@ -142,7 +143,7 @@ func lcs(a, b []word) (keepA, keepB []bool) {
 // them are taken in, so that "a b" replaced reads as one change.
 func spans(ws []word, keep []bool) []Span {
 	var out []Span
-	for i := 0; i < len(ws); i++ {
+	for i := range ws {
 		if keep[i] {
 			continue
 		}

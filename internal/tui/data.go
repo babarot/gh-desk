@@ -2,6 +2,7 @@ package tui
 
 import (
 	"fmt"
+	"maps"
 	"slices"
 	"strings"
 	"time"
@@ -470,9 +471,7 @@ func (m *Model) handleData(msg tea.Msg) tea.Cmd {
 	case bodiesMsg:
 		m.bodies(msg)
 	case checksMsg:
-		for k, mi := range msg.got {
-			m.cache.info[k] = mi
-		}
+		maps.Copy(m.cache.info, msg.got)
 	}
 	return nil
 }

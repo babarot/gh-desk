@@ -2,6 +2,7 @@ package tui
 
 import (
 	"fmt"
+	"strings"
 
 	tea "charm.land/bubbletea/v2"
 
@@ -234,12 +235,12 @@ func ruleWords(r plan.Rule) string {
 	if r.ChecksPassing {
 		parts = append(parts, "checks passing")
 	}
-	s := ""
+	var s strings.Builder
 	for i, p := range parts {
 		if i > 0 {
-			s += " · "
+			s.WriteString(" · ")
 		}
-		s += p
+		s.WriteString(p)
 	}
-	return s
+	return s.String()
 }

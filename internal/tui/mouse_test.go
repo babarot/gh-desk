@@ -19,8 +19,8 @@ func mouseAt(m *Model, msg tea.Msg) {
 func lineOf(t *testing.T, m *Model, s string) (x, y int) {
 	t.Helper()
 	for y, l := range strings.Split(screen(m), "\n") {
-		if i := strings.Index(l, s); i >= 0 {
-			return len([]rune(l[:i])), y
+		if before, _, ok := strings.Cut(l, s); ok {
+			return len([]rune(before)), y
 		}
 	}
 	t.Fatalf("%q is not on the screen:\n%s", s, screen(m))

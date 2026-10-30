@@ -180,7 +180,7 @@ func (m *Model) confirmKey(k string) tea.Cmd {
 		return func() tea.Msg { return reviewMsg{c.pr, c.event, m.src.Review(m.ctx, c.pr, c.event, c.body)} }
 	case k == keymap.Back:
 		m.confirm = nil
-		m.setStatus("cancelled", false)
+		m.setStatus("canceled", false)
 	}
 	return nil
 }

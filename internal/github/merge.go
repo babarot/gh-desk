@@ -174,9 +174,9 @@ func (c *Client) MergeInfo(ctx context.Context, ids []string, details bool) (map
 			continue
 		}
 		if n.Commits2 != nil {
-			n.infoNode.Commits = *n.Commits2
+			n.Commits = *n.Commits2
 		}
-		out[id] = n.infoNode.toModel()
+		out[id] = n.toModel()
 	}
 	var gqlErr *api.GraphQLError
 	if err != nil && !errors.As(err, &gqlErr) {
@@ -198,7 +198,7 @@ func (c *Client) write(ctx context.Context, step string, key model.PRKey, head, 
 	if err != nil {
 		c.log.Info(step+" failed", append(attrs, "err", err.Error())...)
 		if step == "enable-auto-merge" && strings.Contains(strings.ToLower(err.Error()), "clean status") {
-			return fmt.Errorf("%w: %v", ErrCleanStatus, err)
+			return fmt.Errorf("%w: %w", ErrCleanStatus, err)
 		}
 		return err
 	}

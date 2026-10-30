@@ -197,7 +197,9 @@ func (f *fakeSource) SearchPage(_ context.Context, q string, first int, after st
 	prs := f.searches[q]
 	from := 0
 	if after != "" {
-		fmt.Sscan(after, &from)
+		if _, err := fmt.Sscan(after, &from); err != nil {
+			return nil, 0, "", nil, fmt.Errorf("fake cursor %q: %w", after, err)
+		}
 	}
 	to := min(from+min(first, 2), len(prs))
 	next := ""
@@ -535,7 +537,7 @@ func TestCursorRowBackground(t *testing.T) {
 	m := start(t, fixture(), keymap.Default())
 	probe := m.st.sel.Render("\x00")
 	set := probe[:strings.IndexByte(probe, 0)]
-	for _, l := range strings.Split(m.render(), "\n") {
+	for l := range strings.SplitSeq(m.render(), "\n") {
 		if !strings.Contains(ansi.Strip(l), "▎ ● api#12") {
 			continue
 		}
@@ -757,7 +759,7 @@ func (c *fakeClaude) Once(_ context.Context, _, prompt, _ string) (claude.Answer
 
 func TestClaudeConversation(t *testing.T) {
 	m, _ := startWith(t, fixture(), keymap.Default())
-	fc := m.claude.(*fakeClaude)
+	fc := fakeClaudeOf(t, m)
 	press(m, "enter", "C")
 	if m.view != viewChat || len(fc.asked) != 1 {
 		t.Fatalf("view %v, asked %d", m.view, len(fc.asked))
@@ -842,7 +844,7 @@ func TestReleaseNotesMarkBotPullRequests(t *testing.T) {
 	}
 	m, r := startWith(t, f, keymap.Default())
 	m.set.ReleaseNotes = true
-	fc := m.claude.(*fakeClaude)
+	fc := fakeClaudeOf(t, m)
 	press(m, "b", "space", "j", "j", "space", "M")
 	if len(fc.notes) != 1 || !strings.Contains(fc.notes[0], "acme/api#30") || strings.Contains(fc.notes[0], "acme/api#12") {
 		t.Fatalf("asked about %q", fc.notes)
@@ -865,7 +867,7 @@ func TestReleaseNotesMarkBotPullRequests(t *testing.T) {
 // one starts a new session.
 func TestClaudeFirstFailureStartsAgain(t *testing.T) {
 	m, _ := startWith(t, fixture(), keymap.Default())
-	fc := m.claude.(*fakeClaude)
+	fc := fakeClaudeOf(t, m)
 	fc.fail = true
 	press(m, "enter", "C")
 	if !strings.Contains(screen(m), "rate limited") {
@@ -913,7 +915,7 @@ func TestTabShowsItsBoundKey(t *testing.T) {
 		t.Fatal(ps)
 	}
 	m := start(t, fixture(), km)
-	header := strings.SplitN(screen(m), "\n", 2)[0]
+	header, _, _ := strings.Cut(screen(m), "\n")
 	if !strings.Contains(header, "w mine") || strings.Contains(header, "2 mine") {
 		t.Errorf("header = %q, want the mine tab marked w", header)
 	}
