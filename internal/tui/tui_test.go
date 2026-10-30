@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -793,5 +794,31 @@ func TestClaudeFirstFailureStartsAgain(t *testing.T) {
 	}
 	if r := fc.asked[1]; !r.First || r.Session == fc.asked[0].Session {
 		t.Errorf("retry %+v after %+v", r, fc.asked[0])
+	}
+}
+
+func TestDescriptionWraps(t *testing.T) {
+	m := start(t, fixture(), keymap.Default())
+	prose := strings.Repeat("長い段落は端で折り返す。", 5)
+	table := "| " + strings.Repeat("column ", 10) + "|"
+	code := strings.Repeat("x", 40)
+	body := prose + "\n" + table + "\n```\n" + code + "\n```"
+	var got []string
+	for _, l := range m.bodyLines(body, 30) {
+		got = append(got, ansi.Strip(l.text))
+	}
+	var wrapped string
+	n := 0
+	for ; n < len(got) && got[n] != table; n++ {
+		if w := ansi.StringWidth(got[n]); w > 30 {
+			t.Errorf("line %q is %d cells wide", got[n], w)
+		}
+		wrapped += got[n]
+	}
+	if n < 2 || wrapped != prose {
+		t.Errorf("prose became %q", got[:n])
+	}
+	if want := []string{table, "```", code, "```"}; !slices.Equal(got[n:], want) {
+		t.Errorf("table and code became %q, want them uncut", got[n:])
 	}
 }

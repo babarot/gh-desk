@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"charm.land/lipgloss/v2"
+	"github.com/charmbracelet/x/ansi"
 
 	"github.com/babarot/gh-triage/internal/diff"
 	"github.com/babarot/gh-triage/internal/model"
@@ -140,23 +141,38 @@ var (
 	zeroWidth   = strings.NewReplacer("&#8203;", "", "​", "")
 )
 
-// bodyLines are a description as plain lines: links keep their text, HTML
-// comments and tags go, headings stand out.
-func (m *Model) bodyLines(body string) []line {
+// bodyLines are a description as plain lines width cells wide: links keep
+// their text, HTML comments and tags go, headings stand out. Prose wraps at
+// the edge; tables and code blocks are cut instead, as wrapping would break
+// their columns.
+func (m *Model) bodyLines(body string, width int) []line {
 	if strings.TrimSpace(body) == "" {
 		return []line{{text: m.st.dim.Render("no description")}}
 	}
 	body = htmlTag.ReplaceAllString(htmlComment.ReplaceAllString(body, ""), "")
 	body = zeroWidth.Replace(mdLinkRe.ReplaceAllString(body, "$1"))
+	width = max(width, 10)
 	var out []line
+	wrapped := func(l string, style lipgloss.Style) {
+		for _, w := range strings.Split(ansi.Wrap(l, width, " "), "\n") {
+			out = append(out, line{text: style.Render(w)})
+		}
+	}
+	code := false
 	for _, l := range strings.Split(strings.ReplaceAll(body, "\r", ""), "\n") {
+		fence := strings.HasPrefix(strings.TrimSpace(l), "```")
 		switch {
+		case fence || code:
+			out = append(out, line{text: m.st.sub1.Render(l)})
 		case strings.HasPrefix(l, "#"):
-			out = append(out, line{text: m.st.mauve.Render(l)})
+			wrapped(l, m.st.mauve)
 		case strings.HasPrefix(l, "|"):
 			out = append(out, line{text: m.st.teal.Render(l)})
 		default:
-			out = append(out, line{text: m.st.sub1.Render(l)})
+			wrapped(l, m.st.sub1)
+		}
+		if fence {
+			code = !code
 		}
 	}
 	return out
@@ -326,7 +342,7 @@ func (m *Model) paneBody(p model.PR, n *model.Notification, e *entry[[]diff.File
 		case d.err != nil:
 			ls = []line{{text: st.red.Render(d.err.Error())}}
 		default:
-			ls = m.bodyLines(d.val.Body)
+			ls = m.bodyLines(d.val.Body, max(m.width-4, 10))
 		}
 	case e == nil || e.loading:
 		ls = []line{{text: st.dim.Render("reading the diff…")}}

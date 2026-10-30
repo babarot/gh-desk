@@ -116,7 +116,7 @@ func (m *Model) prLines(p model.PR) []line {
 		if w := waitDetail(); w != nil {
 			return w
 		}
-		return m.bodyLines(d.val.Body)
+		return m.bodyLines(d.val.Body, m.width-1)
 	case "files":
 		e := m.cache.diffs[diffID(p)]
 		switch {
