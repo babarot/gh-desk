@@ -258,7 +258,7 @@ func (m *Model) readNotes(b *bulk) tea.Cmd {
 		for _, p := range ask {
 			ns = append(ns, claude.Notes{Key: p.Key, Title: p.Title, Body: bodies[p.ID]})
 		}
-		a, err := m.claude.Once(m.ctx, "", claude.NotesPrompt(ns), claude.NotesSchema)
+		a, err := m.claude.Once(m.ctx, "", claude.NotesPrompt(ns, m.set.Language), claude.NotesSchema)
 		if err != nil {
 			return notesMsg{b: b, err: err}
 		}

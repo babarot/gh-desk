@@ -37,6 +37,8 @@ type Options struct {
 	Model string
 	// Tools are among Tools; the caller has checked them.
 	Tools []string
+	// Language is what Claude answers in.
+	Language string
 	// Instructions are appended to the system prompt of every review.
 	Instructions string
 	Log          *slog.Logger
@@ -112,7 +114,7 @@ func (c *Claude) Ask(ctx context.Context, r Request, progress func(Step)) (Answe
 	args := []string{"-p", "--model", c.opt.Model, "--output-format", "stream-json", "--verbose"}
 	args = append(args, c.restricted(c.opt.Tools)...)
 	args = append(args, "--allowedTools", strings.Join(c.opt.Tools, ","),
-		"--append-system-prompt", reviewInstructions+c.extra())
+		"--append-system-prompt", reviewInstructions+"\n\nAnswer in "+c.opt.Language+"."+c.extra())
 	if r.First {
 		args = append(args, "--session-id", r.Session)
 	} else {

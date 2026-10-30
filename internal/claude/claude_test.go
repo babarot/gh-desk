@@ -84,7 +84,7 @@ func read(t *testing.T, path string) string {
 func TestAskIsRestricted(t *testing.T) {
 	bin, out := fakeClaude(t)
 	wt := t.TempDir()
-	c := New(Options{Bin: bin, Model: "opus", Tools: []string{"Read", "Grep", "Glob"}, Instructions: "Answer in Japanese.", Log: logging.Discard()})
+	c := New(Options{Bin: bin, Model: "opus", Tools: []string{"Read", "Grep", "Glob"}, Language: "Japanese", Instructions: "Point out missing tests.", Log: logging.Discard()})
 	a, err := c.Ask(context.Background(), Request{Dir: wt, Session: "s-1", First: true, Prompt: "Review this.\n<diff>…</diff>"}, func(Step) {})
 	if err != nil || a.Text != "ok" {
 		t.Fatalf("answer %+v, %v", a, err)
@@ -102,8 +102,8 @@ func TestAskIsRestricted(t *testing.T) {
 	if slices.Contains(got, "--resume") || slices.Contains(got, "Review this.") {
 		t.Errorf("got = %q", got)
 	}
-	if i := slices.Index(got, "--append-system-prompt"); i < 0 || !strings.HasSuffix(got[i+1], "Answer in Japanese.") {
-		t.Errorf("instructions not appended: %q", got)
+	if i := slices.Index(got, "--append-system-prompt"); i < 0 || !strings.HasSuffix(got[i+1], "Answer in Japanese.\n\nPoint out missing tests.") {
+		t.Errorf("language and instructions not appended: %q", got)
 	}
 	if got := read(t, filepath.Join(out, "stdin")); !strings.HasPrefix(got, "Review this.") {
 		t.Errorf("stdin = %q", got)

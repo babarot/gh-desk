@@ -94,6 +94,8 @@ type Settings struct {
 	Editor string
 	// Plan is what deciding a merge takes from the config file.
 	Plan plan.Settings
+	// Language is what Claude answers in.
+	Language string
 	// ReleaseNotes has Claude read the release notes of the bot pull
 	// requests in a merge popup.
 	ReleaseNotes bool

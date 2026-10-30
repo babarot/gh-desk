@@ -133,6 +133,8 @@ type Claude struct {
 	// AllowedTools are the tools Claude may use; the claude package checks
 	// them.
 	AllowedTools []string `toml:"allowed_tools"`
+	// Language is what Claude answers in, such as "Japanese".
+	Language string `toml:"language"`
 	// Instructions are appended to the system prompt of every review.
 	Instructions string `toml:"instructions"`
 	// ReleaseNotesCheck lets Claude read the release notes of the bot pull
@@ -238,7 +240,7 @@ func Default() File {
 		Merge: Merge{Methods: []string{"merge", "squash", "rebase"}, AutoMerge: true, ChecksTimeout: "6h",
 			BlockedTimeout: "30m", WatchTimeout: "24h", UpdateBranch: "humans"},
 		Bulk:   Bulk{AttentionPaths: []string{".github/workflows/*", "CODEOWNERS", ".github/CODEOWNERS", "docs/CODEOWNERS"}},
-		Claude: Claude{Model: "opus", CacheDir: defaultCacheDir(), AllowedTools: []string{"Read", "Grep", "Glob"}, ReleaseNotesCheck: true},
+		Claude: Claude{Model: "opus", CacheDir: defaultCacheDir(), AllowedTools: []string{"Read", "Grep", "Glob"}, Language: "English", ReleaseNotesCheck: true},
 	}
 }
 
@@ -389,8 +391,11 @@ func Template(keys string) string {
 # cache_dir = "~/.cache/gh-triage"
 # The tools Claude may use, among "Read", "Grep", "Glob" and "WebFetch".
 # allowed_tools = ["Read", "Grep", "Glob"]
+# The language Claude answers in, such as "Japanese". A review drafted with
+# D is written in the language of the pull request instead.
+# language = "English"
 # Appended to the instructions of every review, such as
-# "Answer in Japanese."
+# "Point out changes that have no tests."
 # instructions = ""
 # Let Claude read the release notes of the bot pull requests in the merge
 # popup, and mark those that need care.
@@ -494,6 +499,9 @@ func Load(path string) (File, error) {
 	ps = append(ps, checkSelect(cfg.Select)...)
 	if strings.TrimSpace(cfg.Claude.Model) == "" {
 		ps = append(ps, problem("claude.model", "claude.model must not be empty"))
+	}
+	if strings.TrimSpace(cfg.Claude.Language) == "" {
+		ps = append(ps, problem("claude.language", "claude.language must not be empty"))
 	}
 	if strings.TrimSpace(cfg.Claude.CacheDir) == "" {
 		ps = append(ps, problem("claude.cache_dir", "claude.cache_dir must not be empty"))

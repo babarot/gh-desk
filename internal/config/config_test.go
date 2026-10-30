@@ -57,11 +57,13 @@ interval = "0"
 approve = "a"
 merge = ["m", "M"]
 claude = 1
+[claude]
+language = "Japanese"
 `))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if cfg.Log.Level != "debug" || cfg.UI.Theme != "latte" || cfg.RefreshInterval() != 0 {
+	if cfg.Log.Level != "debug" || cfg.UI.Theme != "latte" || cfg.RefreshInterval() != 0 || cfg.Claude.Language != "Japanese" {
 		t.Errorf("cfg = %+v", cfg)
 	}
 	if got := cfg.Keys["approve"].Keys; len(got) != 1 || got[0] != "a" {

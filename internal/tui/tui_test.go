@@ -280,7 +280,7 @@ func testSettings() Settings {
 		Plan: plan.Settings{Methods: []model.MergeMethod{model.MethodMerge}, AutoMerge: true, UpdateBranch: "humans",
 			AttentionPaths: []string{".github/workflows/*"}},
 		Rules:   []plan.Rule{{Name: "octo bumps", Author: "renovate", Packages: []string{"octo/app"}}},
-		CanWait: true,
+		CanWait: true, Language: "English",
 	}
 }
 
