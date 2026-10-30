@@ -641,7 +641,12 @@ func (m *Model) tabRead(msg tabMsg) tea.Cmd {
 	}
 	t.loading, t.readAt = false, now
 	m.refreshed[msg.tab] = now
-	return tea.Batch(append(cmds, m.dropGone(t))...)
+	cmds = append(cmds, m.dropGone(t))
+	if m.tabDone(t) {
+		// No heavy fields to wait for: an empty list, or all back.
+		cmds = append(cmds, m.saveTab(msg.tab))
+	}
+	return tea.Batch(cmds...)
 }
 
 // swap puts a reading again in place of the rows. A row of the same pull
@@ -687,6 +692,9 @@ func (m *Model) swap(i int) tea.Cmd {
 	m.refreshed[i] = now
 	m.restoreCursor(t)
 	cmds := []tea.Cmd{m.ensure(), m.queueHeavy(i, t.gen, p.prs), m.dropGone(t)}
+	if m.tabDone(t) {
+		cmds = append(cmds, m.saveTab(i))
+	}
 	if fresh {
 		m.freshGen++
 		gen := m.freshGen

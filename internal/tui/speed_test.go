@@ -149,3 +149,13 @@ func TestFailedReadingKeepsTheRows(t *testing.T) {
 type errString string
 
 func (e errString) Error() string { return string(e) }
+
+// An empty list is kept too, so the next launch does not show an old one.
+func TestEmptyListIsKept(t *testing.T) {
+	lists := cachedReview()
+	m := newModel(fixture(), lists)
+	run(m, m.Init())
+	if l, ok := lists.lists["involved"]; !ok || len(l.PRs) != 0 {
+		t.Errorf("involved kept = %v, %+v", ok, l)
+	}
+}
