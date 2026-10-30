@@ -11,11 +11,11 @@ gh-triage is split into packages by layer. A package imports only packages of lo
 | 1 | `internal/keymap` | Keys bound to actions by name | - | - |
 | 1 | `internal/plan` | Deciding how to merge each pull request; selection rules | `model` | - |
 | 1 | `internal/diff` | Reading patches and the words that changed | - | - |
-| 2 | `internal/github` | GitHub's GraphQL and REST APIs | `model` | `github.com/cli/go-gh/v2` |
-| 2 | `internal/state` | The pending-merge record and its lock | `model` | - |
-| 2 | `internal/claude` | Running claude -p and the pull request worktrees | `model` | - |
-| 3 | `internal/runner` | Bulk approve and merge, auto-merge watching, resuming | `model`, `plan` | - |
-| 4 | `internal/tui` | The terminal UI | `model`, `plan`, `diff`, `keymap`, `runner` | `charm.land/bubbletea/v2`, `charm.land/bubbles/v2`, `charm.land/lipgloss/v2`, `github.com/alecthomas/chroma/v2` |
+| 2 | `internal/github` | GitHub's GraphQL and REST APIs | `model`, `logging` | `github.com/cli/go-gh/v2` |
+| 2 | `internal/state` | The pending-merge record and its lock | `model`, `logging` | - |
+| 2 | `internal/claude` | Running claude -p and the pull request worktrees | `model`, `logging` | - |
+| 3 | `internal/runner` | Bulk approve and merge, auto-merge watching, resuming | `model`, `logging`, `plan` | - |
+| 4 | `internal/tui` | The terminal UI | `model`, `logging`, `plan`, `diff`, `keymap`, `runner` | `charm.land/bubbletea/v2`, `charm.land/bubbles/v2`, `charm.land/lipgloss/v2`, `github.com/alecthomas/chroma/v2` |
 | 5 | `internal/app` | Putting it together: flags, config, log, and starting the TUI | `model`, `logging`, `config`, `keymap`, `plan`, `diff`, `github`, `state`, `claude`, `runner`, `tui` | - |
 | 6 | `main` | Calls app.Run | `app` | - |
 
