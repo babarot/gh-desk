@@ -38,7 +38,8 @@ type Options struct {
 	Model string
 	// Tools are among Tools; the caller has checked them.
 	Tools []string
-	// Language is what Claude answers in.
+	// Language is what Claude answers in about a pull request; a triage is
+	// answered in the language of the request.
 	Language string
 	// Instructions are appended to the system prompt of every review and
 	// triage.
@@ -116,14 +117,15 @@ type Request struct {
 // so it can be resumed, here or in Claude Code. progress hears of each
 // tool Claude uses.
 func (c *Claude) Ask(ctx context.Context, r Request, progress func(Step)) (Answer, error) {
-	args := c.session(r, reviewInstructions, c.opt.Tools)
+	args := c.session(r, reviewInstructions+"\n\nAnswer in "+c.opt.Language+".", c.opt.Tools)
 	args = append(args, "--allowedTools", strings.Join(c.opt.Tools, ","))
 	return c.run(ctx, c.opt.Log.With(logging.KeyClaude, r.Session), r.Dir, args, r.Prompt, progress)
 }
 
-// Triage asks Claude for a plan of what to show and select in the lists,
-// as TriageSchema, in a session kept by Claude Code. It has no tools:
-// everything Claude needs is in the prompt.
+// Triage asks Claude for a plan of what to show and select in the tab
+// shown, as TriageSchema, in a session kept by Claude Code. It has no
+// tools: everything Claude needs is in the prompt. Claude answers in the
+// language of the request, which the user wrote.
 func (c *Claude) Triage(ctx context.Context, r Request) (Answer, error) {
 	r.Schema = TriageSchema
 	args := c.session(r, triageInstructions, nil)
@@ -147,14 +149,13 @@ func (c *Claude) session(r Request, instructions string, tools []string) []strin
 	return args
 }
 
-// system is the system prompt: instructions, the language to answer in,
-// and what the config file adds.
+// system is the system prompt: instructions, and what the config file
+// adds.
 func (c *Claude) system(instructions string) string {
-	s := instructions + "\n\nAnswer in " + c.opt.Language + "."
-	if strings.TrimSpace(c.opt.Instructions) != "" {
-		s += "\n\n" + c.opt.Instructions
+	if strings.TrimSpace(c.opt.Instructions) == "" {
+		return instructions
 	}
-	return s
+	return instructions + "\n\n" + c.opt.Instructions
 }
 
 // Once asks a question with no tools and no session kept, from dir.

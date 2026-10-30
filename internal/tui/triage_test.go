@@ -9,12 +9,14 @@ import (
 	"github.com/babarot/gh-triage/internal/runner"
 )
 
-// startTriage starts the TUI with Claude answering plan, and asks it.
-func startTriage(t *testing.T, plan string) (*Model, *fakeClaude) {
+// startTriage starts the TUI with Claude answering plan, and asks it on
+// the tab pressed, or on the first.
+func startTriage(t *testing.T, plan string, tab ...string) (*Model, *fakeClaude) {
 	t.Helper()
 	m, _ := startWith(t, fixture(), keymap.Default())
 	fc := m.claude.(*fakeClaude)
 	fc.plan = plan
+	press(m, tab...)
 	press(m, "C", "b", "o", "t", "s", "enter")
 	if len(fc.triaged) != 1 {
 		t.Fatalf("asked %d times", len(fc.triaged))
@@ -23,7 +25,7 @@ func startTriage(t *testing.T, plan string) (*Model, *fakeClaude) {
 }
 
 func TestTriagePlanApplied(t *testing.T) {
-	m, fc := startTriage(t, `{"reply":"Picked the bot update; api#99 is not in the lists.","actions":[`+
+	m, fc := startTriage(t, `{"reply":"Picked the bot update; api#99 is not in this tab.","actions":[`+
 		`{"do":"unfold","group":"bots"},{"do":"select","keys":["acme/api#30","acme/api#99"]},`+
 		`{"do":"cursor","key":"acme/api#30"},{"do":"approve","keys":["acme/api#30"]}]}`)
 	r := fc.triaged[0]
@@ -61,7 +63,7 @@ func TestTriageWriteNeedsItsOwnPullRequests(t *testing.T) {
 	fc := m.claude.(*fakeClaude)
 	fc.plan = `{"reply":"Approving.","actions":[{"do":"select","keys":["acme/api#99"]},{"do":"approve","keys":["acme/api#99"]}]}`
 	press(m, "space", "C", "g", "o", "enter")
-	if s := screen(m); strings.Count(s, "✗ acme/api#99 not in the lists") != 2 || strings.Contains(s, "enter apply") {
+	if s := screen(m); strings.Count(s, "✗ acme/api#99 not in this tab") != 2 || strings.Contains(s, "enter apply") {
 		t.Errorf("not shown as left out:\n%s", screen(m))
 	}
 	if m.applicable() {
@@ -136,7 +138,7 @@ func TestTriageStop(t *testing.T) {
 
 // Your own pull request cannot be approved, but can be merged.
 func TestTriageOwnPullRequests(t *testing.T) {
-	m, _ := startTriage(t, `{"reply":"","actions":[{"do":"approve","keys":["me/tool#3"]}]}`)
+	m, _ := startTriage(t, `{"reply":"","actions":[{"do":"approve","keys":["me/tool#3"]}]}`, "2")
 	if !strings.Contains(screen(m), "✗ me/tool#3 your own") || m.applicable() {
 		t.Errorf("approving your own:\n%s", screen(m))
 	}
@@ -144,5 +146,22 @@ func TestTriageOwnPullRequests(t *testing.T) {
 	press(m, "enter")
 	if m.bulk == nil || m.bulk.kind != runner.Merge || len(m.bulk.items) != 1 {
 		t.Errorf("bulk = %+v", m.bulk)
+	}
+}
+
+// Claude is given the tab shown only, and a pull request of another tab is
+// left out of the plan.
+func TestTriageIsAboutTheTabShown(t *testing.T) {
+	m, fc := startTriage(t, `{"reply":"","actions":[{"do":"select","keys":["acme/api#12","me/tool#3"]}]}`)
+	p := fc.triaged[0].Prompt
+	if !strings.Contains(p, `tab "review"`) || !strings.Contains(p, "acme/api#12") || strings.Contains(p, "me/tool#3") || strings.Contains(p, `tab "mine"`) {
+		t.Errorf("prompt:\n%s", p)
+	}
+	if s := screen(m); !strings.Contains(s, "✗ me/tool#3 not in this tab") || !strings.Contains(s, "claude · review") {
+		t.Errorf("screen:\n%s", s)
+	}
+	press(m, "enter")
+	if !m.isSelected(key("acme", "api", 12)) || m.isSelected(key("me", "tool", 3)) {
+		t.Errorf("selected = %v", m.selected)
 	}
 }

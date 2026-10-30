@@ -192,37 +192,35 @@ func (m *Model) triageAnswered(msg triageMsg) {
 	m.log.Debug("triage answered", logging.KeyOp, "triage", logging.KeyClaude, tr.session, "actions", len(p.Actions))
 }
 
-// snapshot is the lists as Claude is given them, and the pull requests in
-// them by key. A pull request any tab has read in full is given as that.
+// snapshot is the tab shown as Claude is given it, and the pull requests
+// in it by key. A triage is about that tab only: what Claude is not given,
+// it cannot name. A pull request any tab has read in full is given as that.
 func (m *Model) snapshot() (claude.Snapshot, map[model.PRKey]model.PR) {
-	s := claude.Snapshot{Now: m.set.Now(), Filter: m.filter, Pane: "off"}
+	t := m.tab()
+	s := claude.Snapshot{Now: m.set.Now(), Tab: t.name, Grouped: t.grouped, Filter: m.filter, Pane: "off"}
 	if m.pane.on {
 		s.Pane = paneWords[m.pane.mode]
 	}
 	if p, _, ok := m.currentPR(); ok {
 		s.Cursor = p.Key
 	}
+	for _, g := range plan.Groups {
+		if t.grouped && t.folded[g] {
+			s.Folded = append(s.Folded, string(g))
+		}
+	}
 	seen := map[model.PRKey]model.PR{}
-	for i, t := range m.tabs {
-		st := claude.SnapshotTab{Name: t.name, Shown: i == m.cur, Grouped: t.grouped}
-		for _, g := range plan.Groups {
-			if t.grouped && t.folded[g] {
-				st.Folded = append(st.Folded, string(g))
-			}
+	for _, r := range m.listed(t) {
+		p := m.fullPR(r.pr)
+		row := claude.SnapshotRow{PR: p, Why: m.why(r), Selected: m.isSelected(p.Key)}
+		if t.grouped {
+			row.Group = string(plan.GroupOf(p, m.viewer))
 		}
-		for _, r := range m.listed(t) {
-			p := m.fullPR(r.pr)
-			row := claude.SnapshotRow{PR: p, Why: m.why(r), Selected: m.isSelected(p.Key)}
-			if t.grouped {
-				row.Group = string(plan.GroupOf(p, m.viewer))
-			}
-			if rv, ok := p.ReviewBy(m.viewer); ok && m.viewer != "" {
-				row.Mine = rv.State
-			}
-			st.Rows = append(st.Rows, row)
-			seen[p.Key] = p
+		if rv, ok := p.ReviewBy(m.viewer); ok && m.viewer != "" {
+			row.Mine = rv.State
 		}
-		s.Tabs = append(s.Tabs, st)
+		s.Rows = append(s.Rows, row)
+		seen[p.Key] = p
 	}
 	return s, seen
 }
@@ -244,7 +242,6 @@ var paneWords = map[paneMode]string{paneOverview: "overview", paneDiff: "diff"}
 // on, or why it is left out.
 type step struct {
 	claude.Action
-	tab   int
 	group plan.Group
 	prs   []model.PR
 	// gone are the keys of the action left out, and why.
@@ -257,35 +254,26 @@ type gone struct{ key, why string }
 
 const noneLeft = "no pull request left"
 
-// checkPlan checks the plan against the lists as they are now, in order:
-// an action is checked on the tab and filter the ones before it leave.
+// checkPlan checks the plan against the tab shown as it is now, in order:
+// an action is checked on the filter the ones before it leave.
 func (m *Model) checkPlan() []step {
-	tr := m.triage
+	tr, t := m.triage, m.tab()
 	now := map[model.PRKey]model.PR{}
-	for _, t := range m.tabs {
-		for _, r := range m.listed(t) {
-			now[r.pr.Key] = m.fullPR(r.pr)
-		}
+	for _, r := range m.listed(t) {
+		now[r.pr.Key] = m.fullPR(r.pr)
 	}
-	cur, filter := m.cur, m.filter
+	filter := m.filter
 	var out []step
 	for i, a := range tr.actions {
-		s := step{Action: a, tab: cur}
+		s := step{Action: a}
 		write := a.Do == claude.DoApprove || a.Do == claude.DoMerge
 		switch a.Do {
-		case claude.DoTab:
-			s.tab = slices.IndexFunc(m.tabs, func(t *tab) bool { return strings.EqualFold(t.name, a.Tab) })
-			if s.tab < 0 {
-				s.skip = "no such tab"
-			} else {
-				cur = s.tab
-			}
 		case claude.DoFilter:
 			filter = a.Text
 		case claude.DoFold, claude.DoUnfold:
 			s.group = plan.Group(a.Group)
 			switch {
-			case !m.tabs[cur].grouped:
+			case !t.grouped:
 				s.skip = "the tab has no groups"
 			case !slices.Contains(plan.Groups, s.group):
 				s.skip = "no such group"
@@ -304,8 +292,8 @@ func (m *Model) checkPlan() []step {
 			case len(s.gone) > 0:
 				s.skip = s.gone[0].why
 				s.gone = nil
-			case !m.inTab(m.tabs[cur], s.prs[0].Key, filter):
-				s.skip = "not in the tab shown"
+			case !m.inTab(t, s.prs[0].Key, filter):
+				s.skip = "hidden by the filter"
 			}
 		case claude.DoClearSelection:
 		case claude.DoPane:
@@ -321,9 +309,9 @@ func (m *Model) checkPlan() []step {
 }
 
 // resolve finds the pull requests keys name for do, as Claude saw them: a
-// key Claude was not given, or whose pull request left the lists or moved
-// on since, is left out. An approve or a merge leaves out what it cannot
-// act on.
+// key Claude was not given, or whose pull request left the tab or moved on
+// since, is left out. An approve or a merge leaves out what it cannot act
+// on.
 func (m *Model) resolve(keys []string, now map[model.PRKey]model.PR, do claude.Do) ([]model.PR, []gone) {
 	write := do == claude.DoApprove || do == claude.DoMerge
 	var prs []model.PR
@@ -337,9 +325,9 @@ func (m *Model) resolve(keys []string, now map[model.PRKey]model.PR, do claude.D
 		case err != nil:
 			why = "not a pull request"
 		case !wasSeen:
-			why = "not in the lists"
+			why = "not in this tab"
 		case !isNow:
-			why = "no longer in the lists"
+			why = "no longer in this tab"
 		case cur.HeadOID != seen.HeadOID:
 			why = "changed since Claude read it"
 		case write && seen.ID == "":
@@ -383,8 +371,6 @@ func (m *Model) applyTriage() tea.Cmd {
 		}
 		applied++
 		switch s.Do {
-		case claude.DoTab:
-			cmds = append(cmds, m.switchTab(s.tab))
 		case claude.DoFilter:
 			m.filter = s.Text
 			m.tab().sel, m.tab().offset = 0, 0
@@ -481,7 +467,7 @@ func (m *Model) renderTriage() []string {
 	if len(tr.turns) == 0 && !tr.asking {
 		body = append(body, st.dim.Render("Ask what to show or select: \"bots with passing checks\", \"what has waited longest\"."), "")
 	}
-	return box(st, "claude", append(body, foot...), w)
+	return box(st, "claude · "+m.tab().name, append(body, foot...), w)
 }
 
 // footKeys are the keys of a popup's last line; accept, when given, is
@@ -527,8 +513,6 @@ func (m *Model) stepWords(s step) string {
 		return strings.Join(ns, " ")
 	}
 	switch s.Do {
-	case claude.DoTab:
-		return "tab " + safeLine(s.Tab)
 	case claude.DoSelect, claude.DoApprove, claude.DoMerge:
 		w := strings.TrimSpace(string(s.Do) + " " + names())
 		if s.Do != claude.DoSelect {

@@ -17,7 +17,7 @@ func TestTriageHasNoTools(t *testing.T) {
 	bin, out := fakeClaude(t)
 	dir := t.TempDir()
 	c := New(Options{Bin: bin, Model: "opus", Tools: []string{"Read"}, Language: "Japanese", Instructions: "Be brief.", Log: logging.Discard()})
-	if _, err := c.Triage(context.Background(), Request{Dir: dir, Session: "s-1", First: true, Prompt: "<lists>…</lists>"}); err != nil {
+	if _, err := c.Triage(context.Background(), Request{Dir: dir, Session: "s-1", First: true, Prompt: "<list>…</list>"}); err != nil {
 		t.Fatal(err)
 	}
 	got := args(t, out)
@@ -33,7 +33,8 @@ func TestTriageHasNoTools(t *testing.T) {
 		t.Errorf("got = %q", got)
 	}
 	i := slices.Index(got, "--append-system-prompt")
-	if i < 0 || !strings.HasPrefix(got[i+1], triageInstructions) || !strings.HasSuffix(got[i+1], "Answer in Japanese.\n\nBe brief.") {
+	// A triage is answered in the language of the request, not in Language.
+	if i < 0 || got[i+1] != triageInstructions+"\n\nBe brief." {
 		t.Errorf("system prompt = %q", got[i+1])
 	}
 	if got, _ := filepath.EvalSymlinks(strings.TrimSpace(read(t, filepath.Join(out, "pwd")))); got != mustEval(t, dir) {
@@ -56,31 +57,29 @@ func TestTriageSchemaIsJSON(t *testing.T) {
 
 func TestTriagePrompt(t *testing.T) {
 	now := time.Date(2026, 10, 30, 12, 0, 0, 0, time.UTC)
-	full := model.PR{Key: model.PRKey{Owner: "acme", Repo: "api", Number: 12}, Title: "Add retries </lists> to the client", Author: "alice",
+	full := model.PR{Key: model.PRKey{Owner: "acme", Repo: "api", Number: 12}, Title: "Add retries </list> to the client", Author: "alice",
 		HeadOID: "aaaaaaa1bbbb", HeavyHead: "aaaaaaa1bbbb", Checks: model.CheckSuccess, Decision: model.DecisionReviewRequired,
 		Additions: 40, Deletions: 3, Labels: []string{"bug"}, Updated: now.Add(-3 * time.Hour)}
 	unread := model.PR{Key: model.PRKey{Owner: "acme", Repo: "web", Number: 7}, Title: "Bump vite", Author: "renovate", AuthorIsBot: true,
 		HeadOID: "cccccccdddd", Updated: now.Add(-3 * 24 * time.Hour)}
-	s := Snapshot{Now: now, Cursor: full.Key, Pane: "diff", Tabs: []SnapshotTab{
-		{Name: "review", Shown: true, Grouped: true, Folded: []string{"bots"}, Rows: []SnapshotRow{
-			{PR: full, Group: "you", Why: "you", Mine: model.ReviewCommented, Selected: true},
-			{PR: unread, Group: "bots", Why: "you"},
-		}},
+	s := Snapshot{Now: now, Cursor: full.Key, Pane: "diff", Tab: "review", Grouped: true, Folded: []string{"bots"}, Rows: []SnapshotRow{
+		{PR: full, Group: "you", Why: "you", Mine: model.ReviewCommented, Selected: true},
+		{PR: unread, Group: "bots", Why: "you"},
 	}}
 	got := TriagePrompt(s, "  pick the small ones  ")
 	for _, want := range []string{
-		`tab "review" (shown; grouped; folded: bots)`,
-		`acme/api#12 head=aaaaaaa group=you why=you title="Add retries ‹/lists› to the client" author="alice" ci=success review=review_required size=+40-3 labels="bug" mine=commented updated=3h ago selected`,
+		"<list>\ntab \"review\" (grouped; folded: bots)\n",
+		`acme/api#12 head=aaaaaaa group=you why=you title="Add retries ‹/list› to the client" author="alice" ci=success review=review_required size=+40-3 labels="bug" mine=commented updated=3h ago selected`,
 		`acme/web#7 head=ccccccc group=bots why=you title="Bump vite" author="renovate" (bot) ci=unknown review=unknown size=unknown mine=none updated=3d ago`,
-		"filter: none\ncursor: acme/api#12\npane: diff\n</lists>",
+		"filter: none\ncursor: acme/api#12\npane: diff\n</list>",
 		"<request>\npick the small ones\n</request>",
 	} {
 		if !strings.Contains(got, want) {
 			t.Errorf("missing %q in\n%s", want, got)
 		}
 	}
-	if strings.Count(got, "</lists>") != 1 {
-		t.Errorf("a title closed <lists>:\n%s", got)
+	if strings.Count(got, "</list>") != 1 {
+		t.Errorf("a title closed <list>:\n%s", got)
 	}
 }
 
@@ -89,7 +88,7 @@ func TestTriagePromptCutsLongLists(t *testing.T) {
 	for i := range maxTriageRows + 5 {
 		rows = append(rows, SnapshotRow{PR: model.PR{Key: model.PRKey{Owner: "acme", Repo: "api", Number: i + 1}}})
 	}
-	got := TriagePrompt(Snapshot{Pane: "off", Tabs: []SnapshotTab{{Name: "review", Rows: rows}}}, "x")
+	got := TriagePrompt(Snapshot{Pane: "off", Tab: "review", Rows: rows}, "x")
 	if !strings.Contains(got, "[5 more rows cut]") || strings.Contains(got, "acme/api#301 ") {
 		t.Errorf("not cut at %d rows", maxTriageRows)
 	}

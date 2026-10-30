@@ -401,9 +401,9 @@ func Template(keys string) string {
 [claude]
 # C asks Claude Code (claude -p, with the account you are signed in with).
 # On a pull request's screen, it reviews that pull request in a worktree of
-# its head. On the list, it plans what to show and select from the lists,
-# with no tools; enter applies the plan, and an approve or a merge in it
-# opens the confirm popup. Claude only reads: no settings files or MCP
+# its head. On the list, it plans what to show and select in the tab shown,
+# with no tools, and answers in the language you ask in; enter applies the
+# plan, and an approve or a merge in it opens the confirm popup. Claude only reads: no settings files or MCP
 # servers are loaded, its file tools see only the worktree, and it has none
 # that run commands.
 # model = "opus"
@@ -413,8 +413,9 @@ func Template(keys string) string {
 # cache_dir = "~/.cache/gh-triage"
 # The tools Claude may use, among "Read", "Grep", "Glob" and "WebFetch".
 # allowed_tools = ["Read", "Grep", "Glob"]
-# The language Claude answers in, such as "Japanese". A review drafted with
-# D is written in the language of the pull request instead.
+# The language Claude answers in about a pull request, such as "Japanese".
+# A review drafted with D is written in the language of the pull request
+# instead.
 # language = "English"
 # Appended to the instructions of every review and triage, such as
 # "Point out changes that have no tests."
