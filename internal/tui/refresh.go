@@ -1,0 +1,94 @@
+package tui
+
+import (
+	"fmt"
+	"time"
+
+	tea "charm.land/bubbletea/v2"
+
+	"github.com/babarot/gh-triage/internal/model"
+)
+
+type tickMsg struct{}
+
+// tick asks for the next automatic refresh.
+func (m *Model) tick() tea.Cmd {
+	if m.set.Refresh <= 0 {
+		return nil
+	}
+	return tea.Tick(m.set.Refresh, func(time.Time) tea.Msg { return tickMsg{} })
+}
+
+// autoRefresh reads the shown tab and the notifications again. It leaves
+// the results on the rows; while a popup is open it waits for the next
+// tick, so what is being confirmed does not change under the user.
+func (m *Model) autoRefresh() tea.Cmd {
+	if m.bulk != nil || m.confirm != nil || m.notesAt != nil || m.view != viewList || m.viewer == "" {
+		return m.tick()
+	}
+	return tea.Batch(m.reload(), m.tick())
+}
+
+// refresh is R: read the shown tab and the notifications again, and put
+// away the results on the rows.
+func (m *Model) refresh() tea.Cmd {
+	n := m.clearResults()
+	if n > 0 {
+		m.setStatus(fmt.Sprintf("refreshing · %d results cleared", n), false)
+	} else {
+		m.setStatus("refreshing", false)
+	}
+	return m.reload()
+}
+
+// reload reads the shown tab again, keeping the cursor on the pull
+// request it is on, and the notifications.
+func (m *Model) reload() tea.Cmd {
+	t := m.tab()
+	t.keep = model.PRKey{}
+	if r, ok := m.current(); ok && r.kind == rowPR {
+		t.keep = r.pr.Key
+	}
+	cmds := []tea.Cmd{m.loadTab(m.cur)}
+	if !t.inbox {
+		cmds = append(cmds, m.loadTab(len(m.tabs)-1))
+	}
+	return tea.Batch(cmds...)
+}
+
+// restoreCursor puts the cursor back on the pull request it was on before
+// a reading, or on the row it was at when that one is gone.
+func (m *Model) restoreCursor(t *tab) {
+	if t.keep == (model.PRKey{}) {
+		m.toFirstPR(t)
+		return
+	}
+	for i, r := range m.rows(t) {
+		if r.kind == rowPR && r.pr.Key == t.keep {
+			t.sel = i
+			return
+		}
+	}
+}
+
+// dropGone unselects the pull requests a finished reading no longer has,
+// and says so.
+func (m *Model) dropGone(t *tab) tea.Cmd {
+	in := map[model.PRKey]bool{}
+	for _, tt := range m.tabs {
+		for _, p := range m.allOf(tt) {
+			in[p.Key] = true
+		}
+	}
+	var gone []noteItem
+	for k := range m.selected {
+		if !in[k] {
+			delete(m.selected, k)
+			gone = append(gone, noteItem{key: k, text: "left the list (merged or closed elsewhere)"})
+		}
+	}
+	if len(gone) == 0 {
+		return nil
+	}
+	return m.pushNote("✗", fmt.Sprintf("%d selected pull requests left the list", len(gone)), gone)
+}

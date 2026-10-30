@@ -12,6 +12,7 @@ import (
 
 	"github.com/babarot/gh-triage/internal/keymap"
 	"github.com/babarot/gh-triage/internal/model"
+	"github.com/babarot/gh-triage/internal/runner"
 )
 
 // kinds are the kinds of review, in the order the writing screen cycles
@@ -65,16 +66,10 @@ func (m *Model) busy() bool {
 	return true
 }
 
-func (m *Model) askApprove(p model.PR) tea.Cmd {
-	if m.busy() {
-		return nil
-	}
-	if m.own(p) {
-		m.setStatus("you cannot approve your own pull request", true)
-		return nil
-	}
-	m.confirm = &confirm{pr: p, event: model.EventApprove}
-	return nil
+// askApprove opens the approve popup for the pull request under the
+// cursor or on screen; an approve goes through the runner, like many.
+func (m *Model) askApprove(model.PR) tea.Cmd {
+	return m.startBulk(runner.Approve)
 }
 
 func (m *Model) startCompose(p model.PR, event model.ReviewEvent) tea.Cmd {

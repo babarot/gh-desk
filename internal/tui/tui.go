@@ -13,6 +13,8 @@ import (
 	"github.com/babarot/gh-triage/internal/keymap"
 	"github.com/babarot/gh-triage/internal/logging"
 	"github.com/babarot/gh-triage/internal/model"
+	"github.com/babarot/gh-triage/internal/plan"
+	"github.com/babarot/gh-triage/internal/runner"
 )
 
 // Source is what the TUI needs from GitHub. The app package passes the
@@ -33,6 +35,14 @@ type Source interface {
 	Review(ctx context.Context, pr model.PR, event model.ReviewEvent, body string) error
 	MarkDone(ctx context.Context, n model.Notification) error
 	Browse(url string) error
+	// MergeInfo reads what deciding a merge needs, by node ID; with
+	// details, each check (and whether it is required) and the files.
+	MergeInfo(ctx context.Context, ids []string, details bool) (map[string]model.MergeInfo, error)
+}
+
+// Runner approves and merges batches of pull requests.
+type Runner interface {
+	Start(ctx context.Context, kind runner.Kind, items []runner.Item) (string, <-chan runner.Event)
 }
 
 // Section is a tab of pull requests found by a search.
@@ -61,6 +71,10 @@ type Settings struct {
 	// Editor is the command ctrl+e runs to edit a review, as $EDITOR
 	// gives it; empty turns it off.
 	Editor string
+	// Plan is what deciding a merge takes from the config file.
+	Plan plan.Settings
+	// Refresh is how often the shown tab is read again; zero turns it off.
+	Refresh time.Duration
 	// Now is the clock, for tests; nil is time.Now.
 	Now func() time.Time
 }
@@ -76,6 +90,7 @@ const (
 // Model is the TUI's state.
 type Model struct {
 	src  Source
+	run  Runner
 	keys keymap.Map
 	log  *slog.Logger
 	set  Settings
@@ -101,20 +116,36 @@ type Model struct {
 	// sending is the review on its way to GitHub; no other is sent until
 	// it is back.
 	sending *model.PRKey
-	prv     prView
-	compose *compose
-	confirm *confirm
+
+	selected map[model.PRKey]bool
+	bulk     *bulk
+	// progress is each pull request's step or result in a batch, shown on
+	// its row until R.
+	progress map[model.PRKey]progress
+	batches  map[string]*batchState
+	notes    []*note
+	notesAt  *notesView
+	toast    *note
+	merged   map[model.PRKey]bool
+	// refreshing is the reading started by R or the clock, and refreshed
+	// when each tab was last read.
+	refreshed map[int]time.Time
+	prv       prView
+	compose   *compose
+	confirm   *confirm
 }
 
-// New returns the TUI reading from src.
-func New(src Source, km keymap.Map, log *slog.Logger, set Settings) *Model {
+// New returns the TUI reading from src and acting through run.
+func New(src Source, run Runner, km keymap.Map, log *slog.Logger, set Settings) *Model {
 	if set.Now == nil {
 		set.Now = time.Now
 	}
 	if log == nil {
 		log = logging.Discard()
 	}
-	m := &Model{src: src, keys: km, log: log, set: set, ctx: context.Background(), unread: map[model.PRKey]model.Notification{}}
+	m := &Model{src: src, run: run, keys: km, log: log, set: set, ctx: context.Background(), unread: map[model.PRKey]model.Notification{},
+		selected: map[model.PRKey]bool{}, progress: map[model.PRKey]progress{}, batches: map[string]*batchState{},
+		merged: map[model.PRKey]bool{}, refreshed: map[int]time.Time{}}
 	m.st = newStyles(mocha)
 	if set.Theme == "latte" {
 		m.st = newStyles(latte)
@@ -128,15 +159,17 @@ func New(src Source, km keymap.Map, log *slog.Logger, set Settings) *Model {
 	return m
 }
 
-// Run shows the TUI until it quits.
-func Run(src Source, km keymap.Map, log *slog.Logger, set Settings) error {
-	_, err := tea.NewProgram(New(src, km, log, set)).Run()
+// Run shows the TUI until it quits. Quitting stops every batch.
+func Run(ctx context.Context, src Source, run Runner, km keymap.Map, log *slog.Logger, set Settings) error {
+	m := New(src, run, km, log, set)
+	m.ctx = ctx
+	_, err := tea.NewProgram(m, tea.WithContext(ctx)).Run()
 	return err
 }
 
 // Init asks for the terminal's background, the viewer, and every tab.
 func (m *Model) Init() tea.Cmd {
-	cmds := []tea.Cmd{m.loadViewer()}
+	cmds := []tea.Cmd{m.loadViewer(), m.tick()}
 	if m.set.Theme == "auto" {
 		cmds = append(cmds, tea.RequestBackgroundColor)
 	}
@@ -159,6 +192,15 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case tea.KeyPressMsg:
 		return m, m.key(msg)
+	case tickMsg:
+		return m, m.autoRefresh()
+	case eventMsg:
+		return m, m.event(msg)
+	case toastMsg:
+		if m.toast == msg.n {
+			m.toast = nil
+		}
+		return m, nil
 	case tea.PasteMsg:
 		return m, m.paste(msg)
 	}
@@ -173,6 +215,10 @@ func (m *Model) key(msg tea.KeyPressMsg) tea.Cmd {
 		return tea.Quit
 	}
 	switch {
+	case m.bulk != nil:
+		return m.bulkKey(k)
+	case m.notesAt != nil:
+		return m.notesKey(k)
 	case m.confirm != nil:
 		return m.confirmKey(k)
 	case m.help:

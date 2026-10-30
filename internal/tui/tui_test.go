@@ -15,6 +15,8 @@ import (
 
 	"github.com/babarot/gh-triage/internal/keymap"
 	"github.com/babarot/gh-triage/internal/model"
+	"github.com/babarot/gh-triage/internal/plan"
+	"github.com/babarot/gh-triage/internal/runner"
 )
 
 var update = flag.Bool("update", false, "rewrite the golden files")
@@ -80,6 +82,56 @@ type fakeSource struct {
 
 	reviews []string
 	done    []string
+	// info overrides what MergeInfo says of a pull request, by key.
+	info map[model.PRKey]func(*model.MergeInfo)
+}
+
+func (f *fakeSource) MergeInfo(_ context.Context, ids []string, _ bool) (map[string]model.MergeInfo, error) {
+	out := map[string]model.MergeInfo{}
+	for _, prs := range f.searches {
+		for _, p := range prs {
+			for _, id := range ids {
+				if p.ID != id {
+					continue
+				}
+				mi := model.MergeInfo{Key: p.Key, ID: p.ID, State: model.StateOpen, HeadOID: p.HeadOID, MergeState: model.MergeClean,
+					Rollup: p.Checks, Checks: []model.Check{}, Files: []string{}, Reviews: p.Reviews,
+					Repo: model.RepoMerge{Methods: []model.MergeMethod{model.MethodMerge}}}
+				if fn := f.info[p.Key]; fn != nil {
+					fn(&mi)
+				}
+				out[id] = mi
+			}
+		}
+	}
+	return out, nil
+}
+
+// fakeRunner records the batches it is given and ends each pull request
+// with the result results says, Approved or Merged by default.
+type fakeRunner struct {
+	kinds   []runner.Kind
+	items   [][]runner.Item
+	results map[model.PRKey]runner.Event
+}
+
+func (r *fakeRunner) Start(_ context.Context, kind runner.Kind, items []runner.Item) (string, <-chan runner.Event) {
+	r.kinds = append(r.kinds, kind)
+	r.items = append(r.items, items)
+	ch := make(chan runner.Event, len(items))
+	for _, it := range items {
+		ev, ok := r.results[it.PR.Key]
+		if !ok {
+			ev = runner.Event{Result: runner.Merged, Text: "merged merge"}
+			if kind == runner.Approve {
+				ev = runner.Event{Result: runner.Approved, Text: "approved", Approved: true}
+			}
+		}
+		ev.Key = it.PR.Key
+		ch <- ev
+	}
+	close(ch)
+	return fmt.Sprintf("b%d", len(r.kinds)), ch
 }
 
 func (f *fakeSource) Viewer(context.Context) (string, error) { return "me", nil }
@@ -139,6 +191,11 @@ func (f *fakeSource) Browse(string) error { return nil }
 
 // start makes the TUI over f, sized, with every tab read.
 func start(t *testing.T, f *fakeSource, km keymap.Map) *Model {
+	m, _ := startWith(t, f, km)
+	return m
+}
+
+func startWith(t *testing.T, f *fakeSource, km keymap.Map) (*Model, *fakeRunner) {
 	t.Helper()
 	set := Settings{
 		Sections: []Section{
@@ -148,11 +205,14 @@ func start(t *testing.T, f *fakeSource, km keymap.Map) *Model {
 		},
 		InboxLimit: 100, HideClosed: true, DoneAfterReview: true, HomeOwners: []string{"acme"}, StaleDays: 30,
 		PreviewHeight: 10, Collapse: []string{"go.sum"}, Theme: "mocha", Now: func() time.Time { return now },
+		Plan: plan.Settings{Methods: []model.MergeMethod{model.MethodMerge}, AutoMerge: true, UpdateBranch: "humans",
+			AttentionPaths: []string{".github/workflows/*"}},
 	}
-	m := New(f, km, nil, set)
+	r := &fakeRunner{results: map[model.PRKey]runner.Event{}}
+	m := New(f, r, km, nil, set)
 	m.Update(tea.WindowSizeMsg{Width: 130, Height: 34})
 	run(m, m.Init())
-	return m
+	return m, r
 }
 
 // run carries out cmd and every command its messages lead to, at once.
@@ -166,7 +226,7 @@ func run(m *Model, cmd tea.Cmd) {
 		}
 		msg := c()
 		switch msg := msg.(type) {
-		case nil:
+		case nil, tickMsg, toastMsg:
 		case tea.BatchMsg:
 			queue = append(queue, msg...)
 		case tea.QuitMsg:
@@ -265,18 +325,18 @@ func TestInbox(t *testing.T) {
 
 func TestApprove(t *testing.T) {
 	f := fixture()
-	m := start(t, f, keymap.Default())
+	m, r := startWith(t, f, keymap.Default())
 	press(m, "A")
-	if !strings.Contains(screen(m), "send approve?") {
+	if !strings.Contains(screen(m), "approve this pull request?") {
 		t.Fatalf("no confirm popup:\n%s", screen(m))
 	}
 	press(m, "esc")
-	if len(f.reviews) != 0 {
-		t.Fatal("esc sent the review")
+	if len(r.items) != 0 {
+		t.Fatal("esc started the approve")
 	}
 	press(m, "A", "y")
-	if len(f.reviews) != 1 || f.reviews[0] != "acme/api#12 APPROVE aaaaaaa1 " {
-		t.Errorf("reviews = %q", f.reviews)
+	if len(r.items) != 1 || r.kinds[0] != runner.Approve || r.items[0][0].Head != "aaaaaaa1" {
+		t.Errorf("batches = %+v", r.items)
 	}
 	if len(f.done) != 1 || f.done[0] != "acme/api#12" {
 		t.Errorf("notification not marked done: %v", f.done)
@@ -307,7 +367,7 @@ func TestOwnPullRequest(t *testing.T) {
 	f := fixture()
 	m := start(t, f, keymap.Default())
 	press(m, "2", "A")
-	if m.confirm != nil || !strings.Contains(m.status, "cannot approve your own") {
+	if m.bulk != nil || !strings.Contains(m.status, "cannot approve your own") {
 		t.Errorf("approve of own PR not refused: %q", m.status)
 	}
 }
@@ -320,11 +380,11 @@ func TestReboundKeys(t *testing.T) {
 	f := fixture()
 	m := start(t, f, km)
 	press(m, "A")
-	if m.confirm != nil {
+	if m.bulk != nil {
 		t.Error("A still approves after approve was rebound to a")
 	}
 	press(m, "a")
-	if m.confirm == nil {
+	if m.bulk == nil {
 		t.Error("a does not approve")
 	}
 }
@@ -408,4 +468,70 @@ func TestCursorRowBackground(t *testing.T) {
 		return
 	}
 	t.Fatal("cursor row not found")
+}
+
+func TestBulkMerge(t *testing.T) {
+	f := fixture()
+	f.info = map[model.PRKey]func(*model.MergeInfo){
+		key("acme", "api", 30): func(mi *model.MergeInfo) { mi.MergeState = model.MergeDirty },
+	}
+	m, r := startWith(t, f, keymap.Default())
+	press(m, "b", "space", "j", "j", "space")
+	if len(m.selected) != 2 {
+		t.Fatalf("selected = %v", m.selected)
+	}
+	press(m, "M")
+	golden(t, "bulk-merge", screen(m))
+	press(m, "y")
+	if len(r.items) != 1 || len(r.items[0]) != 1 || r.items[0][0].PR.Key != key("acme", "api", 12) {
+		t.Fatalf("batches = %+v", r.items)
+	}
+	if len(m.selected) != 0 {
+		t.Errorf("selection left after merge: %v", m.selected)
+	}
+	golden(t, "bulk-progress", screen(m))
+	if m.unseen() != 1 || !strings.Contains(m.notes[0].title, "merged 1, 1 skipped") {
+		t.Errorf("notes = %+v", m.notes)
+	}
+	press(m, "R")
+	if len(m.progress) != 0 || len(m.rows(m.tab())) == 0 {
+		t.Errorf("R did not clear the results: %v", m.progress)
+	}
+	for _, p := range m.tab().prs {
+		if p.Key == key("acme", "api", 12) && m.merged[p.Key] {
+			t.Error("the merged pull request is still listed")
+		}
+	}
+}
+
+func TestHeadMovedIsNotSent(t *testing.T) {
+	f := fixture()
+	f.info = map[model.PRKey]func(*model.MergeInfo){
+		key("acme", "api", 12): func(mi *model.MergeInfo) { mi.HeadOID = "pushed-later" },
+	}
+	m, r := startWith(t, f, keymap.Default())
+	press(m, "M")
+	if !strings.Contains(screen(m), "changed since it was read") {
+		t.Errorf("popup does not say the head moved:\n%s", screen(m))
+	}
+	press(m, "y")
+	if len(r.items) != 0 {
+		t.Errorf("a moved head was sent: %+v", r.items)
+	}
+}
+
+func TestNotificationsJump(t *testing.T) {
+	m, r := startWith(t, fixture(), keymap.Default())
+	r.results[key("acme", "api", 12)] = runner.Event{Result: runner.Stopped, Text: "blocked by another rule"}
+	press(m, "M", "y", "2", "n")
+	if !strings.Contains(screen(m), "blocked by another rule") {
+		t.Fatalf("notification lacks the result:\n%s", screen(m))
+	}
+	press(m, "j", "enter")
+	if m.cur != 0 || m.notesAt != nil {
+		t.Errorf("did not jump: tab %d", m.cur)
+	}
+	if r, ok := m.current(); !ok || r.pr.Key != key("acme", "api", 12) {
+		t.Errorf("cursor on %+v", r.pr.Key)
+	}
 }

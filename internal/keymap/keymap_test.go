@@ -99,7 +99,7 @@ func TestMatches(t *testing.T) {
 	if !m.Matches("approve", "A") || m.Matches("approve", "a") {
 		t.Error("approve should match A only")
 	}
-	if got := m.Actions(ScopePopup); !slices.Equal(got, []Action{"confirm", "include_failing"}) {
+	if got := m.Actions(ScopePopup); !slices.Equal(got, []Action{"confirm", "jump", "include_failing"}) {
 		t.Errorf("Actions(popup) = %v", got)
 	}
 }

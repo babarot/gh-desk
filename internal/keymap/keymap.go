@@ -94,6 +94,7 @@ var Defaults = []Def{
 	{"pr_browse", ScopePR, []string{"o"}, "browser"},
 
 	{"confirm", ScopePopup, []string{"y"}, "yes"},
+	{"jump", ScopePopup, []string{"enter"}, "go to the pull request"},
 	{"include_failing", ScopePopup, []string{"f"}, "include failing"},
 
 	{"ask_more", ScopeChat, []string{"i"}, "ask more"},

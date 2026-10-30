@@ -8,6 +8,7 @@ import (
 
 	"github.com/babarot/gh-triage/internal/keymap"
 	"github.com/babarot/gh-triage/internal/model"
+	"github.com/babarot/gh-triage/internal/runner"
 )
 
 // prTabs are the PR screen's tabs.
@@ -52,6 +53,8 @@ func (m *Model) prKey(k string) tea.Cmd {
 	case !ok:
 	case is("pr_approve"):
 		return m.askApprove(p)
+	case is("pr_merge"):
+		return m.startBulk(runner.Merge)
 	case is("pr_comment"):
 		return m.startCompose(p, model.EventComment)
 	case is("pr_request_changes"):

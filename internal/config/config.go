@@ -105,7 +105,7 @@ type Bulk struct {
 
 // Merge values.
 var (
-	MergeMethods  = []string{"merge", "squash", "rebase"}
+	MergeMethods       = []string{"merge", "squash", "rebase"}
 	UpdateBranchValues = []string{"humans", "all", "never"}
 )
 

@@ -12,6 +12,7 @@ import (
 	"github.com/babarot/gh-triage/internal/keymap"
 	"github.com/babarot/gh-triage/internal/model"
 	"github.com/babarot/gh-triage/internal/plan"
+	"github.com/babarot/gh-triage/internal/runner"
 )
 
 // listKey handles a key on the list.
@@ -34,11 +35,15 @@ func (m *Model) listKey(k string) tea.Cmd {
 	case is("quit"):
 		return tea.Quit
 	case k == keymap.Back:
-		if m.filter != "" {
+		switch {
+		case len(m.selected) > 0:
+			clear(m.selected)
+		case m.filter != "":
 			m.filter = ""
-			return nil
+		default:
+			return tea.Quit
 		}
-		return tea.Quit
+		return nil
 	case is("down"):
 		return move(t.sel + 1)
 	case is("up"):
@@ -65,7 +70,24 @@ func (m *Model) listKey(k string) tea.Cmd {
 	case is("filter"):
 		m.filtering, m.filter = true, ""
 	case is("refresh"):
-		return m.loadTab(m.cur)
+		return m.refresh()
+	case is("notifications"):
+		m.openNotes()
+		return nil
+	case is("select_shown"):
+		for _, r := range rs {
+			if r.kind == rowPR {
+				m.selected[r.pr.Key] = true
+			}
+		}
+		return nil
+	case is("clear_selection"):
+		clear(m.selected)
+		return nil
+	case is("approve") && len(m.selected) > 0:
+		return m.startBulk(runner.Approve)
+	case is("merge"):
+		return m.startBulk(runner.Merge)
 	case is("toggle_bots"):
 		if t.grouped {
 			t.folded[plan.GroupBots] = !t.folded[plan.GroupBots]
@@ -98,13 +120,41 @@ func (m *Model) listKey(k string) tea.Cmd {
 		return nil
 	}
 	if r.kind == rowGroup {
-		if is("open") || is("select") {
+		switch {
+		case is("open"):
 			t.folded[r.group] = !t.folded[r.group]
+		case is("select"):
+			// A group's header selects every pull request in it, or clears
+			// them when all are selected.
+			var in []model.PRKey
+			for _, p := range t.prs {
+				if !t.hidden[p.Key] && m.matches(p) && plan.GroupOf(p, m.viewer) == r.group {
+					in = append(in, p.Key)
+				}
+			}
+			all := len(in) > 0
+			for _, k := range in {
+				all = all && m.selected[k]
+			}
+			for _, k := range in {
+				if all {
+					delete(m.selected, k)
+				} else {
+					m.selected[k] = true
+				}
+			}
 		}
 		return nil
 	}
 	p := r.pr
 	switch {
+	case is("select"):
+		if m.selected[p.Key] {
+			delete(m.selected, p.Key)
+		} else {
+			m.selected[p.Key] = true
+		}
+		return move(t.sel + 1)
 	case is("open"):
 		return m.openPR(p)
 	case is("approve"):
@@ -312,7 +362,23 @@ func (m *Model) renderRow(r row, cols []column, sel bool) string {
 		return line
 	}
 	var cells []string
-	for _, c := range cols {
+	prog, running := m.progress[r.pr.Key]
+	over := progressOver(cols)
+	for i := 0; i < len(cols); i++ {
+		c := cols[i]
+		if running && over[c.id] {
+			// The progress takes the cells of WHY and SIZE (or REVIEW and
+			// SIZE), so no column changes width.
+			w := 0
+			n := 0
+			for ; i+n < len(cols) && over[cols[i+n].id]; n++ {
+				w += cols[i+n].width
+			}
+			w += 2 * (n - 1)
+			i += n - 1
+			cells = append(cells, fit(m.progressText(prog), w))
+			continue
+		}
 		s := m.cell(c.id, r, sel)
 		if c.right {
 			s = spaces(c.width-lipgloss.Width(s)) + s
@@ -320,10 +386,27 @@ func (m *Model) renderRow(r row, cols []column, sel bool) string {
 		cells = append(cells, fit(s, c.width))
 	}
 	line := strings.Join(cells, "  ")
-	if sel {
+	picked := m.selected[r.pr.Key]
+	switch {
+	case sel && picked:
+		return onBackground(line, m.st.pickedSel, m.width)
+	case picked:
+		return onBackground(line, m.st.picked, m.width)
+	case sel:
 		return onBackground(line, m.st.sel, m.width)
 	}
 	return line
+}
+
+// progressOver are the columns a row's progress is written over: WHY and
+// SIZE, or REVIEW and SIZE where there is no WHY.
+func progressOver(cols []column) map[string]bool {
+	for _, c := range cols {
+		if c.id == "why" {
+			return map[string]bool{"why": true, "size": true}
+		}
+	}
+	return map[string]bool{"review": true, "size": true}
 }
 
 var groupLabel = map[plan.Group]string{
@@ -340,7 +423,10 @@ func (m *Model) cell(id string, r row, sel bool) string {
 		if sel {
 			cursor = st.blue.Render("▎")
 		}
-		if _, ok := m.unread[p.Key]; ok {
+		switch {
+		case m.selected[p.Key]:
+			mark = st.mauve.Render("✓")
+		case func() bool { _, ok := m.unread[p.Key]; return ok }():
 			mark = st.blue.Render("●")
 		}
 		repo := p.Key.Repository()
@@ -353,6 +439,9 @@ func (m *Model) cell(id string, r row, sel bool) string {
 		}
 		return cursor + " " + mark + " " + name.Render(repo) + num.Render(fmt.Sprintf("#%d", p.Key.Number))
 	case "title":
+		if m.merged[p.Key] {
+			return st.dim.Render(p.Title)
+		}
 		switch {
 		case p.State == model.StateMerged || p.State == model.StateClosed:
 			return st.dim.Render(p.Title) + " " + st.dim.Render(strings.ToLower(string(p.State)))
@@ -366,6 +455,10 @@ func (m *Model) cell(id string, r row, sel bool) string {
 		}
 		return st.sub0.Render(p.Author)
 	case "ci":
+		if mi, ok := m.cache.info[p.Key]; ok && (p.Checks == model.CheckPending || p.Checks == model.CheckExpected) &&
+			plan.AwaitingApproval(mi.Checks, m.set.Plan.ApprovalChecks) {
+			return st.muted.Render("◌")
+		}
 		return m.ciMark(p.Checks)
 	case "review":
 		s := m.decisionMark(p.Decision)

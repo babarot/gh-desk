@@ -55,10 +55,20 @@ func (m *Model) render() string {
 	b.WriteString(fit(m.hints(), m.width))
 	lines := strings.Split(b.String(), "\n")
 	switch {
+	case m.bulk != nil:
+		lines = overlay(lines, m.renderBulk(), 2, m.width)
+	case m.notesAt != nil:
+		lines = overlay(lines, m.renderNotes(), 2, m.width)
 	case m.confirm != nil:
 		lines = overlay(lines, m.renderConfirm(), 2, m.width)
 	case m.help:
 		lines = overlay(lines, m.renderHelp(), 1, m.width)
+	case m.toast != nil && len(lines) > 3:
+		toast := m.st.border.Render("╭ ") + m.noteIcon(m.toast.icon) + " " + m.st.sub1.Render(m.toast.title) + " " +
+			m.st.dim.Render("· "+m.firstKey("notifications")+" to see") + m.st.border.Render(" ╮")
+		at := len(lines) - 3
+		pad := max(m.width-lipgloss.Width(toast)-1, 0)
+		lines[at] = spaces(pad) + toast
 	}
 	if len(lines) > m.height {
 		lines = lines[:m.height]
@@ -110,6 +120,19 @@ func (m *Model) renderHeader() string {
 func (m *Model) headerRight() string {
 	t, st := m.tab(), m.st
 	var parts []string
+	if n := m.unseen(); n > 0 {
+		parts = append(parts, st.mauve.Render(fmt.Sprintf("✦%d", n))+" "+st.dim.Render(m.firstKey("notifications")))
+	}
+	if s := m.tally(); s != "" {
+		parts = append(parts, s)
+	}
+	if n := len(m.selected); n > 0 {
+		parts = append(parts, st.mauve.Render(fmt.Sprintf("%d selected", n)))
+	}
+	// Results on the rows take the place of the tab's counts.
+	if len(m.progress) > 0 {
+		return st.sub0.Render(strings.Join(parts, " · "))
+	}
 	if t.grouped && t.loaded {
 		n := map[plan.Group]int{}
 		for _, p := range t.prs {
@@ -133,6 +156,8 @@ var ready = map[keymap.Action]bool{
 	"up": true, "down": true, "top": true, "bottom": true, "page_up": true, "page_down": true,
 	"next_tab": true, "prev_tab": true, "tab_1": true, "tab_2": true, "tab_3": true, "tab_4": true,
 	"open": true, "approve": true, "comment": true, "request_changes": true, "browse": true, "hide": true,
+	"notifications": true, "select": true, "select_shown": true, "clear_selection": true, "merge": true, "pr_merge": true,
+	"include_failing": true, "jump": true,
 	"toggle_bots": true, "show_closed": true, "filter": true,
 	"pane_down": true, "pane_up": true, "next_file": true, "prev_file": true, "pane_tab": true, "unfold": true, "toggle_pane": true,
 	"pr_prev_tab": true, "pr_next_tab": true, "pr_approve": true, "pr_comment": true, "pr_request_changes": true, "pr_browse": true,
@@ -143,21 +168,27 @@ var ready = map[keymap.Action]bool{
 func (m *Model) hints() string {
 	var as []keymap.Action
 	switch {
+	case m.bulk != nil:
+		as = []keymap.Action{"confirm", "include_failing"}
+	case m.notesAt != nil:
+		as = []keymap.Action{"jump"}
 	case m.confirm != nil:
 		as = []keymap.Action{"confirm"}
+	case m.view == viewList && len(m.selected) > 0:
+		as = []keymap.Action{"select", "select_shown", "clear_selection", "approve", "merge", "pane_tab", "filter", "help"}
 	case m.filtering:
 		as = []keymap.Action{"accept"}
 	case m.view == viewCompose:
 		as = []keymap.Action{"next_kind", "post", "editor"}
 	case m.view == viewPR:
-		as = []keymap.Action{"pr_next_tab", "down", "pr_approve", "pr_comment", "pr_request_changes", "pr_browse", "help"}
+		as = []keymap.Action{"pr_next_tab", "down", "pr_approve", "pr_merge", "pr_comment", "pr_request_changes", "pr_browse", "help"}
 	default:
-		as = []keymap.Action{"open", "approve", "comment", "request_changes", "browse", "pane_tab", "filter", "help"}
+		as = []keymap.Action{"open", "select", "approve", "merge", "comment", "browse", "pane_tab", "filter", "help"}
 		if m.tab().inbox {
 			as = append(as[:len(as)-1], "hide", "show_closed", "help")
 		}
 		if p, _, ok := m.currentPR(); ok && m.own(p) {
-			as = []keymap.Action{"open", "comment", "browse", "pane_tab", "filter", "help"}
+			as = []keymap.Action{"open", "select", "merge", "comment", "browse", "pane_tab", "filter", "help"}
 		}
 	}
 	var parts []string

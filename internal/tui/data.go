@@ -40,6 +40,8 @@ type tab struct {
 	hidden map[model.PRKey]bool
 
 	sel, offset int
+	// keep is the pull request the cursor was on when a reading started.
+	keep model.PRKey
 }
 
 func newSectionTab(s Section) *tab {
@@ -218,13 +220,16 @@ type entry[T any] struct {
 
 // cache holds what is read for one pull request when it is looked at.
 type cache struct {
+	// info is what deciding a merge needs, with single checks, read for
+	// the pull requests whose checks are pending and for a confirm popup.
+	info     map[model.PRKey]model.MergeInfo
 	diffs    map[string]*entry[[]diff.File]
 	details  map[model.PRKey]*entry[model.Detail]
 	comments map[string]*entry[model.Comment]
 }
 
 func newCache() cache {
-	return cache{diffs: map[string]*entry[[]diff.File]{}, details: map[model.PRKey]*entry[model.Detail]{},
+	return cache{info: map[model.PRKey]model.MergeInfo{}, diffs: map[string]*entry[[]diff.File]{}, details: map[model.PRKey]*entry[model.Detail]{},
 		comments: map[string]*entry[model.Comment]{}}
 }
 
@@ -361,13 +366,14 @@ func (m *Model) handleData(msg tea.Msg) tea.Cmd {
 			t.warnings = append(t.warnings, msg.warnings...)
 		} else {
 			t.prs, t.warnings = safePRs(msg.prs), msg.warnings
-			m.toFirstPR(t)
+			m.restoreCursor(t)
 		}
+		m.refreshed[msg.tab] = m.set.Now()
 		if msg.next != "" && len(t.prs) < t.limit {
 			return tea.Batch(m.ensure(), m.searchPage(msg.tab, msg.gen, msg.next, true))
 		}
 		t.loading = false
-		return m.ensure()
+		return tea.Batch(m.ensure(), m.ensureChecks(t.prs), m.dropGone(t))
 	case notifsMsg:
 		t := m.inboxTab()
 		t.loading = false
@@ -432,6 +438,12 @@ func (m *Model) handleData(msg tea.Msg) tea.Cmd {
 		}
 	case editedMsg:
 		return m.edited(msg)
+	case bulkInfoMsg:
+		return m.bulkInfo(msg)
+	case checksMsg:
+		for k, mi := range msg.got {
+			m.cache.info[k] = mi
+		}
 	}
 	return nil
 }
@@ -509,5 +521,46 @@ func (m *Model) ensureComment(url string) tea.Cmd {
 	return func() tea.Msg {
 		c, err := m.src.Comment(m.ctx, url)
 		return commentMsg{url, c, err}
+	}
+}
+
+type checksMsg struct {
+	got map[model.PRKey]model.MergeInfo
+}
+
+// ensureChecks reads the single checks of the pull requests whose checks
+// are pending, in one query, to tell those waiting only for an approval
+// (CI shows ◌) from those still running.
+func (m *Model) ensureChecks(prs []model.PR) tea.Cmd {
+	if len(m.set.Plan.ApprovalChecks) == 0 {
+		return nil
+	}
+	var ids []string
+	keys := map[string]model.PRKey{}
+	for _, p := range prs {
+		if _, ok := m.cache.info[p.Key]; ok || p.ID == "" {
+			continue
+		}
+		if p.Checks == model.CheckPending || p.Checks == model.CheckExpected {
+			ids = append(ids, p.ID)
+			keys[p.ID] = p.Key
+		}
+		if len(ids) == 50 {
+			break
+		}
+	}
+	if len(ids) == 0 {
+		return nil
+	}
+	return func() tea.Msg {
+		got, err := m.src.MergeInfo(m.ctx, ids, true)
+		if err != nil {
+			m.log.Warn("checks", "err", err.Error())
+		}
+		out := map[model.PRKey]model.MergeInfo{}
+		for id, mi := range got {
+			out[keys[id]] = mi
+		}
+		return checksMsg{out}
 	}
 }

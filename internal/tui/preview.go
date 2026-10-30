@@ -266,6 +266,14 @@ func (m *Model) paneBody(p model.PR, n *model.Notification, e *entry[[]diff.File
 	if len(others) > 0 {
 		meta += "  " + strings.Join(others, " ")
 	}
+	if mi, ok := m.cache.info[p.Key]; ok && p.State == model.StateOpen {
+		d := plan.ForMerge(mi, p, m.viewer, m.set.Plan)
+		how := d.Reason
+		if d.Method != "" {
+			how += " (" + strings.ToLower(string(d.Method)) + ")"
+		}
+		meta += "  " + st.muted.Render("merge:") + " " + m.stepStyle(d.Step).Render(how)
+	}
 	top := []string{meta}
 	if n != nil && n.Unread && n.LatestCommentURL != "" {
 		c := m.cache.comments[n.LatestCommentURL]

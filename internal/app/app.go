@@ -22,6 +22,8 @@ import (
 	"github.com/babarot/gh-triage/internal/keymap"
 	"github.com/babarot/gh-triage/internal/logging"
 	"github.com/babarot/gh-triage/internal/model"
+	"github.com/babarot/gh-triage/internal/plan"
+	"github.com/babarot/gh-triage/internal/runner"
 	"github.com/babarot/gh-triage/internal/tui"
 )
 
@@ -96,8 +98,20 @@ func Run(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintf(stderr, "gh-triage: %v (is gh logged in? try gh auth login)\n", err)
 		return 1
 	}
+	set := settings(cfg)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	viewer, err := gh.Viewer(ctx)
+	if err != nil {
+		log.Error("viewer", "err", err.Error())
+		fmt.Fprintf(stderr, "gh-triage: could not read who you are on GitHub: %v\n", err)
+		return 1
+	}
+	rn := runner.New(runnerGitHub{gh}, log, runner.Options{Settings: set.Plan, Viewer: viewer,
+		ChecksTimeout: config.Duration(cfg.Merge.ChecksTimeout), BlockedTimeout: config.Duration(cfg.Merge.BlockedTimeout),
+		WatchTimeout: config.Duration(cfg.Merge.WatchTimeout)})
 	start := time.Now()
-	err = tui.Run(source{gh}, km, log, settings(cfg))
+	err = tui.Run(ctx, source{gh}, rn, km, log, set)
 	log.Info("exit", logging.KeyDurationMS, time.Since(start).Milliseconds(), "err", errString(err))
 	if err != nil {
 		fmt.Fprintf(stderr, "gh-triage: %v (run %s)\n", err, run)
@@ -114,12 +128,29 @@ func (s source) SearchPage(ctx context.Context, query string, first int, after s
 	return pg.PRs, pg.Total, pg.Next, pg.Warnings, err
 }
 
+// runnerGitHub is the GitHub client as the runner asks for it.
+type runnerGitHub struct{ *github.Client }
+
+func (g runnerGitHub) EnableAutoMerge(ctx context.Context, key model.PRKey, id, head string, method model.MergeMethod) error {
+	err := g.Client.EnableAutoMerge(ctx, key, id, head, method)
+	if errors.Is(err, github.ErrCleanStatus) {
+		return fmt.Errorf("%w: %v", runner.ErrCleanStatus, err)
+	}
+	return err
+}
+
 // settings are the config values the TUI uses.
 func settings(cfg config.File) tui.Settings {
 	set := tui.Settings{
 		InboxLimit: cfg.Inbox.Limit, HideClosed: cfg.Inbox.HideClosed, DoneAfterReview: cfg.Inbox.DoneAfterReview,
 		HomeOwners: cfg.UI.HomeOwners, StaleDays: cfg.UI.StaleDays, PreviewHeight: cfg.Preview.Height,
 		Collapse: cfg.Diff.Collapse, Theme: cfg.UI.Theme, Editor: cmp.Or(os.Getenv("VISUAL"), os.Getenv("EDITOR")),
+		Refresh: cfg.RefreshInterval(),
+		Plan: plan.Settings{AutoMerge: cfg.Merge.AutoMerge, UpdateBranch: cfg.Merge.UpdateBranch,
+			ApprovalChecks: cfg.UI.ApprovalChecks, AttentionPaths: cfg.Bulk.AttentionPaths},
+	}
+	for _, m := range cfg.Merge.Methods {
+		set.Plan.Methods = append(set.Plan.Methods, model.MergeMethod(strings.ToUpper(m)))
 	}
 	for _, s := range cfg.Sections {
 		set.Sections = append(set.Sections, tui.Section{Name: s.Name, Query: s.Query, Grouped: s.Group == "requested",
