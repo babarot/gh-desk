@@ -223,13 +223,14 @@ type cache struct {
 	// info is what deciding a merge needs, with single checks, read for
 	// the pull requests whose checks are pending and for a confirm popup.
 	info     map[model.PRKey]model.MergeInfo
+	bodies   map[model.PRKey]string
 	diffs    map[string]*entry[[]diff.File]
 	details  map[model.PRKey]*entry[model.Detail]
 	comments map[string]*entry[model.Comment]
 }
 
 func newCache() cache {
-	return cache{info: map[model.PRKey]model.MergeInfo{}, diffs: map[string]*entry[[]diff.File]{}, details: map[model.PRKey]*entry[model.Detail]{},
+	return cache{info: map[model.PRKey]model.MergeInfo{}, bodies: map[model.PRKey]string{}, diffs: map[string]*entry[[]diff.File]{}, details: map[model.PRKey]*entry[model.Detail]{},
 		comments: map[string]*entry[model.Comment]{}}
 }
 
@@ -447,6 +448,8 @@ func (m *Model) handleData(msg tea.Msg) tea.Cmd {
 		return m.edited(msg)
 	case bulkInfoMsg:
 		return m.bulkInfo(msg)
+	case bodiesMsg:
+		m.bodies(msg)
 	case checksMsg:
 		for k, mi := range msg.got {
 			m.cache.info[k] = mi

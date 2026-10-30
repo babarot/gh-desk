@@ -38,6 +38,8 @@ type File struct {
 	Diff     Diff      `toml:"diff"`
 	Merge    Merge     `toml:"merge"`
 	Bulk     Bulk      `toml:"bulk"`
+	// Select are the rules S offers besides "approved by me".
+	Select []Select `toml:"select"`
 	// Keys is [keys] as written; the keymap package checks it.
 	Keys Keys `toml:"-"`
 }
@@ -101,6 +103,22 @@ type Bulk struct {
 	// AttentionPaths are glob patterns of files that put a mark on a pull
 	// request in the confirm popup.
 	AttentionPaths []string `toml:"attention_paths"`
+}
+
+// Select is a rule S offers: a pull request matches when it meets every
+// key given.
+type Select struct {
+	Name   string `toml:"name"`
+	Author string `toml:"author"`
+	// Packages are the dependencies a bot's pull request may update, read
+	// from its body.
+	Packages []string `toml:"packages"`
+	// Title is a regular expression the title must match.
+	Title    string `toml:"title"`
+	MaxFiles int    `toml:"max_files"`
+	Bot      bool   `toml:"bot"`
+	// Checks is "passing" to require passing checks, or "".
+	Checks string `toml:"checks"`
 }
 
 // Merge values.
@@ -296,6 +314,26 @@ func Template(keys string) string {
 # updating a branch someone else committed to.
 # update_branch = "humans"
 
+# Rules S offers to select pull requests, besides "approved by me" (bot pull
+# requests you approved that are still open). A pull request matches when it
+# meets every key given: author (a login; bots without app/), packages (the
+# dependencies a renovate or dependabot pull request updates, read from its
+# body; every one it updates must be listed), title (a regular expression),
+# max_files, bot = true, and checks = "passing" (passed, or only
+# ui.approval_checks pending).
+#
+# [[select]]
+# name = "safe renovate"
+# author = "renovate"
+# packages = ["actions/checkout", "songmu/tagpr"]
+# checks = "passing"
+#
+# [[select]]
+# name = "lock files"
+# author = "renovate"
+# title = "(?i)lock file maintenance"
+# checks = "passing"
+
 [bulk]
 # Pull requests changing files that match these glob patterns get a mark in
 # the confirm popup.
@@ -351,6 +389,7 @@ func Load(path string) (File, error) {
 		Diff     Diff           `toml:"diff"`
 		Merge    Merge          `toml:"merge"`
 		Bulk     Bulk           `toml:"bulk"`
+		Select   []Select       `toml:"select"`
 		Keys     map[string]any `toml:"keys"`
 	}{Inbox: cfg.Inbox, Log: cfg.Log, UI: cfg.UI, Refresh: cfg.Refresh, Preview: cfg.Preview, Diff: cfg.Diff, Merge: cfg.Merge, Bulk: cfg.Bulk}
 	if err := toml.NewDecoder(bytes.NewReader(src)).DisallowUnknownFields().Decode(&doc); err != nil {
@@ -361,7 +400,7 @@ func Load(path string) (File, error) {
 		sections = doc.Sections
 	}
 	cfg = File{Sections: sections, Inbox: doc.Inbox, Log: doc.Log, UI: doc.UI, Refresh: doc.Refresh,
-		Preview: doc.Preview, Diff: doc.Diff, Merge: doc.Merge, Bulk: doc.Bulk, Keys: keysFrom(doc.Keys)}
+		Preview: doc.Preview, Diff: doc.Diff, Merge: doc.Merge, Bulk: doc.Bulk, Select: doc.Select, Keys: keysFrom(doc.Keys)}
 	ps := checkSections(cfg.Sections)
 	if !slices.Contains(Themes, cfg.UI.Theme) {
 		ps = append(ps, problem("ui.theme", "ui.theme must be one of %s, got %q", quoted(Themes), cfg.UI.Theme))
@@ -393,6 +432,7 @@ func Load(path string) (File, error) {
 	if !slices.Contains(UpdateBranchValues, cfg.Merge.UpdateBranch) {
 		ps = append(ps, problem("merge.update_branch", "merge.update_branch must be one of %s, got %q", quoted(UpdateBranchValues), cfg.Merge.UpdateBranch))
 	}
+	ps = append(ps, checkSelect(cfg.Select)...)
 	if cfg.Inbox.Limit < 1 || cfg.Inbox.Limit > 1000 {
 		ps = append(ps, problem("inbox.limit", "inbox.limit must be between 1 and 1000, got %d", cfg.Inbox.Limit))
 	}
@@ -444,6 +484,39 @@ func checkSections(ss []Section) Problems {
 		}
 		if s.Limit < 1 || s.Limit > 1000 {
 			bad(i, "limit must be between 1 and 1000, got %d", s.Limit)
+		}
+	}
+	return ps
+}
+
+// checkSelect reports what is wrong with the rules S offers.
+func checkSelect(ss []Select) Problems {
+	var ps Problems
+	bad := func(i int, format string, args ...any) {
+		ps = append(ps, Problem{Key: []string{"select"}, Index: -1, Message: fmt.Sprintf("select[%d]: ", i) + fmt.Sprintf(format, args...)})
+	}
+	seen := map[string]bool{"approved by me": true}
+	for i, s := range ss {
+		switch {
+		case strings.TrimSpace(s.Name) == "":
+			bad(i, "name must not be empty")
+		case seen[s.Name]:
+			bad(i, "name %q is used twice (approved by me is taken)", s.Name)
+		}
+		seen[s.Name] = true
+		if s.Title != "" {
+			if _, err := regexp.Compile(s.Title); err != nil {
+				bad(i, "title is not a regular expression: %v", err)
+			}
+		}
+		if s.MaxFiles < 0 {
+			bad(i, "max_files must be 0 or more, got %d", s.MaxFiles)
+		}
+		if s.Checks != "" && s.Checks != "passing" {
+			bad(i, `checks must be "passing" or left out, got %q`, s.Checks)
+		}
+		if s.Author == "" && len(s.Packages) == 0 && s.Title == "" && s.MaxFiles == 0 && !s.Bot && s.Checks == "" {
+			bad(i, "%q matches every pull request; give it at least one condition", s.Name)
 		}
 	}
 	return ps

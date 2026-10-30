@@ -107,6 +107,20 @@ func (f *fakeSource) MergeInfo(_ context.Context, ids []string, _ bool) (map[str
 	return out, nil
 }
 
+func (f *fakeSource) Bodies(_ context.Context, ids []string) (map[string]string, error) {
+	out := map[string]string{}
+	for _, prs := range f.searches {
+		for _, p := range prs {
+			for _, id := range ids {
+				if p.ID == id {
+					out[id] = f.details[p.Key].Body
+				}
+			}
+		}
+	}
+	return out, nil
+}
+
 // fakeRunner records the batches it is given and ends each pull request
 // with the result results says, Approved or Merged by default.
 type fakeRunner struct {
@@ -207,6 +221,7 @@ func startWith(t *testing.T, f *fakeSource, km keymap.Map) (*Model, *fakeRunner)
 		PreviewHeight: 10, Collapse: []string{"go.sum"}, Theme: "mocha", Now: func() time.Time { return now },
 		Plan: plan.Settings{Methods: []model.MergeMethod{model.MethodMerge}, AutoMerge: true, UpdateBranch: "humans",
 			AttentionPaths: []string{".github/workflows/*"}},
+		Rules: []plan.Rule{{Name: "octo bumps", Author: "renovate", Packages: []string{"octo/app"}}},
 	}
 	r := &fakeRunner{results: map[model.PRKey]runner.Event{}}
 	m := New(f, r, km, nil, set)
@@ -549,5 +564,21 @@ func TestRunningIsNotStartedAgain(t *testing.T) {
 	press(m, "y")
 	if len(r.items) != 0 {
 		t.Errorf("started again: %+v", r.items)
+	}
+}
+
+func TestSelectByRule(t *testing.T) {
+	m := start(t, fixture(), keymap.Default())
+	press(m, "S")
+	golden(t, "select-rule", screen(m))
+	press(m, "j", "enter")
+	if len(m.selected) != 1 || !m.selected[key("acme", "api", 30)] {
+		t.Fatalf("selected = %v", m.selected)
+	}
+	if m.tab().folded[plan.GroupBots] {
+		t.Error("the bots group stayed folded")
+	}
+	if r, ok := m.current(); !ok || r.pr.Key != key("acme", "api", 30) {
+		t.Errorf("cursor on %v", r.pr.Key)
 	}
 }

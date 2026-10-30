@@ -240,7 +240,7 @@ func (m *Model) notesKey(k string) tea.Cmd {
 		v.sel = min(v.sel+1, max(len(ls)-1, 0))
 	case is("up"):
 		v.sel = max(v.sel-1, 0)
-	case is("jump") && v.sel < len(ls):
+	case is("choose") && v.sel < len(ls):
 		l := ls[v.sel]
 		key := model.PRKey{}
 		switch {
@@ -311,7 +311,7 @@ func (m *Model) renderNotes() []string {
 		}
 		lines = append(lines, s)
 	}
-	lines = append(lines, "", st.key.Render(m.firstKey("jump"))+" "+st.muted.Render("go to the pull request")+
+	lines = append(lines, "", st.key.Render(m.firstKey("choose"))+" "+st.muted.Render("go to the pull request")+
 		st.dim.Render(" · ")+st.key.Render(keymap.Back)+" "+st.muted.Render("close"))
 	return box(st, "notifications", lines, w)
 }

@@ -84,6 +84,8 @@ func (m *Model) listKey(k string) tea.Cmd {
 	case is("clear_selection"):
 		clear(m.selected)
 		return nil
+	case is("select_rule"):
+		return m.openPick()
 	case is("approve") && len(m.selected) > 0:
 		return m.startBulk(runner.Approve)
 	case is("merge"):

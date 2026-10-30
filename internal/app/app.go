@@ -14,6 +14,7 @@ import (
 	"io/fs"
 	"log/slog"
 	"os"
+	"regexp"
 	"strings"
 	"time"
 
@@ -153,6 +154,13 @@ func settings(cfg config.File) tui.Settings {
 		Refresh: cfg.RefreshInterval(),
 		Plan: plan.Settings{AutoMerge: cfg.Merge.AutoMerge, UpdateBranch: cfg.Merge.UpdateBranch,
 			ApprovalChecks: cfg.UI.ApprovalChecks, AttentionPaths: cfg.Bulk.AttentionPaths},
+	}
+	for _, s := range cfg.Select {
+		r := plan.Rule{Name: s.Name, Author: s.Author, Packages: s.Packages, MaxFiles: s.MaxFiles, Bot: s.Bot, ChecksPassing: s.Checks == "passing"}
+		if s.Title != "" {
+			r.Title = regexp.MustCompile(s.Title) // config.Load has checked it
+		}
+		set.Rules = append(set.Rules, r)
 	}
 	for _, m := range cfg.Merge.Methods {
 		set.Plan.Methods = append(set.Plan.Methods, model.MergeMethod(strings.ToUpper(m)))

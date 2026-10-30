@@ -23,7 +23,7 @@ func (m *Model) tick() tea.Cmd {
 // the results on the rows; while a popup is open it waits for the next
 // tick, so what is being confirmed does not change under the user.
 func (m *Model) autoRefresh() tea.Cmd {
-	if m.bulk != nil || m.confirm != nil || m.notesAt != nil || m.view != viewList || m.viewer == "" {
+	if m.bulk != nil || m.confirm != nil || m.notesAt != nil || m.picker != nil || m.view != viewList || m.viewer == "" {
 		return m.tick()
 	}
 	return tea.Batch(m.reload(), m.tick())

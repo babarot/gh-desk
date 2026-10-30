@@ -59,6 +59,8 @@ func (m *Model) render() string {
 		lines = overlay(lines, m.renderBulk(), 2, m.width)
 	case m.notesAt != nil:
 		lines = overlay(lines, m.renderNotes(), 2, m.width)
+	case m.picker != nil:
+		lines = overlay(lines, m.renderPick(), 2, m.width)
 	case m.confirm != nil:
 		lines = overlay(lines, m.renderConfirm(), 2, m.width)
 	case m.help:
@@ -157,7 +159,7 @@ var ready = map[keymap.Action]bool{
 	"next_tab": true, "prev_tab": true, "tab_1": true, "tab_2": true, "tab_3": true, "tab_4": true,
 	"open": true, "approve": true, "comment": true, "request_changes": true, "browse": true, "hide": true,
 	"notifications": true, "select": true, "select_shown": true, "clear_selection": true, "merge": true, "pr_merge": true,
-	"include_failing": true, "jump": true,
+	"include_failing": true, "choose": true, "select_rule": true,
 	"toggle_bots": true, "show_closed": true, "filter": true,
 	"pane_down": true, "pane_up": true, "next_file": true, "prev_file": true, "pane_tab": true, "unfold": true, "toggle_pane": true,
 	"pr_prev_tab": true, "pr_next_tab": true, "pr_approve": true, "pr_comment": true, "pr_request_changes": true, "pr_browse": true,
@@ -170,8 +172,8 @@ func (m *Model) hints() string {
 	switch {
 	case m.bulk != nil:
 		as = []keymap.Action{"confirm", "include_failing"}
-	case m.notesAt != nil:
-		as = []keymap.Action{"jump"}
+	case m.notesAt != nil, m.picker != nil:
+		as = []keymap.Action{"choose"}
 	case m.confirm != nil:
 		as = []keymap.Action{"confirm"}
 	case m.view == viewList && len(m.selected) > 0:
@@ -183,7 +185,7 @@ func (m *Model) hints() string {
 	case m.view == viewPR:
 		as = []keymap.Action{"pr_next_tab", "down", "pr_approve", "pr_merge", "pr_comment", "pr_request_changes", "pr_browse", "help"}
 	default:
-		as = []keymap.Action{"open", "select", "approve", "merge", "comment", "browse", "pane_tab", "filter", "help"}
+		as = []keymap.Action{"open", "select", "select_rule", "approve", "merge", "comment", "browse", "pane_tab", "help"}
 		if m.tab().inbox {
 			as = append(as[:len(as)-1], "hide", "show_closed", "help")
 		}

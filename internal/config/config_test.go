@@ -128,3 +128,30 @@ folded = ["robots"]
 		}
 	}
 }
+
+func TestSelectRules(t *testing.T) {
+	cfg, err := Load(write(t, `
+[[select]]
+name = "safe renovate"
+author = "renovate"
+packages = ["actions/checkout"]
+checks = "passing"
+`))
+	if err != nil || len(cfg.Select) != 1 || cfg.Select[0].Packages[0] != "actions/checkout" {
+		t.Fatalf("cfg.Select = %+v, %v", cfg.Select, err)
+	}
+	_, err = Load(write(t, `
+[[select]]
+name = "approved by me"
+title = "("
+checks = "green"
+
+[[select]]
+name = "all"
+`))
+	for _, want := range []string{"is used twice", "not a regular expression", `checks must be "passing"`, "matches every pull request"} {
+		if err == nil || !strings.Contains(err.Error(), want) {
+			t.Errorf("err = %v; want one containing %q", err, want)
+		}
+	}
+}

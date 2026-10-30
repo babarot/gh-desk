@@ -38,6 +38,8 @@ type Source interface {
 	// MergeInfo reads what deciding a merge needs, by node ID; with
 	// details, each check (and whether it is required) and the files.
 	MergeInfo(ctx context.Context, ids []string, details bool) (map[string]model.MergeInfo, error)
+	// Bodies reads descriptions by node ID, for rules that read them.
+	Bodies(ctx context.Context, ids []string) (map[string]string, error)
 }
 
 // Runner approves and merges batches of pull requests.
@@ -73,6 +75,8 @@ type Settings struct {
 	Editor string
 	// Plan is what deciding a merge takes from the config file.
 	Plan plan.Settings
+	// Rules are what S offers besides "approved by me".
+	Rules []plan.Rule
 	// Refresh is how often the shown tab is read again; zero turns it off.
 	Refresh time.Duration
 	// Now is the clock, for tests; nil is time.Now.
@@ -119,6 +123,7 @@ type Model struct {
 
 	selected map[model.PRKey]bool
 	bulk     *bulk
+	picker   *pick
 	// progress is each pull request's step or result in a batch, shown on
 	// its row until R.
 	progress map[model.PRKey]progress
@@ -219,6 +224,8 @@ func (m *Model) key(msg tea.KeyPressMsg) tea.Cmd {
 		return m.bulkKey(k)
 	case m.notesAt != nil:
 		return m.notesKey(k)
+	case m.picker != nil:
+		return m.pickKey(k)
 	case m.confirm != nil:
 		return m.confirmKey(k)
 	case m.help:

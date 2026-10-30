@@ -277,3 +277,33 @@ func (c *Client) CommitInfo(ctx context.Context, key model.PRKey, oid string) (C
 	}
 	return out, nil
 }
+
+// Bodies reads the bodies of the pull requests with the given node IDs, in
+// one query.
+func (c *Client) Bodies(ctx context.Context, ids []string) (map[string]string, error) {
+	out := map[string]string{}
+	if len(ids) == 0 {
+		return out, nil
+	}
+	var resp struct {
+		RateLimit rateLimit
+		Nodes     []*struct {
+			ID   string
+			Body string
+		}
+	}
+	err := c.query(ctx, "bodies", `query($ids: [ID!]!) {
+  rateLimit { cost remaining }
+  nodes(ids: $ids) { ... on PullRequest { id body } }
+}`, map[string]any{"ids": ids}, &resp, &resp.RateLimit)
+	for _, n := range resp.Nodes {
+		if n != nil && n.ID != "" {
+			out[n.ID] = n.Body
+		}
+	}
+	var gqlErr *api.GraphQLError
+	if err != nil && !errors.As(err, &gqlErr) {
+		return out, err
+	}
+	return out, nil
+}
