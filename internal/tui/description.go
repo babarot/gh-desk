@@ -52,7 +52,8 @@ func (m *Model) descPane(p model.PR, n *model.Notification, height int) []string
 	st := m.st
 	left, right := m.descWidths()
 	d := m.cache.details[p.Key]
-	top := []string{m.titleLine(p, left)}
+	title, titleLinks := m.titleLine(p, left)
+	top := []string{title}
 	if s, ok := m.unreadLine(n); ok {
 		top = append(top, s)
 	}
@@ -65,6 +66,7 @@ func (m *Model) descPane(p model.PR, n *model.Notification, height int) []string
 	shown := ls[m.pane.scroll:min(len(ls), m.pane.scroll+rest)]
 	m.pane.heads = make([]string, len(top), height)
 	m.pane.links = make([][]link, len(top), height)
+	m.pane.links[0] = titleLinks
 	for _, l := range shown {
 		top = append(top, l.text)
 		part := ""
@@ -115,12 +117,19 @@ func (m *Model) descPane(p model.PR, n *model.Notification, height int) []string
 }
 
 // titleLine is the pull request's number and title, with its author at
-// the right edge, width cells wide.
-func (m *Model) titleLine(p model.PR, width int) string {
+// the right edge, width cells wide, and the pages a click on the number
+// and on the author open.
+func (m *Model) titleLine(p model.PR, width int) (string, []link) {
 	st := m.st
-	author := st.sub0.Render(p.Author)
-	room := max(width-lipgloss.Width(author)-2, 1)
-	return fit(st.dim.Render(fmt.Sprintf("#%d", p.Key.Number))+" "+st.text.Bold(true).Render(p.Title), room) + "  " + author
+	num := fmt.Sprintf("#%d", p.Key.Number)
+	a := m.author(p)
+	aw := lipgloss.Width(a.text)
+	room := max(width-aw-2, 1)
+	links := []link{{x: 0, w: min(lipgloss.Width(num), room), url: m.prURL(p)}}
+	if a.url != "" {
+		links = append(links, link{x: room + 2, w: aw, url: a.url})
+	}
+	return fit(st.dim.Render(num)+" "+st.text.Bold(true).Render(p.Title), room) + "  " + a.text, links
 }
 
 // descLines are the parts of the description pane, width cells wide, with
@@ -273,6 +282,18 @@ func (m *Model) requiredChecks(p model.PR) map[string]bool {
 // fact is a value of a fact, and the page a click on it opens.
 type fact struct {
 	text, url string
+}
+
+// author is a pull request's author as the list and the pane draw it,
+// and its page: an app's for a bot.
+func (m *Model) author(p model.PR) fact {
+	switch {
+	case p.Author == "":
+		return fact{}
+	case p.AuthorIsBot:
+		return fact{text: m.st.dim.Render(p.Author), url: m.webURL("apps/" + p.Author)}
+	}
+	return fact{text: m.st.sub0.Render(p.Author), url: m.webURL(p.Author)}
 }
 
 // facts are what the list's columns leave out, a fact a line, width cells

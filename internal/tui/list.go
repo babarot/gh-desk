@@ -523,10 +523,7 @@ func (m *Model) cell(id string, r row, sel bool) string {
 		}
 		return st.text.Render(p.Title)
 	case "author":
-		if p.AuthorIsBot {
-			return st.dim.Render(p.Author)
-		}
-		return st.sub0.Render(p.Author)
+		return m.author(p).text
 	case "ci", "review", "size":
 		if !p.HeavyRead() {
 			return st.dim.Render(m.spinner())

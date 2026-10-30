@@ -211,14 +211,12 @@ func (m *Model) linkAt(i, x int) string {
 				return m.prURL(p)
 			}
 		case "author":
-			if p.Author == "" {
+			a := m.author(p)
+			if a.url == "" {
 				return ""
 			}
-			if spanAt([]int{min(lipgloss.Width(p.Author), c.width)}, 0, x-at) == 0 {
-				if p.AuthorIsBot {
-					return m.webURL("apps/" + p.Author)
-				}
-				return m.webURL(p.Author)
+			if spanAt([]int{min(lipgloss.Width(a.text), c.width)}, 0, x-at) == 0 {
+				return a.url
 			}
 		}
 		at += c.width + 2

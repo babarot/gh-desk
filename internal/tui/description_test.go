@@ -147,3 +147,19 @@ func TestCheckOrderPutsFailedFirst(t *testing.T) {
 		t.Errorf("order = %q, want %q", strings.Join(got, " "), want)
 	}
 }
+
+func TestClickTitleLineOpensThePROrItsAuthor(t *testing.T) {
+	f := fixture()
+	m := start(t, f, keymap.Default())
+	x, y := lineOf(t, m, "│ #12 Add retries")
+	mouseAt(m, tea.MouseClickMsg{X: x + 3, Y: y, Button: tea.MouseLeft})
+	x, y = lineOf(t, m, "alice │ status")
+	mouseAt(m, tea.MouseClickMsg{X: x + 1, Y: y, Button: tea.MouseLeft})
+	// The title itself has no page.
+	x, y = lineOf(t, m, "│ #12 Add retries")
+	mouseAt(m, tea.MouseClickMsg{X: x + 8, Y: y, Button: tea.MouseLeft})
+	want := []string{"https://github.com/acme/api/pull/12", "https://github.com/alice"}
+	if strings.Join(f.browsed, " ") != strings.Join(want, " ") {
+		t.Fatalf("browsed %q, want %q", f.browsed, want)
+	}
+}
