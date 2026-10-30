@@ -733,3 +733,23 @@ func TestDismissedBetweenReads(t *testing.T) {
 		t.Errorf("last %+v, calls %v", e, f.calls)
 	}
 }
+
+// An approval dismissed while waiting stops the merge even if the pull
+// request turns mergeable.
+func TestDismissedWhileWaiting(t *testing.T) {
+	mi, it := pr("1", "api", 1, "alice")
+	mi.MergeState = model.MergeBlocked
+	mi.Reviews = []model.Review{{Author: "me", State: model.ReviewApproved}}
+	mi.Checks = []model.Check{{Name: "build", State: model.CheckPending, Required: true}}
+	f := newFake(mi)
+	f.onRead = func(_ string, mi *model.MergeInfo, n int) {
+		if n > 4 {
+			mi.Reviews, mi.Checks[0].State, mi.MergeState = nil, model.CheckSuccess, model.MergeClean
+		}
+	}
+	_, ch := newRunner(f, newStore()).Start(context.Background(), Merge, []Item{it})
+	es := drain(t, ch)
+	if e := last(es); e.Result != Stopped || !strings.Contains(e.Text, "dismissed") || len(f.calls) != 0 {
+		t.Errorf("last %+v, calls %v", e, f.calls)
+	}
+}

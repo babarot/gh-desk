@@ -465,7 +465,8 @@ func (j *job) sendApproval() bool {
 }
 
 // decide reads the pull request and decides its next step, reading again
-// while GitHub works out whether it can be merged.
+// while GitHub works out whether it can be merged. Every read stops the job
+// if it finds the recorded approval dismissed.
 func (j *job) decide() (model.MergeInfo, plan.Decision, bool) {
 	deadline := time.Now().Add(j.r.opt.RecheckFor)
 	for {
@@ -479,6 +480,9 @@ func (j *job) decide() (model.MergeInfo, plan.Decision, bool) {
 		}
 		d := plan.ForMerge(mi, j.it.PR, j.r.opt.Viewer, j.r.opt.Settings)
 		j.log.Debug("decided", logging.KeyStep, string(d.Step), "merge_state", string(mi.MergeState), "approve", d.Approve)
+		if j.dismissed(d) {
+			return mi, d, false
+		}
 		if d.Step != plan.StepRecheck {
 			return mi, d, true
 		}
@@ -500,9 +504,6 @@ func (j *job) merge() {
 	}
 	if d.Step == plan.StepSkip {
 		j.say(Skipped, d.Reason)
-		return
-	}
-	if j.dismissed(d) {
 		return
 	}
 	if d.Step == plan.StepAutoMerge && !j.it.AutoMerge {
@@ -533,9 +534,6 @@ func (j *job) merge() {
 		}
 		if d.Step == plan.StepSkip {
 			j.say(Skipped, d.Reason)
-			return
-		}
-		if j.dismissed(d) {
 			return
 		}
 		if d.Step == plan.StepAutoMerge && !j.it.AutoMerge {
