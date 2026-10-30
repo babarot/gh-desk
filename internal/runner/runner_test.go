@@ -1,0 +1,304 @@
+package runner
+
+import (
+	"context"
+	"fmt"
+	"strings"
+	"sync"
+	"testing"
+	"time"
+
+	"github.com/babarot/gh-triage/internal/logging"
+	"github.com/babarot/gh-triage/internal/model"
+	"github.com/babarot/gh-triage/internal/plan"
+)
+
+// fakeGH is GitHub as a few pull requests whose state tests change as the
+// runner acts on them.
+type fakeGH struct {
+	mu    sync.Mutex
+	prs   map[string]*model.MergeInfo
+	calls []string
+	// onRead is called on every read, to move a pull request along.
+	onRead       func(id string, mi *model.MergeInfo, reads int)
+	reads        map[string]int
+	autoMergeErr error
+	parents      map[string][]string
+}
+
+func (f *fakeGH) log(s string) { f.calls = append(f.calls, s) }
+
+func (f *fakeGH) MergeInfo(_ context.Context, ids []string, _ bool) (map[string]model.MergeInfo, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	out := map[string]model.MergeInfo{}
+	for _, id := range ids {
+		mi := f.prs[id]
+		f.reads[id]++
+		if f.onRead != nil {
+			f.onRead(id, mi, f.reads[id])
+		}
+		out[id] = *mi
+	}
+	return out, nil
+}
+
+func (f *fakeGH) Review(_ context.Context, pr model.PR, ev model.ReviewEvent, _ string) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.log(fmt.Sprintf("review %s %s %s", pr.Key, ev, pr.HeadOID))
+	mi := f.prs[pr.ID]
+	mi.Reviews = append(mi.Reviews, model.Review{Author: "me", State: model.ReviewApproved})
+	return nil
+}
+
+func (f *fakeGH) Merge(_ context.Context, k model.PRKey, id, head string, m model.MergeMethod) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.log(fmt.Sprintf("merge %s %s %s", k, head, m))
+	if f.prs[id].HeadOID != head {
+		return fmt.Errorf("head branch was modified")
+	}
+	f.prs[id].State = model.StateMerged
+	return nil
+}
+
+func (f *fakeGH) EnableAutoMerge(_ context.Context, k model.PRKey, id, head string, m model.MergeMethod) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.log(fmt.Sprintf("auto-merge %s %s %s", k, head, m))
+	if f.autoMergeErr != nil {
+		return f.autoMergeErr
+	}
+	f.prs[id].AutoMerge = true
+	return nil
+}
+
+func (f *fakeGH) UpdateBranch(_ context.Context, k model.PRKey, id, head string) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.log(fmt.Sprintf("update %s %s", k, head))
+	mi := f.prs[id]
+	mi.HeadOID, mi.MergeState = head+"-updated", model.MergeBlocked
+	return nil
+}
+
+func (f *fakeGH) Parents(_ context.Context, _ model.PRKey, oid string) ([]string, error) {
+	return f.parents[oid], nil
+}
+
+func newFake(mis ...model.MergeInfo) *fakeGH {
+	f := &fakeGH{prs: map[string]*model.MergeInfo{}, reads: map[string]int{}, parents: map[string][]string{}}
+	for i := range mis {
+		mi := mis[i]
+		f.prs[mi.ID] = &mi
+	}
+	return f
+}
+
+var settings = plan.Settings{Methods: []model.MergeMethod{model.MethodMerge, model.MethodSquash}, AutoMerge: true,
+	UpdateBranch: "humans", ApprovalChecks: []string{"policy-bot*"}}
+
+func pr(id, repo string, n int, author string) (model.MergeInfo, Item) {
+	k := model.PRKey{Owner: "acme", Repo: repo, Number: n}
+	mi := model.MergeInfo{Key: k, ID: id, State: model.StateOpen, HeadOID: "h-" + id, MergeState: model.MergeClean,
+		Repo: model.RepoMerge{Methods: []model.MergeMethod{model.MethodMerge}}, Checks: []model.Check{}}
+	return mi, Item{PR: model.PR{ID: id, Key: k, Author: author, HeadOID: "h-" + id}, Head: "h-" + id}
+}
+
+func runBatch(t *testing.T, f *fakeGH, kind Kind, items ...Item) map[model.PRKey][]Event {
+	t.Helper()
+	r := New(f, logging.Discard(), Options{Settings: settings, Viewer: "me",
+		ChecksTimeout: time.Second, BlockedTimeout: 40 * time.Millisecond, WatchTimeout: time.Second,
+		PollFast: 5 * time.Millisecond, PollSlow: 5 * time.Millisecond, Recheck: 2 * time.Millisecond, RecheckFor: 50 * time.Millisecond})
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	_, events := r.Start(ctx, kind, items)
+	out := map[model.PRKey][]Event{}
+	for e := range events {
+		out[e.Key] = append(out[e.Key], e)
+	}
+	if ctx.Err() != nil {
+		t.Fatal("the batch did not end")
+	}
+	return out
+}
+
+func last(es []Event) Event { return es[len(es)-1] }
+
+func TestMergeNowApprovesFirst(t *testing.T) {
+	mi, it := pr("1", "api", 1, "alice")
+	f := newFake(mi)
+	evs := runBatch(t, f, Merge, it)
+	if e := last(evs[it.PR.Key]); e.Result != Merged || !e.Approved {
+		t.Errorf("last event = %+v", e)
+	}
+	if want := "review acme/api#1 APPROVE h-1,merge acme/api#1 h-1 MERGE"; strings.Join(f.calls, ",") != want {
+		t.Errorf("calls = %v", f.calls)
+	}
+}
+
+func TestAutoMergeAndWatch(t *testing.T) {
+	mi, it := pr("1", "api", 1, "renovate")
+	mi.MergeState, mi.Repo.AutoMerge = model.MergeBlocked, true
+	f := newFake(mi)
+	f.onRead = func(_ string, mi *model.MergeInfo, n int) {
+		if mi.AutoMerge && n > 6 {
+			mi.State = model.StateMerged
+		}
+	}
+	evs := runBatch(t, f, Merge, it)
+	var auto, merged bool
+	for _, e := range evs[it.PR.Key] {
+		auto = auto || e.Result == AutoMergeOn
+		merged = merged || (e.Watch && e.Result == Merged)
+	}
+	if !auto || !merged {
+		t.Errorf("events = %+v", evs[it.PR.Key])
+	}
+}
+
+func TestCleanStatusMergesDirectly(t *testing.T) {
+	mi, it := pr("1", "api", 1, "renovate")
+	mi.MergeState, mi.Repo.AutoMerge = model.MergeBlocked, true
+	f := newFake(mi)
+	f.autoMergeErr = fmt.Errorf("%w: GitHub said so", ErrCleanStatus)
+	evs := runBatch(t, f, Merge, it)
+	if e := last(evs[it.PR.Key]); e.Result != Merged {
+		t.Errorf("last event = %+v (calls %v)", e, f.calls)
+	}
+}
+
+func TestWaitForChecksThenMerge(t *testing.T) {
+	mi, it := pr("1", "api", 1, "alice")
+	mi.MergeState = model.MergeBlocked
+	mi.Checks = []model.Check{{Name: "build", State: model.CheckPending, Required: true}}
+	f := newFake(mi)
+	f.onRead = func(_ string, mi *model.MergeInfo, n int) {
+		if n > 5 {
+			mi.Checks[0].State, mi.MergeState = model.CheckSuccess, model.MergeClean
+		}
+	}
+	evs := runBatch(t, f, Merge, it)
+	es := evs[it.PR.Key]
+	if last(es).Result != Merged || !strings.Contains(fmt.Sprint(es), "waiting for checks") {
+		t.Errorf("events = %+v", es)
+	}
+}
+
+func TestHeadChangedStops(t *testing.T) {
+	mi, it := pr("1", "api", 1, "alice")
+	mi.HeadOID = "pushed-later"
+	f := newFake(mi)
+	evs := runBatch(t, f, Merge, it)
+	if e := last(evs[it.PR.Key]); e.Result != Stopped || !strings.Contains(e.Text, "head changed") {
+		t.Errorf("last event = %+v", e)
+	}
+	if len(f.calls) != 0 {
+		t.Errorf("wrote to GitHub: %v", f.calls)
+	}
+}
+
+func TestBlockedByAnotherRule(t *testing.T) {
+	mi, it := pr("1", "api", 1, "alice")
+	mi.MergeState = model.MergeBlocked
+	mi.Checks = []model.Check{{Name: "build", State: model.CheckSuccess, Required: true}}
+	f := newFake(mi)
+	evs := runBatch(t, f, Merge, it)
+	if e := last(evs[it.PR.Key]); e.Result != Stopped || e.Text != "blocked by another rule" {
+		t.Errorf("last event = %+v", e)
+	}
+}
+
+func TestOneRepositoryAtATime(t *testing.T) {
+	a, ia := pr("1", "api", 1, "alice")
+	b, ib := pr("2", "api", 2, "alice")
+	c, ic := pr("3", "web", 3, "alice")
+	f := newFake(a, b, c)
+	evs := runBatch(t, f, Merge, ia, ib, ic)
+	for _, k := range []model.PRKey{ia.PR.Key, ib.PR.Key, ic.PR.Key} {
+		if last(evs[k]).Result != Merged {
+			t.Errorf("%s: %+v", k, evs[k])
+		}
+	}
+	if evs[ib.PR.Key][0].Text != "after #1" {
+		t.Errorf("api#2 did not wait for api#1: %+v", evs[ib.PR.Key][0])
+	}
+	pos := func(s string) int {
+		for i, c := range f.calls {
+			if strings.HasPrefix(c, s) {
+				return i
+			}
+		}
+		return -1
+	}
+	if pos("merge acme/api#1") > pos("review acme/api#2") {
+		t.Errorf("api#2 started before api#1 was merged: %v", f.calls)
+	}
+}
+
+func TestSkips(t *testing.T) {
+	dirty, idirty := pr("1", "api", 1, "alice")
+	dirty.MergeState = model.MergeDirty
+	behind, ibehind := pr("2", "web", 2, "renovate")
+	behind.MergeState = model.MergeBehind
+	ibehind.PR.AuthorIsBot = true
+	f := newFake(dirty, behind)
+	evs := runBatch(t, f, Merge, idirty, ibehind)
+	if e := last(evs[idirty.PR.Key]); e.Result != Skipped || e.Text != "conflicts" {
+		t.Errorf("dirty: %+v", e)
+	}
+	if e := last(evs[ibehind.PR.Key]); e.Result != Skipped || !strings.Contains(e.Text, "bot will rebase") {
+		t.Errorf("behind bot: %+v", e)
+	}
+	if len(f.calls) != 0 {
+		t.Errorf("wrote to GitHub: %v", f.calls)
+	}
+}
+
+func TestUpdateBranchThenMerge(t *testing.T) {
+	mi, it := pr("1", "api", 1, "alice")
+	mi.MergeState = model.MergeBehind
+	f := newFake(mi)
+	f.parents["h-1-updated"] = []string{"h-1", "base"}
+	f.onRead = func(_ string, mi *model.MergeInfo, n int) {
+		if mi.HeadOID == "h-1-updated" && n > 8 {
+			mi.MergeState = model.MergeClean
+		}
+	}
+	evs := runBatch(t, f, Merge, it)
+	if e := last(evs[it.PR.Key]); e.Result != Merged {
+		t.Errorf("last event = %+v (calls %v)", e, f.calls)
+	}
+	if !strings.Contains(strings.Join(f.calls, ","), "merge acme/api#1 h-1-updated") {
+		t.Errorf("did not merge the updated head: %v", f.calls)
+	}
+}
+
+func TestUpdatedHeadWithOtherCommitsStops(t *testing.T) {
+	mi, it := pr("1", "api", 1, "alice")
+	mi.MergeState = model.MergeBehind
+	f := newFake(mi)
+	f.parents["h-1-updated"] = []string{"someone-else"}
+	evs := runBatch(t, f, Merge, it)
+	if e := last(evs[it.PR.Key]); e.Result != Stopped {
+		t.Errorf("last event = %+v", e)
+	}
+}
+
+func TestApproveOnly(t *testing.T) {
+	a, ia := pr("1", "api", 1, "alice")
+	b, ib := pr("2", "web", 2, "alice")
+	b.Reviews = []model.Review{{Author: "me", State: model.ReviewApproved}}
+	f := newFake(a, b)
+	evs := runBatch(t, f, Approve, ia, ib)
+	if e := last(evs[ia.PR.Key]); e.Result != Approved {
+		t.Errorf("api#1: %+v", e)
+	}
+	if e := last(evs[ib.PR.Key]); e.Result != Skipped || e.Text != "already approved" {
+		t.Errorf("web#2: %+v", e)
+	}
+	if strings.Contains(strings.Join(f.calls, ","), "merge") {
+		t.Errorf("approve merged: %v", f.calls)
+	}
+}

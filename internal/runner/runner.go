@@ -1,0 +1,500 @@
+// Package runner approves and merges pull requests, many at once, and
+// follows them until each is merged, skipped or stopped. It decides each
+// step with internal/plan from information read just before the step, and
+// acts only on the head the user confirmed.
+//
+// Pull requests of different repositories go side by side; those of one
+// repository go one at a time, since merging one can leave the next behind
+// its base or in conflict. Progress is reported as Events on a channel;
+// the runner knows nothing of the TUI.
+package runner
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"log/slog"
+	"slices"
+	"strings"
+	"sync"
+	"time"
+
+	"github.com/babarot/gh-triage/internal/logging"
+	"github.com/babarot/gh-triage/internal/model"
+	"github.com/babarot/gh-triage/internal/plan"
+)
+
+// GitHub is what the runner needs from GitHub.
+type GitHub interface {
+	MergeInfo(ctx context.Context, ids []string, details bool) (map[string]model.MergeInfo, error)
+	Review(ctx context.Context, pr model.PR, event model.ReviewEvent, body string) error
+	Merge(ctx context.Context, key model.PRKey, id, head string, method model.MergeMethod) error
+	EnableAutoMerge(ctx context.Context, key model.PRKey, id, head string, method model.MergeMethod) error
+	UpdateBranch(ctx context.Context, key model.PRKey, id, head string) error
+	Parents(ctx context.Context, key model.PRKey, oid string) ([]string, error)
+}
+
+// ErrCleanStatus is what EnableAutoMerge returns when the pull request can
+// be merged now; the runner merges it directly then. The app package maps
+// the GitHub client's error to it.
+var ErrCleanStatus = errors.New("pull request is in clean status")
+
+// Options configure a Runner.
+type Options struct {
+	Settings plan.Settings
+	Viewer   string
+	// ChecksTimeout is how long to wait for required checks still running.
+	ChecksTimeout time.Duration
+	// BlockedTimeout is how long a pull request may stay blocked after its
+	// required checks finished before it is given up as blocked by another
+	// rule.
+	BlockedTimeout time.Duration
+	// WatchTimeout is how long a pull request put on auto-merge is
+	// followed.
+	WatchTimeout time.Duration
+	// PollFast is how often a waiting pull request is read in its first
+	// minute, PollSlow after it and while watching auto-merge.
+	PollFast, PollSlow time.Duration
+	// Recheck is how often, and RecheckFor how long, a pull request whose
+	// merge state GitHub is still working out is read again.
+	Recheck, RecheckFor time.Duration
+}
+
+// Defaults fills in the intervals left zero.
+func (o Options) withDefaults() Options {
+	if o.PollFast == 0 {
+		o.PollFast = 15 * time.Second
+	}
+	if o.PollSlow == 0 {
+		o.PollSlow = time.Minute
+	}
+	if o.Recheck == 0 {
+		o.Recheck = 3 * time.Second
+	}
+	if o.RecheckFor == 0 {
+		o.RecheckFor = time.Minute
+	}
+	return o
+}
+
+// Kind is what a batch does.
+type Kind int
+
+const (
+	Approve Kind = iota
+	Merge
+)
+
+// Item is a pull request the user confirmed, with the head they saw.
+type Item struct {
+	PR   model.PR
+	Head string
+}
+
+// Result is where a pull request ended, or Running while it has not.
+type Result int
+
+const (
+	Running Result = iota
+	Approved
+	Merged
+	AutoMergeOn
+	Skipped
+	Stopped
+	Failed
+)
+
+// Final reports whether the result ends the pull request's part in the
+// batch. AutoMergeOn does: GitHub merges it, and a later Event says so.
+func (r Result) Final() bool { return r != Running }
+
+// Event is a step of one pull request.
+type Event struct {
+	Batch  string
+	Key    model.PRKey
+	Result Result
+	// Text says what is happening or happened, in a few words.
+	Text string
+	// Approved is set when an approval was sent.
+	Approved bool
+	// Watch is set on events of a pull request put on auto-merge, after
+	// its batch has ended.
+	Watch bool
+}
+
+// Runner runs batches.
+type Runner struct {
+	gh  GitHub
+	opt Options
+	log *slog.Logger
+}
+
+// New returns a Runner.
+func New(gh GitHub, log *slog.Logger, opt Options) *Runner {
+	return &Runner{gh: gh, opt: opt.withDefaults(), log: log}
+}
+
+// Start runs a batch and returns its ID and its events. The channel is
+// closed when every pull request has a final result and every auto-merge
+// it turned on is no longer watched. Cancelling ctx stops it all.
+func (r *Runner) Start(ctx context.Context, kind Kind, items []Item) (string, <-chan Event) {
+	batch := logging.NewID()
+	log := r.log.With(logging.KeyBatch, batch)
+	events := make(chan Event, 64)
+	byRepo := map[string][]Item{}
+	var repos []string
+	for _, it := range items {
+		repo := it.PR.Key.Repository()
+		if _, ok := byRepo[repo]; !ok {
+			repos = append(repos, repo)
+		}
+		byRepo[repo] = append(byRepo[repo], it)
+	}
+	verb := map[Kind]string{Approve: "approve", Merge: "merge"}[kind]
+	log.Info("batch start", "kind", verb, "prs", len(items), "repos", len(repos))
+	var wg sync.WaitGroup
+	emit := func(e Event) {
+		e.Batch = batch
+		select {
+		case events <- e:
+		case <-ctx.Done():
+		}
+	}
+	for _, repo := range repos {
+		its := byRepo[repo]
+		wg.Go(func() {
+			for i, it := range its[1:] {
+				emit(Event{Key: it.PR.Key, Text: fmt.Sprintf("after #%d", its[i].PR.Key.Number)})
+			}
+			for _, it := range its {
+				if ctx.Err() != nil {
+					return
+				}
+				j := &job{r: r, ctx: ctx, log: log.With(logging.KeyPR, it.PR.Key.String()), it: it, head: it.Head, emit: emit, wg: &wg}
+				if kind == Approve {
+					j.approveOnly()
+				} else {
+					j.merge()
+				}
+			}
+		})
+	}
+	go func() {
+		wg.Wait()
+		log.Info("batch end")
+		close(events)
+	}()
+	return batch, events
+}
+
+// job is one pull request in a batch.
+type job struct {
+	r    *Runner
+	ctx  context.Context
+	log  *slog.Logger
+	it   Item
+	head string
+	emit func(Event)
+	wg   *sync.WaitGroup
+	// approved is set once this job sent an approval.
+	approved bool
+}
+
+func (j *job) say(res Result, text string) {
+	j.emit(Event{Key: j.it.PR.Key, Result: res, Text: text, Approved: j.approved})
+	if res.Final() {
+		j.log.Info("pr end", logging.KeyStep, resultWord[res], "why", text)
+	}
+}
+
+var resultWord = map[Result]string{Running: "running", Approved: "approved", Merged: "merged", AutoMergeOn: "auto-merge-on",
+	Skipped: "skipped", Stopped: "stopped", Failed: "failed"}
+
+// read reads the pull request and checks its head is the one confirmed.
+func (j *job) read(details bool) (model.MergeInfo, bool) {
+	got, err := j.r.gh.MergeInfo(j.ctx, []string{j.it.PR.ID}, details)
+	if err != nil {
+		j.say(Failed, "could not read it: "+short(err))
+		return model.MergeInfo{}, false
+	}
+	mi, ok := got[j.it.PR.ID]
+	if !ok {
+		j.say(Failed, "could not read it")
+		return model.MergeInfo{}, false
+	}
+	if mi.State == model.StateOpen && mi.HeadOID != j.head {
+		j.say(Stopped, "head changed · confirm again")
+		return model.MergeInfo{}, false
+	}
+	return mi, true
+}
+
+func (j *job) approveOnly() {
+	mi, ok := j.read(true)
+	if !ok {
+		return
+	}
+	d := plan.ForApprove(mi, j.it.PR, j.r.opt.Viewer, true, j.r.opt.Settings)
+	if !d.Approve {
+		j.say(Skipped, d.Reason)
+		return
+	}
+	if j.sendApproval() {
+		j.say(Approved, "approved")
+	}
+}
+
+func (j *job) sendApproval() bool {
+	j.say(Running, "approving")
+	pr := j.it.PR
+	pr.HeadOID = j.head
+	if err := j.r.gh.Review(j.ctx, pr, model.EventApprove, ""); err != nil {
+		j.say(Failed, "approve failed: "+short(err))
+		return false
+	}
+	j.approved = true
+	return true
+}
+
+// decide reads the pull request and decides its next step, reading again
+// while GitHub works out whether it can be merged.
+func (j *job) decide() (model.MergeInfo, plan.Decision, bool) {
+	deadline := time.Now().Add(j.r.opt.RecheckFor)
+	for {
+		mi, ok := j.read(true)
+		if !ok {
+			return mi, plan.Decision{}, false
+		}
+		if mi.State == model.StateMerged {
+			j.say(Merged, "merged")
+			return mi, plan.Decision{}, false
+		}
+		d := plan.ForMerge(mi, j.it.PR, j.r.opt.Viewer, j.r.opt.Settings)
+		j.log.Debug("decided", logging.KeyStep, string(d.Step), "merge_state", string(mi.MergeState), "approve", d.Approve)
+		if d.Step != plan.StepRecheck {
+			return mi, d, true
+		}
+		if time.Now().After(deadline) {
+			j.say(Skipped, "GitHub could not tell whether it can be merged")
+			return mi, d, false
+		}
+		j.say(Running, "checking")
+		if !j.sleep(j.r.opt.Recheck) {
+			return mi, d, false
+		}
+	}
+}
+
+func (j *job) merge() {
+	_, d, ok := j.decide()
+	if !ok {
+		return
+	}
+	if d.Step == plan.StepSkip {
+		j.say(Skipped, d.Reason)
+		return
+	}
+	if d.Approve {
+		if !j.sendApproval() {
+			return
+		}
+		// Read again: the approval can change what is next.
+		if _, d, ok = j.decide(); !ok {
+			return
+		}
+		if d.Step == plan.StepSkip {
+			j.say(Skipped, d.Reason)
+			return
+		}
+	}
+	switch d.Step {
+	case plan.StepMerge:
+		j.mergeNow(d.Method)
+	case plan.StepAutoMerge:
+		j.autoMerge(d.Method)
+	case plan.StepUpdate:
+		if j.updateBranch() {
+			j.wait()
+		}
+	case plan.StepWait:
+		j.wait()
+	default:
+		j.say(Skipped, d.Reason)
+	}
+}
+
+func (j *job) mergeNow(method model.MergeMethod) bool {
+	j.say(Running, "merging")
+	err := j.r.gh.Merge(j.ctx, j.it.PR.Key, j.it.PR.ID, j.head, method)
+	if err == nil {
+		j.say(Merged, "merged "+strings.ToLower(string(method)))
+		return true
+	}
+	// A refused merge is read again to tell why: the head moved, it was
+	// merged meanwhile, or it is not mergeable yet.
+	mi, ok := j.read(false)
+	switch {
+	case !ok:
+	case mi.State == model.StateMerged:
+		j.say(Merged, "merged")
+		return true
+	default:
+		j.say(Failed, "merge failed: "+short(err))
+	}
+	return false
+}
+
+func (j *job) autoMerge(method model.MergeMethod) {
+	j.say(Running, "turning on auto-merge")
+	err := j.r.gh.EnableAutoMerge(j.ctx, j.it.PR.Key, j.it.PR.ID, j.head, method)
+	if errors.Is(err, ErrCleanStatus) {
+		j.mergeNow(method)
+		return
+	}
+	if err != nil {
+		j.say(Failed, "auto-merge failed: "+short(err))
+		return
+	}
+	j.say(AutoMergeOn, "auto-merge on")
+	j.wg.Go(j.watch)
+}
+
+// watch follows a pull request put on auto-merge until GitHub merges it,
+// it is closed, auto-merge is turned off, or the watch times out.
+func (j *job) watch() {
+	until := time.Now().Add(j.r.opt.WatchTimeout)
+	for j.sleep(j.r.opt.PollSlow) {
+		got, err := j.r.gh.MergeInfo(j.ctx, []string{j.it.PR.ID}, false)
+		mi, ok := got[j.it.PR.ID]
+		say := func(res Result, text string) {
+			j.emit(Event{Key: j.it.PR.Key, Result: res, Text: text, Watch: true})
+			j.log.Info("watch end", logging.KeyStep, resultWord[res], "why", text)
+		}
+		switch {
+		case err != nil || !ok:
+			continue
+		case mi.State == model.StateMerged:
+			say(Merged, "merged by auto-merge")
+			return
+		case mi.State == model.StateClosed:
+			say(Stopped, "closed")
+			return
+		case !mi.AutoMerge:
+			say(Stopped, "auto-merge was turned off")
+			return
+		case mi.MergeState == model.MergeDirty:
+			say(Stopped, "auto-merge stuck: conflicts")
+			return
+		case time.Now().After(until):
+			say(Stopped, "auto-merge not done in "+j.r.opt.WatchTimeout.String())
+			return
+		}
+	}
+}
+
+// updateBranch merges the base into the branch and takes the new head as
+// the confirmed one, after checking it is the confirmed head with the base
+// merged in and nothing else.
+func (j *job) updateBranch() bool {
+	j.say(Running, "updating the branch")
+	if err := j.r.gh.UpdateBranch(j.ctx, j.it.PR.Key, j.it.PR.ID, j.head); err != nil {
+		j.say(Failed, "update failed: "+short(err))
+		return false
+	}
+	deadline := time.Now().Add(j.r.opt.RecheckFor)
+	for j.sleep(j.r.opt.Recheck) {
+		got, err := j.r.gh.MergeInfo(j.ctx, []string{j.it.PR.ID}, false)
+		mi, ok := got[j.it.PR.ID]
+		if err == nil && ok && mi.HeadOID != j.head {
+			parents, err := j.r.gh.Parents(j.ctx, j.it.PR.Key, mi.HeadOID)
+			if err != nil || !slices.Contains(parents, j.head) {
+				j.say(Stopped, "head changed · confirm again")
+				return false
+			}
+			j.log.Info("branch updated", "head", mi.HeadOID, "was", j.head)
+			j.head = mi.HeadOID
+			return true
+		}
+		if time.Now().After(deadline) {
+			j.say(Failed, "the branch did not update")
+			return false
+		}
+	}
+	return false
+}
+
+// wait reads the pull request until it can be merged, then merges it. It
+// gives up when required checks run past ChecksTimeout, or when it stays
+// blocked BlockedTimeout after its required checks finished.
+func (j *job) wait() {
+	start := time.Now()
+	var blockedSince time.Time
+	for {
+		mi, d, ok := j.decide()
+		if !ok {
+			return
+		}
+		switch d.Step {
+		case plan.StepMerge:
+			j.mergeNow(d.Method)
+			return
+		case plan.StepSkip:
+			j.say(Skipped, d.Reason)
+			return
+		case plan.StepAutoMerge:
+			// The repository allows auto-merge after all; waiting here is
+			// what was asked, so keep waiting.
+		}
+		running := plan.ChecksRunning(mi, j.r.opt.Settings.ApprovalChecks)
+		switch {
+		case running:
+			blockedSince = time.Time{}
+			if time.Since(start) > j.r.opt.ChecksTimeout {
+				j.say(Stopped, "checks still running after "+j.r.opt.ChecksTimeout.String())
+				return
+			}
+			j.say(Running, "waiting for checks")
+		default:
+			if blockedSince.IsZero() {
+				blockedSince = time.Now()
+			}
+			if time.Since(blockedSince) > j.r.opt.BlockedTimeout {
+				j.say(Stopped, "blocked by another rule")
+				return
+			}
+			text := "waiting"
+			if plan.AwaitingApproval(mi.Checks, j.r.opt.Settings.ApprovalChecks) {
+				text = "waiting for approval checks"
+			}
+			j.say(Running, text)
+		}
+		every := j.r.opt.PollFast
+		if time.Since(start) > time.Minute {
+			every = j.r.opt.PollSlow
+		}
+		if !j.sleep(every) {
+			return
+		}
+	}
+}
+
+// sleep waits d, or returns false when the batch is cancelled.
+func (j *job) sleep(d time.Duration) bool {
+	t := time.NewTimer(d)
+	defer t.Stop()
+	select {
+	case <-t.C:
+		return true
+	case <-j.ctx.Done():
+		return false
+	}
+}
+
+// short is the first line of an error, for a row.
+func short(err error) string {
+	s, _, _ := strings.Cut(err.Error(), "\n")
+	if len(s) > 80 {
+		s = s[:79] + "…"
+	}
+	return s
+}
