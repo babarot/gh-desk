@@ -32,6 +32,7 @@ type File struct {
 	Sections []Section `toml:"sections"`
 	Inbox    Inbox     `toml:"inbox"`
 	Log      Log       `toml:"log"`
+	Cache    Cache     `toml:"cache"`
 	UI       UI        `toml:"ui"`
 	Refresh  Refresh   `toml:"refresh"`
 	Preview  Preview   `toml:"preview"`
@@ -142,9 +143,6 @@ type Select struct {
 // Claude configures asking Claude Code.
 type Claude struct {
 	Model string `toml:"model"`
-	// CacheDir holds the clones and worktrees Claude reads; ~ is the home
-	// directory.
-	CacheDir string `toml:"cache_dir"`
 	// AllowedTools are the tools Claude may use; the claude package checks
 	// them.
 	AllowedTools []string `toml:"allowed_tools"`
@@ -158,9 +156,16 @@ type Claude struct {
 	ReleaseNotesCheck bool `toml:"release_notes_check"`
 }
 
-// CacheDir is Claude.CacheDir with ~ expanded.
+// Cache configures where gh-triage keeps what it can read again.
+type Cache struct {
+	// Dir holds the clones and worktrees Claude reads, and the lists last
+	// read; ~ is the home directory.
+	Dir string `toml:"dir"`
+}
+
+// CacheDir is Cache.Dir with ~ expanded.
 func (f File) CacheDir() string {
-	d := f.Claude.CacheDir
+	d := f.Cache.Dir
 	if d == "~" || strings.HasPrefix(d, "~/") {
 		d = filepath.Join(homeDir(), d[1:])
 	}
@@ -249,6 +254,7 @@ func Default() File {
 		},
 		Inbox:   Inbox{HideClosed: true, DoneAfterReview: true, Limit: 100},
 		Log:     Log{Level: "info"},
+		Cache:   Cache{Dir: defaultCacheDir()},
 		UI:      UI{Theme: "auto", StaleDays: 30},
 		Refresh: Refresh{Interval: "3m"},
 		Preview: Preview{Height: DefaultPreviewHeight, Tab: "overview", Description: "rendered"},
@@ -256,7 +262,7 @@ func Default() File {
 		Merge: Merge{Methods: []string{"merge", "squash", "rebase"}, AutoMerge: true, ChecksTimeout: "6h",
 			BlockedTimeout: "30m", WatchTimeout: "24h", UpdateBranch: "humans"},
 		Bulk:   Bulk{AttentionPaths: []string{".github/workflows/*", "CODEOWNERS", ".github/CODEOWNERS", "docs/CODEOWNERS"}},
-		Claude: Claude{Model: "opus", CacheDir: defaultCacheDir(), AllowedTools: []string{"Read", "Grep", "Glob"}, Language: "English", ReleaseNotesCheck: true},
+		Claude: Claude{Model: "opus", AllowedTools: []string{"Read", "Grep", "Glob"}, Language: "English", ReleaseNotesCheck: true},
 	}
 }
 
@@ -319,6 +325,12 @@ func Template(keys string) string {
 # "error". --debug and GH_TRIAGE_LOG_LEVEL take precedence. gh triage log
 # prints where the file is.
 # level = "info"
+
+[cache]
+# Where gh-triage keeps its clones and the worktrees Claude reads, and the
+# lists last read (lists.json, shown at once at the next launch) (~ is your
+# home); by default $XDG_CACHE_HOME/gh-triage, or ~/.cache/gh-triage.
+# dir = "~/.cache/gh-triage"
 
 [ui]
 # Color scheme: "auto" (default) picks mocha on a dark terminal and latte on a
@@ -411,10 +423,6 @@ func Template(keys string) string {
 # servers are loaded, its file tools see only the worktree, and it has none
 # that run commands.
 # model = "opus"
-# Where gh-triage keeps its clones, the worktrees, and the lists last read
-# (lists.json, shown at once at the next launch) (~ is your home); by
-# default $XDG_CACHE_HOME/gh-triage, or ~/.cache/gh-triage.
-# cache_dir = "~/.cache/gh-triage"
 # The tools Claude may use, among "Read", "Grep", "Glob" and "WebFetch".
 # allowed_tools = ["Read", "Grep", "Glob"]
 # The language Claude answers in about a pull request, such as "Japanese".
@@ -472,6 +480,7 @@ func Load(path string) (File, error) {
 		Sections []Section      `toml:"sections"`
 		Inbox    Inbox          `toml:"inbox"`
 		Log      Log            `toml:"log"`
+		Cache    Cache          `toml:"cache"`
 		UI       UI             `toml:"ui"`
 		Refresh  Refresh        `toml:"refresh"`
 		Preview  Preview        `toml:"preview"`
@@ -481,7 +490,7 @@ func Load(path string) (File, error) {
 		Select   []Select       `toml:"select"`
 		Claude   Claude         `toml:"claude"`
 		Keys     map[string]any `toml:"keys"`
-	}{Inbox: cfg.Inbox, Log: cfg.Log, UI: cfg.UI, Refresh: cfg.Refresh, Preview: cfg.Preview, Diff: cfg.Diff, Merge: cfg.Merge, Bulk: cfg.Bulk,
+	}{Inbox: cfg.Inbox, Log: cfg.Log, Cache: cfg.Cache, UI: cfg.UI, Refresh: cfg.Refresh, Preview: cfg.Preview, Diff: cfg.Diff, Merge: cfg.Merge, Bulk: cfg.Bulk,
 		Claude: cfg.Claude}
 	if err := toml.NewDecoder(bytes.NewReader(src)).DisallowUnknownFields().Decode(&doc); err != nil {
 		return File{}, Report(path, decodeProblems(err))
@@ -490,7 +499,7 @@ func Load(path string) (File, error) {
 	if doc.Sections != nil {
 		sections = doc.Sections
 	}
-	cfg = File{Sections: sections, Inbox: doc.Inbox, Log: doc.Log, UI: doc.UI, Refresh: doc.Refresh,
+	cfg = File{Sections: sections, Inbox: doc.Inbox, Log: doc.Log, Cache: doc.Cache, UI: doc.UI, Refresh: doc.Refresh,
 		Preview: doc.Preview, Diff: doc.Diff, Merge: doc.Merge, Bulk: doc.Bulk, Select: doc.Select, Claude: doc.Claude, Keys: keysFrom(doc.Keys)}
 	ps := checkSections(cfg.Sections)
 	if !slices.Contains(Themes, cfg.UI.Theme) {
@@ -536,8 +545,8 @@ func Load(path string) (File, error) {
 	if strings.TrimSpace(cfg.Claude.Language) == "" {
 		ps = append(ps, problem("claude.language", "claude.language must not be empty"))
 	}
-	if strings.TrimSpace(cfg.Claude.CacheDir) == "" {
-		ps = append(ps, problem("claude.cache_dir", "claude.cache_dir must not be empty"))
+	if strings.TrimSpace(cfg.Cache.Dir) == "" {
+		ps = append(ps, problem("cache.dir", "cache.dir must not be empty"))
 	}
 	if cfg.Inbox.Limit < 1 || cfg.Inbox.Limit > 1000 {
 		ps = append(ps, problem("inbox.limit", "inbox.limit must be between 1 and 1000, got %d", cfg.Inbox.Limit))
@@ -687,7 +696,12 @@ func decodeProblems(err error) Problems {
 		var ps Problems
 		for _, e := range strict.Errors {
 			key := []string(e.Key())
-			ps = append(ps, Problem{Key: key, Index: -1, AtKey: true, Message: fmt.Sprintf("%q is not a setting", strings.Join(key, "."))})
+			name := strings.Join(key, ".")
+			msg := fmt.Sprintf("%q is not a setting", name)
+			if to, ok := moved[name]; ok {
+				msg = fmt.Sprintf("%q moved to %q", name, to)
+			}
+			ps = append(ps, Problem{Key: key, Index: -1, AtKey: true, Message: msg})
 		}
 		return ps
 	}
@@ -701,6 +715,12 @@ func decodeProblems(err error) Problems {
 		return Problems{{Line: line, Col: col, Index: -1, Message: msg}}
 	}
 	return Problems{{Index: -1, Message: err.Error()}}
+}
+
+// moved are settings that were renamed, by old name, so a file that still
+// has one is told where it went. The old name is not read.
+var moved = map[string]string{
+	"claude.cache_dir": "cache.dir",
 }
 
 // wrongType is how the decoder says a value has the wrong type.

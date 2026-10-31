@@ -89,6 +89,9 @@ func TestLoadReportsWhereTheMistakeIs(t *testing.T) {
 		{"bad theme", "[ui]\ntheme = \"dark\"\n", `config.toml:2:9: ui.theme must be one of "auto", "mocha", "latte", got "dark"`},
 		{"bad interval", "[refresh]\ninterval = \"soon\"\n", `config.toml:2:12: refresh.interval must be a duration`},
 		{"bad description", "[preview]\ndescription = \"markdown\"\n", `config.toml:2:15: preview.description must be one of "rendered", "plain", got "markdown"`},
+		{"moved setting", "[claude]\nmodel = \"opus\"\ncache_dir = \"~/cache\"\n", `config.toml:3:1: "claude.cache_dir" moved to "cache.dir"`},
+		{"moved setting, dotted", "claude.cache_dir = \"~/cache\"\n", `config.toml:1:8: "claude.cache_dir" moved to "cache.dir"`},
+		{"empty cache dir", "[cache]\ndir = \" \"\n", `config.toml:2:7: cache.dir must not be empty`},
 		{"wrong type", "[ui]\ntheme = 3\n", "ui.theme must be a string, got integer"},
 		{"does not parse", "[ui\n", "config.toml:1:"},
 	}
@@ -160,5 +163,17 @@ name = "all"
 		if err == nil || !strings.Contains(err.Error(), want) {
 			t.Errorf("err = %v; want one containing %q", err, want)
 		}
+	}
+}
+
+func TestCacheDir(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	cfg, err := Load(write(t, "[cache]\ndir = \"~/triage\"\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, want := cfg.CacheDir(), filepath.Join(home, "triage"); got != want {
+		t.Errorf("CacheDir() = %q, want %q", got, want)
 	}
 }
