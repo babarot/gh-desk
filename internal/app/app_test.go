@@ -51,6 +51,39 @@ func TestEveryScopeHasWords(t *testing.T) {
 	}
 }
 
+func TestEditorPrecedence(t *testing.T) {
+	tests := []struct {
+		name, set, visual, editor, want string
+	}{
+		{"config first", "code --wait", "vi", "nano", "code --wait"},
+		{"then VISUAL", "", "vi", "nano", "vi"},
+		{"then EDITOR", "", "", "nano", "nano"},
+		{"blank config is unset", "  ", "", "nano", "nano"},
+		{"none", "", "", "", ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			env := map[string]string{"VISUAL": tt.visual, "EDITOR": tt.editor}
+			if got := editor(tt.set, func(k string) string { return env[k] }); got != tt.want {
+				t.Errorf("editor = %q, want %q", got, tt.want)
+			}
+		})
+	}
+	// Through the config file, arguments and all.
+	path := filepath.Join(t.TempDir(), "config.toml")
+	if err := os.WriteFile(path, []byte("[ui]\neditor = \"code --wait\"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("VISUAL", "vi")
+	cfg, _, err := setup(path, false, new(slog.LevelVar), logging.Discard())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := settings(cfg).Editor; got != "code --wait" {
+		t.Errorf("Settings.Editor = %q", got)
+	}
+}
+
 func TestSetupWritesTemplateAndReportsMistakes(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "gh-triage", "config.toml")
 	var buf bytes.Buffer

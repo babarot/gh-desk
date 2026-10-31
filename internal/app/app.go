@@ -285,7 +285,7 @@ func settings(cfg config.File) tui.Settings {
 		InboxLimit: cfg.Inbox.Limit, HideClosed: cfg.Inbox.HideClosed, DoneAfterReview: cfg.Inbox.DoneAfterReview,
 		HomeOwners: cfg.UI.HomeOwners, StaleDays: cfg.UI.StaleDays, PreviewHeight: cfg.Preview.Height,
 		DefaultPaneHeight: config.DefaultPreviewHeight,
-		Collapse:          cfg.Diff.Collapse, Theme: cfg.UI.Theme, Editor: cmp.Or(os.Getenv("VISUAL"), os.Getenv("EDITOR")),
+		Collapse:          cfg.Diff.Collapse, Theme: cfg.UI.Theme, Editor: editor(cfg.UI.Editor, os.Getenv),
 		Refresh: cfg.RefreshInterval(), ReleaseNotes: cfg.Claude.ReleaseNotesCheck, Language: cfg.Claude.Language,
 		OpenOnDiff: cfg.Preview.Tab == "diff", PlainDescription: cfg.Preview.Description == "plain",
 		Plan: plan.Settings{AutoMerge: cfg.Merge.AutoMerge, UpdateBranch: cfg.Merge.UpdateBranch,
@@ -306,6 +306,12 @@ func settings(cfg config.File) tui.Settings {
 			Folded: s.Folded, DraftsLast: s.Sort == "drafts_last", Limit: s.Limit})
 	}
 	return set
+}
+
+// editor is the command that edits a review: ui.editor, then $VISUAL, then
+// $EDITOR. It may carry arguments, as "code --wait".
+func editor(set string, getenv func(string) string) string {
+	return cmp.Or(strings.TrimSpace(set), getenv("VISUAL"), getenv("EDITOR"))
 }
 
 // setup writes the config file on first run, reads it, sets the log level,

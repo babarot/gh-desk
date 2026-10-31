@@ -97,8 +97,8 @@ type Settings struct {
 	Collapse []string
 	// Theme is "auto", "mocha" or "latte".
 	Theme string
-	// Editor is the command ctrl+e runs to edit a review, as $EDITOR
-	// gives it; empty turns it off.
+	// Editor is the command ctrl+e runs to edit a review, with its
+	// arguments; empty turns it off.
 	Editor string
 	// Plan is what deciding a merge takes from the config file.
 	Plan plan.Settings

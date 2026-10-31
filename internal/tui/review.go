@@ -132,7 +132,7 @@ type editedMsg struct {
 func (m *Model) openEditor() tea.Cmd {
 	args := strings.Fields(m.set.Editor)
 	if len(args) == 0 {
-		m.setStatus("set $EDITOR to write the review in an editor", true)
+		m.setStatus("set ui.editor or $EDITOR to write the review in an editor", true)
 		return nil
 	}
 	f, err := os.CreateTemp("", "gh-triage-review-*.md")

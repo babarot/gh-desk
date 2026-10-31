@@ -206,7 +206,7 @@ type Log struct {
 	Level string `toml:"level"`
 }
 
-// UI configures how the TUI looks.
+// UI configures how the TUI looks and what it opens.
 type UI struct {
 	// Theme is one of Themes.
 	Theme string `toml:"theme"`
@@ -218,6 +218,9 @@ type UI struct {
 	// approval, such as a policy bot's; while only they are pending, a pull
 	// request is shown as waiting for an approval, and counts as passing.
 	ApprovalChecks []string `toml:"approval_checks"`
+	// Editor is the command ctrl+e runs to write a review, with its
+	// arguments; "" takes $VISUAL, then $EDITOR.
+	Editor string `toml:"editor"`
 }
 
 // Refresh configures the automatic refresh of the shown tab.
@@ -344,6 +347,9 @@ func Template(keys string) string {
 # patterns of check names. While only they are pending, CI shows ◌, and the
 # checks count as passing when deciding a merge.
 # approval_checks = []
+# The editor ctrl+e opens to write a review, with its arguments, such as
+# "code --wait". "" (default) takes $VISUAL, then $EDITOR.
+# editor = ""
 
 [refresh]
 # Refresh the shown tab this often, as a Go duration such as "3m" or "90s";
