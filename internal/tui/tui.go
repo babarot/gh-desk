@@ -83,6 +83,9 @@ type Settings struct {
 	// PaneHeight is the pane's lines last set with the mouse or keys; 0
 	// when none was, and PreviewHeight is taken.
 	PaneHeight int
+	// DefaultPaneHeight is the pane's lines when neither PreviewHeight nor
+	// PaneHeight gives them: opened after starting hidden.
+	DefaultPaneHeight int
 	// OpenOnDiff opens the pane on the diff instead of the overview.
 	OpenOnDiff bool
 	// PlainDescription shows a description's Markdown as written instead of
@@ -233,7 +236,7 @@ func New(src Source, run Runner, cl Claude, km keymap.Map, log *slog.Logger, set
 		m.tabs = append(m.tabs, newSectionTab(s))
 	}
 	m.tabs = append(m.tabs, newInboxTab(set.HideClosed))
-	m.pane = pane{on: set.PreviewHeight > 0, height: cmp.Or(set.PaneHeight, set.PreviewHeight, defaultPaneHeight), unfold: map[model.PRKey]bool{}, folded: map[string]bool{}}
+	m.pane = pane{on: set.PreviewHeight > 0, height: cmp.Or(set.PaneHeight, set.PreviewHeight, set.DefaultPaneHeight), unfold: map[model.PRKey]bool{}, folded: map[string]bool{}}
 	if set.OpenOnDiff {
 		m.pane.mode = paneDiff
 	}

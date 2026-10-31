@@ -113,6 +113,23 @@ func TestDragPane(t *testing.T) {
 	}
 }
 
+func TestPaneOpensAtDefaultHeight(t *testing.T) {
+	// With the pane hidden at start and no height kept, opening it takes
+	// the default height the app passes.
+	set := testSettings()
+	set.PreviewHeight, set.PaneHeight, set.DefaultPaneHeight = 0, 0, 9
+	m := New(fixture(), &fakeRunner{}, &fakeClaude{}, keymap.Default(), nil, set)
+	m.Update(tea.WindowSizeMsg{Width: 130, Height: 34})
+	run(m, m.Init())
+	if m.pane.on {
+		t.Fatal("the pane is shown at start")
+	}
+	press(m, "p")
+	if !m.pane.on || m.pane.height != 9 {
+		t.Fatalf("on = %v, height = %d; want shown at 9", m.pane.on, m.pane.height)
+	}
+}
+
 func TestWheel(t *testing.T) {
 	m := start(t, fixture(), keymap.Default())
 	sel := m.tab().sel

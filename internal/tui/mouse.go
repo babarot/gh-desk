@@ -17,9 +17,6 @@ import (
 // is done with it. See ADR-012.
 
 const (
-	// defaultPaneHeight is the pane's lines when neither the config nor
-	// the last launch gives them.
-	defaultPaneHeight = 14
 	// minPaneHeight is the fewest lines the pane is shown with.
 	minPaneHeight = 6
 	// doubleClick is how soon a second click on the same row opens it.

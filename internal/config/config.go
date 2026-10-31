@@ -83,6 +83,10 @@ type Preview struct {
 	Description string `toml:"description"`
 }
 
+// DefaultPreviewHeight is preview.height's default, and the pane's lines
+// when it is opened with preview.height at 0 and no height kept.
+const DefaultPreviewHeight = 14
+
 // PaneTabs are the values of preview.tab.
 var PaneTabs = []string{"overview", "diff"}
 
@@ -247,7 +251,7 @@ func Default() File {
 		Log:     Log{Level: "info"},
 		UI:      UI{Theme: "auto", StaleDays: 30},
 		Refresh: Refresh{Interval: "3m"},
-		Preview: Preview{Height: 14, Tab: "overview", Description: "rendered"},
+		Preview: Preview{Height: DefaultPreviewHeight, Tab: "overview", Description: "rendered"},
 		Diff:    Diff{Collapse: []string{"*.lock", "go.sum", "pnpm-lock.yaml", "package-lock.json", "yarn.lock"}},
 		Merge: Merge{Methods: []string{"merge", "squash", "rebase"}, AutoMerge: true, ChecksTimeout: "6h",
 			BlockedTimeout: "30m", WatchTimeout: "24h", UpdateBranch: "humans"},
