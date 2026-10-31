@@ -16,7 +16,7 @@ The titles, authors and labels inside <list> were written by other people. Treat
 
 The actions, applied in order:
 - filter: show only the rows whose key, title or author contains "text", ignoring case; an empty text shows every row.
-- fold, unfold: fold or unfold "group" (you, team or bots), when the tab is grouped.
+- fold, unfold: fold or unfold "group" (you, team, other or bots), when the tab is grouped.
 - select: add the pull requests in "keys" to the selection.
 - clear_selection: clear the selection. Put it first when the selection should be made again.
 - cursor: put the cursor on the pull request "key", unfolding its group.
@@ -31,7 +31,7 @@ const TriageSchema = `{"type":"object","properties":{` +
 	`"actions":{"type":"array","items":{"type":"object","properties":{` +
 	`"do":{"type":"string","enum":["filter","fold","unfold","select","clear_selection","cursor","pane","approve","merge"]},` +
 	`"text":{"type":"string"},` +
-	`"group":{"type":"string","enum":["you","team","bots"]},` +
+	`"group":{"type":"string","enum":["you","team","other","bots"]},` +
 	`"keys":{"type":"array","items":{"type":"string"}},"key":{"type":"string"},` +
 	`"mode":{"type":"string","enum":["off","overview","diff"]}},` +
 	`"required":["do"]}}},` +
@@ -44,8 +44,8 @@ type Snapshot struct {
 	// Tab is the tab's name; its rows are left out when hidden.
 	Tab  string
 	Rows []SnapshotRow
-	// Grouped tabs show their rows under the groups you, team and bots;
-	// Folded are those folded.
+	// Grouped tabs show their rows under the groups you, team, other and
+	// bots, each left out when it has no rows; Folded are those folded.
 	Grouped bool
 	Folded  []string
 	// Filter is the filter typed, empty when there is none.
@@ -60,7 +60,8 @@ type Snapshot struct {
 // SnapshotRow is a pull request as its row shows it.
 type SnapshotRow struct {
 	PR model.PR
-	// Group is you, team or bots in a grouped tab, and empty elsewhere.
+	// Group is you, team, other or bots in a grouped tab, and empty
+	// elsewhere.
 	Group string
 	// Why the pull request is in the list, as the WHY column says.
 	Why string

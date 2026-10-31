@@ -365,6 +365,73 @@ func TestReviewTab(t *testing.T) {
 	golden(t, "review-bots", screen(m))
 }
 
+// groupHeads are the groups whose heads t's rows show, in order.
+func groupHeads(m *Model) []plan.Group {
+	var gs []plan.Group
+	for _, r := range m.rows(m.tab()) {
+		if r.kind == rowGroup {
+			gs = append(gs, r.group)
+		}
+	}
+	return gs
+}
+
+func TestGroupsOnlyWithRows(t *testing.T) {
+	// The review tab has no pull request without a request: other is not
+	// shown, in the list or the header's counts.
+	m := start(t, fixture(), keymap.Default())
+	if got, want := groupHeads(m), []plan.Group{plan.GroupYou, plan.GroupTeam, plan.GroupBots}; !slices.Equal(got, want) {
+		t.Fatalf("groups = %v, want %v", got, want)
+	}
+	if s := screen(m); strings.Contains(s, "other") {
+		t.Errorf("other is shown with no rows:\n%s", s)
+	}
+
+	// A filter that leaves only the bot's pull request leaves only its group.
+	press(m, "/", "o", "c", "t", "o", "enter")
+	if got := groupHeads(m); !slices.Equal(got, []plan.Group{plan.GroupBots}) {
+		t.Fatalf("filtered groups = %v, want bots only", got)
+	}
+	// A filter that matches nothing leaves no rows, not empty heads.
+	press(m, "/", "z", "z", "z", "enter")
+	if rs := m.rows(m.tab()); len(rs) != 0 {
+		t.Fatalf("rows = %d, want none", len(rs))
+	}
+	if s := screen(m); !strings.Contains(s, "nothing here") || strings.Contains(s, "requested from") {
+		t.Errorf("screen with nothing filtered in:\n%s", s)
+	}
+	if _, _, ok := m.currentPR(); ok {
+		t.Error("the cursor is on a pull request with no rows")
+	}
+	press(m, "esc")
+	if got := groupHeads(m); len(got) != 3 {
+		t.Fatalf("groups after the filter = %v, want three", got)
+	}
+}
+
+func TestGroupedTabWithoutRequests(t *testing.T) {
+	// A grouped tab of one's own pull requests has no requests to the
+	// viewer or a team: its rows are all under other.
+	set := testSettings()
+	set.Sections[1].Grouped = true
+	m := New(fixture(), &fakeRunner{results: map[model.PRKey]runner.Event{}}, &fakeClaude{}, keymap.Default(), nil, set)
+	m.Update(tea.WindowSizeMsg{Width: 130, Height: 34})
+	run(m, m.Init())
+	press(m, "2")
+	if got := groupHeads(m); !slices.Equal(got, []plan.Group{plan.GroupOther}) {
+		t.Fatalf("groups = %v, want other only\n%s", got, screen(m))
+	}
+	s := screen(m)
+	for _, want := range []string{"▾ other 1", "1 other"} {
+		if !strings.Contains(s, want) {
+			t.Errorf("screen does not show %q:\n%s", want, s)
+		}
+	}
+	if strings.Contains(s, "to a team") || strings.Contains(s, "to you") {
+		t.Errorf("screen counts groups with no rows:\n%s", s)
+	}
+}
+
 func TestPreviewDiff(t *testing.T) {
 	m := start(t, fixture(), keymap.Default())
 	press(m, "v")

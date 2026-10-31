@@ -148,6 +148,10 @@ func (m *Model) rowsOf(t *tab, filter string, folded map[plan.Group]bool) []row 
 				in = append(in, p)
 			}
 		}
+		// A group with no rows, filtered or not, is left out with its head.
+		if len(in) == 0 {
+			continue
+		}
 		out = append(out, row{kind: rowGroup, group: g, count: len(in)})
 		if !folded[g] {
 			for _, p := range in {

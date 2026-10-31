@@ -18,7 +18,9 @@ func TestGroupOf(t *testing.T) {
 		{model.PR{Requested: team}, GroupTeam},
 		{model.PR{Requested: append(team, me...)}, GroupYou},
 		{model.PR{Requested: me, AuthorIsBot: true}, GroupBots},
-		{model.PR{}, GroupTeam},
+		{model.PR{Requested: team, AuthorIsBot: true}, GroupBots},
+		{model.PR{Requested: []model.Reviewer{{Login: "someone"}}}, GroupOther},
+		{model.PR{}, GroupOther},
 	}
 	for _, tt := range tests {
 		if got := GroupOf(tt.pr, "me"); got != tt.want {

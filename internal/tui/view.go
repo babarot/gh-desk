@@ -199,7 +199,12 @@ func (m *Model) headerRight() string {
 		for _, p := range t.prs {
 			n[plan.GroupOf(p, m.viewer)]++
 		}
-		parts = append(parts, fmt.Sprintf("%d to you · %d via team · %d bots", n[plan.GroupYou], n[plan.GroupTeam], n[plan.GroupBots]))
+		// A group with no pull requests is left out, as in the list.
+		for _, g := range plan.Groups {
+			if n[g] > 0 {
+				parts = append(parts, fmt.Sprintf("%d %s", n[g], groupCount[g]))
+			}
+		}
 	}
 	if t.loaded && t.total > len(t.prs) && !t.inbox {
 		parts = append(parts, fmt.Sprintf("showing %d of %d", len(t.prs), t.total))

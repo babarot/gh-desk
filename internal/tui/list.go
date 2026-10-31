@@ -473,9 +473,18 @@ func progressOver(cols []column) map[string]bool {
 }
 
 var groupLabel = map[plan.Group]string{
-	plan.GroupYou:  "requested from you",
-	plan.GroupTeam: "via team",
-	plan.GroupBots: "bots",
+	plan.GroupYou:   "requested from you",
+	plan.GroupTeam:  "requested from a team",
+	plan.GroupOther: "other",
+	plan.GroupBots:  "bots",
+}
+
+// groupCount is how the header counts each group.
+var groupCount = map[plan.Group]string{
+	plan.GroupYou:   "to you",
+	plan.GroupTeam:  "to a team",
+	plan.GroupOther: "other",
+	plan.GroupBots:  "bots",
 }
 
 // repoName is a pull request's repository as the PR column shows it:

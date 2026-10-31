@@ -125,6 +125,19 @@ query = "is:open is:pr author:app/renovate"
 	if len(cfg.Sections) != 1 || cfg.Sections[0].Sort != "updated" || cfg.Sections[0].Limit != 100 {
 		t.Errorf("sections = %+v", cfg.Sections)
 	}
+	cfg, err = Load(write(t, `
+[[sections]]
+name = "mine"
+query = "is:open is:pr author:@me"
+group = "requested"
+folded = ["other", "bots"]
+`))
+	if err != nil {
+		t.Fatalf("folded other: %v", err)
+	}
+	if got := cfg.Sections[0].Folded; !reflect.DeepEqual(got, []string{"other", "bots"}) {
+		t.Errorf("folded = %v", got)
+	}
 	_, err = Load(write(t, `
 [[sections]]
 name = "inbox"

@@ -147,6 +147,16 @@ func (p PR) RequestedFrom(login string) bool {
 	return false
 }
 
+// RequestedFromTeam reports whether a review is requested from any team.
+func (p PR) RequestedFromTeam() bool {
+	for _, r := range p.Requested {
+		if r.Team {
+			return true
+		}
+	}
+	return false
+}
+
 // Notification is a GitHub notification about a pull request.
 type Notification struct {
 	ThreadID string

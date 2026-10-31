@@ -12,30 +12,40 @@ import (
 	"github.com/babarot/gh-triage/internal/model"
 )
 
-// Group is where a review request is listed.
+// Group is where a pull request is listed in a grouped tab. A group says
+// only what holds of the pull request itself, never what the tab's query
+// implies, so it is true whatever the query is. See ADR-015.
 type Group string
 
 const (
-	// GroupYou is a request to the viewer in person, from a person.
+	// GroupYou is a pull request whose review is requested from the viewer
+	// in person.
 	GroupYou Group = "you"
-	// GroupTeam is a request only to a team the viewer is on.
+	// GroupTeam is a pull request whose review is requested from a team,
+	// whether or not the viewer is on it.
 	GroupTeam Group = "team"
+	// GroupOther is a pull request with neither request.
+	GroupOther Group = "other"
 	// GroupBots is a pull request opened by a bot.
 	GroupBots Group = "bots"
 )
 
-// Groups are the groups in the order the review tab lists them.
-var Groups = []Group{GroupYou, GroupTeam, GroupBots}
+// Groups are the groups in the order a grouped tab lists them.
+var Groups = []Group{GroupYou, GroupTeam, GroupOther, GroupBots}
 
-// GroupOf is the group a review request falls in for viewer.
+// GroupOf is the group p falls in for viewer: the first of bots, you, team
+// and other that holds. Groups do not overlap, so a bot's pull request is
+// in bots even when it is requested from the viewer.
 func GroupOf(p model.PR, viewer string) Group {
 	switch {
 	case p.AuthorIsBot:
 		return GroupBots
 	case p.RequestedFrom(viewer):
 		return GroupYou
-	default:
+	case p.RequestedFromTeam():
 		return GroupTeam
+	default:
+		return GroupOther
 	}
 }
 

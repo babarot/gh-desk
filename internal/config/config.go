@@ -50,7 +50,8 @@ type File struct {
 type Section struct {
 	Name  string `toml:"name"`
 	Query string `toml:"query"`
-	// Group is "requested" to split rows into you, team and bots, or "".
+	// Group is "requested" to split rows by whom a review is requested
+	// from (you, team, other) and bots, or "".
 	Group string `toml:"group"`
 	// Folded are the groups folded at start.
 	Folded []string `toml:"folded"`
@@ -196,7 +197,7 @@ func Duration(s string) time.Duration {
 var (
 	SectionGroups = []string{"", "requested"}
 	SectionSorts  = []string{"updated", "drafts_last"}
-	GroupNames    = []string{"you", "team", "bots"}
+	GroupNames    = []string{"you", "team", "other", "bots"}
 )
 
 // Log configures the log file.
@@ -294,8 +295,9 @@ func Template(keys string) string {
 	return `# gh-triage settings. Uncomment a line to change it.
 
 # The tabs before the inbox, each a GitHub search. Tabs given here replace
-# all three below. group = "requested" splits a tab into requests to you,
-# requests to your teams, and pull requests opened by bots; folded are the
+# all three below. group = "requested" splits a tab by whom a review is
+# requested from: "you", a "team", or neither ("other"), with pull requests
+# opened by "bots" apart; a group with no rows is not shown. folded are the
 # groups folded at start. sort is "updated" (default) or "drafts_last".
 # limit is how many pull requests to read (at most 1000).
 #

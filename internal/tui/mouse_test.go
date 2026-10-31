@@ -38,15 +38,15 @@ func TestClickTab(t *testing.T) {
 
 func TestClickRowAndDoubleClick(t *testing.T) {
 	m := start(t, fixture(), keymap.Default())
-	x, y := lineOf(t, m, "▸ via team")
+	x, y := lineOf(t, m, "▸ requested from a team")
 	mouseAt(m, tea.MouseClickMsg{X: x, Y: y, Button: tea.MouseLeft})
 	if r, _ := m.current(); r.kind != rowGroup {
-		t.Fatalf("row = %+v, want the via team group", r)
+		t.Fatalf("row = %+v, want the team group", r)
 	}
 	// A second click on the row unfolds the group.
 	mouseAt(m, tea.MouseClickMsg{X: x, Y: y, Button: tea.MouseLeft})
 	if !strings.Contains(screen(m), "settings") {
-		t.Fatalf("via team did not unfold:\n%s", screen(m))
+		t.Fatalf("the team group did not unfold:\n%s", screen(m))
 	}
 
 	x, y = lineOf(t, m, "Add retries")
