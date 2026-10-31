@@ -397,6 +397,7 @@ var scopeWords = map[keymap.Scope]string{
 	keymap.ScopeList:    "The list and its preview pane",
 	keymap.ScopePR:      "The pull request screen",
 	keymap.ScopePopup:   "A confirm popup",
+	keymap.ScopeTriage:  "The list, while Claude's plan is shown",
 	keymap.ScopeChat:    "The Claude screen",
 	keymap.ScopeCompose: "Writing a review",
 	keymap.ScopeInput:   "Typing in the filter",

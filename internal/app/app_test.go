@@ -11,6 +11,7 @@ import (
 
 	"github.com/babarot/gh-triage/internal/claude"
 	"github.com/babarot/gh-triage/internal/config"
+	"github.com/babarot/gh-triage/internal/keymap"
 	"github.com/babarot/gh-triage/internal/logging"
 	"github.com/babarot/gh-triage/internal/model"
 )
@@ -34,6 +35,19 @@ func TestKeysTemplateLoadsUncommented(t *testing.T) {
 	}
 	if _, ps := applyKeys(cfg.Keys); len(ps) > 0 {
 		t.Fatalf("problems: %v", ps)
+	}
+}
+
+func TestEveryScopeHasWords(t *testing.T) {
+	// The [keys] template heads each scope with its words; a scope added to
+	// the keymap without them would get an empty heading.
+	for _, d := range keymap.Defaults {
+		if strings.TrimSpace(scopeWords[d.Scope]) == "" {
+			t.Errorf("scope %q of %s has no words in scopeWords", d.Scope, d.Action)
+		}
+	}
+	if strings.Contains(KeysTemplate(), "# :") {
+		t.Errorf("template has an empty heading:\n%s", KeysTemplate())
 	}
 }
 
