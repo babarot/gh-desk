@@ -63,7 +63,7 @@ func TestTemplateLoadsAsDefault(t *testing.T) {
 func TestTemplateTabsAreTheDefault(t *testing.T) {
 	var b strings.Builder
 	in := false
-	for _, line := range strings.Split(Template(""), "\n") {
+	for line := range strings.SplitSeq(Template(""), "\n") {
 		switch {
 		case line == "# [[tabs]]":
 			in = true
@@ -385,8 +385,8 @@ func TestColumns(t *testing.T) {
 	if err != nil || !slices.Equal(cfg.List.Columns, []string{"pr", "age", "title"}) {
 		t.Fatalf("columns = %v, %v", cfg.List.Columns, err)
 	}
-	wantErrs(t, "[list]\ncolumns = [\"pr\", \"age\", \"age\", \"autor\"]\n",
+	wantErrs(t, "[list]\ncolumns = [\"pr\", \"age\", \"age\", \"authr\"]\n",
 		`config.toml:2:25: list.columns names "age" twice`,
 		`list.columns must have "title"`,
-		`list.columns[3] must be one of "pr", "title", "author", "ci", "review", "why", "size", "age", got "autor"; did you mean "author"?`)
+		`list.columns[3] must be one of "pr", "title", "author", "ci", "review", "why", "size", "age", got "authr"; did you mean "author"?`)
 }

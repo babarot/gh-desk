@@ -68,7 +68,7 @@ func TestTemplateValuesAreTheDefaults(t *testing.T) {
 	var b strings.Builder
 	n := 0
 	inTables, inExample := false, false
-	for _, line := range strings.Split(Template(""), "\n") {
+	for line := range strings.SplitSeq(Template(""), "\n") {
 		switch {
 		case line == "[keys]":
 			inTables = false

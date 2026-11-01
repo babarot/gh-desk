@@ -12,7 +12,7 @@ import (
 // columnsLine is the line of the list's column titles.
 func columnsLine(t *testing.T, m *Model) string {
 	t.Helper()
-	for _, l := range strings.Split(screen(m), "\n") {
+	for l := range strings.SplitSeq(screen(m), "\n") {
 		if strings.Contains(l, "TITLE") {
 			return strings.Join(strings.Fields(l), " ")
 		}
@@ -72,7 +72,7 @@ func TestProgressShowsWhateverTheColumns(t *testing.T) {
 		m := startSet(t, set, 130)
 		m.progress[key("acme", "api", 12)] = progress{text: "waiting for checks", result: runner.Running}
 		line := ""
-		for _, l := range strings.Split(screen(m), "\n") {
+		for l := range strings.SplitSeq(screen(m), "\n") {
 			// The first: the pane under the list names it too.
 			if strings.Contains(l, "api#12") {
 				line = l

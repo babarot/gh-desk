@@ -501,8 +501,8 @@ func warnings(cfg File) Problems {
 		}
 	}
 	for i, s := range cfg.Select {
-		if strings.HasPrefix(s.Author, "app/") {
-			warn([]string{"select", "author"}, i+1, "select[%d].author %q never matches: a bot's login is written without app/, as %q", i, s.Author, strings.TrimPrefix(s.Author, "app/"))
+		if login, ok := strings.CutPrefix(s.Author, "app/"); ok {
+			warn([]string{"select", "author"}, i+1, "select[%d].author %q never matches: a bot's login is written without app/, as %q", i, s.Author, login)
 		}
 	}
 	for i, g := range cfg.Checks.Approval {
@@ -517,7 +517,7 @@ func warnings(cfg File) Problems {
 // searchesPRs reports whether a GitHub search query asks for pull requests
 // only.
 func searchesPRs(q string) bool {
-	for _, f := range strings.Fields(strings.ToLower(q)) {
+	for f := range strings.FieldsSeq(strings.ToLower(q)) {
 		if f == "is:pr" || f == "type:pr" || f == "is:pull-request" {
 			return true
 		}

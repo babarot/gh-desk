@@ -58,6 +58,17 @@ type kind interface {
 	schema() map[string]any
 }
 
+// as is v, a setting's value, as the type its kind takes. The table pairs
+// every kind with a value of that type, so another type is a mistake in the
+// table and panics.
+func as[T any](v any) T {
+	t, ok := v.(T)
+	if !ok {
+		panic(fmt.Sprintf("config: a setting's value is %T, not %T", v, t))
+	}
+	return t
+}
+
 type (
 	boolKind struct{}
 	// intKind is a whole number from Min.
@@ -83,7 +94,7 @@ func (boolKind) toml(v any) string          { return fmt.Sprint(v) }
 func (boolKind) schema() map[string]any     { return map[string]any{"type": "boolean"} }
 
 func (k intKind) check(key string, v any) Problems {
-	if n := v.(int); n < k.Min {
+	if n := as[int](v); n < k.Min {
 		return Problems{problem(key, "%s must be %d or more, got %d", key, k.Min, n)}
 	}
 	return nil
@@ -94,7 +105,7 @@ func (k intKind) schema() map[string]any {
 }
 
 func (k stringKind) check(key string, v any) Problems {
-	if k.NonEmpty && strings.TrimSpace(v.(string)) == "" {
+	if k.NonEmpty && strings.TrimSpace(as[string](v)) == "" {
 		return Problems{problem(key, "%s must not be empty", key)}
 	}
 	return nil
@@ -108,14 +119,14 @@ func (k stringKind) schema() map[string]any {
 	return s
 }
 
-func (k enumKind) check(key string, v any) Problems { return oneOf(key, v.(string), k.Values) }
+func (k enumKind) check(key string, v any) Problems { return oneOf(key, as[string](v), k.Values) }
 func (enumKind) toml(v any) string                  { return fmt.Sprintf("%q", v) }
 func (k enumKind) schema() map[string]any {
 	return map[string]any{"type": "string", "enum": k.Values}
 }
 
 func (k listKind) check(key string, v any) Problems {
-	ss := v.([]string)
+	ss := as[[]string](v)
 	var ps Problems
 	if k.NonEmpty && len(ss) == 0 {
 		ps = append(ps, problem(key, "%s must name at least one of %s", key, quoted(k.Values)))
@@ -130,7 +141,7 @@ func (k listKind) check(key string, v any) Problems {
 	}
 	return ps
 }
-func (listKind) toml(v any) string { return tomlList(v.([]string)) }
+func (listKind) toml(v any) string { return tomlList(as[[]string](v)) }
 func (k listKind) schema() map[string]any {
 	items := map[string]any{"type": "string"}
 	if len(k.Values) > 0 {
@@ -144,12 +155,12 @@ func (k listKind) schema() map[string]any {
 }
 
 func (k durationKind) check(key string, v any) Problems {
-	if p, bad := v.(Duration).problem(key, k.Off); bad {
+	if p, bad := as[Duration](v).problem(key, k.Off); bad {
 		return Problems{p}
 	}
 	return nil
 }
-func (durationKind) toml(v any) string { return fmt.Sprintf("%q", v.(Duration).String()) }
+func (durationKind) toml(v any) string { return fmt.Sprintf("%q", as[Duration](v).String()) }
 func (k durationKind) schema() map[string]any {
 	d := map[string]any{"type": "string", "pattern": `^([0-9]+(\.[0-9]+)?(ns|us|µs|ms|s|m|h))+$`}
 	if !k.Off {
@@ -159,13 +170,13 @@ func (k durationKind) schema() map[string]any {
 }
 
 func (daysKind) check(key string, v any) Problems {
-	if p, bad := v.(Days).problem(key); bad {
+	if p, bad := as[Days](v).problem(key); bad {
 		return Problems{p}
 	}
 	return nil
 }
 func (daysKind) toml(v any) string {
-	if d := v.(Days); !d.Off {
+	if d := as[Days](v); !d.Off {
 		return fmt.Sprint(d.N)
 	}
 	return `"off"`
@@ -174,8 +185,8 @@ func (daysKind) schema() map[string]any {
 	return map[string]any{"anyOf": []any{map[string]any{"type": "integer", "minimum": 1}, map[string]any{"const": "off"}}}
 }
 
-func (globsKind) check(key string, v any) Problems { return globProblems(key, v.([]Glob)) }
-func (globsKind) toml(v any) string                { return tomlList(Patterns(v.([]Glob))) }
+func (globsKind) check(key string, v any) Problems { return globProblems(key, as[[]Glob](v)) }
+func (globsKind) toml(v any) string                { return tomlList(Patterns(as[[]Glob](v))) }
 func (globsKind) schema() map[string]any {
 	return map[string]any{"type": "array", "items": map[string]any{"type": "string"}}
 }
@@ -416,7 +427,7 @@ func comment(text string) string {
 	}
 	var b strings.Builder
 	line := "#"
-	for _, w := range strings.Fields(text) {
+	for w := range strings.FieldsSeq(text) {
 		if len(line)+1+len(w) > 76 && line != "#" {
 			b.WriteString(line + "\n")
 			line = "#"
