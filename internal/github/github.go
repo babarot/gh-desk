@@ -110,10 +110,13 @@ fragment light on PullRequest {
   latestReviews(first: 10) { nodes { author { login } state } }
 }`
 
+// heavyFields read up to 100 labels, the most a page holds; a lower limit
+// left labels out of the pane and the triage prompt, and costs no fewer
+// points.
 const heavyFields = `
 fragment heavy on PullRequest {
   headRefOid additions deletions changedFiles reviewDecision
-  labels(first: 5) { nodes { name } }
+  labels(first: 100) { nodes { name } }
   comments { totalCount }
   commits(last: 1) { nodes { commit { statusCheckRollup { state } } } }
 }`
