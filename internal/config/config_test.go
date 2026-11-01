@@ -288,6 +288,24 @@ func TestCacheDir(t *testing.T) {
 	}
 }
 
+func TestClaudeCommand(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	if got := Default().ClaudeCommand(); got != "claude" {
+		t.Errorf("default ClaudeCommand() = %q, want %q", got, "claude")
+	}
+	cfg, _, err := Load(write(t, "[claude]\ncommand = \"~/bin/claude\"\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, want := cfg.ClaudeCommand(), filepath.Join(home, "bin", "claude"); got != want {
+		t.Errorf("ClaudeCommand() = %q, want %q", got, want)
+	}
+	if _, _, err := Load(write(t, "[claude]\ncommand = \"\"\n")); err == nil {
+		t.Error("an empty claude.command loaded without a problem")
+	}
+}
+
 func TestDidYouMean(t *testing.T) {
 	tests := []struct{ name, body, want string }{
 		{"key", "[list]\nstal_days = 3\n", `"list.stal_days" is not a setting; did you mean "list.stale_days"?`},

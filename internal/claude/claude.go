@@ -180,7 +180,7 @@ func (c *Claude) Interactive(dir, session string) *exec.Cmd {
 func (c *Claude) run(ctx context.Context, log *slog.Logger, dir string, args []string, prompt string, progress func(Step)) (Answer, error) {
 	bin, err := exec.LookPath(c.opt.Bin)
 	if err != nil {
-		return Answer{}, errors.New("claude (Claude Code) is not on PATH")
+		return Answer{}, fmt.Errorf("%s (Claude Code) is not found; claude.command sets where it is", c.opt.Bin)
 	}
 	start := time.Now()
 	cmd := exec.CommandContext(ctx, bin, args...)

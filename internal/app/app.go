@@ -158,7 +158,7 @@ func Run(args []string, stdout, stderr io.Writer) int {
 	rn := runner.New(runnerGitHub{gh}, log, runner.Options{Settings: set.Plan, Viewer: viewer, Store: rstore, CanWait: rstore != nil,
 		ChecksTimeout: cfg.Merge.ChecksTimeout.D, BlockedTimeout: cfg.Merge.BlockedTimeout.D})
 	cl := asker{
-		Claude: claude.New(claude.Options{Model: cfg.Claude.Model, Tools: cfg.Claude.AllowedTools, Language: cfg.Claude.Language, Instructions: cfg.Claude.Instructions, Log: log}),
+		Claude: claude.New(claude.Options{Bin: cfg.ClaudeCommand(), Model: cfg.Claude.Model, Tools: cfg.Claude.AllowedTools, Language: cfg.Claude.Language, Instructions: cfg.Claude.Instructions, Log: log}),
 		ws:     &claude.Workspace{Dir: cfg.CacheDir(), Borrow: claude.GhqRoots(ctx), Log: log},
 	}
 	start := time.Now()

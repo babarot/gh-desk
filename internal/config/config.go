@@ -197,7 +197,10 @@ type Select struct {
 
 // Claude configures asking Claude Code.
 type Claude struct {
-	Model string `toml:"model"`
+	// Command is the claude command: a name looked up on PATH, or a path;
+	// ~ is the home directory.
+	Command string `toml:"command"`
+	Model   string `toml:"model"`
 	// AllowedTools are the tools Claude may use; the claude package checks
 	// them.
 	AllowedTools []string `toml:"allowed_tools"`
@@ -234,12 +237,17 @@ type Cache struct {
 }
 
 // CacheDir is Cache.Dir with ~ expanded.
-func (f File) CacheDir() string {
-	d := f.Cache.Dir
-	if d == "~" || strings.HasPrefix(d, "~/") {
-		d = filepath.Join(homeDir(), d[1:])
+func (f File) CacheDir() string { return expandHome(f.Cache.Dir) }
+
+// ClaudeCommand is Claude.Command with ~ expanded.
+func (f File) ClaudeCommand() string { return expandHome(f.Claude.Command) }
+
+// expandHome replaces a leading ~ in p with the home directory.
+func expandHome(p string) string {
+	if p == "~" || strings.HasPrefix(p, "~/") {
+		p = filepath.Join(homeDir(), p[1:])
 	}
-	return d
+	return p
 }
 
 // RefreshInterval is list.refresh as a duration; zero turns automatic
@@ -288,7 +296,7 @@ func Default() File {
 		Merge: Merge{Methods: []string{"merge", "squash", "rebase"}, AutoMerge: true, ChecksTimeout: dur("6h"),
 			BlockedTimeout: dur("30m"), UpdateBranch: "humans"},
 		Bulk:   Bulk{AttentionPaths: globs(".github/workflows/*", "CODEOWNERS", ".github/CODEOWNERS", "docs/CODEOWNERS")},
-		Claude: Claude{Model: "opus", AllowedTools: []string{"Read", "Grep", "Glob"}, Language: "English", ReleaseNotesCheck: true},
+		Claude: Claude{Command: "claude", Model: "opus", AllowedTools: []string{"Read", "Grep", "Glob"}, Language: "English", ReleaseNotesCheck: true},
 		Theme:  Theme{Dark: "default", Light: "latte"},
 		Log:    Log{Level: "info"},
 		Cache:  Cache{Dir: defaultCacheDir()},

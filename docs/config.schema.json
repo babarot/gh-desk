@@ -50,6 +50,11 @@
           },
           "type": "array"
         },
+        "command": {
+          "description": "The claude command: a name looked up on PATH, or a path to it (~ is your home), without arguments.",
+          "pattern": "\\S",
+          "type": "string"
+        },
         "instructions": {
           "description": "Appended to the instructions of every review and triage, such as \"Point out changes that have no tests.\"",
           "type": "string"

@@ -249,6 +249,8 @@ var settings = []setting{
 	{Key: "bulk.attention_paths", Kind: globsKind{}, Value: func(f File) any { return f.Bulk.AttentionPaths },
 		Doc: "Pull requests changing files that match these glob patterns get a mark in the confirm popup."},
 
+	{Key: "claude.command", Kind: stringKind{NonEmpty: true}, Value: func(f File) any { return f.Claude.Command },
+		Doc: "The claude command: a name looked up on PATH, or a path to it (~ is your home), without arguments."},
 	{Key: "claude.model", Kind: stringKind{NonEmpty: true}, Value: func(f File) any { return f.Claude.Model },
 		Doc: "The model Claude Code runs, as claude --model takes it."},
 	{Key: "claude.allowed_tools", Kind: listKind{}, Value: func(f File) any { return f.Claude.AllowedTools },
