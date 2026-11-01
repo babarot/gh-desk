@@ -120,11 +120,7 @@ func (m *Model) listKey(k string) tea.Cmd {
 	case is("prev_file"):
 		m.jumpFile(-1)
 	case is("unfold"):
-		if m.pane.mode == paneOverview {
-			m.foldPart()
-		} else if p, _, ok := m.currentPR(); ok {
-			m.pane.unfold[p.Key] = !m.pane.unfold[p.Key]
-		}
+		m.foldPart()
 	}
 	r, ok := m.current()
 	if !ok {

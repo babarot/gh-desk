@@ -152,9 +152,9 @@ func (m *Model) listClick(x, y int) tea.Cmd {
 		m.dragging = true
 		return nil
 	}
-	// In the overview, a click on a fact opens its page, and one on
-	// the header of a part folds it.
-	if top := m.paneTop(l); l.pane > 0 && y > top && m.pane.mode == paneOverview {
+	// A click on a fact of the overview opens its page, and one on the
+	// header of a part, or of a file of the diff, folds it.
+	if top := m.paneTop(l); l.pane > 0 && y > top {
 		r := y - top - 1
 		if r < len(m.pane.links) {
 			for _, k := range m.pane.links[r] {
@@ -165,7 +165,11 @@ func (m *Model) listClick(x, y int) tea.Cmd {
 			}
 		}
 		if r < len(m.pane.heads) && m.pane.heads[r] != "" {
-			m.pane.folded[m.pane.heads[r]] = !m.pane.folded[m.pane.heads[r]]
+			if m.pane.mode == paneOverview {
+				m.pane.folded[m.pane.heads[r]] = !m.pane.folded[m.pane.heads[r]]
+			} else if p, _, ok := m.currentPR(); ok {
+				m.foldFile(p, m.pane.heads[r])
+			}
 		}
 		return nil
 	}

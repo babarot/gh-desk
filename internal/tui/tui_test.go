@@ -439,6 +439,26 @@ func TestPreviewDiff(t *testing.T) {
 	golden(t, "preview-diff", screen(m))
 }
 
+func TestPreviewDiffFoldsFiles(t *testing.T) {
+	m := start(t, fixture(), keymap.Default())
+	press(m, "v")
+	// go.sum matches the collapse patterns, so it starts folded; z folds
+	// the file whose header is in sight first, and leaves go.sum alone.
+	if s := screen(m); !strings.Contains(s, "▾ client.go") || !strings.Contains(s, "▸ go.sum") {
+		t.Fatalf("want client.go open and go.sum folded:\n%s", s)
+	}
+	press(m, "z")
+	if s := screen(m); !strings.Contains(s, "▸ client.go") || strings.Contains(s, "var tries = 3") || !strings.Contains(s, "▸ go.sum") {
+		t.Fatalf("z did not fold client.go alone:\n%s", s)
+	}
+	// A click on a file's header folds or unfolds it.
+	x, y := lineOf(t, m, "▸ go.sum")
+	mouseAt(m, tea.MouseClickMsg{X: x, Y: y, Button: tea.MouseLeft})
+	if s := screen(m); !strings.Contains(s, "▾ go.sum") || !strings.Contains(s, "+x v2") {
+		t.Fatalf("a click did not unfold go.sum:\n%s", s)
+	}
+}
+
 func TestPreviewOpensOnDiff(t *testing.T) {
 	set := testSettings()
 	set.OpenOnDiff = true

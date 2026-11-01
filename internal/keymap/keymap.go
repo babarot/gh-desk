@@ -91,7 +91,7 @@ var Defaults = []Def{
 	{"next_file", ScopeList, []string{"]"}, "next file / part"},
 	{"prev_file", ScopeList, []string{"["}, "previous file / part"},
 	{"pane_tab", ScopeList, []string{"v"}, "overview / diff"},
-	{"unfold", ScopeList, []string{"z"}, "unfold lock files / fold part"},
+	{"unfold", ScopeList, []string{"z"}, "fold file / part"},
 	{"toggle_pane", ScopeList, []string{"p"}, "preview pane"},
 	{"pane_grow", ScopeList, []string{"+"}, "taller pane"},
 	{"pane_shrink", ScopeList, []string{"-"}, "shorter pane"},

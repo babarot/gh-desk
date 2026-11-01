@@ -422,25 +422,36 @@ func (m *Model) facts(p model.PR, d *entry[model.Detail], width int) []line {
 	return out
 }
 
-// foldPart folds or unfolds the first part whose header the pane shows,
-// or, with none in sight, the part the pane is in; the header stays in
-// sight.
+// foldPart folds or unfolds the first part, or file of the diff, whose
+// header the pane shows, or, with none in sight, the one the pane is in;
+// the header stays in sight.
 func (m *Model) foldPart() {
 	p, _, ok := m.currentPR()
 	if !ok {
 		return
 	}
+	var ls []line
+	fold := func(part string) { m.pane.folded[part] = !m.pane.folded[part] }
+	if m.pane.mode == paneOverview {
+		left, _ := m.descWidths()
+		ls = m.descLines(p, left)
+	} else {
+		e := m.cache.diffs[diffID(p)]
+		if e == nil || e.loading || e.err != nil {
+			return
+		}
+		ls = m.paneDiffLines(p, e.val)
+		fold = func(path string) { m.foldFile(p, path) }
+	}
 	for _, part := range m.pane.heads {
 		if part != "" {
-			m.pane.folded[part] = !m.pane.folded[part]
+			fold(part)
 			return
 		}
 	}
-	left, _ := m.descWidths()
-	ls := m.descLines(p, left)
 	for i := min(m.pane.scroll, len(ls)-1); i >= 0; i-- {
 		if ls[i].head {
-			m.pane.folded[ls[i].part] = !m.pane.folded[ls[i].part]
+			fold(ls[i].part)
 			m.pane.scroll = i
 			return
 		}

@@ -29,12 +29,15 @@ type pane struct {
 	height int
 	mode   paneMode
 	scroll int
-	unfold map[model.PRKey]bool
+	// files are the files of each pull request's diff folded or unfolded
+	// by hand, by path; the others are folded when they match the
+	// collapse patterns.
+	files map[model.PRKey]map[string]bool
 	// folded are the parts of the description pane folded, by name.
 	folded map[string]bool
-	// heads are the parts whose headers the description pane last drew,
-	// by its lines, for a click to fold them; links are the pages a click
-	// on each line opens.
+	// heads are the parts, or the files of the diff, whose headers the
+	// pane last drew, by its lines, for a click to fold them; links are
+	// the pages a click on each line opens.
 	heads []string
 	links [][]link
 }
@@ -55,8 +58,8 @@ func (p *pane) toggleMode() {
 }
 
 // line is a line of the pane's scrolled part, with the file it belongs to.
-// A head is a file's header, or that of a part of the description pane,
-// named by part.
+// A head is a file's header, named by its path in part, or that of a part
+// of the description pane, named by part.
 type line struct {
 	text string
 	file int
@@ -66,23 +69,30 @@ type line struct {
 	links []link
 }
 
-// diffLines are a diff's lines as the pane and the PR screen show them.
-// Files matching the collapse patterns are one line until unfolded.
-func (m *Model) diffLines(files []diff.File, unfold bool) []line {
+// diffLines are a diff's lines as the pane and the PR screen show them,
+// width cells wide. Like the parts of the description pane, a file's
+// header runs to the edge with a rule, and the lines of an unfolded file
+// have a gutter, closed under its last line. folded tells which files are
+// one line; nil folds none.
+func (m *Model) diffLines(files []diff.File, width int, folded func(diff.File) bool) []line {
 	st := m.st
+	gutter := st.border.Render("│ ")
 	var out []line
 	for i, f := range files {
-		add, del := f.Stat()
-		head := st.file.Render("── "+f.Path()) + "  " + st.green.Render(fmt.Sprintf("+%d", add)) + " " + st.red.Render(fmt.Sprintf("−%d", del))
-		folded := !unfold && plan.MatchAny(m.set.Collapse, f.Path())
-		if folded {
-			head += "  " + st.dim.Render("folded · "+m.firstKey("unfold")+" to unfold")
+		fold := folded != nil && folded(f)
+		mark := "▾ "
+		if fold {
+			mark = "▸ "
 		}
+		add, del := f.Stat()
+		head := st.blue.Render(mark) + st.file.Render(f.Path()) + "  " + st.green.Render(fmt.Sprintf("+%d", add)) + " " + st.red.Render(fmt.Sprintf("−%d", del))
 		if f.Binary {
 			head += "  " + st.dim.Render("binary")
 		}
-		out = append(out, line{text: head, file: i, head: true})
-		if folded {
+		head += " "
+		head += st.border.Render(strings.Repeat("─", max(width-lipgloss.Width(head), 0)))
+		out = append(out, line{text: head, file: i, head: true, part: f.Path()})
+		if fold {
 			continue
 		}
 		for _, h := range f.Hunks {
@@ -90,13 +100,38 @@ func (m *Model) diffLines(files []diff.File, unfold bool) []line {
 			if h.Section != "" {
 				hh += " " + st.dim.Render(h.Section)
 			}
-			out = append(out, line{text: st.hunk.Render(hh), file: i})
+			out = append(out, line{text: gutter + st.hunk.Render(hh), file: i})
 			for _, l := range m.hunkLines(h.Lines) {
-				out = append(out, line{text: l, file: i})
+				out = append(out, line{text: gutter + l, file: i})
 			}
 		}
+		out = append(out, line{text: st.border.Render("╵"), file: i})
 	}
 	return out
+}
+
+// paneDiffLines are p's diff as the pane shows it, each file folded as
+// it was left, or as the collapse patterns say.
+func (m *Model) paneDiffLines(p model.PR, files []diff.File) []line {
+	return m.diffLines(files, max(m.width-4, 10), func(f diff.File) bool { return m.fileFolded(p, f.Path()) })
+}
+
+// fileFolded tells whether the file of p's diff at path is folded in the
+// pane: as it was left, or, before that, whether it matches the collapse
+// patterns.
+func (m *Model) fileFolded(p model.PR, path string) bool {
+	if v, ok := m.pane.files[p.Key][path]; ok {
+		return v
+	}
+	return plan.MatchAny(m.set.Collapse, path)
+}
+
+// foldFile folds or unfolds the file of p's diff at path.
+func (m *Model) foldFile(p model.PR, path string) {
+	if m.pane.files[p.Key] == nil {
+		m.pane.files[p.Key] = map[string]bool{}
+	}
+	m.pane.files[p.Key][path] = !m.fileFolded(p, path)
 }
 
 // hunkLines colors a hunk's lines, marking the words that changed between
@@ -222,7 +257,7 @@ func (m *Model) jumpFile(dir int) {
 		if e == nil || e.loading {
 			return
 		}
-		ls = m.diffLines(e.val, m.pane.unfold[p.Key])
+		ls = m.paneDiffLines(p, e.val)
 	}
 	if dir > 0 {
 		for i := m.pane.scroll + 1; i < len(ls); i++ {
@@ -348,7 +383,7 @@ func (m *Model) paneBody(p model.PR, n *model.Notification, e *entry[[]diff.File
 	case e.err != nil:
 		ls = []line{{text: st.red.Render(e.err.Error())}}
 	default:
-		ls = m.diffLines(files, m.pane.unfold[p.Key])
+		ls = m.paneDiffLines(p, files)
 	}
 	rest := max(height-len(top), 1)
 	strip := len(files) > 1
@@ -373,8 +408,16 @@ func (m *Model) paneBody(p model.PR, n *model.Notification, e *entry[[]diff.File
 		}
 		top = append(top, strings.Join(names, st.dim.Render(" · ")))
 	}
+	m.pane.heads = make([]string, len(top), height)
+	m.pane.links = make([][]link, len(top), height)
 	for _, l := range shown {
 		top = append(top, l.text)
+		part := ""
+		if l.head {
+			part = l.part
+		}
+		m.pane.heads = append(m.pane.heads, part)
+		m.pane.links = append(m.pane.links, nil)
 	}
 	return top
 }

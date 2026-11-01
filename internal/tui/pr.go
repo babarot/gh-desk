@@ -139,7 +139,7 @@ func (m *Model) prLines(p model.PR) []line {
 		case e.err != nil:
 			return []line{{text: st.red.Render(e.err.Error())}}
 		}
-		return m.diffLines(e.val, true)
+		return m.diffLines(e.val, m.width-1, nil)
 	case "checks":
 		if w := waitDetail(); w != nil {
 			return w
