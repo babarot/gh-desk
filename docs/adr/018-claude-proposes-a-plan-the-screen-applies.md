@@ -1,4 +1,4 @@
-# ADR-013: Claude proposes a plan; the screen applies it
+# ADR-018: Claude proposes a plan; the screen applies it
 
 ## Status
 

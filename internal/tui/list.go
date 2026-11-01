@@ -314,8 +314,8 @@ var columnDefs = []column{
 
 // dropFirst are the columns left out on a narrow terminal, first to last,
 // while TITLE would be narrower than minTitle; the others are never left
-// out (ADR-016). minTitle keeps SIZE down to 120 columns, as before the
-// columns could be chosen.
+// out (ADR-017). minTitle keeps SIZE down to 120 columns with all the
+// columns on a grouped tab.
 var dropFirst = []string{"size", "author"}
 
 const minTitle = 27

@@ -12,9 +12,9 @@ gh-triage will grow parts that are easy to tangle: a TUI, a GitHub client, a run
 
 Split the code into layered packages, each allowed to import only lower layers and a listed set of outside modules, as `docs/architecture.md` shows:
 
-- Layer 0: `model` (shared types), `logging`
+- Layer 0: `model` (shared types), `logging`, `near` (the closest name, for a did-you-mean)
 - Layer 1: `config`, `keymap`, `plan` (pure decisions), `diff`
-- Layer 2: `github`, `state`, `claude` (each owning one part of the outside world)
+- Layer 2: `github`, `state`, `claude`, `listcache` (each owning one part of the outside world)
 - Layer 3: `runner` (bulk approve and merge; no Bubble Tea)
 - Layer 4: `tui`
 - Layer 5: `app` (wiring), then `main`

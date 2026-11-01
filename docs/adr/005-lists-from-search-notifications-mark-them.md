@@ -15,15 +15,17 @@ GitHub's search is also slow: its response time grows with the number of results
 
 ## Decision
 
-- Each tab before the inbox is a GitHub search, defined in `[[sections]]` of the config file (`review`, `mine` and `involved` by default). A tab with `group = "requested"` splits its rows into requests to the viewer, requests only to their teams, and pull requests opened by bots, with the last two folded at start.
-- Notifications are read for two things only: an unread mark (●) on the rows of every tab, and the inbox tab, which lists them with the reason and hides those whose pull request is merged or closed until asked. The inbox reads the state of its pull requests in one GraphQL query with an alias per pull request.
-- A search is read in pages: a first page of 20 so the tab appears in a few seconds, then pages of 50 appended as they arrive, up to the tab's `limit`.
+- The tabs are `[[tabs]]` of the config file, in the order shown. A tab is a GitHub search, or the inbox (`kind = "inbox"`), which may be anywhere among them; its name is free and is `inbox` by default. There is exactly one inbox: reading notifications comes with it, and every tab needs them (below). The default tabs are `review`, `mine`, `involved` and the inbox. A search tab may be split into groups (ADR-015).
+- Notifications are read for two things only: an unread mark (●) on the rows of every tab, and the inbox, which lists them with the reason. The inbox hides those whose pull request is merged or closed (settled) until a key shows them, or from the start with `show_settled = true`. It reads the state of its pull requests in one GraphQL query with an alias per pull request.
+- The keys 1 to 9 go to the tabs, so there are at most nine. When the tabs do not fit the header, it shows those around the tab shown, with `…` where some are left out, and moves them only when the tab shown would be out of them.
+- A tab with no rows reads its search in pages: a first page of 20 so the tab appears in a few seconds, then pages of 50 added as they arrive, up to the tab's `limit`. A tab with rows is read again as ADR-011 has it.
 - What only one pull request needs (its body, its comments, its diff) is read when it is under the cursor or opened, and cached; the diffs of the rows next to the cursor are read ahead. The single checks are read for every row whose checks are pending, in one query, once the list's checks are known, so the CI column can tell the rows waiting only for an approval check (◌).
-- Since ADR-011, the search reads only the light fields of each pull request, and the heavy ones (checks, review decision, line counts) are read after it.
+- The search reads only the light fields of each pull request; the heavy ones (checks, review decision, line counts) are read after it (ADR-011).
 
 ## Consequences
 
 - A tab shows what is open now, with its state, in one query per page.
-- A review sent from gh-triage can mark the pull request's notification done (`[inbox] done_after_review`), so the inbox empties as the work is done.
+- A review sent from gh-triage can mark the pull request's notification done (`review.mark_done`), so the inbox empties as the work is done.
 - The first page of a large tab is visible after a few seconds, and the rest fills in; the count in the tab's title is GitHub's total from the first page.
 - Showing whether only approval checks are pending (◌ in the CI column) needs each check of each pull request with pending checks, one more query per list.
+- The inbox cannot be left out of the tabs: that would need notifications read apart from any tab, which they are not.

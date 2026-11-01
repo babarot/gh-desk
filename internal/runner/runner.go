@@ -73,7 +73,7 @@ type Options struct {
 	BlockedTimeout time.Duration
 	// WatchTimeout is how long a pull request put on auto-merge is
 	// followed, 24h unless set: the merge is GitHub's, so this decides
-	// only how long gh-triage watches for the result (ADR-016).
+	// only how long gh-triage watches for the result (ADR-006).
 	WatchTimeout time.Duration
 	// PollFast is how often a waiting pull request is read in its first
 	// minute, PollSlow after it and while watching auto-merge.
