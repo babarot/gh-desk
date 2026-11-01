@@ -2,6 +2,7 @@ package tui
 
 import (
 	"image/color"
+	"math"
 	"strings"
 
 	"charm.land/lipgloss/v2"
@@ -18,9 +19,10 @@ type palette struct {
 	// Claude selected; fresh is that of a row a reading again added or
 	// changed.
 	pick, pickSel, claude, claudeSel, fresh color.Color
-	// tab is the background of the tab shown: blue laid over base, as if
-	// at 35% (25% on a light terminal), which terminals cannot draw.
-	tab color.Color
+	// tabMix is how much of blue the background of the tab shown has,
+	// laid over base, from 0 to 1: as if blue were drawn at that opacity,
+	// which terminals cannot do.
+	tabMix float64
 }
 
 var (
@@ -32,7 +34,7 @@ var (
 		yellow: lipgloss.Color("#ffe5a0"), peach: lipgloss.Color("#ffc49a"), red: lipgloss.Color("#f5a3b5"), teal: lipgloss.Color("#94e2d5"),
 		pick: lipgloss.Color("#3a3150"), pickSel: lipgloss.Color("#4d4068"),
 		claude: lipgloss.Color("#22393d"), claudeSel: lipgloss.Color("#2f4f54"), fresh: lipgloss.Color("#26324a"),
-		tab: lipgloss.Color("#485677"),
+		tabMix: 0.35,
 	}
 	latte = palette{
 		base: lipgloss.Color("#eff1f5"), surface0: lipgloss.Color("#ccd0da"), surface1: lipgloss.Color("#bcc0cc"),
@@ -42,7 +44,7 @@ var (
 		yellow: lipgloss.Color("#df8e1d"), peach: lipgloss.Color("#fe640b"), red: lipgloss.Color("#d20f39"), teal: lipgloss.Color("#179299"),
 		pick: lipgloss.Color("#e6dcf7"), pickSel: lipgloss.Color("#d6c6f2"),
 		claude: lipgloss.Color("#d4eeee"), claudeSel: lipgloss.Color("#bde3e4"), fresh: lipgloss.Color("#dce6fb"),
-		tab: lipgloss.Color("#bbcef5"),
+		tabMix: 0.25,
 	}
 )
 
@@ -72,13 +74,14 @@ type styles struct {
 
 func newStyles(p palette) styles {
 	fg := func(c color.Color) lipgloss.Style { return lipgloss.NewStyle().Foreground(c) }
+	tab := mix(p.blue, p.base, p.tabMix)
 	return styles{
 		p:         p,
 		header:    lipgloss.NewStyle().Background(p.surface0).Foreground(p.subtext0),
 		app:       fg(p.blue).Bold(true),
-		tabOn:     lipgloss.NewStyle().Background(p.tab).Foreground(p.text).Bold(true),
+		tabOn:     lipgloss.NewStyle().Background(tab).Foreground(p.text).Bold(true),
 		tabOff:    fg(p.subtext0),
-		tabKeyOn:  lipgloss.NewStyle().Background(p.tab).Foreground(p.subtext0),
+		tabKeyOn:  lipgloss.NewStyle().Background(tab).Foreground(p.subtext0),
 		subOn:     lipgloss.NewStyle().Background(p.surface0).Foreground(p.blue).Bold(true),
 		subOff:    fg(p.overlay),
 		colHeader: fg(p.subtext1).Bold(true),
@@ -151,4 +154,14 @@ func spaces(n int) string {
 		b[i] = ' '
 	}
 	return string(b)
+}
+
+// mix is a laid over b with the share t of a, from 0 to 1.
+func mix(a, b color.Color, t float64) color.Color {
+	ar, ag, ab, _ := a.RGBA()
+	br, bg, bb, _ := b.RGBA()
+	ch := func(x, y uint32) uint8 {
+		return uint8(math.Round((float64(x)*t + float64(y)*(1-t)) / 0x101))
+	}
+	return color.RGBA{R: ch(ar, br), G: ch(ag, bg), B: ch(ab, bb), A: 0xff}
 }
