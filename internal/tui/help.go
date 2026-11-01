@@ -15,10 +15,13 @@ import (
 // they have. z or a click on a section's header folds or unfolds it;
 // the moving keys and the wheel scroll it.
 
-// helpSection is a section of the ? popup: its title and rows.
+// helpSection is a section of the ? popup: its title, its rows as keys
+// and what they do, and whether its keys work on the screen ? was opened
+// from.
 type helpSection struct {
 	title string
-	rows  []string
+	rows  [][2]string
+	works bool
 }
 
 // helpScopes are the scopes the ? popup tells, with their titles.
@@ -46,15 +49,11 @@ func (m *Model) helpScope() keymap.Scope {
 	}
 }
 
-// helpRow is a row of the ? popup: its keys and what they do.
-func (m *Model) helpRow(keys, what string) string {
-	return "  " + fit(m.st.key.Render(keys), helpKeyWidth) + m.st.muted.Render(what)
-}
-
 // helpRows are the key rows of scope s. The tab_N actions, one key each,
 // are told in one row.
-func (m *Model) helpRows(s keymap.Scope) []string {
-	var rows, tabs []string
+func (m *Model) helpRows(s keymap.Scope) [][2]string {
+	var rows [][2]string
+	var tabs []string
 	tabsAt := -1
 	for _, a := range m.keys.Actions(s) {
 		ks := m.keys.Keys(a)
@@ -64,53 +63,57 @@ func (m *Model) helpRows(s keymap.Scope) []string {
 		if strings.HasPrefix(string(a), "tab_") && len(ks) == 1 {
 			if tabsAt < 0 {
 				tabsAt = len(rows)
-				rows = append(rows, "")
+				rows = append(rows, [2]string{})
 			}
 			tabs = append(tabs, ks[0])
 			continue
 		}
-		rows = append(rows, m.helpRow(strings.Join(ks, " "), m.keys.Help(a)))
+		rows = append(rows, [2]string{strings.Join(ks, " "), m.keys.Help(a)})
 	}
 	if tabsAt >= 0 {
 		keys := strings.Join(tabs, " ")
 		if len(tabs) > 1 && lipgloss.Width(keys) > helpKeyWidth-2 {
 			keys = tabs[0] + " … " + tabs[len(tabs)-1]
 		}
-		rows[tabsAt] = m.helpRow(keys, fmt.Sprintf("tab 1 to %d", len(tabs)))
+		rows[tabsAt] = [2]string{keys, fmt.Sprintf("tab 1 to %d", len(tabs))}
 	}
 	return rows
 }
 
 // helpSections are the sections of the ? popup: the screen's own first,
 // then the scopes in their order, the fixed keys among anywhere, and the
-// mouse last.
+// mouse last. The keys of the screen's own scope, of anywhere and moving,
+// and the mouse work there.
 func (m *Model) helpSections() []helpSection {
 	here := m.helpScope()
-	rowsOf := func(s keymap.Scope) []string {
+	rowsOf := func(s keymap.Scope) [][2]string {
 		rows := m.helpRows(s)
 		if s == keymap.ScopeGlobal {
-			rows = append(rows, m.helpRow(keymap.Interrupt, "quit"), m.helpRow(keymap.Back, "back"))
+			rows = append(rows, [2]string{keymap.Interrupt, "quit"}, [2]string{keymap.Back, "back"})
 		}
 		return rows
+	}
+	works := func(s keymap.Scope) bool {
+		return s == here || s == keymap.ScopeGlobal || s == keymap.ScopeNav
 	}
 	var out []helpSection
 	for _, sc := range helpScopes {
 		if sc.s == here {
-			out = append(out, helpSection{sc.title, rowsOf(sc.s)})
+			out = append(out, helpSection{sc.title, rowsOf(sc.s), true})
 		}
 	}
 	for _, sc := range helpScopes {
 		if rows := rowsOf(sc.s); sc.s != here && len(rows) > 0 {
-			out = append(out, helpSection{sc.title, rows})
+			out = append(out, helpSection{sc.title, rows, works(sc.s)})
 		}
 	}
-	return append(out, helpSection{"mouse", []string{
-		m.helpRow("click", "tab, row, pane tab"),
-		m.helpRow("double click", "open"),
-		m.helpRow("click", "@you, an author, a PR: browser"),
-		m.helpRow("wheel", "scroll"),
-		m.helpRow("drag", "the pane's top edge: resize"),
-	}})
+	return append(out, helpSection{"mouse", [][2]string{
+		{"click", "tab, row, pane tab"},
+		{"double click", "open"},
+		{"click", "@you, an author, a PR: browser"},
+		{"wheel", "scroll"},
+		{"drag", "the pane's top edge: resize"},
+	}, true})
 }
 
 // openHelp opens the ? popup at its top, with only the section of the
@@ -124,21 +127,31 @@ func (m *Model) openHelp() {
 }
 
 // helpLines are the lines of the ? popup w cells wide, with the title of
-// the section each header line is of ("" for the other lines).
+// the section each header line is of ("" for the other lines). A section
+// whose keys work on the screen ? was opened from is drawn in color and
+// says so; the others are grayed.
 func (m *Model) helpLines(w int) ([]string, []string) {
 	st := m.st
 	var lines, heads []string
 	for _, s := range m.helpSections() {
-		mark, rest := "▾ ", ""
-		if m.helpFolded[s.title] {
-			mark, rest = "▸ ", st.dim.Render(fmt.Sprintf(" (%d)", len(s.rows)))
+		mark, title, key, what := st.blue, st.blue.Bold(true), st.key, st.muted
+		if !s.works {
+			mark, title, key, what = st.dim, st.muted.Bold(true), st.muted, st.dim
 		}
-		h := st.blue.Render(mark) + st.blue.Bold(true).Render(s.title) + rest + " "
+		arrow, rest := "▾ ", ""
+		if m.helpFolded[s.title] {
+			arrow, rest = "▸ ", st.dim.Render(fmt.Sprintf(" (%d)", len(s.rows)))
+		}
+		if s.works {
+			rest += st.dim.Render(" · works here")
+		}
+		h := mark.Render(arrow) + title.Render(s.title) + rest + " "
 		h += st.border.Render(strings.Repeat("─", max(w-lipgloss.Width(h), 0)))
 		lines, heads = append(lines, h), append(heads, s.title)
 		if !m.helpFolded[s.title] {
 			for _, r := range s.rows {
-				lines, heads = append(lines, r), append(heads, "")
+				lines = append(lines, "  "+fit(key.Render(r[0]), helpKeyWidth)+what.Render(r[1]))
+				heads = append(heads, "")
 			}
 		}
 	}

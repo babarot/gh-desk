@@ -21,10 +21,10 @@ func TestHelpUnfoldsTheScreenItWasOpenedFrom(t *testing.T) {
 	run(m, m.Init())
 	press(m, "?")
 	s := helpText(m)
-	if !strings.HasPrefix(s, "▾ the list and its preview") || !strings.Contains(s, "select by rule") {
+	if !strings.HasPrefix(s, "▾ the list and its preview · works here") || !strings.Contains(s, "select by rule") {
 		t.Errorf("the list's section is not first and unfolded:\n%s", s)
 	}
-	for _, want := range []string{"▸ anywhere (6)", "▸ moving (6)", "▸ a pull request (8)", "▸ writing a review (3)", "▸ mouse (5)"} {
+	for _, want := range []string{"▸ anywhere (6) · works here", "▸ moving (6) · works here", "▸ a pull request (8) ─", "▸ writing a review (3) ─", "▸ mouse (5) · works here"} {
 		if !strings.Contains(s, want) {
 			t.Errorf("the ? popup has no %q:\n%s", want, s)
 		}
@@ -37,7 +37,7 @@ func TestHelpUnfoldsTheScreenItWasOpenedFrom(t *testing.T) {
 	}
 
 	press(m, "esc", "enter", "?")
-	if s := helpText(m); !strings.HasPrefix(s, "▾ a pull request") || !strings.Contains(s, "▸ the list and its preview (29)") {
+	if s := helpText(m); !strings.HasPrefix(s, "▾ a pull request · works here") || !strings.Contains(s, "▸ the list and its preview (29) ─") {
 		t.Errorf("the PR screen's section is not first and unfolded:\n%s", s)
 	}
 }
@@ -48,7 +48,7 @@ func TestHelpFolds(t *testing.T) {
 	m := newModel(fixture(), cachedReview())
 	run(m, m.Init())
 	press(m, "?", "z")
-	if s := helpText(m); !strings.HasPrefix(s, "▸ the list and its preview (29)") {
+	if s := helpText(m); !strings.HasPrefix(s, "▸ the list and its preview (29) · works here") {
 		t.Errorf("z did not fold the list's section:\n%s", s)
 	}
 	x, y := lineOf(t, m, "▸ moving")
@@ -73,7 +73,7 @@ func TestHelpScrolls(t *testing.T) {
 	}
 	press(m, "G")
 	s := screen(m)
-	if !strings.Contains(s, "▸ mouse (5)") || strings.Contains(s, "↓ ") {
+	if !strings.Contains(s, "▸ mouse (5) · works here") || strings.Contains(s, "↓ ") {
 		t.Errorf("G did not scroll to the end:\n%s", s)
 	}
 	end := m.helpTop
