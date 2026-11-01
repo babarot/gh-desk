@@ -43,11 +43,16 @@ func TestClickRowAndDoubleClick(t *testing.T) {
 	if r, _ := m.current(); r.kind != rowGroup {
 		t.Fatalf("row = %+v, want the team group", r)
 	}
-	// A second click on the row unfolds the group.
-	mouseAt(m, tea.MouseClickMsg{X: x, Y: y, Button: tea.MouseLeft})
+	// A single click on a group unfolds it, and another folds it again.
 	if !strings.Contains(screen(m), "settings") {
 		t.Fatalf("the team group did not unfold:\n%s", screen(m))
 	}
+	x, y = lineOf(t, m, "▾ requested from a team")
+	mouseAt(m, tea.MouseClickMsg{X: x, Y: y, Button: tea.MouseLeft})
+	if strings.Contains(screen(m), "settings") {
+		t.Fatalf("the team group did not fold:\n%s", screen(m))
+	}
+	mouseAt(m, tea.MouseClickMsg{X: x, Y: y, Button: tea.MouseLeft})
 
 	x, y = lineOf(t, m, "Add retries")
 	mouseAt(m, tea.MouseClickMsg{X: x, Y: y, Button: tea.MouseLeft})

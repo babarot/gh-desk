@@ -11,8 +11,8 @@ import (
 	"github.com/babarot/gh-triage/internal/model"
 )
 
-// The mouse points: it picks a tab or a row, opens a row with a double
-// click, opens a profile or a pull request in the browser, scrolls, and
+// The mouse points: it picks a tab or a row, folds a group with a click,
+// opens a pull request with a double click, opens a profile or a pull request in the browser, scrolls, and
 // resizes the preview pane by its top edge. Nothing that writes to GitHub
 // is done with it. See ADR-012.
 
@@ -186,6 +186,13 @@ func (m *Model) listClick(x, y int) tea.Cmd {
 	if url := m.linkAt(i, x); url != "" {
 		m.lastClick = click{}
 		return tea.Batch(m.moveTo(i), m.browseURL(url))
+	}
+	// A click on a group folds or unfolds it, as one on a header of the
+	// pane does.
+	if rs := m.rows(m.tab()); rs[i].kind == rowGroup {
+		m.lastClick = click{}
+		cmd := m.moveTo(i)
+		return tea.Batch(cmd, m.openRow(rs[i]))
 	}
 	now := m.set.Now()
 	double := m.lastClick.tab == m.cur && m.lastClick.row == i && now.Sub(m.lastClick.at) < doubleClick
