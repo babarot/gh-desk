@@ -80,7 +80,7 @@
       "additionalProperties": false,
       "properties": {
         "style": {
-          "description": "How a description is drawn, in the pane and on the PR screen: \"rendered\" (default) draws headings, lists, code, quotes and tables; \"plain\" shows the Markdown as written.",
+          "description": "How a description and its comments are drawn, in the pane and on the PR screen: \"rendered\" (default) draws headings, lists, code, quotes and tables; \"plain\" shows the Markdown as written.",
           "enum": [
             "rendered",
             "plain"

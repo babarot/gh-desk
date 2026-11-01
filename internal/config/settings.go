@@ -233,7 +233,7 @@ var settings = []setting{
 		Doc: `The tab the pane opens on: "overview" (default), the description beside a column of facts, or "diff".`},
 
 	{Key: "description.style", Kind: enumKind{DescriptionStyles}, Value: func(f File) any { return f.Description.Style },
-		Doc: `How a description is drawn, in the pane and on the PR screen: "rendered" (default) draws headings, lists, code, quotes and tables; "plain" shows the Markdown as written.`},
+		Doc: `How a description and its comments are drawn, in the pane and on the PR screen: "rendered" (default) draws headings, lists, code, quotes and tables; "plain" shows the Markdown as written.`},
 
 	{Key: "diff.collapse", Kind: globsKind{}, Value: func(f File) any { return f.Diff.Collapse },
 		Doc: "Files shown folded, as their name and line counts, until unfolded: glob patterns, matched against the base name unless they have a slash."},

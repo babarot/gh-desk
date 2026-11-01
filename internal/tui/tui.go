@@ -99,8 +99,8 @@ type Settings struct {
 	DefaultPaneHeight int
 	// OpenOnDiff opens the pane on the diff instead of the overview.
 	OpenOnDiff bool
-	// PlainDescription shows a description's Markdown as written instead of
-	// drawing it.
+	// PlainDescription shows the Markdown of a description and its comments
+	// as written instead of drawing it.
 	PlainDescription bool
 	// Layout keeps the pane's height when it is changed; nil keeps it
 	// for this run only.

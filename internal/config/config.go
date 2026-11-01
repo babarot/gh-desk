@@ -122,8 +122,8 @@ type Preview struct {
 	Tab string
 }
 
-// Description configures how a pull request's description is drawn, in
-// the pane and on the PR screen.
+// Description configures how a pull request's description and comments
+// are drawn, in the pane and on the PR screen.
 type Description struct {
 	// Style is one of DescriptionStyles: "rendered" draws the Markdown,
 	// "plain" shows it as written.

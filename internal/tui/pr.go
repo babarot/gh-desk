@@ -161,8 +161,9 @@ func (m *Model) prLines(p model.PR) []line {
 		var out []line
 		for _, c := range d.val.Comments {
 			out = append(out, line{text: st.sub0.Render(c.Author) + " " + st.dim.Render(shortAge(m.set.Now().Sub(c.Created))+" ago")})
-			for l := range strings.SplitSeq(strings.TrimSpace(htmlComment.ReplaceAllString(c.Body, "")), "\n") {
-				out = append(out, line{text: "  " + st.muted.Render(l)})
+			for _, l := range m.bodyLines(c.Body, m.width-3) {
+				l.text = "  " + l.text
+				out = append(out, l)
 			}
 			out = append(out, line{})
 		}
