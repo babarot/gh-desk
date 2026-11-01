@@ -1,0 +1,375 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "additionalProperties": false,
+  "properties": {
+    "bulk": {
+      "additionalProperties": false,
+      "properties": {
+        "attention_paths": {
+          "description": "Pull requests changing files that match these glob patterns get a mark in the confirm popup.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "type": "object"
+    },
+    "cache": {
+      "additionalProperties": false,
+      "properties": {
+        "dir": {
+          "description": "Where gh-triage keeps its clones and the worktrees Claude reads, and the lists last read (lists.json, shown at once at the next launch) (~ is your home); by default $XDG_CACHE_HOME/gh-triage, or ~/.cache/gh-triage.",
+          "pattern": "\\S",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "checks": {
+      "additionalProperties": false,
+      "properties": {
+        "approval": {
+          "description": "Checks that pass only after an approval, such as a policy bot's: glob patterns of check names. While only they are pending, CI shows ◌, and the checks count as passing when deciding a merge.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "type": "object"
+    },
+    "claude": {
+      "additionalProperties": false,
+      "description": "C asks Claude Code (claude -p, with the account you are signed in with). On a pull request's screen, it reviews that pull request in a worktree of its head. On the list, it plans what to show and select in the tab shown, with no tools, and answers in the language you ask in; enter applies the plan, and an approve or a merge in it opens the confirm popup. Claude only reads: no settings files or MCP servers are loaded, its file tools see only the worktree, and it has none that run commands.",
+      "properties": {
+        "allowed_tools": {
+          "description": "The tools Claude may use, among \"Read\", \"Grep\", \"Glob\" and \"WebFetch\".",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "instructions": {
+          "description": "Appended to the instructions of every review and triage, such as \"Point out changes that have no tests.\"",
+          "type": "string"
+        },
+        "language": {
+          "description": "The language Claude answers in about a pull request, such as \"Japanese\". A review drafted with D is written in the language of the pull request instead.",
+          "pattern": "\\S",
+          "type": "string"
+        },
+        "model": {
+          "description": "The model Claude Code runs, as claude --model takes it.",
+          "pattern": "\\S",
+          "type": "string"
+        },
+        "release_notes_check": {
+          "description": "Let Claude read the release notes of the bot pull requests in the merge popup, and mark those that need care.",
+          "type": "boolean"
+        }
+      },
+      "type": "object"
+    },
+    "description": {
+      "additionalProperties": false,
+      "properties": {
+        "style": {
+          "description": "How a description is drawn, in the pane and on the PR screen: \"rendered\" (default) draws headings, lists, code, quotes and tables; \"plain\" shows the Markdown as written.",
+          "enum": [
+            "rendered",
+            "plain"
+          ],
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "diff": {
+      "additionalProperties": false,
+      "properties": {
+        "collapse": {
+          "description": "Files shown folded, as their name and line counts, until unfolded: glob patterns, matched against the base name unless they have a slash.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "type": "object"
+    },
+    "keys": {
+      "additionalProperties": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        ]
+      },
+      "description": "Which keys do what, by action: a key or a list of keys, or [] to turn it off.",
+      "type": "object"
+    },
+    "list": {
+      "additionalProperties": false,
+      "properties": {
+        "home_owners": {
+          "description": "Owners whose name is left out of the PR column, such as your company.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "refresh": {
+          "anyOf": [
+            {
+              "pattern": "^([0-9]+(\\.[0-9]+)?(ns|us|µs|ms|s|m|h))+$",
+              "type": "string"
+            },
+            {
+              "const": "off"
+            }
+          ],
+          "description": "Refresh the shown tab this often, as a Go duration such as \"3m\" or \"90s\"; \"off\" refreshes only when R is pressed."
+        },
+        "stale_days": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "const": "off"
+            }
+          ],
+          "description": "Mark AGE when a pull request has not been updated for this many days, or \"off\"."
+        }
+      },
+      "type": "object"
+    },
+    "log": {
+      "additionalProperties": false,
+      "properties": {
+        "level": {
+          "description": "How much goes to the log file: \"debug\", \"info\" (default), \"warn\" or \"error\". --debug and GH_TRIAGE_LOG_LEVEL take precedence. gh triage log prints where the file is.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "merge": {
+      "additionalProperties": false,
+      "properties": {
+        "auto_merge": {
+          "description": "Use GitHub's auto-merge where the repository allows it; elsewhere gh-triage waits for the checks and merges when they pass. Commits pushed after auto-merge is turned on are merged too, as GitHub does.",
+          "type": "boolean"
+        },
+        "blocked_timeout": {
+          "description": "Where gh-triage waits, how long a pull request may stay blocked by another rule (a second approval, code owners) after its required checks finished. Only the time gh-triage is running counts.",
+          "pattern": "^([0-9]+(\\.[0-9]+)?(ns|us|µs|ms|s|m|h))+$",
+          "type": "string"
+        },
+        "checks_timeout": {
+          "description": "Where gh-triage waits, how long to wait for required checks still running. Only the time gh-triage is running counts.",
+          "pattern": "^([0-9]+(\\.[0-9]+)?(ns|us|µs|ms|s|m|h))+$",
+          "type": "string"
+        },
+        "methods": {
+          "description": "The order of preference among the methods a repository allows: \"merge\", \"squash\", \"rebase\". The first one the repository allows is used.",
+          "items": {
+            "enum": [
+              "merge",
+              "squash",
+              "rebase"
+            ],
+            "type": "string"
+          },
+          "minItems": 1,
+          "type": "array"
+        },
+        "update_branch": {
+          "description": "Whose branch is updated when it is behind its base: \"humans\" (default), \"all\" or \"never\". Bots rebase their own branches, and some (renovate) stop updating a branch someone else committed to.",
+          "enum": [
+            "humans",
+            "all",
+            "never"
+          ],
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "preview": {
+      "additionalProperties": false,
+      "properties": {
+        "height": {
+          "description": "Lines of the preview pane under the list; 0 hides it until it is shown with a key. Dragging the pane's top edge, or + and -, changes them, and the lines set that way are kept over this one.",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "tab": {
+          "description": "The tab the pane opens on: \"overview\" (default), the description beside a column of facts, or \"diff\".",
+          "enum": [
+            "overview",
+            "diff"
+          ],
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "review": {
+      "additionalProperties": false,
+      "properties": {
+        "editor": {
+          "description": "The editor ctrl+e opens to write a review, with its arguments, such as \"code --wait\". Left out, $VISUAL, then $EDITOR.",
+          "type": "string"
+        },
+        "mark_done": {
+          "description": "Mark a pull request's notification done after you review it here, from any tab.",
+          "type": "boolean"
+        }
+      },
+      "type": "object"
+    },
+    "select": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "author": {
+            "description": "A login; bots without app/.",
+            "type": "string"
+          },
+          "bot": {
+            "description": "The author must be a bot.",
+            "type": "boolean"
+          },
+          "checks": {
+            "description": "\"passing\": passed, or only checks.approval pending.",
+            "enum": [
+              "passing"
+            ],
+            "type": "string"
+          },
+          "max_files": {
+            "description": "The most files it may change.",
+            "minimum": 1,
+            "type": "integer"
+          },
+          "name": {
+            "description": "The rule's name, as S lists it.",
+            "pattern": "\\S",
+            "type": "string"
+          },
+          "packages": {
+            "description": "The dependencies a renovate or dependabot pull request updates, read from its body; every one it updates must be listed.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "title": {
+            "description": "A regular expression the title must match.",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "type": "array"
+    },
+    "tabs": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "folded": {
+            "description": "The groups folded at start, among groups.",
+            "items": {
+              "enum": [
+                "you",
+                "team",
+                "other",
+                "bots"
+              ],
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "groups": {
+            "description": "The groups a search is split into, in the order shown.",
+            "items": {
+              "enum": [
+                "you",
+                "team",
+                "other",
+                "bots"
+              ],
+              "type": "string"
+            },
+            "minItems": 1,
+            "type": "array"
+          },
+          "kind": {
+            "description": "\"search\" (default), a GitHub search, or \"inbox\", the pull requests in your notifications.",
+            "enum": [
+              "search",
+              "inbox"
+            ],
+            "type": "string"
+          },
+          "limit": {
+            "description": "How many pull requests, or notifications, to read (at most 1000; 100 by default).",
+            "minimum": 1,
+            "type": "integer"
+          },
+          "name": {
+            "description": "The tab's name; \"inbox\" for the inbox by default.",
+            "pattern": "\\S",
+            "type": "string"
+          },
+          "query": {
+            "description": "A search's GitHub search query.",
+            "pattern": "\\S",
+            "type": "string"
+          },
+          "show_settled": {
+            "description": "The inbox shows notifications whose pull request is merged or closed from the start.",
+            "type": "boolean"
+          },
+          "sort": {
+            "description": "\"updated\" (default) or \"drafts_last\".",
+            "enum": [
+              "updated",
+              "drafts_last"
+            ],
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "maxItems": 9,
+      "type": "array"
+    },
+    "theme": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "description": "Color scheme: \"auto\" (default) picks mocha on a dark terminal and latte on a light one; or \"mocha\", \"latte\".",
+          "enum": [
+            "auto",
+            "mocha",
+            "latte"
+          ],
+          "type": "string"
+        }
+      },
+      "type": "object"
+    }
+  },
+  "title": "gh-triage config",
+  "type": "object"
+}
