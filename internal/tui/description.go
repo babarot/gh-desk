@@ -64,6 +64,7 @@ func (m *Model) descPane(p model.PR, n *model.Notification, height int) []string
 	rest := max(height-len(top), 1)
 	m.pane.scroll = min(m.pane.scroll, max(len(ls)-rest, 0))
 	shown := ls[m.pane.scroll:min(len(ls), m.pane.scroll+rest)]
+	m.pane.tabRow, m.pane.tabs = -1, nil
 	m.pane.heads = make([]string, len(top), height)
 	m.pane.links = make([][]link, len(top), height)
 	m.pane.links[0] = titleLinks
@@ -437,7 +438,7 @@ func (m *Model) foldPart() {
 		ls = m.descLines(p, left)
 	} else {
 		e := m.cache.diffs[diffID(p)]
-		if e == nil || e.loading || e.err != nil {
+		if e == nil || e.loading || e.err != nil || m.fileTab(p, e.val) >= 0 {
 			return
 		}
 		ls = m.paneDiffLines(p, e.val)

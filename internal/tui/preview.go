@@ -33,6 +33,13 @@ type pane struct {
 	// by hand, by path; the others are folded when they match the
 	// collapse patterns.
 	files map[model.PRKey]map[string]bool
+	// file is the file tab of each pull request's diff shown, by path;
+	// with none, all the files are.
+	file map[model.PRKey]string
+	// tabRow is the line of the pane the file tabs were last drawn on,
+	// -1 with none, and tabs where each tab is on it, for a click.
+	tabRow int
+	tabs   []fileTabSpan
 	// folded are the parts of the description pane folded, by name.
 	folded map[string]bool
 	// heads are the parts, or the files of the diff, whose headers the
@@ -41,6 +48,10 @@ type pane struct {
 	heads []string
 	links [][]link
 }
+
+// fileTabSpan is a file tab on cells x to x+w of the pane's line; tab is
+// the file's index, -1 for all.
+type fileTabSpan struct{ x, w, tab int }
 
 // link is a page a click on cells x to x+w of a line opens.
 type link struct {
@@ -110,9 +121,13 @@ func (m *Model) diffLines(files []diff.File, width int, folded func(diff.File) b
 	return out
 }
 
-// paneDiffLines are p's diff as the pane shows it, each file folded as
-// it was left, or as the collapse patterns say.
+// paneDiffLines are p's diff as the pane shows it: the file of the file
+// tab shown, or all of them, each folded as it was left, or as the
+// collapse patterns say.
 func (m *Model) paneDiffLines(p model.PR, files []diff.File) []line {
+	if i := m.fileTab(p, files); i >= 0 {
+		return m.diffLines(files[i:i+1], max(m.width-4, 10), nil)
+	}
 	return m.diffLines(files, max(m.width-4, 10), func(f diff.File) bool { return m.fileFolded(p, f.Path()) })
 }
 
@@ -124,6 +139,142 @@ func (m *Model) fileFolded(p model.PR, path string) bool {
 		return v
 	}
 	return plan.MatchAny(m.set.Collapse, path)
+}
+
+// fileTab is the index of the file of p's diff whose tab the pane shows,
+// or -1 for all.
+func (m *Model) fileTab(p model.PR, files []diff.File) int {
+	if path := m.pane.file[p.Key]; path != "" {
+		for i, f := range files {
+			if f.Path() == path {
+				return i
+			}
+		}
+	}
+	return -1
+}
+
+// showFileTab shows the tab of the file of p's diff at index i, or all
+// of them with -1.
+func (m *Model) showFileTab(p model.PR, files []diff.File, i int) {
+	if i < 0 {
+		delete(m.pane.file, p.Key)
+	} else {
+		m.pane.file[p.Key] = files[i].Path()
+	}
+	m.pane.scroll = 0
+}
+
+// stepFileTab shows the next or previous file tab of the diff; all comes
+// before the first file.
+func (m *Model) stepFileTab(dir int) {
+	p, _, ok := m.currentPR()
+	if !ok {
+		return
+	}
+	e := m.cache.diffs[diffID(p)]
+	if e == nil || e.loading || e.err != nil || len(e.val) < 2 {
+		return
+	}
+	m.showFileTab(p, e.val, min(max(m.fileTab(p, e.val)+dir, -1), len(e.val)-1))
+}
+
+// clickFileTab shows the file tab at cell x of the pane's line, if one is
+// there.
+func (m *Model) clickFileTab(x int) {
+	p, _, ok := m.currentPR()
+	if !ok {
+		return
+	}
+	e := m.cache.diffs[diffID(p)]
+	if e == nil || e.loading || e.err != nil {
+		return
+	}
+	for _, t := range m.pane.tabs {
+		if x >= t.x && x < t.x+t.w && t.tab < len(e.val) {
+			m.showFileTab(p, e.val, t.tab)
+			return
+		}
+	}
+}
+
+// fileTabNames are the names of the diff's file tabs: each file's base
+// name, with as many of its directories as tell it from the others.
+func fileTabNames(files []diff.File) []string {
+	names := make([]string, len(files))
+	parts := make([][]string, len(files))
+	depth := make([]int, len(files))
+	for i, f := range files {
+		parts[i] = strings.Split(f.Path(), "/")
+		depth[i] = 1
+	}
+	for {
+		same := map[string][]int{}
+		for i, ps := range parts {
+			names[i] = strings.Join(ps[len(ps)-min(depth[i], len(ps)):], "/")
+			same[names[i]] = append(same[names[i]], i)
+		}
+		grew := false
+		for _, is := range same {
+			for _, i := range is {
+				if len(is) > 1 && depth[i] < len(parts[i]) {
+					depth[i]++
+					grew = true
+				}
+			}
+		}
+		if !grew {
+			return names
+		}
+	}
+}
+
+// fileTabLine is the line of the diff's file tabs, all first, and where
+// each tab is on it. When they do not fit in width, the tabs before the
+// one shown go, so that it stays in sight.
+func (m *Model) fileTabLine(files []diff.File, cur, width int) (string, []fileTabSpan) {
+	st := m.st
+	labels := append([]string{fmt.Sprintf("all (%d)", len(files))}, fileTabNames(files)...)
+	ws := make([]int, len(labels))
+	for i, l := range labels {
+		ws[i] = lipgloss.Width(" " + l + " ")
+	}
+	const more = "‹ "
+	from := 0
+	for from < cur+1 {
+		w := 0
+		if from > 0 {
+			w = lipgloss.Width(more)
+		}
+		for _, x := range ws[from : cur+2] {
+			w += x + 1
+		}
+		if w-1 <= width {
+			break
+		}
+		from++
+	}
+	var b strings.Builder
+	var spans []fileTabSpan
+	at := 0
+	if from > 0 {
+		b.WriteString(st.dim.Render(more))
+		at = lipgloss.Width(more)
+	}
+	for i := from; i < len(labels); i++ {
+		if i > from {
+			b.WriteString(" ")
+			at++
+		}
+		style := st.muted
+		if i == cur+1 {
+			style = st.fileTab
+		}
+		b.WriteString(style.Render(" " + labels[i] + " "))
+		spans = append(spans, fileTabSpan{x: at, w: ws[i], tab: i - 1})
+		at += ws[i]
+	}
+	return b.String(), spans
 }
 
 // foldFile folds or unfolds the file of p's diff at path.
@@ -241,24 +392,19 @@ func (m *Model) bodyLines(body string, width int) []line {
 
 var mdLinkRe = regexp.MustCompile(`\[([^\]]*)\]\([^)]*\)`)
 
-// jumpFile scrolls the pane to the next or previous file's header, or
-// that of a part of the description pane.
+// jumpFile shows the next or previous file tab of the diff, or scrolls
+// the overview to the next or previous part's header.
 func (m *Model) jumpFile(dir int) {
+	if m.pane.mode == paneDiff {
+		m.stepFileTab(dir)
+		return
+	}
 	p, _, ok := m.currentPR()
 	if !ok {
 		return
 	}
-	var ls []line
-	if m.pane.mode == paneOverview {
-		left, _ := m.descWidths()
-		ls = m.descLines(p, left)
-	} else {
-		e := m.cache.diffs[diffID(p)]
-		if e == nil || e.loading {
-			return
-		}
-		ls = m.paneDiffLines(p, e.val)
-	}
+	left, _ := m.descWidths()
+	ls := m.descLines(p, left)
 	if dir > 0 {
 		for i := m.pane.scroll + 1; i < len(ls); i++ {
 			if ls[i].head {
@@ -392,28 +538,20 @@ func (m *Model) paneBody(p model.PR, n *model.Notification, e *entry[[]diff.File
 	}
 	m.pane.scroll = min(m.pane.scroll, max(len(ls)-rest, 0))
 	shown := ls[m.pane.scroll:min(len(ls), m.pane.scroll+rest)]
+	cur := m.fileTab(p, files)
+	m.pane.tabRow, m.pane.tabs = -1, nil
 	if strip {
-		cur := 0
-		if len(shown) > 0 {
-			cur = shown[0].file
-		}
-		var names []string
-		for i, f := range files {
-			name := f.Path()[strings.LastIndex(f.Path(), "/")+1:]
-			if i == cur {
-				names = append(names, st.mauve.Bold(true).Render(name))
-			} else {
-				names = append(names, st.muted.Render(name))
-			}
-		}
-		top = append(top, strings.Join(names, st.dim.Render(" · ")))
+		s, spans := m.fileTabLine(files, cur, max(m.width-4, 10))
+		m.pane.tabRow, m.pane.tabs = len(top), spans
+		top = append(top, s)
 	}
 	m.pane.heads = make([]string, len(top), height)
 	m.pane.links = make([][]link, len(top), height)
 	for _, l := range shown {
 		top = append(top, l.text)
+		// A file shown in its own tab does not fold.
 		part := ""
-		if l.head {
+		if l.head && cur < 0 {
 			part = l.part
 		}
 		m.pane.heads = append(m.pane.heads, part)

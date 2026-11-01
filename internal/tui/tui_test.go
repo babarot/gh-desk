@@ -16,6 +16,7 @@ import (
 	"github.com/charmbracelet/x/ansi"
 
 	"github.com/babarot/gh-triage/internal/claude"
+	"github.com/babarot/gh-triage/internal/diff"
 	"github.com/babarot/gh-triage/internal/keymap"
 	"github.com/babarot/gh-triage/internal/model"
 	"github.com/babarot/gh-triage/internal/plan"
@@ -456,6 +457,46 @@ func TestPreviewDiffFoldsFiles(t *testing.T) {
 	mouseAt(m, tea.MouseClickMsg{X: x, Y: y, Button: tea.MouseLeft})
 	if s := screen(m); !strings.Contains(s, "▾ go.sum") || !strings.Contains(s, "+x v2") {
 		t.Fatalf("a click did not unfold go.sum:\n%s", s)
+	}
+}
+
+func TestPreviewDiffFileTabs(t *testing.T) {
+	m := start(t, fixture(), keymap.Default())
+	press(m, "v")
+	if s := screen(m); !strings.Contains(s, " all (2)   client.go   go.sum ") {
+		t.Fatalf("no file tabs:\n%s", s)
+	}
+	// ] shows the next file alone, unfolded even when it matches the
+	// collapse patterns, and z does not fold it.
+	press(m, "]", "]")
+	if s := screen(m); !strings.Contains(s, "▾ go.sum") || !strings.Contains(s, "+x v2") || strings.Contains(s, "client.go  +2") {
+		t.Fatalf("] did not show go.sum alone:\n%s", s)
+	}
+	press(m, "z")
+	if s := screen(m); !strings.Contains(s, "+x v2") {
+		t.Fatalf("z folded a file shown in its own tab:\n%s", s)
+	}
+	press(m, "[", "[", "[")
+	if s := screen(m); !strings.Contains(s, "▾ client.go") || !strings.Contains(s, "▸ go.sum") {
+		t.Fatalf("[ did not go back to all:\n%s", s)
+	}
+	// A click on a tab shows it.
+	x, y := lineOf(t, m, " client.go   go.sum ")
+	mouseAt(m, tea.MouseClickMsg{X: x + 1, Y: y, Button: tea.MouseLeft})
+	if s := screen(m); !strings.Contains(s, "▾ client.go") || strings.Contains(s, "go.sum  +1") {
+		t.Fatalf("a click did not show client.go alone:\n%s", s)
+	}
+}
+
+func TestFileTabNames(t *testing.T) {
+	var files []diff.File
+	for _, p := range []string{"api/Dockerfile", "web/Dockerfile", "compose.yaml", "a/x/main.go", "b/x/main.go"} {
+		files = append(files, diff.File{NewPath: p})
+	}
+	got := fileTabNames(files)
+	want := []string{"api/Dockerfile", "web/Dockerfile", "compose.yaml", "a/x/main.go", "b/x/main.go"}
+	if !slices.Equal(got, want) {
+		t.Errorf("fileTabNames = %q; want %q", got, want)
 	}
 }
 
@@ -1027,5 +1068,22 @@ func TestPlaceKeepsTheSides(t *testing.T) {
 		if ansi.Strip(got) != c.want || ansi.StringWidth(got) != ansi.StringWidth(c.want) {
 			t.Errorf("place(%q, %q, %d) = %q, want %q", c.base, c.over, c.x, ansi.Strip(got), c.want)
 		}
+	}
+}
+
+func TestFileTabLineKeepsTheTabShownInSight(t *testing.T) {
+	m := start(t, fixture(), keymap.Default())
+	var files []diff.File
+	for _, p := range []string{"compose.prod.yaml", "compose.yaml", "renovate.json", "Dockerfile", "README.md"} {
+		files = append(files, diff.File{NewPath: p})
+	}
+	s, spans := m.fileTabLine(files, 4, 40)
+	s = ansi.Strip(s)
+	if !strings.HasPrefix(s, "‹ ") || !strings.Contains(s, " README.md ") || ansi.StringWidth(s) > 40 {
+		t.Fatalf("line = %q; want the tabs before README.md cut so that it fits in 40 cells", s)
+	}
+	last := spans[len(spans)-1]
+	if last.tab != 4 || string([]rune(s)[last.x:last.x+last.w]) != " README.md " {
+		t.Errorf("last span = %+v on %q; want README.md", last, s)
 	}
 }

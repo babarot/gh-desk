@@ -257,7 +257,7 @@ func New(src Source, run Runner, cl Claude, km keymap.Map, log *slog.Logger, set
 		}
 		m.tabs = append(m.tabs, newTab(t))
 	}
-	m.pane = pane{on: set.PreviewHeight > 0, height: cmp.Or(set.PaneHeight, set.PreviewHeight, set.DefaultPaneHeight), files: map[model.PRKey]map[string]bool{}, folded: map[string]bool{}}
+	m.pane = pane{on: set.PreviewHeight > 0, height: cmp.Or(set.PaneHeight, set.PreviewHeight, set.DefaultPaneHeight), files: map[model.PRKey]map[string]bool{}, file: map[model.PRKey]string{}, tabRow: -1, folded: map[string]bool{}}
 	if set.OpenOnDiff {
 		m.pane.mode = paneDiff
 	}

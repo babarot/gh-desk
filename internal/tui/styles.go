@@ -51,6 +51,8 @@ type styles struct {
 	del, hunk, file, tabPill, tabPillOff, me lipgloss.Style
 	picked, pickedSel, claude, claudeSel     lipgloss.Style
 	fresh                                    lipgloss.Style
+	// fileTab is the file tab of the diff shown.
+	fileTab lipgloss.Style
 	// code is inline code in a description; block a code block, and
 	// blockLang its language.
 	code, block, blockLang lipgloss.Style
@@ -95,6 +97,7 @@ func newStyles(p palette) styles {
 		claude:     lipgloss.NewStyle().Background(p.claude),
 		claudeSel:  lipgloss.NewStyle().Background(p.claudeSel),
 		fresh:      lipgloss.NewStyle().Background(p.fresh),
+		fileTab:    lipgloss.NewStyle().Background(p.surface1).Foreground(p.mauve).Bold(true),
 		code:       lipgloss.NewStyle().Background(p.surface0).Foreground(p.peach),
 		block:      lipgloss.NewStyle().Background(p.surface0).Foreground(p.subtext1),
 		blockLang:  lipgloss.NewStyle().Background(p.surface0).Foreground(p.overlay),
