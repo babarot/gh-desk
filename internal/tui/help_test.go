@@ -8,29 +8,57 @@ import (
 	"github.com/charmbracelet/x/ansi"
 )
 
-// The ? popup tells the keys of the screen it was opened from first, folds
-// the other scopes, and takes about two thirds of the terminal, leaving
-// the screen around it.
-func TestHelpTellsTheScreenItWasOpenedFrom(t *testing.T) {
+// helpText is the ? popup's lines, unstyled.
+func helpText(m *Model) string {
+	lines, _ := m.helpLines(60)
+	return ansi.Strip(strings.Join(lines, "\n"))
+}
+
+// The ? popup has a section for every scope; that of the screen it was
+// opened from comes first and unfolded, the rest folded with their counts.
+func TestHelpUnfoldsTheScreenItWasOpenedFrom(t *testing.T) {
 	m := newModel(fixture(), cachedReview())
 	run(m, m.Init())
 	press(m, "?")
-	s := screen(m)
-	for _, want := range []string{"the list and its preview   here", "select by rule", "↓ "} {
+	s := helpText(m)
+	if !strings.HasPrefix(s, "▾ the list and its preview") || !strings.Contains(s, "select by rule") {
+		t.Errorf("the list's section is not first and unfolded:\n%s", s)
+	}
+	for _, want := range []string{"▸ anywhere (6)", "▸ moving (6)", "▸ a pull request (8)", "▸ writing a review (3)", "▸ mouse (5)"} {
 		if !strings.Contains(s, want) {
-			t.Errorf("the list's ? popup does not tell %q:\n%s", want, s)
+			t.Errorf("the ? popup has no %q:\n%s", want, s)
 		}
 	}
-	if n := len(m.renderHelp()); n > 34*2/3+2 {
-		t.Errorf("the ? popup is %d lines tall in a terminal of 34", n)
+	if n := len(m.renderHelp(make([]string, 34))); n != 34 {
+		t.Errorf("the popup changed the screen to %d lines", n)
 	}
-	if !strings.Contains(s, "triage") {
-		t.Errorf("the ? popup covers the header:\n%s", s)
+	if !strings.Contains(screen(m), "triage") {
+		t.Errorf("the ? popup covers the header:\n%s", screen(m))
 	}
 
 	press(m, "esc", "enter", "?")
-	if s := ansiStrip(m.helpLines()); !strings.HasPrefix(s, "a pull request   here") || !strings.Contains(s, "the list and its preview · ") {
-		t.Errorf("the PR screen's ? popup does not put its own keys first:\n%s", s)
+	if s := helpText(m); !strings.HasPrefix(s, "▾ a pull request") || !strings.Contains(s, "▸ the list and its preview (29)") {
+		t.Errorf("the PR screen's section is not first and unfolded:\n%s", s)
+	}
+}
+
+// z folds the first section in sight, and a click on a header folds or
+// unfolds that one; a click outside the box closes the popup.
+func TestHelpFolds(t *testing.T) {
+	m := newModel(fixture(), cachedReview())
+	run(m, m.Init())
+	press(m, "?", "z")
+	if s := helpText(m); !strings.HasPrefix(s, "▸ the list and its preview (29)") {
+		t.Errorf("z did not fold the list's section:\n%s", s)
+	}
+	x, y := lineOf(t, m, "▸ moving")
+	mouseAt(m, tea.MouseClickMsg{X: x, Y: y, Button: tea.MouseLeft})
+	if s := helpText(m); !strings.Contains(s, "▾ moving") || !strings.Contains(s, "page down") {
+		t.Errorf("a click on the header did not unfold moving:\n%s", s)
+	}
+	mouseAt(m, tea.MouseClickMsg{X: 0, Y: 0, Button: tea.MouseLeft})
+	if m.help {
+		t.Error("a click outside the popup did not close it")
 	}
 }
 
@@ -45,7 +73,7 @@ func TestHelpScrolls(t *testing.T) {
 	}
 	press(m, "G")
 	s := screen(m)
-	if !strings.Contains(s, "writing a review · 3") || strings.Contains(s, "↓ ") {
+	if !strings.Contains(s, "▸ mouse (5)") || strings.Contains(s, "↓ ") {
 		t.Errorf("G did not scroll to the end:\n%s", s)
 	}
 	end := m.helpTop
@@ -53,7 +81,7 @@ func TestHelpScrolls(t *testing.T) {
 	if m.helpTop != end {
 		t.Errorf("j scrolled past the end: %d, want %d", m.helpTop, end)
 	}
-	mouseAt(m, tea.MouseWheelMsg{X: 10, Y: 10, Button: tea.MouseWheelUp})
+	mouseAt(m, tea.MouseWheelMsg{X: 70, Y: 10, Button: tea.MouseWheelUp})
 	if m.helpTop != end-wheelLines {
 		t.Errorf("the wheel scrolled to %d, want %d", m.helpTop, end-wheelLines)
 	}
@@ -61,8 +89,4 @@ func TestHelpScrolls(t *testing.T) {
 	if !m.help || m.helpTop != 0 {
 		t.Errorf("? again opens the popup at %d, want its top", m.helpTop)
 	}
-}
-
-func ansiStrip(lines []string) string {
-	return ansi.Strip(strings.Join(lines, "\n"))
 }

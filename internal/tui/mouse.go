@@ -32,7 +32,8 @@ type click struct {
 }
 
 // mouse routes a mouse message. A popup or the filter being typed takes
-// no clicks; the help goes with one and scrolls with the wheel.
+// no clicks; the help folds a section with one, goes with one outside
+// it, and scrolls with the wheel.
 func (m *Model) mouse(msg tea.MouseMsg) tea.Cmd {
 	switch msg := msg.(type) {
 	case tea.MouseMotionMsg:
@@ -55,7 +56,9 @@ func (m *Model) mouse(msg tea.MouseMsg) tea.Cmd {
 	if m.help {
 		switch msg := msg.(type) {
 		case tea.MouseClickMsg:
-			m.help = false
+			if msg.Button == tea.MouseLeft {
+				m.helpClick(msg.X, msg.Y)
+			}
 		case tea.MouseWheelMsg:
 			switch msg.Button {
 			case tea.MouseWheelDown:

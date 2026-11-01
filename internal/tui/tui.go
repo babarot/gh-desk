@@ -181,7 +181,9 @@ type Model struct {
 	width, height int
 	view          view
 	help          bool
-	helpTop       int // the first line of the ? popup shown
+	helpTop       int             // the first line of the ? popup shown
+	helpFolded    map[string]bool // the ? popup's sections folded, by title
+	helpBox       helpBox
 	status        string
 	statusErr     bool
 
@@ -373,7 +375,7 @@ func (m *Model) key(msg tea.KeyPressMsg) tea.Cmd {
 		return m.chatKeyPress(msg)
 	}
 	if m.keys.Matches("help", k) {
-		m.help, m.helpTop = true, 0
+		m.openHelp()
 		return nil
 	}
 	switch m.view {
