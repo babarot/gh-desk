@@ -90,7 +90,7 @@ func Run(args []string, stdout, stderr io.Writer) int {
 	run := logging.NewID()
 	log = log.With(logging.KeyRun, run)
 
-	cfg, km, err := setup(*configPath, *debug, level, log)
+	cfg, km, warns, err := setup(*configPath, *debug, level, log)
 	if err != nil {
 		log.Error("setup failed", "err", err.Error())
 		fmt.Fprintln(stderr, err)
@@ -115,6 +115,7 @@ func Run(args []string, stdout, stderr io.Writer) int {
 		return 0
 	}
 	set := settings(cfg)
+	set.ConfigWarnings = warns
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	viewer, err := gh.Viewer(ctx)
@@ -319,16 +320,17 @@ func editor(set string, getenv func(string) string) string {
 
 // setup writes the config file on first run, reads it, sets the log level,
 // and builds the keymap. A mistake anywhere in the file is reported where
-// it is, all at once.
-func setup(path string, debug bool, level *slog.LevelVar, log *slog.Logger) (config.File, keymap.Map, error) {
+// it is, all at once. The warnings come back one line each, with where they
+// are, for the TUI to show; they are logged too.
+func setup(path string, debug bool, level *slog.LevelVar, log *slog.Logger) (config.File, keymap.Map, []string, error) {
 	if err := config.WriteTemplate(path, KeysTemplate()); err == nil {
 		log.Info("wrote the config file", "config", path)
 	} else if !errors.Is(err, fs.ErrExist) {
 		log.Warn("could not write the config file", "config", path, "err", err.Error())
 	}
-	cfg, err := config.Load(path)
+	cfg, warns, err := config.Load(path)
 	if err != nil {
-		return config.File{}, keymap.Map{}, err
+		return config.File{}, keymap.Map{}, nil, err
 	}
 	var ps config.Problems
 	want := cfg.Log.Level
@@ -342,7 +344,7 @@ func setup(path string, debug bool, level *slog.LevelVar, log *slog.Logger) (con
 		if want == cfg.Log.Level {
 			ps = append(ps, config.SettingProblem("log.level", "log.level: %v", err))
 		} else {
-			return config.File{}, keymap.Map{}, fmt.Errorf("%s: %w", EnvLogLevel, err)
+			return config.File{}, keymap.Map{}, nil, fmt.Errorf("%s: %w", EnvLogLevel, err)
 		}
 	} else {
 		level.Set(l)
@@ -356,9 +358,13 @@ func setup(path string, debug bool, level *slog.LevelVar, log *slog.Logger) (con
 	km, kps := applyKeys(cfg.Keys)
 	ps = append(ps, kps...)
 	if len(ps) > 0 {
-		return config.File{}, keymap.Map{}, config.Report(path, ps)
+		return config.File{}, keymap.Map{}, nil, config.Report(path, append(ps, warns...))
 	}
-	return cfg, km, nil
+	lines := config.Lines(path, warns)
+	for _, l := range lines {
+		log.Warn("config", "warning", l)
+	}
+	return cfg, km, lines, nil
 }
 
 // applyKeys gives the actions under [keys] their keys, turning what the

@@ -18,12 +18,15 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"reflect"
 	"regexp"
 	"slices"
 	"strings"
 	"time"
 
 	"github.com/pelletier/go-toml/v2"
+
+	"github.com/babarot/gh-triage/internal/near"
 )
 
 // The values of the settings that take one of a few.
@@ -577,19 +580,21 @@ func set[T any](dst *T, p *T) {
 
 // Load reads the config file at path. A missing file yields the defaults;
 // keys left out of the file keep their defaults. A key it does not know is
-// an error, since it would otherwise be ignored without a word.
-func Load(path string) (File, error) {
+// an error, since it would otherwise be ignored without a word. The
+// problems returned with a File are warnings: what is likely not what was
+// meant, which does not stop gh-triage.
+func Load(path string) (File, Problems, error) {
 	src, err := os.ReadFile(path)
 	if err != nil {
 		if errors.Is(err, fs.ErrNotExist) {
-			return Default(), nil
+			return Default(), nil, nil
 		}
-		return File{}, fmt.Errorf("read %s: %w", path, err)
+		return File{}, nil, fmt.Errorf("read %s: %w", path, err)
 	}
 	cfg := Default()
 	d := doc{Claude: cfg.Claude, Theme: cfg.Theme, Log: cfg.Log, Cache: cfg.Cache}
 	if err := toml.NewDecoder(bytes.NewReader(src)).DisallowUnknownFields().Decode(&d); err != nil {
-		return File{}, Report(path, decodeProblems(err))
+		return File{}, nil, Report(path, decodeProblems(err))
 	}
 	var ps Problems
 	if d.Tabs != nil {
@@ -652,7 +657,7 @@ func Load(path string) (File, error) {
 	}
 	for i, m := range cfg.Merge.Methods {
 		if !slices.Contains(MergeMethods, m) {
-			ps = append(ps, Problem{Key: []string{"merge", "methods"}, Index: i, Message: fmt.Sprintf("merge.methods[%d] must be one of %s, got %q", i, quoted(MergeMethods), m)})
+			ps = append(ps, Problem{Key: []string{"merge", "methods"}, Index: i, Message: fmt.Sprintf("merge.methods[%d] must be one of %s, got %q%s", i, quoted(MergeMethods), m, didYouMean(m, MergeMethods))})
 		}
 	}
 	if strings.TrimSpace(cfg.Claude.Model) == "" {
@@ -664,10 +669,57 @@ func Load(path string) (File, error) {
 	if strings.TrimSpace(cfg.Cache.Dir) == "" {
 		ps = append(ps, problem("cache.dir", "cache.dir must not be empty"))
 	}
+	warns := warnings(cfg)
 	if len(ps) > 0 {
-		return File{}, Report(path, ps)
+		return File{}, nil, Report(path, append(ps, warns...))
 	}
-	return cfg, nil
+	return cfg, warns, nil
+}
+
+// warnings are what is likely not what was meant in cfg.
+func warnings(cfg File) Problems {
+	var ps Problems
+	warn := func(key []string, elem int, format string, args ...any) {
+		ps = append(ps, Problem{Key: key, Element: elem, Index: -1, Warn: true, Message: fmt.Sprintf(format, args...)})
+	}
+	queries := map[string]int{}
+	for i, t := range cfg.Tabs {
+		if t.Inbox() {
+			continue
+		}
+		if !searchesPRs(t.Query) {
+			warn([]string{"tabs", "query"}, i+1, "tabs[%d].query has no is:pr: GitHub's search returns issues too, which are left out but take up the limit and the count", i)
+		}
+		q := strings.Join(strings.Fields(t.Query), " ")
+		if j, ok := queries[q]; ok {
+			warn([]string{"tabs", "query"}, i+1, "tabs[%d].query is the same as tabs[%d]'s", i, j)
+		} else {
+			queries[q] = i
+		}
+	}
+	for i, s := range cfg.Select {
+		if strings.HasPrefix(s.Author, "app/") {
+			warn([]string{"select", "author"}, i+1, "select[%d].author %q never matches: a bot's login is written without app/, as %q", i, s.Author, strings.TrimPrefix(s.Author, "app/"))
+		}
+	}
+	for i, g := range cfg.Checks.Approval {
+		if strings.Trim(g.Pattern, "*") == "" {
+			ps = append(ps, Problem{Key: []string{"checks", "approval"}, Index: i, Warn: true,
+				Message: fmt.Sprintf("checks.approval[%d] %q matches every check, so pending checks always count as passing", i, g.Pattern)})
+		}
+	}
+	return ps
+}
+
+// searchesPRs reports whether a GitHub search query asks for pull requests
+// only.
+func searchesPRs(q string) bool {
+	for _, f := range strings.Fields(strings.ToLower(q)) {
+		if f == "is:pr" || f == "type:pr" || f == "is:pull-request" {
+			return true
+		}
+	}
+	return false
 }
 
 // oneOf reports setting's value when it is not among values.
@@ -675,7 +727,16 @@ func oneOf(setting, v string, values []string) Problems {
 	if slices.Contains(values, v) {
 		return nil
 	}
-	return Problems{problem(setting, "%s must be one of %s, got %q", setting, quoted(values), v)}
+	return Problems{problem(setting, "%s must be one of %s, got %q%s", setting, quoted(values), v, didYouMean(v, values))}
+}
+
+// didYouMean is "; did you mean ...?" naming the value among values that
+// v is likely a typo of, or "".
+func didYouMean(v string, values []string) string {
+	if c, ok := near.Closest(v, values); ok {
+		return fmt.Sprintf("; did you mean %q?", c)
+	}
+	return ""
 }
 
 // tabsFrom reads the tabs as written, filling in what each kind leaves
@@ -701,7 +762,7 @@ func tabsFrom(ds []tabDoc) ([]Tab, Problems) {
 		t := Tab{Kind: "search", Sort: "updated", Limit: 100}
 		set(&t.Kind, d.Kind)
 		if !slices.Contains(TabKinds, t.Kind) {
-			at(i, "kind", "must be one of %s, got %q", quoted(TabKinds), t.Kind)
+			at(i, "kind", "must be one of %s, got %q%s", quoted(TabKinds), t.Kind, didYouMean(t.Kind, TabKinds))
 		}
 		if t.Inbox() {
 			inboxes++
@@ -735,7 +796,7 @@ func tabsFrom(ds []tabDoc) ([]Tab, Problems) {
 				at(i, "query", "must not be empty")
 			}
 			if !slices.Contains(TabSorts, t.Sort) {
-				at(i, "sort", "must be one of %s, got %q", quoted(TabSorts), t.Sort)
+				at(i, "sort", "must be one of %s, got %q%s", quoted(TabSorts), t.Sort, didYouMean(t.Sort, TabSorts))
 			}
 		}
 		if d.Groups != nil && len(t.Groups) == 0 {
@@ -745,7 +806,7 @@ func tabsFrom(ds []tabDoc) ([]Tab, Problems) {
 			switch {
 			case !slices.Contains(GroupNames, g):
 				ps = append(ps, Problem{Key: []string{"tabs", "groups"}, Element: i + 1, Index: j,
-					Message: fmt.Sprintf("tabs[%d].groups must name groups among %s, got %q", i, quoted(GroupNames), g)})
+					Message: fmt.Sprintf("tabs[%d].groups must name groups among %s, got %q%s", i, quoted(GroupNames), g, didYouMean(g, GroupNames))})
 			case slices.Contains(t.Groups[:j], g):
 				ps = append(ps, Problem{Key: []string{"tabs", "groups"}, Element: i + 1, Index: j,
 					Message: fmt.Sprintf("tabs[%d].groups names %q twice", i, g)})
@@ -887,6 +948,9 @@ func decodeProblems(err error) Problems {
 			key := []string(e.Key())
 			name := strings.Join(key, ".")
 			msg := fmt.Sprintf("%q is not a setting", name)
+			if c, ok := near.Closest(key[len(key)-1], settingsIn(key[:len(key)-1])); ok {
+				msg += fmt.Sprintf("; did you mean %q?", strings.Join(append(slices.Clone(key[:len(key)-1]), c), "."))
+			}
 			if to, ok := moved[name]; ok {
 				// A table repeated, as [[sections]], is told once.
 				if told[name] {
@@ -923,6 +987,42 @@ var moved = map[string]string{
 	"refresh":             `moved: refresh.interval is list.refresh, and "0" is "off"`,
 	"preview.description": `moved to "description.style"`,
 	"merge.watch_timeout": `is no longer a setting: gh-triage watches a pull request on auto-merge for 24h, and GitHub's auto-merge goes on after`,
+}
+
+// settingsIn are the keys the file may have in table, a path of table
+// names from the top ([] for the top, [tabs] for an element of [[tabs]]),
+// read from the toml tags of doc.
+func settingsIn(table []string) []string {
+	t := reflect.TypeFor[doc]()
+	for _, name := range table {
+		f, ok := fieldTagged(t, name)
+		if !ok {
+			return nil
+		}
+		t = f.Type
+		for t.Kind() == reflect.Pointer || t.Kind() == reflect.Slice {
+			t = t.Elem()
+		}
+		if t.Kind() != reflect.Struct {
+			return nil
+		}
+	}
+	var names []string
+	for f := range t.Fields() {
+		if tag, _, _ := strings.Cut(f.Tag.Get("toml"), ","); tag != "" && tag != "-" {
+			names = append(names, tag)
+		}
+	}
+	return names
+}
+
+func fieldTagged(t reflect.Type, name string) (reflect.StructField, bool) {
+	for f := range t.Fields() {
+		if tag, _, _ := strings.Cut(f.Tag.Get("toml"), ","); tag == name {
+			return f, true
+		}
+	}
+	return reflect.StructField{}, false
 }
 
 // wrongType is how the decoder says a value has the wrong type.

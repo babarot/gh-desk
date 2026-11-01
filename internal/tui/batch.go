@@ -213,6 +213,24 @@ func (m *Model) pushNote(icon, title string, items []noteItem) tea.Cmd {
 	return tea.Tick(4*time.Second, func(time.Time) tea.Msg { return toastMsg{n} })
 }
 
+// configNote tells of the config file's warnings, which did not stop
+// gh-triage, in a notification.
+func (m *Model) configNote() tea.Cmd {
+	ws := m.set.ConfigWarnings
+	if len(ws) == 0 {
+		return nil
+	}
+	items := make([]noteItem, len(ws))
+	for i, w := range ws {
+		items[i] = noteItem{text: w}
+	}
+	noun := "warnings"
+	if len(ws) == 1 {
+		noun = "warning"
+	}
+	return m.pushNote("!", fmt.Sprintf("the config file has %d %s", len(ws), noun), items)
+}
+
 func (m *Model) unseen() int {
 	n := 0
 	for _, x := range m.notes {
@@ -322,6 +340,9 @@ func (m *Model) renderNotes() []string {
 		var s string
 		if l.item == nil {
 			s = cursor + " " + m.noteIcon(l.n.icon) + " " + st.sub1.Render(l.n.title) + "  " + st.dim.Render(shortAge(m.set.Now().Sub(l.n.at))+" ago")
+		} else if l.item.key == (model.PRKey{}) {
+			// An item about no pull request, as a warning of the config file.
+			s = cursor + "     " + st.yellow.Render(l.item.text)
 		} else {
 			name := st.sub1.Render(l.item.key.Repository()) + st.muted.Render(fmt.Sprintf("#%d", l.item.key.Number))
 			s = cursor + "     " + fit(name, 30) + " " + m.resultStyle(l.item.result).Render(l.item.text)
@@ -337,8 +358,11 @@ func (m *Model) renderNotes() []string {
 }
 
 func (m *Model) noteIcon(icon string) string {
-	if icon == "✗" {
+	switch icon {
+	case "✗":
 		return m.st.red.Render(icon)
+	case "!":
+		return m.st.yellow.Render(icon)
 	}
 	return m.st.green.Render(icon)
 }

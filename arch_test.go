@@ -25,8 +25,9 @@ import (
 var layers = []layer{
 	{"internal/model", 0, nil, nil, "Shared types: pull requests and their names"},
 	{"internal/logging", 0, nil, nil, "The slog logger and the log file"},
-	{"internal/config", 1, []string{"model"}, []string{"github.com/pelletier/go-toml/v2"}, "Reading the config file and reporting its mistakes"},
-	{"internal/keymap", 1, nil, nil, "Keys bound to actions by name"},
+	{"internal/near", 0, nil, nil, "The closest of a few names to one mistyped, for a did-you-mean"},
+	{"internal/config", 1, []string{"model", "near"}, []string{"github.com/pelletier/go-toml/v2"}, "Reading the config file and reporting its mistakes"},
+	{"internal/keymap", 1, []string{"near"}, nil, "Keys bound to actions by name"},
 	{"internal/plan", 1, []string{"model"}, nil, "Deciding how to merge each pull request; selection rules"},
 	{"internal/diff", 1, nil, nil, "Reading patches and the words that changed"},
 	{"internal/github", 2, []string{"model", "logging"}, []string{"github.com/cli/go-gh/v2"}, "GitHub's GraphQL and REST APIs"},

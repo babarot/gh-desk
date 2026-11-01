@@ -22,7 +22,7 @@ func write(t *testing.T, body string) string {
 // wantErrs loads body and checks that the error has each of wants.
 func wantErrs(t *testing.T, body string, wants ...string) {
 	t.Helper()
-	_, err := Load(write(t, body))
+	_, _, err := Load(write(t, body))
 	for _, want := range wants {
 		if err == nil || !strings.Contains(err.Error(), want) {
 			t.Errorf("err = %v\nwant one containing %q", err, want)
@@ -31,7 +31,7 @@ func wantErrs(t *testing.T, body string, wants ...string) {
 }
 
 func TestLoadMissingFileIsDefault(t *testing.T) {
-	cfg, err := Load(filepath.Join(t.TempDir(), "none.toml"))
+	cfg, _, err := Load(filepath.Join(t.TempDir(), "none.toml"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -48,7 +48,7 @@ func TestTemplateLoadsAsDefault(t *testing.T) {
 	if err := WriteTemplate(path, ""); err == nil {
 		t.Error("WriteTemplate overwrote an existing file")
 	}
-	cfg, err := Load(path)
+	cfg, _, err := Load(path)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -73,7 +73,7 @@ func TestTemplateTabsAreTheDefault(t *testing.T) {
 			b.WriteString(strings.TrimPrefix(strings.TrimPrefix(line, "#"), " ") + "\n")
 		}
 	}
-	cfg, err := Load(write(t, b.String()))
+	cfg, _, err := Load(write(t, b.String()))
 	if err != nil {
 		t.Fatalf("%v\n%s", err, b.String())
 	}
@@ -83,7 +83,7 @@ func TestTemplateTabsAreTheDefault(t *testing.T) {
 }
 
 func TestLoadValues(t *testing.T) {
-	cfg, err := Load(write(t, `
+	cfg, _, err := Load(write(t, `
 [log]
 level = "debug"
 [theme]
@@ -155,7 +155,7 @@ func TestLoadReportsWhereTheMistakeIs(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, err := Load(write(t, tt.body))
+			_, _, err := Load(write(t, tt.body))
 			if err == nil || !strings.Contains(err.Error(), tt.want) {
 				t.Errorf("err = %v\nwant one containing %q", err, tt.want)
 			}
@@ -179,7 +179,7 @@ func TestReportPlacesKeyProblems(t *testing.T) {
 }
 
 func TestTabs(t *testing.T) {
-	cfg, err := Load(write(t, `
+	cfg, _, err := Load(write(t, `
 [[tabs]]
 kind = "inbox"
 name = "通知"
@@ -245,7 +245,7 @@ query = "is:pr"
 }
 
 func TestSelectRules(t *testing.T) {
-	cfg, err := Load(write(t, `
+	cfg, _, err := Load(write(t, `
 [[select]]
 name = "safe renovate"
 author = "renovate"
@@ -277,11 +277,85 @@ name = "all"
 func TestCacheDir(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
-	cfg, err := Load(write(t, "[cache]\ndir = \"~/triage\"\n"))
+	cfg, _, err := Load(write(t, "[cache]\ndir = \"~/triage\"\n"))
 	if err != nil {
 		t.Fatal(err)
 	}
 	if got, want := cfg.CacheDir(), filepath.Join(home, "triage"); got != want {
 		t.Errorf("CacheDir() = %q, want %q", got, want)
+	}
+}
+
+func TestDidYouMean(t *testing.T) {
+	tests := []struct{ name, body, want string }{
+		{"key", "[list]\nstal_days = 3\n", `"list.stal_days" is not a setting; did you mean "list.stale_days"?`},
+		{"table", "[thme]\nname = \"auto\"\n", `"thme" is not a setting; did you mean "theme"?`},
+		{"key in a tab", "[[tabs]]\nkind = \"inbox\"\nshow_setled = true\n", `"tabs.show_setled" is not a setting; did you mean "tabs.show_settled"?`},
+		{"value", "[theme]\nname = \"lattte\"\n", `got "lattte"; did you mean "latte"?`},
+		{"kind", "[[tabs]]\nkind = \"inbx\"\n", `got "inbx"; did you mean "inbox"?`},
+		{"group", "[[tabs]]\nname = \"r\"\nquery = \"is:pr\"\ngroups = [\"bot\"]\n[[tabs]]\nkind = \"inbox\"\n", `got "bot"; did you mean "bots"?`},
+		{"moved wins", "[ui]\ntheme = \"auto\"\n", `"ui" moved:`},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) { wantErrs(t, tt.body, tt.want) })
+	}
+	wantNo := func(body, not string) {
+		t.Helper()
+		_, _, err := Load(write(t, body))
+		if err == nil || strings.Contains(err.Error(), not) {
+			t.Errorf("err = %v; want no %q", err, not)
+		}
+	}
+	wantNo("[list]\nnewest = 1\n", "did you mean")
+	wantNo("[ui]\ntheme = \"auto\"\n", "did you mean")
+}
+
+func TestWarnings(t *testing.T) {
+	path := write(t, `
+[[tabs]]
+name = "a"
+query = "is:open author:@me"
+
+[[tabs]]
+name = "b"
+query = "is:open  author:@me"
+
+[[tabs]]
+kind = "inbox"
+
+[checks]
+approval = ["*"]
+
+[[select]]
+name = "bots"
+author = "app/renovate"
+`)
+	cfg, warns, err := Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(cfg.Tabs) != 3 {
+		t.Fatalf("tabs = %+v", cfg.Tabs)
+	}
+	got := strings.Join(Lines(path, warns), "\n")
+	for _, want := range []string{
+		"config.toml:4:9: tabs[0].query has no is:pr",
+		"config.toml:8:9: tabs[1].query has no is:pr",
+		"config.toml:8:9: tabs[1].query is the same as tabs[0]'s",
+		`config.toml:14:13: checks.approval[0] "*" matches every check`,
+		`config.toml:18:10: select[0].author "app/renovate" never matches`,
+	} {
+		if !strings.Contains(got, want) {
+			t.Errorf("warnings =\n%s\nwant one containing %q", got, want)
+		}
+	}
+	// With a mistake as well, the warnings are reported with it, marked.
+	_, _, err = Load(write(t, "[[tabs]]\nname = \"a\"\nquery = \"author:@me\"\n[[tabs]]\nkind = \"inbox\"\n[theme]\nname = \"x\"\n"))
+	if err == nil || !strings.Contains(err.Error(), "warning: tabs[0].query has no is:pr") || !strings.Contains(err.Error(), "theme.name must be one of") {
+		t.Errorf("err = %v", err)
+	}
+	// The default tabs have none.
+	if _, warns, _ := Load(write(t, "")); len(warns) > 0 {
+		t.Errorf("the defaults warn: %v", warns)
 	}
 }

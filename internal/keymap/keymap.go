@@ -11,6 +11,8 @@ import (
 	"fmt"
 	"slices"
 	"strings"
+
+	"github.com/babarot/gh-triage/internal/near"
 )
 
 // Action is something a key does, named as it is under [keys].
@@ -282,6 +284,13 @@ func (m Map) conflicts() []conflict {
 // unknownAction says an action does not exist, naming a close one when
 // there is.
 func unknownAction(name string) string {
+	names := make([]string, len(Defaults))
+	for i, d := range Defaults {
+		names[i] = string(d.Action)
+	}
+	if a, ok := near.Closest(name, names); ok {
+		return fmt.Sprintf("%q is not an action; did you mean %q?", name, a)
+	}
 	for _, d := range Defaults {
 		if a := string(d.Action); strings.Contains(a, name) || strings.Contains(name, a) {
 			return fmt.Sprintf("%q is not an action; did you mean %q?", name, a)

@@ -29,7 +29,7 @@ func TestKeysTemplateLoadsUncommented(t *testing.T) {
 	if err := os.WriteFile(path, []byte("[keys]\n"+strings.Join(lines, "\n")+"\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	cfg, err := config.Load(path)
+	cfg, _, err := config.Load(path)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -75,7 +75,7 @@ func TestEditorPrecedence(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Setenv("VISUAL", "vi")
-	cfg, _, err := setup(path, false, new(slog.LevelVar), logging.Discard())
+	cfg, _, _, err := setup(path, false, new(slog.LevelVar), logging.Discard())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -89,7 +89,7 @@ func TestSetupWritesTemplateAndReportsMistakes(t *testing.T) {
 	var buf bytes.Buffer
 	log := logging.New(&buf, slog.LevelInfo)
 	level := new(slog.LevelVar)
-	if _, _, err := setup(path, false, level, log); err != nil {
+	if _, _, _, err := setup(path, false, level, log); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := os.Stat(path); err != nil {
@@ -101,7 +101,7 @@ func TestSetupWritesTemplateAndReportsMistakes(t *testing.T) {
 	if err := os.WriteFile(path, []byte("[log]\nlevel = \"loud\"\n[keys]\napprove = \"shift+a\"\nmerge = 1\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	_, _, err := setup(path, false, level, log)
+	_, _, _, err := setup(path, false, level, log)
 	if err == nil {
 		t.Fatal("no error")
 	}
@@ -119,14 +119,14 @@ func TestLevelPrecedence(t *testing.T) {
 	}
 	level := new(slog.LevelVar)
 	log := logging.Discard()
-	if _, _, err := setup(path, false, level, log); err != nil || level.Level() != slog.LevelWarn {
+	if _, _, _, err := setup(path, false, level, log); err != nil || level.Level() != slog.LevelWarn {
 		t.Errorf("config: level = %v, err = %v", level.Level(), err)
 	}
 	t.Setenv(EnvLogLevel, "error")
-	if _, _, err := setup(path, false, level, log); err != nil || level.Level() != slog.LevelError {
+	if _, _, _, err := setup(path, false, level, log); err != nil || level.Level() != slog.LevelError {
 		t.Errorf("env: level = %v, err = %v", level.Level(), err)
 	}
-	if _, _, err := setup(path, true, level, log); err != nil || level.Level() != slog.LevelDebug {
+	if _, _, _, err := setup(path, true, level, log); err != nil || level.Level() != slog.LevelDebug {
 		t.Errorf("--debug: level = %v, err = %v", level.Level(), err)
 	}
 }
@@ -151,7 +151,7 @@ func TestOnlyReadingToolsForClaude(t *testing.T) {
 	if err := os.WriteFile(path, []byte("[claude]\nallowed_tools = [\"Read\", \"Bash\"]\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	_, _, err := setup(path, false, new(slog.LevelVar), logging.Discard())
+	_, _, _, err := setup(path, false, new(slog.LevelVar), logging.Discard())
 	if err == nil || !strings.Contains(err.Error(), `claude.allowed_tools[1]`) || !strings.Contains(err.Error(), `"Bash"`) {
 		t.Errorf("err = %v", err)
 	}

@@ -137,3 +137,22 @@ func TestGroupLeftOutIsNotSelected(t *testing.T) {
 		t.Fatal("no rule picks the bot's pull request with bots shown; the test proves nothing")
 	}
 }
+
+func TestConfigWarningsAtStart(t *testing.T) {
+	set := testSettings()
+	set.ConfigWarnings = []string{"~/.config/gh-triage/config.toml:4:9: tabs[0].query has no is:pr"}
+	m := startSet(t, set, 130)
+	if s := screen(m); !strings.Contains(s, "the config file has 1 warning") {
+		t.Fatalf("no notification of the warning at start:\n%s", s)
+	}
+	press(m, "n")
+	s := screen(m)
+	if !strings.Contains(s, "config.toml:4:9: tabs[0].query has no is:pr") || strings.Contains(s, "#0") {
+		t.Errorf("the warning is not listed as itself:\n%s", s)
+	}
+	// It names no pull request, so choosing it only closes the list.
+	press(m, "down", "enter")
+	if m.notesAt != nil || m.view != viewList {
+		t.Errorf("notes still open, or the view moved: %v", m.view)
+	}
+}

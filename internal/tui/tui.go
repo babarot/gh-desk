@@ -123,6 +123,10 @@ type Settings struct {
 	// pending merges. Without it, merges that wait are left out, since
 	// nothing would go on with them after quitting.
 	CanWait bool
+	// ConfigWarnings are what the config file likely did not mean, one
+	// line each with where it is; they are shown as a notification at
+	// start.
+	ConfigWarnings []string
 	// StoreProblem says why the record could not be opened, when it was
 	// not another gh-triage holding it.
 	StoreProblem string
@@ -270,7 +274,7 @@ func Run(ctx context.Context, src Source, run Runner, cl Claude, km keymap.Map, 
 
 // Init asks for the terminal's background, the viewer, and every tab.
 func (m *Model) Init() tea.Cmd {
-	cmds := []tea.Cmd{m.tick(), m.resume()}
+	cmds := []tea.Cmd{m.tick(), m.resume(), m.configNote()}
 	if m.viewer == "" {
 		cmds = append(cmds, m.loadViewer())
 	} else {

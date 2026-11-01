@@ -33,6 +33,9 @@ type Problem struct {
 	// AtKey marks the key rather than its value, as for a key that is not
 	// a setting.
 	AtKey bool
+	// Warn marks what is likely not what was meant but does not stop
+	// gh-triage, rather than a mistake that does.
+	Warn bool
 	// Line and Col place the mistake when the file says where it is
 	// itself, as for a file that does not parse; they win over Key.
 	Line, Col int
@@ -89,10 +92,10 @@ func (r *report) Error() string {
 		}
 		p, line, col, width := pl.p, pl.line, pl.col, pl.width
 		if line == 0 {
-			fmt.Fprintf(&b, "%s: %s\n", shown, p.Message)
+			fmt.Fprintf(&b, "%s: %s\n", shown, p.text())
 			continue
 		}
-		fmt.Fprintf(&b, "%s:%d:%d: %s\n", shown, line, col, p.Message)
+		fmt.Fprintf(&b, "%s:%d:%d: %s\n", shown, line, col, p.text())
 		if line > len(lines) {
 			continue
 		}
@@ -103,6 +106,42 @@ func (r *report) Error() string {
 		fmt.Fprintf(&b, "%s |\n%s | %s\n%s | %s%s\n", gutter, num, text, gutter, strings.Repeat(" ", max(0, col-1)), mark)
 	}
 	return strings.TrimRight(b.String(), "\n")
+}
+
+// text is the problem's message, marked when it is a warning.
+func (p Problem) text() string {
+	if p.Warn {
+		return "warning: " + p.Message
+	}
+	return p.Message
+}
+
+// Lines are problems in the config file at path, one line each with where
+// it is (file:line:col: message), top to bottom, for a place with no room
+// for the line itself.
+func Lines(path string, ps Problems) []string {
+	src, _ := os.ReadFile(path)
+	shown := TildePath(path)
+	type placed struct {
+		text      string
+		line, col int
+	}
+	all := make([]placed, len(ps))
+	for i, p := range ps {
+		all[i] = placed{text: p.Message, line: p.Line, col: p.Col}
+		if p.Line == 0 {
+			all[i].line, all[i].col, _, _ = locate(src, p)
+		}
+	}
+	slices.SortStableFunc(all, func(a, b placed) int { return cmp.Or(a.line-b.line, a.col-b.col) })
+	out := make([]string, len(all))
+	for i, pl := range all {
+		out[i] = fmt.Sprintf("%s: %s", shown, pl.text)
+		if pl.line > 0 {
+			out[i] = fmt.Sprintf("%s:%d:%d: %s", shown, pl.line, pl.col, pl.text)
+		}
+	}
+	return out
 }
 
 // TildePath writes a path under the home directory with ~.

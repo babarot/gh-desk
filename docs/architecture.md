@@ -7,8 +7,9 @@ gh-triage is split into packages by layer. A package imports only packages of lo
 |---|---|---|---|---|
 | 0 | `internal/model` | Shared types: pull requests and their names | - | - |
 | 0 | `internal/logging` | The slog logger and the log file | - | - |
-| 1 | `internal/config` | Reading the config file and reporting its mistakes | `model` | `github.com/pelletier/go-toml/v2` |
-| 1 | `internal/keymap` | Keys bound to actions by name | - | - |
+| 0 | `internal/near` | The closest of a few names to one mistyped, for a did-you-mean | - | - |
+| 1 | `internal/config` | Reading the config file and reporting its mistakes | `model`, `near` | `github.com/pelletier/go-toml/v2` |
+| 1 | `internal/keymap` | Keys bound to actions by name | `near` | - |
 | 1 | `internal/plan` | Deciding how to merge each pull request; selection rules | `model` | - |
 | 1 | `internal/diff` | Reading patches and the words that changed | - | - |
 | 2 | `internal/github` | GitHub's GraphQL and REST APIs | `model`, `logging` | `github.com/cli/go-gh/v2` |
