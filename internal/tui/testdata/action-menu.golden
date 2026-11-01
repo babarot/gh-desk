@@ -1,0 +1,34 @@
+triage // @me    1 review (3)   2 mine (1)   3 involved (0)   4 inbox (2)                         1 to you · 1 to a team · 1 bots 
+    PR                        TITLE                                  AUTHOR          CI  REVIEW   WHY         SIZE          AGE
+  ▾ requested from you ╭ acme/api#12 ─────────────────────────────────────────────────────────────────────╮
+▎ ● api#12             │ Add retries to the client                                                        │   +40 −3         3h   
+  ▸ requested from a te│                                                                                  │
+  ▸ bots 1             │ ▎ approve               A      send an approving review                          │
+                       │   merge                 M      merge it, as the next popup decides               │
+                       │   comment               c      write a comment                                   │
+                       │   request changes       X      ask for changes in a review                       │
+                       │   ask claude about it   i      talk with claude about its diff                   │
+                       │   browser               o      open it on github.com                             │
+                       │   hide / done           d      hide it from this tab                             │
+                       │                                                                                  │
+                       │ enter run · or the action's key · esc close                                      │
+                       ╰──────────────────────────────────────────────────────────────────────────────────╯
+
+
+
+
+
+╭  overview   diff (2)  ────────────────────────────────────────────────────────────────────────────────── acme/api#12 · J/K · v ╮
+│ #12 Add retries to the client                                                       alice │ status    open                     │
+│ ▾ description ─────────────────────────────────────────────────────────────────────────── │ requested me @core                 │
+│ │ What                                                                                    │ checks    ✓1                       │
+│ │ Retry failed requests.                                                                  │ size      +40 −3 · 2 files         │
+│ ╵                                                                                         │ branch    retries                  │
+│                                                                                           │           → main                   │
+│ ▾ checks (1)  ✓1 ──────────────────────────────────────────────────────────────────────── │ updated   3h ago                   │
+│ │ ✓ test                                                                                  │                                    │
+│ ╵                                                                                         │                                    │
+│                                                                                           │                                    │
+╰────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+                                                                                                                                  
+enter choose · esc back                                                                                                           

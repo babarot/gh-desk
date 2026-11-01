@@ -39,8 +39,6 @@ func (m *Model) render() string {
 		body--
 	}
 	switch m.view {
-	case viewPR:
-		m.renderPR(&b, body)
 	case viewCompose:
 		m.renderCompose(&b, body)
 	case viewChat:
@@ -72,6 +70,8 @@ func (m *Model) render() string {
 		lines = overlay(lines, m.renderNotes(), 2, m.width)
 	case m.picker != nil:
 		lines = overlay(lines, m.renderPick(), 2, m.width)
+	case m.menu != nil:
+		lines = overlay(lines, m.renderMenu(), 2, m.width)
 	case m.confirm != nil:
 		lines = overlay(lines, m.renderConfirm(), 2, m.width)
 	case m.triage != nil && m.triage.open:
@@ -165,8 +165,8 @@ func (m *Model) shownTabs() (from, to int) {
 	return from, to
 }
 
-// tabGap is what comes between two tabs: the header's, the PR screen's,
-// the pane's and the diff's file tabs. The pills' own padding spaces them
+// tabGap is what comes between two tabs: the header's, the pane's and
+// the diff's file tabs. The pills' own padding spaces them
 // out.
 const tabGap = " "
 
@@ -285,11 +285,10 @@ var ready = map[keymap.Action]bool{
 	"up": true, "down": true, "top": true, "bottom": true, "page_up": true, "page_down": true,
 	"next_tab": true, "prev_tab": true, "tab_1": true, "tab_2": true, "tab_3": true, "tab_4": true, "tab_5": true, "tab_6": true, "tab_7": true, "tab_8": true, "tab_9": true,
 	"open": true, "expand": true, "collapse": true, "approve": true, "comment": true, "request_changes": true, "browse": true, "hide": true,
-	"notifications": true, "select": true, "select_shown": true, "clear_selection": true, "merge": true, "pr_merge": true,
+	"notifications": true, "select": true, "select_shown": true, "clear_selection": true, "merge": true,
 	"include_failing": true, "choose": true, "select_rule": true,
 	"toggle_bots": true, "show_settled": true, "filter": true,
 	"pane_down": true, "pane_up": true, "pane_grow": true, "pane_shrink": true, "next_file": true, "prev_file": true, "pane_tab": true, "unfold": true, "toggle_pane": true,
-	"pr_prev_tab": true, "pr_next_tab": true, "pr_approve": true, "pr_comment": true, "pr_request_changes": true, "pr_browse": true,
 	"confirm": true, "next_kind": true, "post": true, "editor": true, "accept": true, "erase": true,
 	"claude": true, "triage_apply": true, "triage_more": true, "pr_claude": true, "ask_more": true, "draft_review": true, "open_claude": true, "chat_approve": true,
 }
@@ -300,7 +299,7 @@ func (m *Model) hints() string {
 	switch {
 	case m.bulk != nil:
 		as = []keymap.Action{"confirm", "include_failing"}
-	case m.notesAt != nil, m.picker != nil:
+	case m.notesAt != nil, m.picker != nil, m.menu != nil:
 		as = []keymap.Action{"choose"}
 	case m.confirm != nil:
 		as = []keymap.Action{"confirm"}
@@ -324,8 +323,6 @@ func (m *Model) hints() string {
 		as = []keymap.Action{"accept"}
 	case m.view == viewChat:
 		as = []keymap.Action{"ask_more", "draft_review", "chat_approve", "open_claude", "down", "help"}
-	case m.view == viewPR:
-		as = []keymap.Action{"pr_next_tab", "down", "pr_approve", "pr_merge", "pr_comment", "pr_claude", "pr_browse", "help"}
 	default:
 		as = []keymap.Action{"open", "select", "select_rule", "approve", "merge", "comment", "claude", "browse", "pane_tab", "help"}
 		if m.tab().inbox {

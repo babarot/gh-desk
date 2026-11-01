@@ -153,7 +153,6 @@ type view int
 
 const (
 	viewList view = iota
-	viewPR
 	viewCompose
 	viewChat
 )
@@ -204,6 +203,7 @@ type Model struct {
 	selected map[model.PRKey]selection
 	bulk     *bulk
 	picker   *pick
+	menu     *actionMenu
 	// progress is each pull request's step or result in a batch, shown on
 	// its row until R.
 	progress map[model.PRKey]progress
@@ -215,7 +215,6 @@ type Model struct {
 	// refreshing is the reading started by R or the clock, and refreshed
 	// when each tab was last read.
 	refreshed map[int]time.Time
-	prv       prView
 	compose   *compose
 	confirm   *confirm
 	// chats are the conversations with Claude, by pull request; chatKey is
@@ -360,6 +359,8 @@ func (m *Model) key(msg tea.KeyPressMsg) tea.Cmd {
 		return m.notesKey(k)
 	case m.picker != nil:
 		return m.pickKey(k)
+	case m.menu != nil:
+		return m.menuKey(k)
 	case m.confirm != nil:
 		return m.confirmKey(k)
 	case m.triage != nil && m.triage.open:
@@ -379,8 +380,6 @@ func (m *Model) key(msg tea.KeyPressMsg) tea.Cmd {
 		return nil
 	}
 	switch m.view {
-	case viewPR:
-		return m.prKey(k)
 	case viewChat:
 		return m.chatKeyPress(msg)
 	default:

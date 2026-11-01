@@ -174,6 +174,8 @@ func (m *Model) listKey(k string) tea.Cmd {
 		return m.startCompose(p, model.EventComment)
 	case is("request_changes"):
 		return m.startCompose(p, model.EventRequestChanges)
+	case is("pr_claude"):
+		return m.openChat(p)
 	case is("browse"):
 		return m.browse(p)
 	case is("hide"):
@@ -197,13 +199,14 @@ func (m *Model) moveTo(to int) tea.Cmd {
 	return m.ensure()
 }
 
-// openRow opens a pull request, or folds or unfolds a group.
+// openRow opens the action menu of a pull request, or folds or unfolds a
+// group.
 func (m *Model) openRow(r row) tea.Cmd {
 	if r.kind == rowGroup {
 		m.tab().folded[r.group] = !m.tab().folded[r.group]
 		return nil
 	}
-	return m.openPR(r.pr)
+	return m.openMenu()
 }
 
 func (m *Model) switchTab(i int) tea.Cmd {

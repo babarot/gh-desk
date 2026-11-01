@@ -210,7 +210,7 @@ var tables = []table{
 	{Name: "review"},
 	{Name: "merge"},
 	{Name: "bulk", Before: selectExamples},
-	{Name: "claude", Doc: "C asks Claude Code (claude -p, with the account you are signed in with). On a pull request's screen, it reviews that pull request in a worktree of its head. On the list, it plans what to show and select in the tab shown, with no tools, and answers in the language you ask in; enter applies the plan, and an approve or a merge in it opens the confirm popup. Claude only reads: no settings files or MCP servers are loaded, its file tools see only the worktree, and it has none that run commands."},
+	{Name: "claude", Doc: "C and i ask Claude Code (claude -p, with the account you are signed in with). i, or ask claude about it in the menu of enter, reviews the pull request under the cursor in a worktree of its head. C plans what to show and select in the tab shown, with no tools, and answers in the language you ask in; enter applies the plan, and an approve or a merge in it opens the confirm popup. Claude only reads: no settings files or MCP servers are loaded, its file tools see only the worktree, and it has none that run commands."},
 	{Name: "theme"},
 	{Name: "log"},
 	{Name: "cache"},
@@ -233,7 +233,7 @@ var settings = []setting{
 		Doc: `The tab the pane opens on: "overview" (default), the description beside a column of facts, or "diff".`},
 
 	{Key: "description.style", Kind: enumKind{DescriptionStyles}, Value: func(f File) any { return f.Description.Style },
-		Doc: `How a description and its comments are drawn, in the pane and on the PR screen: "rendered" (default) draws headings, lists, code, quotes and tables; "plain" shows the Markdown as written.`},
+		Doc: `How a description and its comments are drawn in the pane: "rendered" (default) draws headings, lists, code, quotes and tables; "plain" shows the Markdown as written.`},
 
 	{Key: "diff.collapse", Kind: globsKind{}, Value: func(f File) any { return f.Diff.Collapse },
 		Doc: "Files shown folded, as their name and line counts, until unfolded: glob patterns, matched against the base name unless they have a slash."},

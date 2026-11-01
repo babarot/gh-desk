@@ -511,12 +511,48 @@ func TestPreviewOpensOnDiff(t *testing.T) {
 	}
 }
 
-func TestPRScreen(t *testing.T) {
+// Enter on a pull request opens the menu of what can be done to it; an
+// action runs by its key there as on the list, and one that cannot run
+// says why and leaves the menu open.
+func TestActionMenu(t *testing.T) {
 	m := start(t, fixture(), keymap.Default())
 	press(m, "enter")
-	golden(t, "pr-overview", screen(m))
-	press(m, "l")
-	golden(t, "pr-files", screen(m))
+	if m.menu == nil {
+		t.Fatal("enter did not open the menu")
+	}
+	golden(t, "action-menu", screen(m))
+	press(m, "esc")
+	if m.menu != nil || m.view != viewList {
+		t.Fatal("esc did not close the menu")
+	}
+
+	press(m, "enter", "j", "enter")
+	if m.menu != nil || m.bulk == nil || m.bulk.kind != runner.Merge {
+		t.Fatalf("choosing merge did not open the merge popup: menu %v, bulk %v", m.menu, m.bulk)
+	}
+	press(m, "esc")
+
+	press(m, "enter", "c")
+	if m.view != viewCompose || m.menu != nil {
+		t.Fatalf("c in the menu did not start a comment: view %v", m.view)
+	}
+}
+
+// With a selection the menu acts on all of it: approve and merge count
+// what they would act on, and actions on one pull request cannot run.
+func TestActionMenuSelection(t *testing.T) {
+	m := start(t, fixture(), keymap.Default())
+	// space on #12, then on the team group under it, which selects #7.
+	press(m, "space", "space", "k", "enter")
+	golden(t, "action-menu-selection", screen(m))
+	press(m, "c")
+	if m.menu == nil || m.view != viewList || !m.statusErr {
+		t.Fatalf("comment on a selection ran: menu %v, view %v", m.menu, m.view)
+	}
+	press(m, "A")
+	if m.menu != nil || m.bulk == nil || m.bulk.kind != runner.Approve {
+		t.Fatalf("approve did not open the approve popup for the selection: %v", m.bulk)
+	}
 }
 
 func TestInbox(t *testing.T) {
@@ -889,7 +925,7 @@ func (c *fakeClaude) Once(_ context.Context, _, prompt, _ string) (claude.Answer
 func TestClaudeConversation(t *testing.T) {
 	m, _ := startWith(t, fixture(), keymap.Default())
 	fc := fakeClaudeOf(t, m)
-	press(m, "enter", "C")
+	press(m, "i")
 	if m.view != viewChat || len(fc.asked) != 1 {
 		t.Fatalf("view %v, asked %d", m.view, len(fc.asked))
 	}
@@ -912,10 +948,10 @@ func TestClaudeConversation(t *testing.T) {
 
 	// Leaving and coming back keeps the conversation.
 	press(m, "esc")
-	if m.view != viewPR {
+	if m.view != viewList {
 		t.Fatalf("view %v", m.view)
 	}
-	press(m, "C")
+	press(m, "i")
 	if len(fc.asked) != 2 || !strings.Contains(screen(m), "Answer 2") {
 		t.Errorf("the conversation was not kept:\n%s", screen(m))
 	}
@@ -926,7 +962,7 @@ func TestClaudeConversation(t *testing.T) {
 // the row until the conversation is opened.
 func TestClaudeAnsweringElsewhere(t *testing.T) {
 	m, _ := startWith(t, fixture(), keymap.Default())
-	press(m, "enter", "C")
+	press(m, "i")
 	k := m.chatKey
 	c := m.chat()
 	c.running, c.since = true, now.Add(-75*time.Second)
@@ -937,7 +973,7 @@ func TestClaudeAnsweringElsewhere(t *testing.T) {
 		t.Error("the spinner does not turn while Claude answers")
 	}
 
-	press(m, "esc", "esc")
+	press(m, "esc")
 	if s := screen(m); !strings.Contains(s, "Claude is answering on "+k.String()+"…") {
 		t.Errorf("the list does not say Claude is answering:\n%s", s)
 	}
@@ -945,7 +981,7 @@ func TestClaudeAnsweringElsewhere(t *testing.T) {
 	if !c.unseen || strings.Count(screen(m), "✦") != 1 {
 		t.Errorf("the answer that came elsewhere is not marked:\n%s", screen(m))
 	}
-	press(m, "enter", "C")
+	press(m, "i")
 	if c.unseen {
 		t.Error("opening the conversation kept the mark")
 	}
@@ -953,7 +989,7 @@ func TestClaudeAnsweringElsewhere(t *testing.T) {
 
 func TestClaudeDraft(t *testing.T) {
 	m, _ := startWith(t, fixture(), keymap.Default())
-	press(m, "enter", "C", "D")
+	press(m, "i", "D")
 	if m.view != viewCompose || m.compose == nil {
 		t.Fatalf("view %v", m.view)
 	}
@@ -998,7 +1034,7 @@ func TestClaudeFirstFailureStartsAgain(t *testing.T) {
 	m, _ := startWith(t, fixture(), keymap.Default())
 	fc := fakeClaudeOf(t, m)
 	fc.fail = true
-	press(m, "enter", "C")
+	press(m, "i")
 	if !strings.Contains(screen(m), "rate limited") {
 		t.Fatalf("no error shown:\n%s", screen(m))
 	}

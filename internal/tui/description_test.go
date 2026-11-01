@@ -164,13 +164,15 @@ func TestClickTitleLineOpensThePROrItsAuthor(t *testing.T) {
 	}
 }
 
-func TestPRConversationIsDrawn(t *testing.T) {
+// A comment in the pane's comments part is drawn from its Markdown, as
+// the description is.
+func TestCommentIsDrawn(t *testing.T) {
 	f := fixture()
 	d := f.details[key("acme", "api", 12)]
 	d.Comments = []model.Comment{{Author: "dave", Body: "## Timeout\n\n- [x] covered by `wait`"}}
 	f.details[key("acme", "api", 12)] = d
 	m := start(t, f, keymap.Default())
-	press(m, "enter", "l", "l", "l")
+	press(m, "+", "+", "+", "+", "+", "+")
 	if s := screen(m); !strings.Contains(s, "☑ covered by wait") || strings.Contains(s, "## Timeout") {
 		t.Errorf("the comment was not drawn from its Markdown:\n%s", s)
 	}

@@ -30,7 +30,7 @@ var helpScopes = []struct {
 	title string
 }{
 	{keymap.ScopeGlobal, "anywhere"}, {keymap.ScopeNav, "moving"}, {keymap.ScopeList, "the list and its preview"},
-	{keymap.ScopePR, "a pull request"}, {keymap.ScopePopup, "a confirm popup"},
+	{keymap.ScopePopup, "a confirm popup"},
 	{keymap.ScopeTriage, "claude on the list"}, {keymap.ScopeChat, "claude on a pull request"},
 	{keymap.ScopeCompose, "writing a review"},
 }
@@ -40,8 +40,6 @@ const helpKeyWidth = 16
 // helpScope is the scope of the screen ? was opened from.
 func (m *Model) helpScope() keymap.Scope {
 	switch m.view {
-	case viewPR:
-		return keymap.ScopePR
 	case viewChat:
 		return keymap.ScopeChat
 	default:
@@ -109,7 +107,7 @@ func (m *Model) helpSections() []helpSection {
 	}
 	return append(out, helpSection{"mouse", [][2]string{
 		{"click", "tab, row, pane tab"},
-		{"double click", "open"},
+		{"double click", "actions"},
 		{"click", "@you, an author, a PR: browser"},
 		{"wheel", "scroll"},
 		{"drag", "the pane's top edge: resize"},

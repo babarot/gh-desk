@@ -27,7 +27,6 @@ const (
 	ScopeGlobal  Scope = "global"
 	ScopeNav     Scope = "nav"
 	ScopeList    Scope = "list"
-	ScopePR      Scope = "pr"
 	ScopePopup   Scope = "popup"
 	ScopeTriage  Scope = "triage"
 	ScopeChat    Scope = "chat"
@@ -69,7 +68,7 @@ var Defaults = []Def{
 	{"tab_7", ScopeList, []string{"7"}, "tab 7"},
 	{"tab_8", ScopeList, []string{"8"}, "tab 8"},
 	{"tab_9", ScopeList, []string{"9"}, "tab 9"},
-	{"open", ScopeList, []string{"enter"}, "open"},
+	{"open", ScopeList, []string{"enter"}, "actions"},
 	{"expand", ScopeList, []string{"l", "right"}, "unfold group"},
 	{"collapse", ScopeList, []string{"h", "left"}, "fold group"},
 	{"select", ScopeList, []string{"space"}, "select"},
@@ -81,6 +80,7 @@ var Defaults = []Def{
 	{"comment", ScopeList, []string{"c"}, "comment"},
 	{"request_changes", ScopeList, []string{"X"}, "request changes"},
 	{"claude", ScopeList, []string{"C"}, "ask claude"},
+	{"pr_claude", ScopeList, []string{"i"}, "ask claude about it"},
 	{"browse", ScopeList, []string{"o"}, "browser"},
 	{"hide", ScopeList, []string{"d"}, "hide / done"},
 	{"toggle_bots", ScopeList, []string{"b"}, "bots"},
@@ -95,15 +95,6 @@ var Defaults = []Def{
 	{"toggle_pane", ScopeList, []string{"p"}, "preview pane"},
 	{"pane_grow", ScopeList, []string{"+"}, "taller pane"},
 	{"pane_shrink", ScopeList, []string{"-"}, "shorter pane"},
-
-	{"pr_prev_tab", ScopePR, []string{"h", "left"}, "previous tab"},
-	{"pr_next_tab", ScopePR, []string{"l", "right"}, "next tab"},
-	{"pr_approve", ScopePR, []string{"A"}, "approve"},
-	{"pr_merge", ScopePR, []string{"M"}, "merge"},
-	{"pr_comment", ScopePR, []string{"c"}, "comment"},
-	{"pr_request_changes", ScopePR, []string{"X"}, "request changes"},
-	{"pr_claude", ScopePR, []string{"C"}, "ask claude"},
-	{"pr_browse", ScopePR, []string{"o"}, "browser"},
 
 	{"confirm", ScopePopup, []string{"y"}, "yes"},
 	{"choose", ScopePopup, []string{"enter"}, "choose"},

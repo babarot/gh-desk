@@ -80,7 +80,7 @@ type line struct {
 	links []link
 }
 
-// diffLines are a diff's lines as the pane and the PR screen show them,
+// diffLines are a diff's lines as the pane shows them,
 // width cells wide. Like the parts of the description pane, a file's
 // header runs to the edge with a rule, and the lines of an unfolded file
 // have a gutter, closed under its last line. folded tells which files are

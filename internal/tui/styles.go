@@ -69,7 +69,7 @@ type styles struct {
 	picked, pickedSel, claude, claudeSel    lipgloss.Style
 	fresh                                   lipgloss.Style
 	// tabOn and tabOff are a tab that switches the screen or the pane
-	// (the header, the PR screen, the pane's overview and diff), shown or
+	// (the header, the pane's overview and diff), shown or
 	// not; subOn and subOff a choice within one (a file of the diff, the
 	// kind of a review). Both are drawn as pills, the second on a fainter
 	// background, so that one reads as under the other.

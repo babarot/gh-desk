@@ -243,13 +243,8 @@ func (m *Model) current() (row, bool) {
 	return rs[t.sel], true
 }
 
-// currentPR is the pull request the screen is about: the one opened, or
-// the one under the cursor.
+// currentPR is the pull request under the cursor.
 func (m *Model) currentPR() (model.PR, *model.Notification, bool) {
-	if m.view != viewList {
-		p, ok := m.knownPR(m.prv.key)
-		return p, nil, ok
-	}
 	r, ok := m.current()
 	if !ok || r.kind != rowPR {
 		return model.PR{}, nil, false
@@ -506,7 +501,7 @@ func (m *Model) ensure() tea.Cmd {
 		return nil
 	}
 	cmds = append(cmds, m.ensureDiff(p))
-	if p.AuthorIsBot || m.pane.mode == paneOverview || m.view == viewPR {
+	if p.AuthorIsBot || m.pane.mode == paneOverview {
 		cmds = append(cmds, m.ensureDetail(p.Key))
 	}
 	if n != nil && n.Unread && n.LatestCommentURL != "" {

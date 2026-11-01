@@ -41,7 +41,7 @@
     },
     "claude": {
       "additionalProperties": false,
-      "description": "C asks Claude Code (claude -p, with the account you are signed in with). On a pull request's screen, it reviews that pull request in a worktree of its head. On the list, it plans what to show and select in the tab shown, with no tools, and answers in the language you ask in; enter applies the plan, and an approve or a merge in it opens the confirm popup. Claude only reads: no settings files or MCP servers are loaded, its file tools see only the worktree, and it has none that run commands.",
+      "description": "C and i ask Claude Code (claude -p, with the account you are signed in with). i, or ask claude about it in the menu of enter, reviews the pull request under the cursor in a worktree of its head. C plans what to show and select in the tab shown, with no tools, and answers in the language you ask in; enter applies the plan, and an approve or a merge in it opens the confirm popup. Claude only reads: no settings files or MCP servers are loaded, its file tools see only the worktree, and it has none that run commands.",
       "properties": {
         "allowed_tools": {
           "description": "The tools Claude may use, among \"Read\", \"Grep\", \"Glob\" and \"WebFetch\".",
@@ -80,7 +80,7 @@
       "additionalProperties": false,
       "properties": {
         "style": {
-          "description": "How a description and its comments are drawn, in the pane and on the PR screen: \"rendered\" (default) draws headings, lists, code, quotes and tables; \"plain\" shows the Markdown as written.",
+          "description": "How a description and its comments are drawn in the pane: \"rendered\" (default) draws headings, lists, code, quotes and tables; \"plain\" shows the Markdown as written.",
           "enum": [
             "rendered",
             "plain"

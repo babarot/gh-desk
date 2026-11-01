@@ -56,12 +56,12 @@ func TestClickRowAndDoubleClick(t *testing.T) {
 
 	x, y = lineOf(t, m, "Add retries")
 	mouseAt(m, tea.MouseClickMsg{X: x, Y: y, Button: tea.MouseLeft})
-	if m.view != viewList {
-		t.Fatal("a single click opened the pull request")
+	if m.menu != nil {
+		t.Fatal("a single click opened the menu")
 	}
 	mouseAt(m, tea.MouseClickMsg{X: x, Y: y, Button: tea.MouseLeft})
-	if m.view != viewPR || m.prv.key != key("acme", "api", 12) {
-		t.Fatalf("view = %v, key = %v; want acme/api#12 opened", m.view, m.prv.key)
+	if p, _, _ := m.currentPR(); m.menu == nil || p.Key != key("acme", "api", 12) {
+		t.Fatalf("menu = %v, cursor on %v; want the menu of acme/api#12", m.menu, p.Key)
 	}
 }
 

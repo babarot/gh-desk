@@ -50,7 +50,7 @@ func (m *Model) mouse(msg tea.MouseMsg) tea.Cmd {
 		}
 		return nil
 	}
-	if m.bulk != nil || m.notesAt != nil || m.picker != nil || m.confirm != nil || m.triage != nil && m.triage.open || m.filtering || m.view == viewCompose {
+	if m.bulk != nil || m.notesAt != nil || m.picker != nil || m.menu != nil || m.confirm != nil || m.triage != nil && m.triage.open || m.filtering || m.view == viewCompose {
 		return nil
 	}
 	if m.help {
@@ -76,15 +76,8 @@ func (m *Model) mouse(msg tea.MouseMsg) tea.Cmd {
 		if msg.Button != tea.MouseLeft {
 			return nil
 		}
-		switch m.view {
-		case viewList:
+		if m.view == viewList {
 			return m.listClick(msg.X, msg.Y)
-		case viewPR:
-			if msg.Y == m.top()+1 {
-				if i := spanAt(m.prTabWidths(), len(tabGap), msg.X); i >= 0 {
-					m.prv.tab, m.prv.scroll = i, 0
-				}
-			}
 		}
 	}
 	return nil
@@ -109,8 +102,6 @@ func (m *Model) wheel(msg tea.MouseWheelMsg) tea.Cmd {
 		return nil
 	}
 	switch m.view {
-	case viewPR:
-		m.prv.scroll = max(0, m.prv.scroll+step*wheelLines)
 	case viewChat:
 		// A chat's scroll counts up from its end.
 		if c := m.chat(); c != nil {
