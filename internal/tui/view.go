@@ -77,7 +77,8 @@ func (m *Model) render() string {
 	case m.triage != nil && m.triage.open:
 		lines = overlay(lines, m.renderTriage(), 2, m.width)
 	case m.help:
-		lines = overlay(lines, m.renderHelp(), 1, m.width)
+		help := m.renderHelp()
+		lines = overlay(lines, help, max((len(lines)-len(help))/2, 0), m.width)
 	case m.toast != nil && len(lines) > 3:
 		toast := m.st.border.Render("╭ ") + m.noteIcon(m.toast.icon) + " " + m.st.sub1.Render(m.toast.title) + " " +
 			m.st.dim.Render("· "+m.firstKey("notifications")+" to see") + m.st.border.Render(" ╮")
@@ -345,44 +346,151 @@ func (m *Model) hints() string {
 	return strings.Join(parts, m.st.dim.Render(" · "))
 }
 
-// renderHelp is the ? popup: every action this version does, with its
-// keys, scope by scope.
+// helpScopes are the scopes the ? popup tells, with their titles.
+var helpScopes = []struct {
+	s     keymap.Scope
+	title string
+}{
+	{keymap.ScopeGlobal, "anywhere"}, {keymap.ScopeNav, "moving"}, {keymap.ScopeList, "the list and its preview"},
+	{keymap.ScopePR, "a pull request"}, {keymap.ScopePopup, "a confirm popup"},
+	{keymap.ScopeTriage, "claude on the list"}, {keymap.ScopeChat, "claude on a pull request"},
+	{keymap.ScopeCompose, "writing a review"},
+}
+
+// helpScope is the scope of the screen ? was opened from.
+func (m *Model) helpScope() keymap.Scope {
+	switch m.view {
+	case viewPR:
+		return keymap.ScopePR
+	case viewChat:
+		return keymap.ScopeChat
+	default:
+		return keymap.ScopeList
+	}
+}
+
+// helpRow is a row of the ? popup: its keys and what they do, in kw cells
+// for the keys.
+func (m *Model) helpRow(keys, what string, kw int) string {
+	return "  " + fit(m.st.key.Render(keys), kw) + m.st.muted.Render(what)
+}
+
+// helpRows are the key rows of scope s. The tab_N actions, one key each,
+// are told in one row.
+func (m *Model) helpRows(s keymap.Scope, kw int) []string {
+	var rows, tabs []string
+	tabsAt := -1
+	for _, a := range m.keys.Actions(s) {
+		ks := m.keys.Keys(a)
+		if !ready[a] || len(ks) == 0 || !m.hasTabFor(a) {
+			continue
+		}
+		if strings.HasPrefix(string(a), "tab_") && len(ks) == 1 {
+			if tabsAt < 0 {
+				tabsAt = len(rows)
+				rows = append(rows, "")
+			}
+			tabs = append(tabs, ks[0])
+			continue
+		}
+		rows = append(rows, m.helpRow(strings.Join(ks, " "), m.keys.Help(a), kw))
+	}
+	if tabsAt >= 0 {
+		keys := strings.Join(tabs, " ")
+		if len(tabs) > 1 && lipgloss.Width(keys) > kw-2 {
+			keys = tabs[0] + " … " + tabs[len(tabs)-1]
+		}
+		rows[tabsAt] = m.helpRow(keys, fmt.Sprintf("tab 1 to %d", len(tabs)), kw)
+	}
+	return rows
+}
+
+// helpGroup appends a titled group of rows to lines, a blank line apart
+// from what is above it.
+func helpGroup(lines []string, title string, rows []string) []string {
+	if len(rows) == 0 {
+		return lines
+	}
+	if len(lines) > 0 {
+		lines = append(lines, "")
+	}
+	return append(append(lines, title), rows...)
+}
+
+// sideBySide puts right beside left, each column w cells wide.
+func sideBySide(left, right []string, w int) []string {
+	out := make([]string, max(len(left), len(right)))
+	for i := range out {
+		var l, r string
+		if i < len(left) {
+			l = left[i]
+		}
+		if i < len(right) {
+			r = right[i]
+		}
+		out[i] = fit(l, w) + "  " + r
+	}
+	return out
+}
+
+// renderHelp is the ? popup. The keys of the screen it was opened from
+// come first, marked here, then those read everywhere (the fixed keys
+// among them), moving and the mouse; the other scopes are folded to their titles and how many keys
+// they have. When the lines would not fit the terminal and it is wide
+// enough, they are laid out in two columns.
 func (m *Model) renderHelp() []string {
 	st := m.st
-	var lines []string
-	scopes := []struct {
-		s     keymap.Scope
-		title string
-	}{
-		{keymap.ScopeGlobal, "anywhere"}, {keymap.ScopeNav, "moving"}, {keymap.ScopeList, "the list and its preview"},
-		{keymap.ScopePR, "a pull request"}, {keymap.ScopePopup, "a confirm popup"},
-		{keymap.ScopeTriage, "claude on the list"}, {keymap.ScopeChat, "claude on a pull request"},
-		{keymap.ScopeCompose, "writing a review"},
+	here := m.helpScope()
+	title := func(s keymap.Scope) string {
+		for _, sc := range helpScopes {
+			if sc.s == s {
+				return sc.title
+			}
+		}
+		return string(s)
 	}
-	for _, sc := range scopes {
-		var rows []string
-		for _, a := range m.keys.Actions(sc.s) {
-			ks := m.keys.Keys(a)
-			if !ready[a] || len(ks) == 0 || !m.hasTabFor(a) {
+	layout := func(kw int) (head string, hereRows, left, right []string) {
+		head = st.title.Render(title(here)) + "  " + st.subOn.Render(" here ")
+		hereRows = m.helpRows(here, kw)
+		// The fixed keys are told with the actions read everywhere.
+		anywhere := m.helpRows(keymap.ScopeGlobal, kw)
+		anywhere = append(anywhere, m.helpRow(keymap.Interrupt, "quit", kw), m.helpRow(keymap.Back, "back", kw))
+		left = helpGroup(left, st.group.Render(title(keymap.ScopeGlobal)), anywhere)
+		right = helpGroup(right, st.group.Render(title(keymap.ScopeNav)), m.helpRows(keymap.ScopeNav, kw))
+		var folded []string
+		for _, sc := range helpScopes {
+			if sc.s == here || sc.s == keymap.ScopeGlobal || sc.s == keymap.ScopeNav {
 				continue
 			}
-			rows = append(rows, "  "+fit(st.key.Render(strings.Join(ks, " ")), 16)+st.muted.Render(m.keys.Help(a)))
+			if n := len(m.helpRows(sc.s, kw)); n > 0 {
+				folded = append(folded, "  "+st.muted.Render(fmt.Sprintf("%s · %d", sc.title, n)))
+			}
 		}
-		if len(rows) > 0 {
-			lines = append(lines, st.group.Render(sc.title))
-			lines = append(lines, rows...)
-		}
+		left = helpGroup(left, st.muted.Render("other screens, in their key line"), folded)
+		right = helpGroup(right, st.group.Render("mouse"), []string{
+			m.helpRow("click", "tab, row, pane tab", kw),
+			m.helpRow("double click", "open", kw),
+			m.helpRow("click", "@you, an author, a PR: web", kw),
+			m.helpRow("wheel", "scroll", kw),
+			m.helpRow("drag", "pane's top edge: resize", kw),
+		})
+		return head, hereRows, left, right
 	}
-	lines = append(lines, st.group.Render("fixed"), "  "+fit(st.key.Render(keymap.Interrupt), 16)+st.muted.Render("quit"),
-		"  "+fit(st.key.Render(keymap.Back), 16)+st.muted.Render("back"),
-		st.group.Render("mouse"), "  "+fit(st.key.Render("click"), 16)+st.muted.Render("tab, row, pane tab"),
-		"  "+fit(st.key.Render("double click"), 16)+st.muted.Render("open"),
-		"  "+fit(st.key.Render("click"), 16)+st.muted.Render("@you, an author or a PR name: browser"),
-		"  "+fit(st.key.Render("wheel"), 16)+st.muted.Render("scroll"),
-		"  "+fit(st.key.Render("drag"), 16)+st.muted.Render("the pane's top edge to resize it"))
 	maxLines := max(m.height-3, 5)
-	if len(lines) > maxLines {
-		lines = append(lines[:maxLines-1], st.dim.Render("  …"))
+	w := min(64, max(m.width-2, 30))
+	head, hereRows, left, right := layout(16)
+	lines := append([]string{head}, hereRows...)
+	lines = append(append(append(lines, ""), left...), append([]string{""}, right...)...)
+	if len(lines) > maxLines && m.width-2 >= 90 {
+		w = 90
+		col := (w - 4 - 2) / 2
+		head, hereRows, left, right = layout(14)
+		half := (len(hereRows) + 1) / 2
+		lines = append([]string{head}, sideBySide(hereRows[:half], hereRows[half:], col)...)
+		lines = append(append(lines, ""), sideBySide(left, right, col)...)
 	}
-	return box(st, "keys", lines, min(max(m.width-8, 30), 70))
+	if len(lines) > maxLines {
+		lines = append(lines[:maxLines-1], st.dim.Render("  … a taller terminal shows the rest"))
+	}
+	return box(st, "keys · "+m.firstKey("help")+" esc q close", lines, w)
 }
