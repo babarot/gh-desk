@@ -64,11 +64,11 @@ func TestDescriptionPaneParts(t *testing.T) {
 	}
 	// ] goes to the checks; z folds the part the pane starts in.
 	press(m, "]")
-	if !strings.Contains(screen(m), "│ ▾ checks 1") || strings.Contains(screen(m), "▾ description") {
+	if !strings.Contains(screen(m), "│ ▾ checks (1)") || strings.Contains(screen(m), "▾ description") {
 		t.Fatalf("] did not go to the checks:\n%s", screen(m))
 	}
 	press(m, "z")
-	if !strings.Contains(screen(m), "▸ checks 1") || strings.Contains(screen(m), "✓ test") {
+	if !strings.Contains(screen(m), "▸ checks (1)") || strings.Contains(screen(m), "✓ test") {
 		t.Errorf("z did not fold the checks:\n%s", screen(m))
 	}
 	// A click on a part's header folds or unfolds it.

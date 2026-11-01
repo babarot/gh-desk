@@ -293,7 +293,7 @@ func (m *Model) diffTabName(p model.PR) string {
 	if e == nil || e.loading || e.err != nil {
 		return "diff"
 	}
-	return fmt.Sprintf("diff %d", len(e.val))
+	return fmt.Sprintf("diff (%d)", len(e.val))
 }
 
 // paneBody is the pane's lines: the overview, or what the columns

@@ -18,14 +18,14 @@ triage // @me   1 review (3)  2 mine (1)  3 involved (0)  4 inbox (2)
 
 
 
-╭  overview   diff 2  ──────────────────────────────────────────────────────────────────────────────────── acme/api#12 · J/K · v ╮
+╭  overview   diff (2)  ────────────────────────────────────────────────────────────────────────────────── acme/api#12 · J/K · v ╮
 │ #12 Add retries to the client                                                       alice │ status    open                     │
 │ ▾ description ─────────────────────────────────────────────────────────────────────────── │ requested me @core                 │
 │ │ What                                                                                    │ checks    ✓1                       │
 │ │ Retry failed requests.                                                                  │ size      +40 −3 · 2 files         │
 │ ╵                                                                                         │ branch    retries                  │
 │                                                                                           │           → main                   │
-│ ▾ checks 1  ✓1 ────────────────────────────────────────────────────────────────────────── │ updated   3h ago                   │
+│ ▾ checks (1)  ✓1 ──────────────────────────────────────────────────────────────────────── │ updated   3h ago                   │
 │ │ ✓ test                                                                                  │                                    │
 │ ╵                                                                                         │                                    │
 │                                                                                           │                                    │

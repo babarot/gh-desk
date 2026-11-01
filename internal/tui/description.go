@@ -177,7 +177,7 @@ func (m *Model) descLines(p model.PR, width int) []line {
 	}
 	if cs := d.val.Checks; len(cs) > 0 {
 		out = append(out, line{})
-		if head(partChecks, st.dim.Render(fmt.Sprintf(" %d  ", len(cs)))+m.checkCounts(cs)) {
+		if head(partChecks, st.dim.Render(fmt.Sprintf(" (%d)  ", len(cs)))+m.checkCounts(cs)) {
 			// Failed checks first, then running ones, names lined up.
 			required := m.requiredChecks(p)
 			w := 0
@@ -200,7 +200,7 @@ func (m *Model) descLines(p model.PR, width int) []line {
 	}
 	if cs := d.val.Comments; len(cs) > 0 {
 		out = append(out, line{})
-		if head(partComments, st.dim.Render(fmt.Sprintf(" %d", len(cs)))) {
+		if head(partComments, st.dim.Render(fmt.Sprintf(" (%d)", len(cs)))) {
 			for i, c := range cs {
 				if i > 0 {
 					out = append(out, line{text: gutter})

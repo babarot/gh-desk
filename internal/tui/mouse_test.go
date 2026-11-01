@@ -62,7 +62,7 @@ func TestClickRowAndDoubleClick(t *testing.T) {
 
 func TestClickPaneTab(t *testing.T) {
 	m := start(t, fixture(), keymap.Default())
-	x, y := lineOf(t, m, "diff 2")
+	x, y := lineOf(t, m, "diff (2)")
 	mouseAt(m, tea.MouseClickMsg{X: x, Y: y, Button: tea.MouseLeft})
 	if m.pane.mode != paneDiff || m.dragging {
 		t.Fatalf("mode = %v, dragging = %v; want the diff", m.pane.mode, m.dragging)
