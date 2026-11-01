@@ -41,4 +41,4 @@ The shape this gives:
 - Every file written for gh-triage before this change has to be rewritten once; each old key is reported at its line with where it went.
 - The inbox can be placed anywhere among the tabs. The places in `internal/tui` that take the last tab for the inbox find it instead.
 - New settings follow these rules, and a change to a rule is a new ADR.
-- ADR-005 names `[[sections]]`, `group = "requested"` and `[inbox] done_after_review`, and ADR-014 names `ui.editor`, as they were when written; they are now `[[tabs]]`, `groups` and `[review] mark_done`, and `[review] editor`.
+- Earlier ADRs name settings as they were when written. ADR-005's `[[sections]]`, `group = "requested"` and `[inbox] done_after_review` are now `[[tabs]]`, `groups` and `[review] mark_done`; ADR-013's `preview.description` is `description.style`; ADR-014's `ui.editor` is `review.editor`; and `watch_timeout`, which ADR-006 and ADR-009 name, is a constant of 24 hours.

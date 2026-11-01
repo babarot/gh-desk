@@ -35,7 +35,7 @@ func TestApply(t *testing.T) {
 		{
 			name:  "replace keys",
 			set:   map[string][]string{"approve": {"a"}},
-			check: map[Action][]string{"approve": {"a"}, "show_closed": nil},
+			check: map[Action][]string{"approve": {"a"}, "show_settled": nil},
 		},
 		{
 			name:  "turn off",

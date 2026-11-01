@@ -71,7 +71,7 @@ func TestEditorPrecedence(t *testing.T) {
 	}
 	// Through the config file, arguments and all.
 	path := filepath.Join(t.TempDir(), "config.toml")
-	if err := os.WriteFile(path, []byte("[ui]\neditor = \"code --wait\"\n"), 0o644); err != nil {
+	if err := os.WriteFile(path, []byte("[review]\neditor = \"code --wait\"\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	t.Setenv("VISUAL", "vi")

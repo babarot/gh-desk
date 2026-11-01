@@ -204,8 +204,8 @@ func (m *Model) snapshot() (claude.Snapshot, map[model.PRKey]model.PR) {
 	if p, _, ok := m.currentPR(); ok {
 		s.Cursor = p.Key
 	}
-	for _, g := range plan.Groups {
-		if t.grouped && t.folded[g] {
+	for _, g := range t.groups {
+		if t.folded[g] {
 			s.Folded = append(s.Folded, string(g))
 		}
 	}
@@ -275,7 +275,7 @@ func (m *Model) checkPlan() []step {
 			switch {
 			case !t.grouped:
 				s.skip = "the tab has no groups"
-			case !slices.Contains(plan.Groups, s.group):
+			case !slices.Contains(t.groups, s.group):
 				s.skip = "no such group"
 			}
 		case claude.DoSelect, claude.DoApprove, claude.DoMerge:

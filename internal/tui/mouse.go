@@ -125,12 +125,13 @@ func (m *Model) listClick(x, y int) tea.Cmd {
 		if name := m.viewerName(); name != "" && spanAt([]int{lipgloss.Width(name)}, 0, x-lead) == 0 {
 			return m.browseURL(m.webURL(m.viewer))
 		}
+		from, to := m.shownTabs()
 		var ws []int
-		for i := range m.tabs {
+		for i := from; i < to; i++ {
 			ws = append(ws, lipgloss.Width(m.tabLabel(i)))
 		}
-		if i := spanAt(ws, 2, x-lipgloss.Width(m.headerLead())); i >= 0 {
-			return m.switchTab(i)
+		if i := spanAt(ws, 2, x-lipgloss.Width(m.headerLead())-lipgloss.Width(tabsBefore(from))); i >= 0 {
+			return m.switchTab(from + i)
 		}
 		return nil
 	}

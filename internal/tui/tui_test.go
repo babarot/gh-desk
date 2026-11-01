@@ -272,12 +272,13 @@ func startWith(t *testing.T, f *fakeSource, km keymap.Map) (*Model, *fakeRunner)
 // testSettings are the settings of the tests' TUI.
 func testSettings() Settings {
 	return Settings{
-		Sections: []Section{
-			{Name: "review", Query: "review", Grouped: true, Folded: []string{"team", "bots"}, Limit: 100},
+		Tabs: []Tab{
+			{Name: "review", Query: "review", Groups: plan.Groups, Folded: []plan.Group{plan.GroupTeam, plan.GroupBots}, Limit: 100},
 			{Name: "mine", Query: "mine", DraftsLast: true, Limit: 100},
 			{Name: "involved", Query: "involved", Limit: 100},
+			{Name: "inbox", Inbox: true, Limit: 100},
 		},
-		InboxLimit: 100, HideClosed: true, DoneAfterReview: true, HomeOwners: []string{"acme"}, StaleDays: 30,
+		MarkDone: true, HomeOwners: []string{"acme"}, StaleDays: 30,
 		PreviewHeight: 10, Collapse: []string{"go.sum"}, Theme: "mocha", Now: func() time.Time { return now },
 		Plan: plan.Settings{Methods: []model.MergeMethod{model.MethodMerge}, AutoMerge: true, UpdateBranch: "humans",
 			AttentionPaths: []string{".github/workflows/*"}},
@@ -413,7 +414,7 @@ func TestGroupedTabWithoutRequests(t *testing.T) {
 	// A grouped tab of one's own pull requests has no requests to the
 	// viewer or a team: its rows are all under other.
 	set := testSettings()
-	set.Sections[1].Grouped = true
+	set.Tabs[1].Groups = plan.Groups
 	m := New(fixture(), &fakeRunner{results: map[model.PRKey]runner.Event{}}, &fakeClaude{}, keymap.Default(), nil, set)
 	m.Update(tea.WindowSizeMsg{Width: 130, Height: 34})
 	run(m, m.Init())
@@ -749,7 +750,7 @@ func TestSelectByRule(t *testing.T) {
 
 func TestResumeAtStart(t *testing.T) {
 	f := fixture()
-	set := Settings{Sections: []Section{{Name: "review", Query: "review", Grouped: true, Limit: 100}}, InboxLimit: 100,
+	set := Settings{Tabs: []Tab{{Name: "review", Query: "review", Groups: plan.Groups, Limit: 100}, {Name: "inbox", Inbox: true, Limit: 100}},
 		Theme: "mocha", Now: func() time.Time { return now }, CanWait: true,
 		Resume: []model.Pending{{Key: key("acme", "api", 12), ID: "1", Head: "aaaaaaa1", Author: "alice"}}}
 	r := &fakeRunner{results: map[model.PRKey]runner.Event{}}

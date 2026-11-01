@@ -64,12 +64,9 @@ func (m *Model) listKey(k string) tea.Cmd {
 		return m.switchTab(m.cur + 1)
 	case is("prev_tab"):
 		return m.switchTab(m.cur - 1)
-	case is("tab_1"), is("tab_2"), is("tab_3"), is("tab_4"):
-		n := map[keymap.Action]int{"tab_1": 0, "tab_2": 1, "tab_3": 2, "tab_4": 3}
-		for a, i := range n {
-			if is(a) && i < len(m.tabs) {
-				return m.switchTab(i)
-			}
+	case tabKey(is) >= 0:
+		if i := tabKey(is); i < len(m.tabs) {
+			return m.switchTab(i)
 		}
 	case is("filter"):
 		m.filtering, m.filter = true, ""
@@ -100,9 +97,9 @@ func (m *Model) listKey(k string) tea.Cmd {
 		if t.grouped {
 			t.folded[plan.GroupBots] = !t.folded[plan.GroupBots]
 		}
-	case is("show_closed"):
+	case is("show_settled"):
 		if t.inbox {
-			t.showClosed = !t.showClosed
+			t.showSettled = !t.showSettled
 			t.sel = 0
 		}
 	case is("toggle_pane"):
@@ -215,6 +212,7 @@ func (m *Model) openRow(r row) tea.Cmd {
 
 func (m *Model) switchTab(i int) tea.Cmd {
 	m.cur = (i + len(m.tabs)) % len(m.tabs)
+	m.tabFrom, _ = m.shownTabs()
 	m.pane.scroll = 0
 	// A tab not read for longer than the refresh interval is read again
 	// when it is opened.
@@ -387,14 +385,14 @@ func (m *Model) renderList(b *strings.Builder, height int) {
 		b.WriteString(m.renderRow(rs[i], cols, i == t.sel) + "\n")
 		lines++
 	}
-	if t.inbox && !t.showClosed && lines < height {
+	if t.inbox && !t.showSettled && lines < height {
 		if _, closed := m.inboxRows(t, m.filter); closed > 0 && len(rs) < height {
 			noun := "notifications"
 			if closed == 1 {
 				noun = "notification"
 			}
 			b.WriteString(m.st.dim.Render(fmt.Sprintf("  %d %s on merged or closed pull requests hidden · %s to show",
-				closed, noun, m.firstKey("show_closed"))) + "\n")
+				closed, noun, m.firstKey("show_settled"))) + "\n")
 			lines++
 		}
 	}
@@ -654,4 +652,25 @@ func (m *Model) why(r row) string {
 		s += fmt.Sprintf(" +%d", len(teams)-1)
 	}
 	return s
+}
+
+// tabKey is the tab, counted from 0, that the key matched by is goes to
+// (tab_1 to tab_9), or -1.
+func tabKey(is func(keymap.Action) bool) int {
+	for i := range 9 {
+		if is(keymap.Action(fmt.Sprintf("tab_%d", i+1))) {
+			return i
+		}
+	}
+	return -1
+}
+
+// hasTabFor reports whether a is no key to a tab, or one to a tab there
+// is, so the ? list leaves out the numbers of tabs not in the config.
+func (m *Model) hasTabFor(a keymap.Action) bool {
+	var n int
+	if _, err := fmt.Sscanf(string(a), "tab_%d", &n); err != nil {
+		return true
+	}
+	return n <= len(m.tabs)
 }

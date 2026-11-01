@@ -2,6 +2,7 @@ package tui
 
 import (
 	"fmt"
+	"slices"
 
 	tea "charm.land/bubbletea/v2"
 
@@ -170,10 +171,22 @@ func containsKey(prs []model.PR, k model.PRKey) bool {
 	return false
 }
 
-// allOf is every pull request a tab holds, filtered or not.
+// allOf is every pull request a tab holds, filtered or not, leaving out
+// the groups the tab does not show.
 func (m *Model) allOf(t *tab) []model.PR {
-	if !t.inbox {
+	if !t.inbox && !t.grouped {
 		return t.prs
+	}
+	if !t.inbox {
+		// A group left out of the tab's groups is never shown, so nothing
+		// in it is selected or acted on from this tab.
+		var out []model.PR
+		for _, p := range t.prs {
+			if slices.Contains(t.groups, plan.GroupOf(p, m.viewer)) {
+				out = append(out, p)
+			}
+		}
+		return out
 	}
 	var out []model.PR
 	for _, n := range t.notifs {

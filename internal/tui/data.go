@@ -23,8 +23,10 @@ type tab struct {
 	draftsLast bool
 	limit      int
 
-	inbox      bool
-	showClosed bool
+	// groups are the groups the rows are split into, in the order shown.
+	groups      []plan.Group
+	inbox       bool
+	showSettled bool
 
 	loading  bool
 	loaded   bool
@@ -67,17 +69,16 @@ type pending struct {
 	warnings []string
 }
 
-func newSectionTab(s Section) *tab {
-	t := &tab{name: s.Name, query: s.Query, grouped: s.Grouped, draftsLast: s.DraftsLast, limit: s.Limit,
-		folded: map[plan.Group]bool{}, hidden: map[model.PRKey]bool{}}
+func newTab(s Tab) *tab {
+	t := &tab{name: s.Name, query: s.Query, grouped: len(s.Groups) > 0, groups: s.Groups, draftsLast: s.DraftsLast, limit: s.Limit,
+		inbox: s.Inbox, showSettled: s.ShowSettled, folded: map[plan.Group]bool{}, hidden: map[model.PRKey]bool{}}
 	for _, g := range s.Folded {
-		t.folded[plan.Group(g)] = true
+		t.folded[g] = true
+	}
+	if s.Inbox {
+		t.inboxPRs = map[model.PRKey]model.PR{}
 	}
 	return t
-}
-
-func newInboxTab(hideClosed bool) *tab {
-	return &tab{name: "inbox", inbox: true, showClosed: !hideClosed, hidden: map[model.PRKey]bool{}, inboxPRs: map[model.PRKey]model.PR{}}
 }
 
 type rowKind int
@@ -141,7 +142,7 @@ func (m *Model) rowsOf(t *tab, filter string, folded map[plan.Group]bool) []row 
 		return out
 	}
 	var out []row
-	for _, g := range plan.Groups {
+	for _, g := range t.groups {
 		var in []model.PR
 		for _, p := range prs {
 			if plan.GroupOf(p, m.viewer) == g {
@@ -178,7 +179,7 @@ func (m *Model) inboxRows(t *tab, filter string) ([]row, int) {
 		}
 		if p.State != model.StateOpen && p.State != "" {
 			closed++
-			if !t.showClosed {
+			if !t.showSettled {
 				continue
 			}
 		}
@@ -356,7 +357,7 @@ func (m *Model) loadTab(i int) tea.Cmd {
 	t := m.tabs[i]
 	t.loading = true
 	if t.inbox {
-		limit := m.set.InboxLimit
+		limit := t.limit
 		return func() tea.Msg {
 			ns, err := m.src.Notifications(m.ctx, limit)
 			return notifsMsg{ns, err}
@@ -480,7 +481,7 @@ func (m *Model) handleData(msg tea.Msg) tea.Cmd {
 	return nil
 }
 
-func (m *Model) inboxTab() *tab { return m.tabs[len(m.tabs)-1] }
+func (m *Model) inboxTab() *tab { return m.tabs[m.inbox] }
 
 // toFirstPR puts the cursor of a tab just read on its first pull request
 // when it is still on the first line, a group's header.

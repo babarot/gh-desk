@@ -24,6 +24,9 @@ type Problem struct {
 	// Key is the setting, as its table and key: refresh, interval; keys,
 	// approve.
 	Key []string
+	// Element is which element of an array of tables ([[tabs]],
+	// [[select]]) Key is in, counted from 1; 0 when it is in none.
+	Element int
 	// Index is which element of a list the mistake is in, or -1 for the
 	// whole value.
 	Index int
@@ -131,17 +134,33 @@ func locate(src []byte, p Problem) (line, col, width int, ok bool) {
 		}
 		return parts, last
 	}
+	// elem is which element of its array of tables the table being read
+	// is, counted from 1; 0 for a plain table.
+	elem := 0
+	seen := map[string]int{}
 	for parser.NextExpression() {
 		e := parser.Expression()
 		switch e.Kind {
-		case unstable.Table:
+		case unstable.Table, unstable.ArrayTable:
 			var last *unstable.Node
 			table, last = keyOf(e)
-			if len(table) <= len(p.Key) && slices.Equal(table, p.Key[:len(table)]) {
+			elem = 0
+			if e.Kind == unstable.ArrayTable {
+				name := strings.Join(table, ".")
+				seen[name]++
+				elem = seen[name]
+			}
+			if len(table) <= len(p.Key) && slices.Equal(table, p.Key[:len(table)]) && (p.Element == 0 || elem == p.Element) {
+				if p.AtKey && len(table) == len(p.Key) {
+					return at(last)
+				}
 				header.line, header.col, header.width, _ = at(last)
 			}
 		case unstable.KeyValue:
 			parts, keyNode := keyOf(e)
+			if p.Element != 0 && elem != p.Element {
+				continue
+			}
 			if !slices.Equal(append(slices.Clone(table), parts...), p.Key) {
 				continue
 			}

@@ -58,25 +58,33 @@ type Runner interface {
 	Resume(ctx context.Context, ps []model.Pending) (string, <-chan runner.Event)
 }
 
-// Section is a tab of pull requests found by a search.
-type Section struct {
-	Name    string
-	Query   string
-	Grouped bool
-	Folded  []string
+// Tab is a tab: pull requests found by a search, or the inbox.
+type Tab struct {
+	Name  string
+	Inbox bool
+	Query string
+	// Groups are the groups a search's rows are split into, in the order
+	// shown; none leaves them unsplit.
+	Groups []plan.Group
+	Folded []plan.Group
 	// DraftsLast sorts drafts after the rest.
 	DraftsLast bool
-	Limit      int
+	// Limit is how many pull requests, or notifications, to read.
+	Limit int
+	// ShowSettled shows the inbox's notifications whose pull request is
+	// merged or closed from the start.
+	ShowSettled bool
 }
 
 // Settings are the config values the TUI uses, as plain values.
 type Settings struct {
-	Sections        []Section
-	InboxLimit      int
-	HideClosed      bool
-	DoneAfterReview bool
-	HomeOwners      []string
-	StaleDays       int
+	// Tabs are the tabs in the order shown; exactly one is the inbox.
+	Tabs []Tab
+	// MarkDone marks a pull request's notification done after a review
+	// is sent here.
+	MarkDone   bool
+	HomeOwners []string
+	StaleDays  int
 	// PreviewHeight is the preview pane's lines from the config file; 0
 	// hides it until it is toggled.
 	PreviewHeight int
@@ -155,7 +163,11 @@ type Model struct {
 	viewer string
 	tabs   []*tab
 	cur    int
-	unread map[model.PRKey]model.Notification
+	// inbox is the inbox's place among the tabs.
+	inbox int
+	// tabFrom is the first tab the header shows when the tabs do not fit.
+	tabFrom int
+	unread  map[model.PRKey]model.Notification
 
 	width, height int
 	view          view
@@ -232,10 +244,12 @@ func New(src Source, run Runner, cl Claude, km keymap.Map, log *slog.Logger, set
 	if set.Theme == "latte" {
 		m.st = newStyles(latte)
 	}
-	for _, s := range set.Sections {
-		m.tabs = append(m.tabs, newSectionTab(s))
+	for i, t := range set.Tabs {
+		if t.Inbox {
+			m.inbox = i
+		}
+		m.tabs = append(m.tabs, newTab(t))
 	}
-	m.tabs = append(m.tabs, newInboxTab(set.HideClosed))
 	m.pane = pane{on: set.PreviewHeight > 0, height: cmp.Or(set.PaneHeight, set.PreviewHeight, set.DefaultPaneHeight), unfold: map[model.PRKey]bool{}, folded: map[string]bool{}}
 	if set.OpenOnDiff {
 		m.pane.mode = paneDiff

@@ -133,7 +133,7 @@ func (m *Model) markApproved(k model.PRKey) {
 // settings say so.
 func (m *Model) doneAfterReview(k model.PRKey) tea.Cmd {
 	n, ok := m.unread[k]
-	if !ok || !m.set.DoneAfterReview {
+	if !ok || !m.set.MarkDone {
 		return nil
 	}
 	delete(m.unread, k)

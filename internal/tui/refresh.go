@@ -53,7 +53,7 @@ func (m *Model) reload() tea.Cmd {
 	}
 	cmds := []tea.Cmd{m.loadTab(m.cur)}
 	if !t.inbox {
-		cmds = append(cmds, m.loadTab(len(m.tabs)-1))
+		cmds = append(cmds, m.loadTab(m.inbox))
 	}
 	return tea.Batch(cmds...)
 }

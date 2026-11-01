@@ -123,14 +123,61 @@ func place(base, over string, x int) string {
 }
 
 func (m *Model) renderHeader() string {
+	from, to := m.shownTabs()
 	var tabs []string
-	for i := range m.tabs {
+	for i := from; i < to; i++ {
 		tabs = append(tabs, m.tabLabel(i))
 	}
-	left := m.headerLead() + strings.Join(tabs, "  ")
+	left := m.headerLead() + m.st.dim.Render(tabsBefore(from)) + strings.Join(tabs, "  ") + m.st.dim.Render(tabsAfter(to, len(m.tabs)))
 	right := m.headerRight()
 	gap := m.width - lipgloss.Width(left) - lipgloss.Width(right) - 1
 	return m.st.header.Render(fit(left+spaces(gap)+right, m.width))
+}
+
+// shownTabs are the tabs the header has room for, from (included) to
+// (left out), the shown one among them. The tabs shown move only when the
+// shown one would be out of them, and take what room is left.
+func (m *Model) shownTabs() (from, to int) {
+	n := len(m.tabs)
+	ws := make([]int, n)
+	for i := range n {
+		ws[i] = lipgloss.Width(m.tabLabel(i))
+	}
+	room := m.width - lipgloss.Width(m.headerLead()) - lipgloss.Width(m.headerRight()) - 1
+	width := func(from, to int) int {
+		w := lipgloss.Width(tabsBefore(from)) + lipgloss.Width(tabsAfter(to, n)) + 2*(to-from-1)
+		for _, x := range ws[from:to] {
+			w += x
+		}
+		return w
+	}
+	from = min(m.tabFrom, m.cur)
+	for from < m.cur && width(from, m.cur+1) > room {
+		from++
+	}
+	to = m.cur + 1
+	for to < n && width(from, to+1) <= room {
+		to++
+	}
+	for from > 0 && width(from-1, to) <= room {
+		from--
+	}
+	return from, to
+}
+
+// tabsBefore and tabsAfter mark the tabs the header leaves out.
+func tabsBefore(from int) string {
+	if from > 0 {
+		return "… "
+	}
+	return ""
+}
+
+func tabsAfter(to, n int) string {
+	if to < n {
+		return " …"
+	}
+	return ""
 }
 
 // headerLead is what the header shows before the tabs.
@@ -200,7 +247,7 @@ func (m *Model) headerRight() string {
 			n[plan.GroupOf(p, m.viewer)]++
 		}
 		// A group with no pull requests is left out, as in the list.
-		for _, g := range plan.Groups {
+		for _, g := range t.groups {
 			if n[g] > 0 {
 				parts = append(parts, fmt.Sprintf("%d %s", n[g], groupCount[g]))
 			}
@@ -220,11 +267,11 @@ func (m *Model) headerRight() string {
 var ready = map[keymap.Action]bool{
 	"quit": true, "help": true, "refresh": true,
 	"up": true, "down": true, "top": true, "bottom": true, "page_up": true, "page_down": true,
-	"next_tab": true, "prev_tab": true, "tab_1": true, "tab_2": true, "tab_3": true, "tab_4": true,
+	"next_tab": true, "prev_tab": true, "tab_1": true, "tab_2": true, "tab_3": true, "tab_4": true, "tab_5": true, "tab_6": true, "tab_7": true, "tab_8": true, "tab_9": true,
 	"open": true, "expand": true, "collapse": true, "approve": true, "comment": true, "request_changes": true, "browse": true, "hide": true,
 	"notifications": true, "select": true, "select_shown": true, "clear_selection": true, "merge": true, "pr_merge": true,
 	"include_failing": true, "choose": true, "select_rule": true,
-	"toggle_bots": true, "show_closed": true, "filter": true,
+	"toggle_bots": true, "show_settled": true, "filter": true,
 	"pane_down": true, "pane_up": true, "pane_grow": true, "pane_shrink": true, "next_file": true, "prev_file": true, "pane_tab": true, "unfold": true, "toggle_pane": true,
 	"pr_prev_tab": true, "pr_next_tab": true, "pr_approve": true, "pr_comment": true, "pr_request_changes": true, "pr_browse": true,
 	"confirm": true, "next_kind": true, "post": true, "editor": true, "accept": true, "erase": true,
@@ -266,7 +313,7 @@ func (m *Model) hints() string {
 	default:
 		as = []keymap.Action{"open", "select", "select_rule", "approve", "merge", "comment", "claude", "browse", "pane_tab", "help"}
 		if m.tab().inbox {
-			as = append(as[:len(as)-1], "hide", "show_closed", "help")
+			as = append(as[:len(as)-1], "hide", "show_settled", "help")
 		}
 		if p, _, ok := m.currentPR(); ok && m.own(p) {
 			as = []keymap.Action{"open", "select", "merge", "comment", "browse", "pane_tab", "filter", "help"}
@@ -300,7 +347,7 @@ func (m *Model) renderHelp() []string {
 		var rows []string
 		for _, a := range m.keys.Actions(sc.s) {
 			ks := m.keys.Keys(a)
-			if !ready[a] || len(ks) == 0 {
+			if !ready[a] || len(ks) == 0 || !m.hasTabFor(a) {
 				continue
 			}
 			rows = append(rows, "  "+fit(st.key.Render(strings.Join(ks, " ")), 16)+st.muted.Render(m.keys.Help(a)))

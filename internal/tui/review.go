@@ -132,7 +132,7 @@ type editedMsg struct {
 func (m *Model) openEditor() tea.Cmd {
 	args := strings.Fields(m.set.Editor)
 	if len(args) == 0 {
-		m.setStatus("set ui.editor or $EDITOR to write the review in an editor", true)
+		m.setStatus("set review.editor or $EDITOR to write the review in an editor", true)
 		return nil
 	}
 	f, err := os.CreateTemp("", "gh-triage-review-*.md")
@@ -211,7 +211,7 @@ func (m *Model) reviewed(msg reviewMsg) tea.Cmd {
 	}
 	m.setStatus(fmt.Sprintf("✓ %s sent to %s", kindWords[msg.event], msg.pr.Key), false)
 	n, ok := m.unread[msg.pr.Key]
-	if !ok || !m.set.DoneAfterReview {
+	if !ok || !m.set.MarkDone {
 		return nil
 	}
 	delete(m.unread, msg.pr.Key)
@@ -261,7 +261,7 @@ func (m *Model) renderConfirm() []string {
 		}
 	}
 	lines = append(lines, "", st.dim.Render(fmt.Sprintf("Reviews the head you saw (%s). GitHub cannot take a review back.", short(c.pr.HeadOID))))
-	if _, ok := m.unread[c.pr.Key]; ok && m.set.DoneAfterReview {
+	if _, ok := m.unread[c.pr.Key]; ok && m.set.MarkDone {
 		lines = append(lines, st.dim.Render("Its notification is marked done after."))
 	}
 	lines = append(lines, "", st.sub0.Render("send "+title+"? ")+st.key.Render(m.firstKey("confirm"))+" "+st.muted.Render("yes")+

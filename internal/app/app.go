@@ -15,7 +15,6 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
-	"regexp"
 	"slices"
 	"strings"
 	"time"
@@ -153,8 +152,7 @@ func Run(args []string, stdout, stderr io.Writer) int {
 		log.Info("another gh-triage holds the record of pending merges")
 	}
 	rn := runner.New(runnerGitHub{gh}, log, runner.Options{Settings: set.Plan, Viewer: viewer, Store: rstore, CanWait: rstore != nil,
-		ChecksTimeout: config.Duration(cfg.Merge.ChecksTimeout), BlockedTimeout: config.Duration(cfg.Merge.BlockedTimeout),
-		WatchTimeout: config.Duration(cfg.Merge.WatchTimeout)})
+		ChecksTimeout: cfg.Merge.ChecksTimeout.D, BlockedTimeout: cfg.Merge.BlockedTimeout.D})
 	cl := asker{
 		Claude: claude.New(claude.Options{Model: cfg.Claude.Model, Tools: cfg.Claude.AllowedTools, Language: cfg.Claude.Language, Instructions: cfg.Claude.Instructions, Log: log}),
 		ws:     &claude.Workspace{Dir: cfg.CacheDir(), Borrow: claude.GhqRoots(ctx), Log: log},
@@ -282,33 +280,38 @@ func (g runnerGitHub) CommitInfo(ctx context.Context, key model.PRKey, oid strin
 // settings are the config values the TUI uses.
 func settings(cfg config.File) tui.Settings {
 	set := tui.Settings{
-		InboxLimit: cfg.Inbox.Limit, HideClosed: cfg.Inbox.HideClosed, DoneAfterReview: cfg.Inbox.DoneAfterReview,
-		HomeOwners: cfg.UI.HomeOwners, StaleDays: cfg.UI.StaleDays, PreviewHeight: cfg.Preview.Height,
+		MarkDone: cfg.Review.MarkDone, HomeOwners: cfg.List.HomeOwners, PreviewHeight: cfg.Preview.Height,
 		DefaultPaneHeight: config.DefaultPreviewHeight,
-		Collapse:          cfg.Diff.Collapse, Theme: cfg.UI.Theme, Editor: editor(cfg.UI.Editor, os.Getenv),
+		Collapse:          config.Patterns(cfg.Diff.Collapse), Theme: cfg.Theme.Name, Editor: editor(cfg.Review.Editor, os.Getenv),
 		Refresh: cfg.RefreshInterval(), ReleaseNotes: cfg.Claude.ReleaseNotesCheck, Language: cfg.Claude.Language,
-		OpenOnDiff: cfg.Preview.Tab == "diff", PlainDescription: cfg.Preview.Description == "plain",
+		OpenOnDiff: cfg.Preview.Tab == "diff", PlainDescription: cfg.Description.Style == "plain",
 		Plan: plan.Settings{AutoMerge: cfg.Merge.AutoMerge, UpdateBranch: cfg.Merge.UpdateBranch,
-			ApprovalChecks: cfg.UI.ApprovalChecks, AttentionPaths: cfg.Bulk.AttentionPaths},
+			ApprovalChecks: config.Patterns(cfg.Checks.Approval), AttentionPaths: config.Patterns(cfg.Bulk.AttentionPaths)},
+	}
+	if !cfg.List.StaleDays.Off {
+		set.StaleDays = cfg.List.StaleDays.N
 	}
 	for _, s := range cfg.Select {
-		r := plan.Rule{Name: s.Name, Author: s.Author, Packages: s.Packages, MaxFiles: s.MaxFiles, Bot: s.Bot, ChecksPassing: s.Checks == "passing"}
-		if s.Title != "" {
-			r.Title = regexp.MustCompile(s.Title) // config.Load has checked it
-		}
-		set.Rules = append(set.Rules, r)
+		set.Rules = append(set.Rules, plan.Rule{Name: s.Name, Author: s.Author, Packages: s.Packages, Title: s.Title, MaxFiles: s.MaxFiles,
+			Bot: s.Bot, ChecksPassing: s.Checks == "passing"})
 	}
 	for _, m := range cfg.Merge.Methods {
 		set.Plan.Methods = append(set.Plan.Methods, model.MergeMethod(strings.ToUpper(m)))
 	}
-	for _, s := range cfg.Sections {
-		set.Sections = append(set.Sections, tui.Section{Name: s.Name, Query: s.Query, Grouped: s.Group == "requested",
-			Folded: s.Folded, DraftsLast: s.Sort == "drafts_last", Limit: s.Limit})
+	for _, t := range cfg.Tabs {
+		tt := tui.Tab{Name: t.Name, Inbox: t.Inbox(), Query: t.Query, DraftsLast: t.Sort == "drafts_last", Limit: t.Limit, ShowSettled: t.ShowSettled}
+		for _, g := range t.Groups {
+			tt.Groups = append(tt.Groups, plan.Group(g))
+		}
+		for _, g := range t.Folded {
+			tt.Folded = append(tt.Folded, plan.Group(g))
+		}
+		set.Tabs = append(set.Tabs, tt)
 	}
 	return set
 }
 
-// editor is the command that edits a review: ui.editor, then $VISUAL, then
+// editor is the command that edits a review: review.editor, then $VISUAL, then
 // $EDITOR. It may carry arguments, as "code --wait".
 func editor(set string, getenv func(string) string) string {
 	return cmp.Or(strings.TrimSpace(set), getenv("VISUAL"), getenv("EDITOR"))
