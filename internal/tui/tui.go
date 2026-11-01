@@ -181,6 +181,7 @@ type Model struct {
 	width, height int
 	view          view
 	help          bool
+	helpTop       int // the first line of the ? popup shown
 	status        string
 	statusErr     bool
 
@@ -362,9 +363,7 @@ func (m *Model) key(msg tea.KeyPressMsg) tea.Cmd {
 	case m.triage != nil && m.triage.open:
 		return m.triageKey(msg)
 	case m.help:
-		if k == keymap.Back || m.keys.Matches("help", k) || m.keys.Matches("quit", k) {
-			m.help = false
-		}
+		m.helpKey(k)
 		return nil
 	case m.filtering:
 		return m.filterKey(msg)
@@ -374,7 +373,7 @@ func (m *Model) key(msg tea.KeyPressMsg) tea.Cmd {
 		return m.chatKeyPress(msg)
 	}
 	if m.keys.Matches("help", k) {
-		m.help = true
+		m.help, m.helpTop = true, 0
 		return nil
 	}
 	switch m.view {

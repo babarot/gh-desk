@@ -417,29 +417,13 @@ func helpGroup(lines []string, title string, rows []string) []string {
 	return append(append(lines, title), rows...)
 }
 
-// sideBySide puts right beside left, each column w cells wide.
-func sideBySide(left, right []string, w int) []string {
-	out := make([]string, max(len(left), len(right)))
-	for i := range out {
-		var l, r string
-		if i < len(left) {
-			l = left[i]
-		}
-		if i < len(right) {
-			r = right[i]
-		}
-		out[i] = fit(l, w) + "  " + r
-	}
-	return out
-}
-
-// renderHelp is the ? popup. The keys of the screen it was opened from
-// come first, marked here, then those read everywhere (the fixed keys
-// among them), moving and the mouse; the other scopes are folded to their titles and how many keys
-// they have. When the lines would not fit the terminal and it is wide
-// enough, they are laid out in two columns.
-func (m *Model) renderHelp() []string {
+// helpLines are every line of the ? popup. The keys of the screen it was
+// opened from come first, marked here, then those read everywhere (the
+// fixed keys among them), moving and the mouse; the other scopes are
+// folded to their titles and how many keys they have.
+func (m *Model) helpLines() []string {
 	st := m.st
+	const kw = 16
 	here := m.helpScope()
 	title := func(s keymap.Scope) string {
 		for _, sc := range helpScopes {
@@ -449,48 +433,93 @@ func (m *Model) renderHelp() []string {
 		}
 		return string(s)
 	}
-	layout := func(kw int) (head string, hereRows, left, right []string) {
-		head = st.title.Render(title(here)) + "  " + st.subOn.Render(" here ")
-		hereRows = m.helpRows(here, kw)
-		// The fixed keys are told with the actions read everywhere.
-		anywhere := m.helpRows(keymap.ScopeGlobal, kw)
-		anywhere = append(anywhere, m.helpRow(keymap.Interrupt, "quit", kw), m.helpRow(keymap.Back, "back", kw))
-		left = helpGroup(left, st.group.Render(title(keymap.ScopeGlobal)), anywhere)
-		right = helpGroup(right, st.group.Render(title(keymap.ScopeNav)), m.helpRows(keymap.ScopeNav, kw))
-		var folded []string
-		for _, sc := range helpScopes {
-			if sc.s == here || sc.s == keymap.ScopeGlobal || sc.s == keymap.ScopeNav {
-				continue
-			}
-			if n := len(m.helpRows(sc.s, kw)); n > 0 {
-				folded = append(folded, "  "+st.muted.Render(fmt.Sprintf("%s · %d", sc.title, n)))
-			}
+	lines := helpGroup(nil, st.title.Render(title(here))+"  "+st.subOn.Render(" here "), m.helpRows(here, kw))
+	anywhere := m.helpRows(keymap.ScopeGlobal, kw)
+	anywhere = append(anywhere, m.helpRow(keymap.Interrupt, "quit", kw), m.helpRow(keymap.Back, "back", kw))
+	lines = helpGroup(lines, st.group.Render(title(keymap.ScopeGlobal)), anywhere)
+	lines = helpGroup(lines, st.group.Render(title(keymap.ScopeNav)), m.helpRows(keymap.ScopeNav, kw))
+	lines = helpGroup(lines, st.group.Render("mouse"), []string{
+		m.helpRow("click", "tab, row, pane tab", kw),
+		m.helpRow("double click", "open", kw),
+		m.helpRow("click", "@you, an author, a PR: browser", kw),
+		m.helpRow("wheel", "scroll", kw),
+		m.helpRow("drag", "the pane's top edge: resize", kw),
+	})
+	var folded []string
+	for _, sc := range helpScopes {
+		if sc.s == here || sc.s == keymap.ScopeGlobal || sc.s == keymap.ScopeNav {
+			continue
 		}
-		left = helpGroup(left, st.muted.Render("other screens, in their key line"), folded)
-		right = helpGroup(right, st.group.Render("mouse"), []string{
-			m.helpRow("click", "tab, row, pane tab", kw),
-			m.helpRow("double click", "open", kw),
-			m.helpRow("click", "@you, an author, a PR: web", kw),
-			m.helpRow("wheel", "scroll", kw),
-			m.helpRow("drag", "pane's top edge: resize", kw),
-		})
-		return head, hereRows, left, right
+		if n := len(m.helpRows(sc.s, kw)); n > 0 {
+			folded = append(folded, "  "+st.muted.Render(fmt.Sprintf("%s · %d", sc.title, n)))
+		}
 	}
-	maxLines := max(m.height-3, 5)
+	return helpGroup(lines, st.muted.Render("other screens, in their key line"), folded)
+}
+
+// helpHeight is how many of n lines the ? popup shows at once: about two
+// thirds of the terminal, so that the screen stays around it.
+func (m *Model) helpHeight(n int) int {
+	return max(min(n, (m.height-2)*2/3), 1)
+}
+
+// scrollHelp moves the ? popup by d lines, within its lines.
+func (m *Model) scrollHelp(d int) {
+	n := len(m.helpLines())
+	m.helpTop = min(max(m.helpTop+d, 0), max(n-m.helpHeight(n), 0))
+}
+
+// lastKey is the last key of action a, which is j for down rather than
+// the arrow.
+func (m *Model) lastKey(a keymap.Action) string {
+	if ks := m.keys.Keys(a); len(ks) > 0 {
+		return ks[len(ks)-1]
+	}
+	return "(unbound)"
+}
+
+// helpKey is a key pressed with the ? popup open: it scrolls the popup or
+// closes it.
+func (m *Model) helpKey(k string) {
+	page := m.helpHeight(len(m.helpLines())) - 1
+	switch {
+	case k == keymap.Back || m.keys.Matches("help", k) || m.keys.Matches("quit", k):
+		m.help = false
+	case m.keys.Matches("down", k):
+		m.scrollHelp(1)
+	case m.keys.Matches("up", k):
+		m.scrollHelp(-1)
+	case m.keys.Matches("page_down", k):
+		m.scrollHelp(page)
+	case m.keys.Matches("page_up", k):
+		m.scrollHelp(-page)
+	case m.keys.Matches("bottom", k):
+		m.scrollHelp(1 << 20)
+	case m.keys.Matches("top", k):
+		m.scrollHelp(-(1 << 20))
+	}
+}
+
+// renderHelp is the ? popup: the part of helpLines scrolled to, in a box
+// whose bottom edge tells how much is above and below.
+func (m *Model) renderHelp() []string {
+	st := m.st
+	all := m.helpLines()
+	h := m.helpHeight(len(all))
+	top := min(max(m.helpTop, 0), max(len(all)-h, 0))
 	w := min(64, max(m.width-2, 30))
-	head, hereRows, left, right := layout(16)
-	lines := append([]string{head}, hereRows...)
-	lines = append(append(append(lines, ""), left...), append([]string{""}, right...)...)
-	if len(lines) > maxLines && m.width-2 >= 90 {
-		w = 90
-		col := (w - 4 - 2) / 2
-		head, hereRows, left, right = layout(14)
-		half := (len(hereRows) + 1) / 2
-		lines = append([]string{head}, sideBySide(hereRows[:half], hereRows[half:], col)...)
-		lines = append(append(lines, ""), sideBySide(left, right, col)...)
+	out := box(st, "keys · "+m.firstKey("help")+" esc q close", all[top:top+h], w)
+	if len(all) > h {
+		var parts []string
+		if top > 0 {
+			parts = append(parts, fmt.Sprintf("↑ %d", top))
+		}
+		if below := len(all) - top - h; below > 0 {
+			parts = append(parts, fmt.Sprintf("↓ %d", below))
+		}
+		tell := " " + strings.Join(parts, "  ") + " · " + m.lastKey("down") + " " + m.lastKey("up") + " wheel "
+		fill := max(w-2-lipgloss.Width(tell)-1, 0)
+		out[len(out)-1] = st.border.Render("╰"+strings.Repeat("─", fill)) + st.dim.Render(tell) + st.border.Render("─╯")
 	}
-	if len(lines) > maxLines {
-		lines = append(lines[:maxLines-1], st.dim.Render("  … a taller terminal shows the rest"))
-	}
-	return box(st, "keys · "+m.firstKey("help")+" esc q close", lines, w)
+	return out
 }

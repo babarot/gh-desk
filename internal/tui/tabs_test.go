@@ -86,7 +86,7 @@ func TestTabKeysToNine(t *testing.T) {
 		t.Error("8 did not go to the inbox")
 	}
 	press(m, "?")
-	if s := screen(m); !strings.Contains(s, "tab 1 to 8") || strings.Contains(s, "9") {
+	if s := ansiStrip(m.helpLines()); !strings.Contains(s, "tab 1 to 8") || strings.Contains(s, "9") {
 		t.Errorf("the ? list should name tabs 1 to 8 only:\n%s", s)
 	}
 }
