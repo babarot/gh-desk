@@ -2,6 +2,7 @@ package tui
 
 import (
 	"image/color"
+	"reflect"
 	"testing"
 
 	"charm.land/lipgloss/v2"
@@ -24,20 +25,36 @@ func TestMix(t *testing.T) {
 	}
 }
 
-// TestThemesFilled checks that every theme gives every color it must, and
-// that default and latte keep the backgrounds they give.
+// TestThemesFilled checks that every color of every theme is there once
+// the backgrounds are worked out, so that a color added to palette and
+// left out of a theme, or a theme that leaves out a color, fails. It goes
+// through palette's fields, not a list of them, so a new one is checked
+// without a change here.
 func TestThemesFilled(t *testing.T) {
-	for name, p := range themes {
-		cs := []color.Color{p.base, p.surface0, p.surface1, p.overlay, p.subtext0, p.subtext1, p.text, p.dim,
-			p.blue, p.mauve, p.green, p.yellow, p.peach, p.red, p.teal}
-		for i, c := range cs {
-			if c == nil {
-				t.Errorf("%s: color %d is missing", name, i)
+	missing := func(p palette) []string {
+		var out []string
+		v := reflect.ValueOf(p)
+		for i := range v.NumField() {
+			if f := v.Type().Field(i); f.Type == reflect.TypeFor[color.Color]() && v.Field(i).IsNil() {
+				out = append(out, f.Name)
 			}
 		}
-		_, q := p.backgrounds()
-		if q.pick == nil || q.pickSel == nil || q.claude == nil || q.claudeSel == nil || q.fresh == nil {
-			t.Errorf("%s: a background is not worked out", name)
+		return out
+	}
+	for _, name := range ThemeNames() {
+		p := themes[name]
+		// A color the backgrounds are worked out from makes it panic.
+		q, ok := func() (q palette, ok bool) {
+			defer func() { ok = recover() == nil }()
+			_, q = p.backgrounds()
+			return q, true
+		}()
+		if !ok {
+			t.Errorf("theme %s: the backgrounds cannot be worked out; it has no %q", name, missing(p))
+			continue
+		}
+		if m := missing(q); len(m) > 0 {
+			t.Errorf("theme %s has no %q", name, m)
 		}
 	}
 	if _, q := themes["default"].backgrounds(); q.pick != themes["default"].pick {

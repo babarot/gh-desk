@@ -19,6 +19,7 @@ gh-triage had two color schemes, `mocha` and `latte`, chosen by `theme.name`, wh
 ## Consequences
 
 - Adding a theme is a palette in `internal/tui` and its name in `internal/config`; the backgrounds come with it.
+- A color is written only in the themes. `colors_test.go` fails on a color written anywhere else in the code, and a test in `internal/tui` on a theme without a color that palette has, so a color added to the screen is added to every theme.
 - `theme.name` is an old name (ADR-016): a file that has it is told at that line to use `theme.dark` and `theme.light`.
 - A theme that follows the terminal's own sixteen colors is not possible this way: their values are not known, so nothing can be laid over them. It would need a decision of its own.
 - A file that names the theme `mocha` is a mistake, reported at that line. gh-triage had no release when it was renamed, so no old name is kept for it.
