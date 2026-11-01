@@ -469,3 +469,86 @@ func described(s map[string]any, doc string) map[string]any {
 	}
 	return s
 }
+
+// Show is f as a config file, every setting with its value, or with
+// onlyDiff only those that differ from the defaults. It reads back as f.
+// The tabs are written all or none, since tabs given replace the defaults;
+// [keys] is left to the caller, who has the keymap.
+func Show(f File, onlyDiff bool) string {
+	def := Default()
+	var b strings.Builder
+	if !onlyDiff || !slices.EqualFunc(f.Tabs, def.Tabs, sameTab) {
+		for _, t := range f.Tabs {
+			b.WriteString("[[tabs]]\n")
+			if t.Inbox() {
+				b.WriteString("kind = \"inbox\"\n")
+			}
+			fmt.Fprintf(&b, "name = %q\n", t.Name)
+			if !t.Inbox() {
+				fmt.Fprintf(&b, "query = %q\n", t.Query)
+				if len(t.Groups) > 0 {
+					b.WriteString("groups = " + tomlList(t.Groups) + "\n")
+				}
+				if len(t.Folded) > 0 {
+					b.WriteString("folded = " + tomlList(t.Folded) + "\n")
+				}
+				fmt.Fprintf(&b, "sort = %q\n", t.Sort)
+			}
+			fmt.Fprintf(&b, "limit = %d\n", t.Limit)
+			if t.Inbox() {
+				fmt.Fprintf(&b, "show_settled = %v\n", t.ShowSettled)
+			}
+			b.WriteString("\n")
+		}
+	}
+	for _, s := range f.Select {
+		b.WriteString("[[select]]\n")
+		fmt.Fprintf(&b, "name = %q\n", s.Name)
+		if s.Author != "" {
+			fmt.Fprintf(&b, "author = %q\n", s.Author)
+		}
+		if len(s.Packages) > 0 {
+			b.WriteString("packages = " + tomlList(s.Packages) + "\n")
+		}
+		if s.Title != nil {
+			fmt.Fprintf(&b, "title = %q\n", s.Title.String())
+		}
+		if s.MaxFiles > 0 {
+			fmt.Fprintf(&b, "max_files = %d\n", s.MaxFiles)
+		}
+		if s.Bot {
+			b.WriteString("bot = true\n")
+		}
+		if s.Checks != "" {
+			fmt.Fprintf(&b, "checks = %q\n", s.Checks)
+		}
+		b.WriteString("\n")
+	}
+	for _, t := range tables {
+		var lines []string
+		for _, s := range settings {
+			table, key, _ := strings.Cut(s.Key, ".")
+			if table != t.Name {
+				continue
+			}
+			v := s.Kind.toml(s.Value(f))
+			if onlyDiff && v == s.Kind.toml(s.Value(def)) {
+				continue
+			}
+			// A setting with no value of its own (review.editor) is left out.
+			if s.Example != "" && v == `""` {
+				continue
+			}
+			lines = append(lines, key+" = "+v)
+		}
+		if len(lines) > 0 {
+			b.WriteString("[" + t.Name + "]\n" + strings.Join(lines, "\n") + "\n\n")
+		}
+	}
+	return b.String()
+}
+
+func sameTab(a, b Tab) bool {
+	return a.Kind == b.Kind && a.Name == b.Name && a.Query == b.Query && slices.Equal(a.Groups, b.Groups) &&
+		slices.Equal(a.Folded, b.Folded) && a.Sort == b.Sort && a.Limit == b.Limit && a.ShowSettled == b.ShowSettled
+}

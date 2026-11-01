@@ -27,7 +27,7 @@ Standard library packages that reach outside the process:
 |---|---|
 | `net` | `internal/github` |
 | `net/http` | `internal/github` |
-| `os/exec` | `internal/claude`, `internal/github`, `internal/tui` |
+| `os/exec` | `internal/app`, `internal/claude`, `internal/github`, `internal/tui` |
 | `syscall` | `internal/state` |
 <!-- layers:end -->
 

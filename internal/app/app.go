@@ -41,6 +41,7 @@ const EnvLogLevel = "GH_TRIAGE_LOG_LEVEL"
 const usage = `Usage: gh triage [flags] [command]
 
 Commands:
+  config     check, show or edit the config file (gh triage config help)
   gc         remove the worktrees of pull requests no longer open
   log        print where the log file is
   version    print the version
@@ -68,6 +69,8 @@ func Run(args []string, stdout, stderr io.Writer) int {
 	}
 	switch flags.Arg(0) {
 	case "", "gc":
+	case "config":
+		return configCommand(flags.Args()[1:], *configPath, *debug, stdout, stderr)
 	case "log":
 		fmt.Fprintln(stdout, logging.DefaultPath())
 		return 0
@@ -318,16 +321,30 @@ func editor(set string, getenv func(string) string) string {
 	return cmp.Or(strings.TrimSpace(set), getenv("VISUAL"), getenv("EDITOR"))
 }
 
-// setup writes the config file on first run, reads it, sets the log level,
-// and builds the keymap. A mistake anywhere in the file is reported where
-// it is, all at once. The warnings come back one line each, with where they
-// are, for the TUI to show; they are logged too.
+// setup writes the config file on first run, then loads it. The warnings
+// come back one line each, with where they are, for the TUI to show; they
+// are logged too.
 func setup(path string, debug bool, level *slog.LevelVar, log *slog.Logger) (config.File, keymap.Map, []string, error) {
 	if err := config.WriteTemplate(path, KeysTemplate()); err == nil {
 		log.Info("wrote the config file", "config", path)
 	} else if !errors.Is(err, fs.ErrExist) {
 		log.Warn("could not write the config file", "config", path, "err", err.Error())
 	}
+	cfg, km, warns, err := load(path, debug, level)
+	if err != nil {
+		return config.File{}, keymap.Map{}, nil, err
+	}
+	lines := config.Lines(path, warns)
+	for _, l := range lines {
+		log.Warn("config", "warning", l)
+	}
+	return cfg, km, lines, nil
+}
+
+// load reads the config file, sets the log level, and builds the keymap.
+// A mistake anywhere in the file is reported where it is, all at once,
+// with the warnings; with none, the warnings come back.
+func load(path string, debug bool, level *slog.LevelVar) (config.File, keymap.Map, config.Problems, error) {
 	cfg, warns, err := config.Load(path)
 	if err != nil {
 		return config.File{}, keymap.Map{}, nil, err
@@ -360,11 +377,7 @@ func setup(path string, debug bool, level *slog.LevelVar, log *slog.Logger) (con
 	if len(ps) > 0 {
 		return config.File{}, keymap.Map{}, nil, config.Report(path, append(ps, warns...))
 	}
-	lines := config.Lines(path, warns)
-	for _, l := range lines {
-		log.Warn("config", "warning", l)
-	}
-	return cfg, km, lines, nil
+	return cfg, km, warns, nil
 }
 
 // applyKeys gives the actions under [keys] their keys, turning what the

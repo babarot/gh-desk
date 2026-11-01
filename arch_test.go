@@ -56,7 +56,7 @@ type layer struct {
 var reach = map[string][]string{
 	"net":      {"internal/github"},
 	"net/http": {"internal/github"},
-	"os/exec":  {"internal/claude", "internal/github", "internal/tui"},
+	"os/exec":  {"internal/app", "internal/claude", "internal/github", "internal/tui"},
 	"syscall":  {"internal/state"},
 }
 
