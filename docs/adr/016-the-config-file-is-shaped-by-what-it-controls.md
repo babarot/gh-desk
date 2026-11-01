@@ -22,14 +22,10 @@ Rules for the config file:
 - A zero value has no meaning of its own. A key left out takes its default; `0` or `""` written in the file is read as that value and checked as such, never as "use the default". A setting that can be off says so with a value (`"off"`), not with 0.
 - A key that is moved or renamed stays in a table of old names, so that a file that still has it is told at that line where it went. The old name is not read.
 
-Where the settings sit:
+Where each setting sits is in the table of settings in `internal/config` (ADR-014). Three choices follow from the rules above and are kept:
 
-- `[[tabs]]` are the tabs (ADR-005), with their groups (ADR-015); `[[select]]` are the rules S offers.
-- `[list]` is the list: how often it is read again (`refresh`), when AGE is marked (`stale_days`), the owners left out of the PR column (`home_owners`), and its columns (ADR-017).
-- `[preview]` is the pane under the list. `[description]` is how a description is drawn, in the pane and on the PR screen. `[diff]` is how diffs are shown.
-- `[checks]` holds `approval`, the checks that pass only after an approval: the CI column and deciding a merge both use them.
-- `[review]` is sending a review, from any tab: the editor it is written in (`editor`), and marking the notification done after it (`mark_done`).
-- `[merge]` and `[bulk]` are merging and the bulk popup. `[claude]` is asking Claude. `[theme]`, `[log]`, `[cache]` and `[keys]` are the colors, the log file, the cache directory and the keys.
+- `[checks]` holds `approval`, the checks that pass only after an approval: the CI column and deciding a merge both use them, so neither `[list]` nor `[merge]` has it.
+- `[review]` is sending a review from any tab, not a part of the inbox, though marking the notification done after it (`mark_done`) concerns notifications.
 - The inbox's setting to show the notifications whose pull request is merged or closed is `show_settled`, as is its key action: settled covers both. `done`, `hidden` and `stale` are not used for it, since they already mean marking a notification done, putting a row away with `d`, and the AGE mark.
 
 ## Consequences

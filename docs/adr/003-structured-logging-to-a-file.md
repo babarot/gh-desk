@@ -13,9 +13,9 @@ The project is meant to become public. Users will paste logs into issues, so the
 ## Decision
 
 - Log with the standard library's `log/slog`, as JSON lines, to `$XDG_STATE_HOME/gh-triage/logs/gh-triage.log` (default `~/.local/state/gh-triage/logs/`). `gh triage log` prints the path. Nothing is logged to stdout or stderr while the TUI runs.
-- Rotate at startup: when the file is over 10 MB, move it to `.1`, keeping three old files. No outside library.
+- Rotate at startup by size, keeping a few old files. No outside library.
 - The level is `info` unless `--debug`, `GH_TRIAGE_LOG_LEVEL` or `[log] level` says otherwise, in that order.
-- `internal/app` builds the logger, adds `run` (an ID per process) and passes it down. Packages add `op`, `batch`, `pr`, `step`, `attempt` with `logger.With`. GitHub calls add `gh_request_id`, `gql_cost`, `gql_remaining`, `duration_ms`. The attribute names are constants in `internal/logging`. No package variable logger; `slog.SetDefault` is not used.
+- `internal/app` builds the logger, adds `run` (an ID per process) and passes it down. Packages add their own attributes with `logger.With`, and GitHub calls add the request ID and the cost. The attribute names are constants in `internal/logging`. No package variable logger; `slog.SetDefault` is not used.
 - Every write to GitHub is logged at `info` with its pull request, result and request ID. Reads and the reasons behind merge decisions are logged at `debug`.
 - Never logged: tokens, pull request bodies, diffs, comments, review bodies, Claude conversations. A pull request is named as `owner/repo#n`, not by its title. Typed text is not logged; key presses are logged at `debug` as the action name only.
 

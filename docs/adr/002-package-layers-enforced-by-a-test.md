@@ -10,14 +10,7 @@ gh-triage will grow parts that are easy to tangle: a TUI, a GitHub client, a run
 
 ## Decision
 
-Split the code into layered packages, each allowed to import only lower layers and a listed set of outside modules, as `docs/architecture.md` shows:
-
-- Layer 0: `model` (shared types), `logging`, `near` (the closest name, for a did-you-mean)
-- Layer 1: `config`, `keymap`, `plan` (pure decisions), `diff`
-- Layer 2: `github`, `state`, `claude`, `listcache` (each owning one part of the outside world)
-- Layer 3: `runner` (bulk approve and merge; no Bubble Tea)
-- Layer 4: `tui`
-- Layer 5: `app` (wiring), then `main`
+Split the code into layered packages, each allowed to import only lower layers and a listed set of outside modules, from shared types at the bottom, through pure decisions and the packages that each own one part of the outside world, to `runner` (bulk approve and merge, with no Bubble Tea), then `tui`, then `app`, which wires them. The table in `arch_test.go` holds the packages and their layers, and `docs/architecture.md` shows it.
 
 Standard library packages that reach outside the process (`net`, `net/http`, `os/exec`, `syscall`) are allowed only in the packages that own that reach.
 

@@ -12,12 +12,11 @@ Several layouts were drawn in a mock and compared: the facts above the descripti
 
 ## Decision
 
-- The overview tab has the title and author, the unread comment and a bot's updates at its top, and, when the pane is at least 100 cells wide inside its border, a column of facts on the right, 34 cells wide: status, merge plan, reviews, requested reviewers, checks counted by result, labels, size, branch, opened and updated. Narrower, the facts go above the parts, in the scrolled lines. A value longer than the column breaks onto the next line; facts that do not fit in the pane are counted on its last line (`+2 more`), and the column does not scroll.
-- A click on a fact that has a page opens it in the browser, as ADR-012 lets the mouse open pages: a reviewer's profile, a team's page, the checks tab for the checks, the files tab for the size, and the repository's open pull requests with a label for that label. The branch has no link, as its repository is not read for a pull request from a fork.
-- The left side holds the parts the column does not already say, in this order: the description, the checks one by one (required ones marked, from the merge information), and the comments read with the description. Each part has a header and folds. `next_file` and `prev_file` jump between parts as they jump between files in the diff; `unfold` folds the first part whose header is in sight, or the part the pane is in; a click on a header folds it, as ADR-012 lets the mouse point. Folds hold for every pull request until gh-triage quits.
-- A description, and a comment's body, is drawn from its Markdown by gh-triage's own code in `internal/tui/markdown.go`: headings without their `#`, bullets, task boxes, numbered items, quotes, rules, inline code and bold, code blocks on their own background with their language, and tables with their columns lined up. Prose wraps at the edge; code blocks and tables are cut there. Anything else is shown as written.
+- The overview tab shows, beside the description, the facts a reviewer looks for (status, merge plan, reviews, checks, labels, size and the like), from what gh-triage already reads. On a wide pane they stand in a column on the right that does not scroll; on a narrow one they go above the description. The width where this changes is a constant.
+- A fact that has a page opens it in the browser on a click, as ADR-012 lets the mouse open pages.
+- The description, the checks and the comments are parts that fold, by key and by click. Folds hold for every pull request until gh-triage quits.
+- A description, and a comment's body, is drawn from its Markdown by gh-triage's own code in `internal/tui/markdown.go`, covering the part of Markdown that pull request descriptions use. Anything else is shown as written.
 - `description.style` in the config file chooses between that (`"rendered"`, the default) and the Markdown as written (`"plain"`). It applies to the pane and to the PR screen's overview.
-- The diff tab keeps its line of facts.
 
 ## Consequences
 

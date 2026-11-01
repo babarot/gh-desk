@@ -21,7 +21,7 @@ Tabs and their queries are meant to stay free to write, and the grouping should 
   3. team: a review is requested from at least one team. Whether the viewer is on that team is not known from an arbitrary query, so it is not looked at, and the label is "requested from a team".
   4. other: none of the above; the group that takes the rest.
 - Groups do not overlap, so a label says that its fact holds, not that the others do not: a bot's pull request is under bots even when it is requested from the viewer.
-- A tab's `groups` lists the groups it is split into, in the order shown; writing it splits the tab. A group left out is not shown, and nothing in it is selected or acted on from that tab. `folded` names the groups folded at start, among those. The default review tab has `groups = ["you", "team", "other", "bots"]` and `folded = ["team", "bots"]`.
+- A tab's `groups` lists the groups it is split into, in the order shown; writing it splits the tab. A group left out is not shown, and nothing in it is selected or acted on from that tab. `folded` names the groups folded at start, among those.
 - A group with no rows is not shown, its head included, and the header's counts leave it out. This holds under a filter too, so that what the list shows does not depend on how the rows were narrowed.
 - Groups defined in the config file (their conditions and labels) were rejected: their conditions, the order they are tried in and where the rest go are much to learn and hard to explain in the config file's comments, and ADR-014 keeps settings to what differs between users. They will be considered when there is a concrete need, such as splitting by team.
 

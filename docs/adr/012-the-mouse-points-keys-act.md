@@ -12,10 +12,10 @@ Turning the mouse on in a terminal has a cost: the terminal no longer selects te
 
 ## Decision
 
-- The TUI reports clicks, the wheel and motion while a button is held (`tea.MouseModeCellMotion`), always; there is no setting to turn it off.
-- The mouse only points and moves: a click picks a tab, a row or a preview pane tab, a double click opens a row as `enter` does, the wheel scrolls what is under it, and dragging the preview pane's top border resizes it. A click on the viewer's `@login` in the header, on an author, or on a pull request's name in the PR column opens that page in the browser, on the host gh is logged in to; for a pull request this is what `o` does, and a profile has no key, as reading it is not part of triage. Nothing that writes to GitHub (approve, comment, merge, marking done) is done with the mouse; those stay on keys, which are rebindable and shown in the hints.
-- A popup, the filter being typed and the review being written take no mouse input, so a click never acts behind what has the focus. A click closes the `?` list.
-- The preview pane's height can also be changed with keys (`pane_grow`, `pane_shrink`), bound like any other action.
+- The TUI takes the mouse always: clicks, the wheel and drags. There is no setting to turn it off.
+- The mouse only points and moves: it picks, opens, folds and scrolls what is on the screen, resizes the preview pane, and opens pages in the browser on the host gh is logged in to. Nothing that writes to GitHub (approve, comment, merge, marking done) is done with the mouse; those stay on keys, which are rebindable and shown in the hints.
+- A popup, the filter being typed and the review being written take no mouse input, so a click never acts behind what has the focus.
+- The preview pane's height can also be changed with keys (`pane_grow`, `pane_shrink`), so resizing it does not need the mouse.
 - A height set with the mouse or those keys is kept in `layout.json` in the state directory and is used over `preview.height` at the next launch. `internal/state` owns the file, as it owns the other state kept between launches; it is not locked, and when two gh-triage write it the last write is kept.
 
 ## Consequences
