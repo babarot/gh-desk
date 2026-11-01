@@ -118,6 +118,24 @@
     "list": {
       "additionalProperties": false,
       "properties": {
+        "columns": {
+          "description": "The columns shown, in the order given; \"pr\" and \"title\" are needed. WHY shows on grouped tabs and the inbox only, and AUTHOR not on a tab of your own pull requests. On a narrow terminal SIZE goes first, then AUTHOR.",
+          "items": {
+            "enum": [
+              "pr",
+              "title",
+              "author",
+              "ci",
+              "review",
+              "why",
+              "size",
+              "age"
+            ],
+            "type": "string"
+          },
+          "minItems": 1,
+          "type": "array"
+        },
         "home_owners": {
           "description": "Owners whose name is left out of the PR column, such as your company.",
           "items": {

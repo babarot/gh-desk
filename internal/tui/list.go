@@ -305,28 +305,58 @@ type column struct {
 	right bool
 }
 
+// columnDefs are every column, in the default order.
+var columnDefs = []column{
+	{id: "pr", title: "    PR", width: 28}, {id: "title", title: "TITLE"}, {id: "author", title: "AUTHOR", width: 14},
+	{id: "ci", title: "CI", width: 2}, {id: "review", title: "REVIEW", width: 7}, {id: "why", title: "WHY", width: 10},
+	{id: "size", title: "SIZE", width: 11}, {id: "age", title: "AGE", width: 4, right: true},
+}
+
+// dropFirst are the columns left out on a narrow terminal, first to last,
+// while TITLE would be narrower than minTitle; the others are never left
+// out (ADR-016). minTitle keeps SIZE down to 120 columns, as before the
+// columns could be chosen.
+var dropFirst = []string{"size", "author"}
+
+const minTitle = 27
+
 func (m *Model) columns(t *tab) []column {
 	w := m.width
-	cols := []column{{id: "pr", title: "    PR", width: 28}, {id: "title", title: "TITLE"}}
-	showAuthor := w >= 110 && !m.allMine(t)
-	if showAuthor {
-		cols = append(cols, column{id: "author", title: "AUTHOR", width: 14})
+	ids := m.set.Columns
+	if ids == nil {
+		for _, c := range columnDefs {
+			ids = append(ids, c.id)
+		}
 	}
-	cols = append(cols, column{id: "ci", title: "CI", width: 2}, column{id: "review", title: "REVIEW", width: 7})
-	if t.grouped || t.inbox {
-		cols = append(cols, column{id: "why", title: "WHY", width: 10})
+	var cols []column
+	for _, id := range ids {
+		switch {
+		case id == "author" && m.allMine(t):
+		case id == "why" && !t.grouped && !t.inbox:
+		default:
+			if i := slices.IndexFunc(columnDefs, func(c column) bool { return c.id == id }); i >= 0 {
+				cols = append(cols, columnDefs[i])
+			}
+		}
 	}
-	if w >= 120 {
-		cols = append(cols, column{id: "size", title: "SIZE", width: 11})
+	// TITLE takes what the others leave.
+	titleWidth := func() int {
+		fixed := 0
+		for _, c := range cols {
+			fixed += c.width + 2
+		}
+		return w - fixed - 1
 	}
-	cols = append(cols, column{id: "age", title: "AGE", width: 4, right: true})
-	fixed := 0
-	for _, c := range cols {
-		fixed += c.width + 2
+	for _, id := range dropFirst {
+		if titleWidth() >= minTitle {
+			break
+		}
+		cols = slices.DeleteFunc(cols, func(c column) bool { return c.id == id })
 	}
+	tw := max(titleWidth(), 10)
 	for i := range cols {
-		if cols[i].width == 0 {
-			cols[i].width = max(w-fixed-1, 10)
+		if cols[i].id == "title" {
+			cols[i].width = tw
 		}
 	}
 	return cols
@@ -419,27 +449,34 @@ func (m *Model) renderRow(r row, cols []column, sel bool) string {
 	}
 	var cells []string
 	prog, running := m.progress[r.pr.Key]
-	over := progressOver(cols)
+	from, to, steal := progressOver(cols)
 	for i := 0; i < len(cols); i++ {
 		c := cols[i]
-		if running && over[c.id] {
-			// The progress takes the cells of WHY and SIZE (or REVIEW and
-			// SIZE), so no column changes width.
-			w := 0
-			n := 0
-			for ; i+n < len(cols) && over[cols[i+n].id]; n++ {
-				w += cols[i+n].width
+		if running && i == from {
+			// The progress takes the cells from..to, and steal more from the
+			// end of TITLE, so no column moves.
+			w := steal
+			for _, pc := range cols[from:to] {
+				w += pc.width
 			}
-			w += 2 * (n - 1)
-			i += n - 1
+			w += 2 * max(to-from-1, 0)
 			cells = append(cells, fit(m.progressText(prog), w))
+			i = to - 1
 			continue
 		}
 		s := m.cell(c.id, r, sel)
-		if c.right {
-			s = spaces(c.width-lipgloss.Width(s)) + s
+		width := c.width
+		if running && c.id == "title" {
+			width -= steal
 		}
-		cells = append(cells, fit(s, c.width))
+		if c.right {
+			s = spaces(width-lipgloss.Width(s)) + s
+		}
+		cells = append(cells, fit(s, width))
+	}
+	if running && from == len(cols) {
+		// No column right of TITLE: the progress is all taken from it.
+		cells = append(cells, fit(m.progressText(prog), steal-2))
 	}
 	line := strings.Join(cells, "  ")
 	switch by := m.selected[r.pr.Key]; {
@@ -459,15 +496,43 @@ func (m *Model) renderRow(r row, cols []column, sel bool) string {
 	return line
 }
 
-// progressOver are the columns a row's progress is written over: WHY and
-// SIZE, or REVIEW and SIZE where there is no WHY.
-func progressOver(cols []column) map[string]bool {
-	for _, c := range cols {
-		if c.id == "why" {
-			return map[string]bool{"why": true, "size": true}
+// progressWidth is the least room a row's progress is written in: as
+// wide as WHY and SIZE.
+const progressWidth = 23
+
+// progressOver is where a row's progress is written: over cols[from:to],
+// with steal columns more taken from the end of TITLE when they leave too
+// little room. It is WHY and SIZE, or REVIEW and SIZE where there is no
+// WHY, when the columns have them next to each other, or WHY (REVIEW)
+// alone when there is no SIZE, as on a narrow terminal; otherwise every
+// column right of TITLE, so that a row shows its result whatever the
+// columns are (ADR-007).
+func progressOver(cols []column) (from, to, steal int) {
+	at := func(id string) int { return slices.IndexFunc(cols, func(c column) bool { return c.id == id }) }
+	first := "review"
+	if at("why") >= 0 {
+		first = "why"
+	}
+	if i := at(first); i >= 0 {
+		switch j := at("size"); {
+		case j == i+1:
+			return i, j + 1, 0
+		case j < 0:
+			return i, i + 1, 0
 		}
 	}
-	return map[string]bool{"review": true, "size": true}
+	from, to = at("title")+1, len(cols)
+	// The room is the cells' widths and the gaps between them; with no cell
+	// at all, the gap before the progress is taken from TITLE too.
+	room := -2
+	for _, c := range cols[from:to] {
+		room += c.width + 2
+	}
+	if room < progressWidth {
+		// Never all of TITLE.
+		steal = min(progressWidth-room, cols[from-1].width-1)
+	}
+	return from, to, steal
 }
 
 var groupLabel = map[plan.Group]string{

@@ -284,7 +284,7 @@ func (g runnerGitHub) CommitInfo(ctx context.Context, key model.PRKey, oid strin
 // settings are the config values the TUI uses.
 func settings(cfg config.File) tui.Settings {
 	set := tui.Settings{
-		MarkDone: cfg.Review.MarkDone, HomeOwners: cfg.List.HomeOwners, PreviewHeight: cfg.Preview.Height,
+		MarkDone: cfg.Review.MarkDone, HomeOwners: cfg.List.HomeOwners, Columns: cfg.List.Columns, PreviewHeight: cfg.Preview.Height,
 		DefaultPaneHeight: config.DefaultPreviewHeight,
 		Collapse:          config.Patterns(cfg.Diff.Collapse), Theme: cfg.Theme.Name, Editor: editor(cfg.Review.Editor, os.Getenv),
 		Refresh: cfg.RefreshInterval(), ReleaseNotes: cfg.Claude.ReleaseNotesCheck, Language: cfg.Claude.Language,

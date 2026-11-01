@@ -31,13 +31,15 @@ import (
 
 // The values of the settings that take one of a few.
 var (
-	Themes             = []string{"auto", "mocha", "latte"}
-	TabKinds           = []string{"search", "inbox"}
-	TabSorts           = []string{"updated", "drafts_last"}
-	GroupNames         = []string{"you", "team", "other", "bots"}
-	PaneTabs           = []string{"overview", "diff"}
-	DescriptionStyles  = []string{"rendered", "plain"}
-	MergeMethods       = []string{"merge", "squash", "rebase"}
+	Themes            = []string{"auto", "mocha", "latte"}
+	TabKinds          = []string{"search", "inbox"}
+	TabSorts          = []string{"updated", "drafts_last"}
+	GroupNames        = []string{"you", "team", "other", "bots"}
+	PaneTabs          = []string{"overview", "diff"}
+	DescriptionStyles = []string{"rendered", "plain"}
+	MergeMethods      = []string{"merge", "squash", "rebase"}
+	// Columns are the list's columns, in their default order.
+	Columns            = []string{"pr", "title", "author", "ci", "review", "why", "size", "age"}
 	UpdateBranchValues = []string{"humans", "all", "never"}
 )
 
@@ -103,6 +105,9 @@ type List struct {
 	StaleDays Days
 	// HomeOwners are owners whose name is left out of the PR column.
 	HomeOwners []string
+	// Columns are the columns shown, in their order; pr and title among
+	// them.
+	Columns []string
 }
 
 // Preview configures the pane under the list.
@@ -271,7 +276,7 @@ func Default() File {
 			{Kind: "search", Name: "involved", Query: "is:open is:pr involves:@me -author:@me -review-requested:@me archived:false", Sort: "updated", Limit: 100},
 			{Kind: "inbox", Name: "inbox", Limit: 100},
 		},
-		List:        List{Refresh: dur("3m"), StaleDays: days(30)},
+		List:        List{Refresh: dur("3m"), StaleDays: days(30), Columns: slices.Clone(Columns)},
 		Preview:     Preview{Height: DefaultPreviewHeight, Tab: "overview"},
 		Description: Description{Style: "rendered"},
 		Diff:        Diff{Collapse: globs("*.lock", "go.sum", "pnpm-lock.yaml", "package-lock.json", "yarn.lock")},
@@ -355,6 +360,7 @@ type (
 		Refresh    *Duration `toml:"refresh"`
 		StaleDays  *Days     `toml:"stale_days"`
 		HomeOwners *[]string `toml:"home_owners"`
+		Columns    *[]string `toml:"columns"`
 	}
 	previewDoc struct {
 		Height *int    `toml:"height"`
@@ -429,6 +435,7 @@ func Load(path string) (File, Problems, error) {
 	set(&cfg.List.Refresh, d.List.Refresh)
 	set(&cfg.List.StaleDays, d.List.StaleDays)
 	set(&cfg.List.HomeOwners, d.List.HomeOwners)
+	set(&cfg.List.Columns, d.List.Columns)
 	set(&cfg.Preview.Height, d.Preview.Height)
 	set(&cfg.Preview.Tab, d.Preview.Tab)
 	set(&cfg.Description.Style, d.Description.Style)
@@ -449,6 +456,7 @@ func Load(path string) (File, Problems, error) {
 	ps = append(ps, sps...)
 
 	ps = append(ps, checkSettings(cfg)...)
+	ps = append(ps, checkColumns(cfg.List.Columns)...)
 	if d.Review.Editor != nil && strings.TrimSpace(*d.Review.Editor) == "" {
 		ps = append(ps, problem("review.editor", "review.editor must not be empty; leave it out to take $VISUAL, then $EDITOR"))
 	}
@@ -825,4 +833,21 @@ func goTypeWords(t string) string {
 		return "a list"
 	}
 	return t
+}
+
+// checkColumns reports the columns named twice, and pr or title left out:
+// without them a row does not say which pull request it is.
+func checkColumns(cols []string) Problems {
+	var ps Problems
+	for i, c := range cols {
+		if slices.Contains(cols[:i], c) {
+			ps = append(ps, Problem{Key: []string{"list", "columns"}, Index: i, Message: fmt.Sprintf("list.columns names %q twice", c)})
+		}
+	}
+	for _, c := range []string{"pr", "title"} {
+		if !slices.Contains(cols, c) {
+			ps = append(ps, problem("list.columns", "list.columns must have %q", c))
+		}
+	}
+	return ps
 }

@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -358,4 +359,15 @@ author = "app/renovate"
 	if _, warns, _ := Load(write(t, "")); len(warns) > 0 {
 		t.Errorf("the defaults warn: %v", warns)
 	}
+}
+
+func TestColumns(t *testing.T) {
+	cfg, _, err := Load(write(t, "[list]\ncolumns = [\"pr\", \"age\", \"title\"]\n"))
+	if err != nil || !slices.Equal(cfg.List.Columns, []string{"pr", "age", "title"}) {
+		t.Fatalf("columns = %v, %v", cfg.List.Columns, err)
+	}
+	wantErrs(t, "[list]\ncolumns = [\"pr\", \"age\", \"age\", \"autor\"]\n",
+		`config.toml:2:25: list.columns names "age" twice`,
+		`list.columns must have "title"`,
+		`list.columns[3] must be one of "pr", "title", "author", "ci", "review", "why", "size", "age", got "autor"; did you mean "author"?`)
 }

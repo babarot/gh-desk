@@ -82,7 +82,10 @@ type Settings struct {
 	Tabs []Tab
 	// MarkDone marks a pull request's notification done after a review
 	// is sent here.
-	MarkDone   bool
+	MarkDone bool
+	// Columns are the list's columns in their order, by id; nil for all of
+	// them in the default order.
+	Columns    []string
 	HomeOwners []string
 	StaleDays  int
 	// PreviewHeight is the preview pane's lines from the config file; 0
