@@ -65,17 +65,17 @@ func (m *Model) render() string {
 	lines := strings.Split(b.String(), "\n")
 	switch {
 	case m.bulk != nil:
-		lines = overlay(lines, m.renderBulk(), 2, m.width)
+		lines = m.overlay(lines, m.renderBulk(), 2, m.width)
 	case m.notesAt != nil:
-		lines = overlay(lines, m.renderNotes(), 2, m.width)
+		lines = m.overlay(lines, m.renderNotes(), 2, m.width)
 	case m.picker != nil:
-		lines = overlay(lines, m.renderPick(), 2, m.width)
+		lines = m.overlay(lines, m.renderPick(), 2, m.width)
 	case m.menu != nil:
-		lines = overlay(lines, m.renderMenu(), 2, m.width)
+		lines = m.overlay(lines, m.renderMenu(), 2, m.width)
 	case m.confirm != nil:
-		lines = overlay(lines, m.renderConfirm(), 2, m.width)
+		lines = m.overlay(lines, m.renderConfirm(), 2, m.width)
 	case m.triage != nil && m.triage.open:
-		lines = overlay(lines, m.renderTriage(), 2, m.width)
+		lines = m.overlay(lines, m.renderTriage(), 2, m.width)
 	case m.help:
 		lines = m.renderHelp(lines)
 	case m.toast != nil && len(lines) > 3:
@@ -88,6 +88,17 @@ func (m *Model) render() string {
 		lines = lines[:m.height]
 	}
 	return strings.Join(lines, "\n")
+}
+
+// overlay puts a popup over the screen's lines, the screen dimmed under
+// it: drawn in one faint color of the theme, so only the popup keeps its
+// colors and stands out, as a dialog over a darkened page does.
+func (m *Model) overlay(lines, popup []string, top, width int) []string {
+	under := make([]string, len(lines))
+	for i, l := range lines {
+		under[i] = m.st.dim.Render(ansi.Strip(l))
+	}
+	return overlay(under, popup, top, width)
 }
 
 // overlay puts popup over lines from row top, in the middle, keeping what

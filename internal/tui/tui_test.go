@@ -538,6 +538,21 @@ func TestActionMenu(t *testing.T) {
 	}
 }
 
+// Under a popup the screen is drawn in the theme's faint color alone, so
+// only the popup keeps its colors.
+func TestPopupDimsTheScreen(t *testing.T) {
+	m := start(t, fixture(), keymap.Default())
+	header := func() string { return strings.Split(m.render(), "\n")[0] }
+	before := header()
+	if before == m.st.dim.Render(ansi.Strip(before)) {
+		t.Fatalf("the header is faint before any popup: %q", before)
+	}
+	press(m, "enter")
+	if got, want := header(), m.st.dim.Render(ansi.Strip(before)); got != want {
+		t.Errorf("the header under the menu is not dimmed:\n got %q\nwant %q", got, want)
+	}
+}
+
 // With a selection the menu acts on all of it: approve and merge count
 // what they would act on, and actions on one pull request cannot run.
 func TestActionMenuSelection(t *testing.T) {

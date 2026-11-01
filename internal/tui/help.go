@@ -279,5 +279,5 @@ func (m *Model) renderHelp(lines []string) []string {
 	}
 	y := max((len(lines)-len(box))/2, 0)
 	m.helpBox = helpBox{x: max((m.width-w)/2, 0), y: y, w: w, h: len(box), heads: heads[top : top+h]}
-	return overlay(lines, box, y, m.width)
+	return m.overlay(lines, box, y, m.width)
 }
