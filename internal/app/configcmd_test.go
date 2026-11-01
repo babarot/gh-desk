@@ -34,10 +34,10 @@ func TestConfigCheck(t *testing.T) {
 		code       int
 		want       []string
 	}{
-		{"fine", "[theme]\nname = \"latte\"\n", 0, []string{"config.toml: no mistakes"}},
+		{"fine", "[theme]\nlight = \"latte\"\n", 0, []string{"config.toml: no mistakes"}},
 		{"warning", "[[tabs]]\nname = \"a\"\nquery = \"author:@me\"\n[[tabs]]\nkind = \"inbox\"\n", 0,
 			[]string{"config.toml:3:9: warning: tabs[0].query has no is:pr", "no mistakes, 1 warning"}},
-		{"mistake", "[theme]\nname = \"dark\"\n", 1, []string{"theme.name must be one of"}},
+		{"mistake", "[theme]\nlight = \"dark\"\n", 1, []string{"theme.light must be one of"}},
 		{"key mistake", "[keys]\naprove = \"a\"\n", 1, []string{`"aprove" is not an action; did you mean "approve"?`}},
 	}
 	for _, tt := range tests {
@@ -56,7 +56,7 @@ func TestConfigCheck(t *testing.T) {
 	// A path after check wins over --config, and one not there is the
 	// defaults.
 	none := filepath.Join(t.TempDir(), "none.toml")
-	if code, out, _ := runConfig(t, writeFile(t, "[theme]\nname = \"dark\"\n"), "check", none); code != 0 || !strings.Contains(out, "the defaults are used") {
+	if code, out, _ := runConfig(t, writeFile(t, "[theme]\nlight = \"dark\"\n"), "check", none); code != 0 || !strings.Contains(out, "the defaults are used") {
 		t.Errorf("check %s: code %d, out %q", none, code, out)
 	}
 }
@@ -101,7 +101,7 @@ quit = ["q", "Q"]
 	// What show prints reads back as the same settings.
 	_, all, _ := runConfig(t, path, "show")
 	_, again, _ := runConfig(t, writeFile(t, all), "show")
-	if all != again || !strings.Contains(all, "[theme]\nname = \"auto\"") {
+	if all != again || !strings.Contains(all, "[theme]\ndark = \"default\"") {
 		t.Errorf("show does not read back as itself:\n%s\n---\n%s", all, again)
 	}
 }

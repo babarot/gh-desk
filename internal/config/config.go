@@ -31,7 +31,9 @@ import (
 
 // The values of the settings that take one of a few.
 var (
-	Themes            = []string{"auto", "mocha", "latte"}
+	// Themes are the themes internal/tui draws; a test in internal/app
+	// keeps the two in step.
+	Themes            = []string{"default", "latte", "github-dark", "github-light", "tokyonight", "tokyonight-day", "gruvbox-dark", "gruvbox-light", "nord"}
 	TabKinds          = []string{"search", "inbox"}
 	TabSorts          = []string{"updated", "drafts_last"}
 	GroupNames        = []string{"you", "team", "other", "bots"}
@@ -211,8 +213,10 @@ type Claude struct {
 
 // Theme configures the colors.
 type Theme struct {
-	// Name is one of Themes.
-	Name string `toml:"name"`
+	// Dark and Light are the themes used on a dark terminal and on a
+	// light one, among Themes; the same theme in both is used on any.
+	Dark  string `toml:"dark"`
+	Light string `toml:"light"`
 }
 
 // Log configures the log file.
@@ -285,7 +289,7 @@ func Default() File {
 			BlockedTimeout: dur("30m"), UpdateBranch: "humans"},
 		Bulk:   Bulk{AttentionPaths: globs(".github/workflows/*", "CODEOWNERS", ".github/CODEOWNERS", "docs/CODEOWNERS")},
 		Claude: Claude{Model: "opus", AllowedTools: []string{"Read", "Grep", "Glob"}, Language: "English", ReleaseNotesCheck: true},
-		Theme:  Theme{Name: "auto"},
+		Theme:  Theme{Dark: "default", Light: "latte"},
 		Log:    Log{Level: "info"},
 		Cache:  Cache{Dir: defaultCacheDir()},
 	}
@@ -772,9 +776,10 @@ func decodeProblems(err error) Problems {
 // not each key in it.
 var moved = map[string]string{
 	"claude.cache_dir":    `moved to "cache.dir"`,
+	"theme.name":          `replaced by theme.dark and theme.light, the themes used on a dark terminal and on a light one; write the same theme in both to use it on any`,
 	"sections":            `moved to "tabs"; group = "requested" is groups = ["you", "team", "other", "bots"]`,
 	"inbox":               `moved: the inbox is a [[tabs]] element with kind = "inbox", holding limit, and show_settled for hide_closed with the opposite value; done_after_review is review.mark_done`,
-	"ui":                  `moved: theme is theme.name; stale_days and home_owners are under [list]; editor is review.editor; approval_checks is checks.approval`,
+	"ui":                  `moved: theme is theme.dark and theme.light; stale_days and home_owners are under [list]; editor is review.editor; approval_checks is checks.approval`,
 	"refresh":             `moved: refresh.interval is list.refresh, and "0" is "off"`,
 	"preview.description": `moved to "description.style"`,
 	"merge.watch_timeout": `is no longer a setting: gh-triage watches a pull request on auto-merge for 24h, and GitHub's auto-merge goes on after`,

@@ -106,8 +106,10 @@ type Settings struct {
 	// for this run only.
 	Layout   Layout
 	Collapse []string
-	// Theme is "auto", "mocha" or "latte".
-	Theme string
+	// ThemeDark and ThemeLight are the themes on a dark terminal and on a
+	// light one. ThemeDark is used until the terminal tells its
+	// background, and on one that does not.
+	ThemeDark, ThemeLight string
 	// Editor is the command ctrl+e runs to edit a review, with its
 	// arguments; empty turns it off.
 	Editor string
@@ -247,10 +249,7 @@ func New(src Source, run Runner, cl Claude, km keymap.Map, log *slog.Logger, set
 	m := &Model{src: src, run: run, claude: cl, chats: map[model.PRKey]*chat{}, cautions: map[string]string{}, fresh: map[model.PRKey]time.Time{}, keys: km, log: log, set: set, ctx: context.Background(), unread: map[model.PRKey]model.Notification{},
 		selected: map[model.PRKey]selection{}, progress: map[model.PRKey]progress{}, batches: map[string]*batchState{},
 		merged: map[model.PRKey]bool{}, refreshed: map[int]time.Time{}}
-	m.st = newStyles(mocha)
-	if set.Theme == "latte" {
-		m.st = newStyles(latte)
-	}
+	m.st = newStyles(theme(set.ThemeDark))
 	for i, t := range set.Tabs {
 		if t.Inbox {
 			m.inbox = i
@@ -283,7 +282,7 @@ func (m *Model) Init() tea.Cmd {
 	} else {
 		cmds = append(cmds, m.loadAll())
 	}
-	if m.set.Theme == "auto" {
+	if m.set.ThemeLight != m.set.ThemeDark {
 		cmds = append(cmds, tea.RequestBackgroundColor)
 	}
 	return tea.Batch(cmds...)
@@ -308,8 +307,8 @@ func (m *Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 	case tea.BackgroundColorMsg:
-		if m.set.Theme == "auto" && !msg.IsDark() {
-			m.st = newStyles(latte)
+		if !msg.IsDark() {
+			m.st = newStyles(theme(m.set.ThemeLight))
 		}
 		return m, nil
 	case tea.KeyPressMsg:

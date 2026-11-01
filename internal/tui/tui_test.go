@@ -280,7 +280,7 @@ func testSettings() Settings {
 			{Name: "inbox", Inbox: true, Limit: 100},
 		},
 		MarkDone: true, HomeOwners: []string{"acme"}, StaleDays: 30,
-		PreviewHeight: 10, Collapse: []string{"go.sum"}, Theme: "mocha", Now: func() time.Time { return now },
+		PreviewHeight: 10, Collapse: []string{"go.sum"}, ThemeDark: "default", ThemeLight: "default", Now: func() time.Time { return now },
 		Plan: plan.Settings{Methods: []model.MergeMethod{model.MethodMerge}, AutoMerge: true, UpdateBranch: "humans",
 			AttentionPaths: []string{".github/workflows/*"}},
 		Rules:   []plan.Rule{{Name: "octo bumps", Author: "renovate", Packages: []string{"octo/app"}}},
@@ -812,7 +812,7 @@ func TestSelectByRule(t *testing.T) {
 func TestResumeAtStart(t *testing.T) {
 	f := fixture()
 	set := Settings{Tabs: []Tab{{Name: "review", Query: "review", Groups: plan.Groups, Limit: 100}, {Name: "inbox", Inbox: true, Limit: 100}},
-		Theme: "mocha", Now: func() time.Time { return now }, CanWait: true,
+		ThemeDark: "default", ThemeLight: "default", Now: func() time.Time { return now }, CanWait: true,
 		Resume: []model.Pending{{Key: key("acme", "api", 12), ID: "1", Head: "aaaaaaa1", Author: "alice"}}}
 	r := &fakeRunner{results: map[model.PRKey]runner.Event{}}
 	m := New(f, r, &fakeClaude{}, keymap.Default(), nil, set)

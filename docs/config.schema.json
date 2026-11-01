@@ -375,12 +375,33 @@
     "theme": {
       "additionalProperties": false,
       "properties": {
-        "name": {
-          "description": "Color scheme: \"auto\" (default) picks mocha on a dark terminal and latte on a light one; or \"mocha\", \"latte\".",
+        "dark": {
+          "description": "The color scheme on a dark terminal, and on one that does not tell its background.",
           "enum": [
-            "auto",
-            "mocha",
-            "latte"
+            "default",
+            "latte",
+            "github-dark",
+            "github-light",
+            "tokyonight",
+            "tokyonight-day",
+            "gruvbox-dark",
+            "gruvbox-light",
+            "nord"
+          ],
+          "type": "string"
+        },
+        "light": {
+          "description": "The color scheme on a light terminal. Write the same theme as theme.dark to use it on any terminal.",
+          "enum": [
+            "default",
+            "latte",
+            "github-dark",
+            "github-light",
+            "tokyonight",
+            "tokyonight-day",
+            "gruvbox-dark",
+            "gruvbox-light",
+            "nord"
           ],
           "type": "string"
         }

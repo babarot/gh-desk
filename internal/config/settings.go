@@ -260,8 +260,10 @@ var settings = []setting{
 	{Key: "claude.release_notes_check", Kind: boolKind{}, Value: func(f File) any { return f.Claude.ReleaseNotesCheck },
 		Doc: "Let Claude read the release notes of the bot pull requests in the merge popup, and mark those that need care."},
 
-	{Key: "theme.name", Kind: enumKind{Themes}, Value: func(f File) any { return f.Theme.Name },
-		Doc: `Color scheme: "auto" (default) picks mocha on a dark terminal and latte on a light one; or "mocha", "latte".`},
+	{Key: "theme.dark", Kind: enumKind{Themes}, Value: func(f File) any { return f.Theme.Dark },
+		Doc: `The color scheme on a dark terminal, and on one that does not tell its background.`},
+	{Key: "theme.light", Kind: enumKind{Themes}, Value: func(f File) any { return f.Theme.Light },
+		Doc: `The color scheme on a light terminal. Write the same theme as theme.dark to use it on any terminal.`},
 
 	{Key: "log.level", Kind: stringKind{}, Value: func(f File) any { return f.Log.Level },
 		Doc: `How much goes to the log file: "debug", "info" (default), "warn" or "error". --debug and GH_TRIAGE_LOG_LEVEL take precedence. gh triage log prints where the file is.`},

@@ -9,44 +9,54 @@ import (
 	"github.com/charmbracelet/x/ansi"
 )
 
-// palette is a color scheme: Catppuccin Mocha on a dark terminal, Latte on
-// a light one.
+// palette is a color scheme: the colors a theme gives, each named by the
+// role it has in Catppuccin, whose names they were first. The
+// backgrounds of rows and of the tab shown are worked out from these (see
+// backgrounds), unless a palette gives its own.
 type palette struct {
+	// dark says the palette is for a dark terminal.
+	dark bool
+	// base is the background; surface0 that of the header, the cursor's
+	// row and a choice shown, and surface1 the borders. overlay, dim and
+	// subtext0 and subtext1 are text fainter than text, dim the faintest.
 	base, surface0, surface1, overlay, subtext0, subtext1, text, dim color.Color
 	blue, mauve, green, yellow, peach, red, teal                     color.Color
 	// pick and pickSel are the backgrounds of a selected row, and of a
 	// selected row under the cursor; claude and claudeSel those of a row
 	// Claude selected; fresh is that of a row a reading again added or
-	// changed.
+	// changed. Left nil, they are worked out.
 	pick, pickSel, claude, claudeSel, fresh color.Color
-	// tabMix is how much of blue the background of the tab shown has,
-	// laid over base, from 0 to 1: as if blue were drawn at that opacity,
-	// which terminals cannot do.
-	tabMix float64
 }
 
+// shares are how much of a color each background has, laid over base,
+// from 0 to 1: as if the color were drawn at that opacity, which terminals
+// cannot do. A light background needs less of a color to show it.
+type shares struct{ tab, pick, pickSel, claude, claudeSel, fresh float64 }
+
 var (
-	mocha = palette{
-		base: lipgloss.Color("#1e1e2e"), surface0: lipgloss.Color("#3b3b52"), surface1: lipgloss.Color("#525270"),
-		overlay: lipgloss.Color("#8888a4"), subtext0: lipgloss.Color("#b0b8d1"), subtext1: lipgloss.Color("#d0d6e8"),
-		text: lipgloss.Color("#e0e4f0"), dim: lipgloss.Color("#706f87"),
-		blue: lipgloss.Color("#96bfff"), mauve: lipgloss.Color("#d4b0ff"), green: lipgloss.Color("#b5f0b0"),
-		yellow: lipgloss.Color("#ffe5a0"), peach: lipgloss.Color("#ffc49a"), red: lipgloss.Color("#f5a3b5"), teal: lipgloss.Color("#94e2d5"),
-		pick: lipgloss.Color("#3a3150"), pickSel: lipgloss.Color("#4d4068"),
-		claude: lipgloss.Color("#22393d"), claudeSel: lipgloss.Color("#2f4f54"), fresh: lipgloss.Color("#26324a"),
-		tabMix: 0.35,
-	}
-	latte = palette{
-		base: lipgloss.Color("#eff1f5"), surface0: lipgloss.Color("#ccd0da"), surface1: lipgloss.Color("#bcc0cc"),
-		overlay: lipgloss.Color("#7c7f93"), subtext0: lipgloss.Color("#6c6f85"), subtext1: lipgloss.Color("#5c5f77"),
-		text: lipgloss.Color("#4c4f69"), dim: lipgloss.Color("#9ca0b0"),
-		blue: lipgloss.Color("#1e66f5"), mauve: lipgloss.Color("#8839ef"), green: lipgloss.Color("#40a02b"),
-		yellow: lipgloss.Color("#df8e1d"), peach: lipgloss.Color("#fe640b"), red: lipgloss.Color("#d20f39"), teal: lipgloss.Color("#179299"),
-		pick: lipgloss.Color("#e6dcf7"), pickSel: lipgloss.Color("#d6c6f2"),
-		claude: lipgloss.Color("#d4eeee"), claudeSel: lipgloss.Color("#bde3e4"), fresh: lipgloss.Color("#dce6fb"),
-		tabMix: 0.25,
-	}
+	darkShares  = shares{tab: 0.35, pick: 0.16, pickSel: 0.26, claude: 0.12, claudeSel: 0.25, fresh: 0.12}
+	lightShares = shares{tab: 0.25, pick: 0.11, pickSel: 0.24, claude: 0.10, claudeSel: 0.22, fresh: 0.08}
 )
+
+// backgrounds are the backgrounds p does not give, worked out from its
+// colors: blue for the tab shown, mauve for a selected row, teal for one
+// Claude selected, and blue for one read again.
+func (p palette) backgrounds() (tab color.Color, q palette) {
+	sh := lightShares
+	if p.dark {
+		sh = darkShares
+	}
+	or := func(c, from color.Color, t float64) color.Color {
+		if c != nil {
+			return c
+		}
+		return mix(from, p.base, t)
+	}
+	p.pick, p.pickSel = or(p.pick, p.mauve, sh.pick), or(p.pickSel, p.mauve, sh.pickSel)
+	p.claude, p.claudeSel = or(p.claude, p.teal, sh.claude), or(p.claudeSel, p.teal, sh.claudeSel)
+	p.fresh = or(p.fresh, p.blue, sh.fresh)
+	return mix(p.blue, p.base, sh.tab), p
+}
 
 // styles are the styles drawn with one palette.
 type styles struct {
@@ -74,7 +84,7 @@ type styles struct {
 
 func newStyles(p palette) styles {
 	fg := func(c color.Color) lipgloss.Style { return lipgloss.NewStyle().Foreground(c) }
-	tab := mix(p.blue, p.base, p.tabMix)
+	tab, p := p.backgrounds()
 	return styles{
 		p:         p,
 		header:    lipgloss.NewStyle().Background(p.surface0).Foreground(p.subtext0),
