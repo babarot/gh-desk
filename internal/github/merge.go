@@ -123,9 +123,11 @@ func (n infoNode) toModel() model.MergeInfo {
 
 // MergeInfo reads what merging needs about the pull requests with the given
 // node IDs, in one query. With details it also reads each one's checks
-// (with whether they are required) and its changed files, which costs more;
-// a poll leaves them out. A pull request that cannot be read is left out
-// of the result.
+// (with whether they are required) and its changed files, which makes a
+// larger query. Deciding a merge needs them, so a merge that waits reads
+// them at every poll; watching auto-merge, and reading a pull request
+// again to tell what happened to it, leave them out. A pull request that
+// cannot be read is left out of the result.
 func (c *Client) MergeInfo(ctx context.Context, ids []string, details bool) (map[string]model.MergeInfo, error) {
 	out := map[string]model.MergeInfo{}
 	if len(ids) == 0 {

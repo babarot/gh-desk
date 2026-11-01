@@ -25,4 +25,4 @@ Rules:
 - Required H2s: Status, Context, Decision, Consequences
 - Status value: Must be exactly `Accepted`, `Deprecated`, or `Superseded`
 - Additional H2s (e.g., `## History`) are allowed
-- Write an ADR for a decision that sets the direction of the code and constrains later changes, in the commit that implements it or the one before. To change a decision, write a new ADR and mark the old one `Superseded`.
+- Write an ADR for a decision that sets the direction of the code and constrains later changes, in the commit that implements it or the one before. To change a decision, write a new ADR. When it replaces the old decision whole, mark the old one `Superseded`. When it replaces only part of it, name in the new ADR the sentences it replaces, and leave the old one `Accepted` (as ADR-015 does for ADR-005, and ADR-016 for ADR-014 and ADR-015).
