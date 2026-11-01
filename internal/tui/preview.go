@@ -345,21 +345,22 @@ var (
 )
 
 // bodyLines are a description in lines width cells wide: links keep their
-// text, HTML comments and tags go. It is drawn from its Markdown, or, when
-// the config asks for it as written, headings stand out and prose wraps at
-// the edge, while tables and code blocks are cut instead, as wrapping would
-// break their columns.
+// text. It is drawn from its Markdown, its HTML turned into Markdown, or,
+// when the config asks for it as written, HTML comments and some tags go,
+// headings stand out and prose wraps at the edge, while tables and code
+// blocks are cut instead, as wrapping would break their columns.
 func (m *Model) bodyLines(body string, width int) []line {
 	if strings.TrimSpace(body) == "" {
 		return []line{{text: m.st.dim.Render("no description")}}
 	}
-	body = htmlTag.ReplaceAllString(htmlComment.ReplaceAllString(body, ""), "")
-	body = zeroWidth.Replace(mdLinkRe.ReplaceAllString(body, "$1"))
 	body = strings.ReplaceAll(body, "\r", "")
 	width = max(width, 10)
 	if !m.set.PlainDescription {
-		return m.markdownLines(body, width)
+		body = zeroWidth.Replace(mdLinkRe.ReplaceAllString(htmlToMarkdown(body), "$1"))
+		return m.markdownLines(strings.TrimRight(body, " \t\n"), width)
 	}
+	body = htmlTag.ReplaceAllString(htmlComment.ReplaceAllString(body, ""), "")
+	body = zeroWidth.Replace(mdLinkRe.ReplaceAllString(body, "$1"))
 	var out []line
 	wrapped := func(l string, style lipgloss.Style) {
 		for w := range strings.SplitSeq(ansi.Wrap(l, width, " "), "\n") {
@@ -386,7 +387,8 @@ func (m *Model) bodyLines(body string, width int) []line {
 	return out
 }
 
-var mdLinkRe = regexp.MustCompile(`\[([^\]]*)\]\([^)]*\)`)
+// mdLinkRe is a link or an image; the text, or the alt text, stays.
+var mdLinkRe = regexp.MustCompile(`!?\[([^\]]*)\]\([^)]*\)`)
 
 // jumpFile shows the next or previous file tab of the diff, or scrolls
 // the overview to the next or previous part's header.

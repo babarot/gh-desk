@@ -12,7 +12,8 @@ import (
 // as written: headings lose their #, list items get a bullet or a box,
 // code and tables keep their columns, and prose wraps at the edge. Only
 // what pull request descriptions use is drawn; anything else is shown as
-// written. See ADR-013.
+// written. HTML is turned into this Markdown first, in html.go. See
+// ADR-013 and ADR-020.
 
 // span is text in one style.
 type span struct {
