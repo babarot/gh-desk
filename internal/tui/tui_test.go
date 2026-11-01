@@ -323,6 +323,10 @@ func keyMsg(k string) tea.KeyPressMsg {
 		return tea.KeyPressMsg{Code: tea.KeySpace, Text: " "}
 	case "backspace":
 		return tea.KeyPressMsg{Code: tea.KeyBackspace}
+	case "left":
+		return tea.KeyPressMsg{Code: tea.KeyLeft}
+	case "right":
+		return tea.KeyPressMsg{Code: tea.KeyRight}
 	}
 	if c, ok := strings.CutPrefix(k, "ctrl+"); ok {
 		return tea.KeyPressMsg{Code: []rune(c)[0], Mod: tea.ModCtrl}
@@ -485,6 +489,53 @@ func TestPreviewDiffFileTabs(t *testing.T) {
 	mouseAt(m, tea.MouseClickMsg{X: x + 1, Y: y, Button: tea.MouseLeft})
 	if s := screen(m); !strings.Contains(s, "▾ client.go") || strings.Contains(s, "go.sum  +1") {
 		t.Fatalf("a click did not show client.go alone:\n%s", s)
+	}
+}
+
+// On a pull request, l and h step the pane along overview, all of the diff
+// and each file, and stop at either end.
+func TestPreviewStepsTabsSideways(t *testing.T) {
+	m := start(t, fixture(), keymap.Default())
+	tab := func() string {
+		t.Helper()
+		p, _, ok := m.currentPR()
+		if !ok {
+			t.Fatal("no pull request under the cursor")
+		}
+		if m.pane.mode == paneOverview {
+			return "overview"
+		}
+		if f := m.pane.file[p.Key]; f != "" {
+			return f
+		}
+		return "all"
+	}
+	steps := []struct{ key, want string }{
+		{"h", "overview"},
+		{"l", "all"},
+		{"l", "client.go"},
+		{"right", "go.sum"},
+		{"l", "go.sum"},
+		{"h", "client.go"},
+		{"left", "all"},
+		{"h", "overview"},
+	}
+	for i, s := range steps {
+		press(m, s.key)
+		if got := tab(); got != s.want {
+			t.Fatalf("step %d (%s): tab = %s; want %s", i, s.key, got, s.want)
+		}
+	}
+	// From the overview, l opens the diff on all, whichever file was left.
+	press(m, "v", "]")
+	press(m, "v", "l")
+	if got := tab(); got != "all" {
+		t.Fatalf("l from the overview: tab = %s; want all", got)
+	}
+	// With the pane hidden, h and l do nothing.
+	press(m, "p", "h")
+	if got := tab(); got != "all" {
+		t.Fatalf("h with the pane hidden: tab = %s; want all", got)
 	}
 }
 

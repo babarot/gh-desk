@@ -5,6 +5,7 @@ import (
 	"regexp"
 	"strings"
 
+	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
 
@@ -177,6 +178,30 @@ func (m *Model) stepFileTab(dir int) {
 		return
 	}
 	m.showFileTab(p, e.val, min(max(m.fileTab(p, e.val)+dir, -1), len(e.val)-1))
+}
+
+// stepPane moves the preview pane of p one tab along overview, all of the
+// diff, then each file of it; it stops at either end, and does nothing
+// while the pane is hidden.
+func (m *Model) stepPane(p model.PR, dir int) tea.Cmd {
+	if !m.pane.on {
+		return nil
+	}
+	e := m.cache.diffs[diffID(p)]
+	read := e != nil && !e.loading && e.err == nil
+	switch {
+	case m.pane.mode == paneOverview && dir > 0:
+		m.pane.toggleMode()
+		delete(m.pane.file, p.Key)
+		return m.ensure()
+	case m.pane.mode == paneOverview:
+		return nil
+	case dir < 0 && (!read || m.fileTab(p, e.val) < 0):
+		m.pane.toggleMode()
+		return m.ensure()
+	}
+	m.stepFileTab(dir)
+	return nil
 }
 
 // clickFileTab shows the file tab at cell x of the pane's line, if one is

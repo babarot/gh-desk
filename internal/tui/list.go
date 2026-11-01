@@ -180,6 +180,10 @@ func (m *Model) listKey(k string) tea.Cmd {
 		return m.browse(p)
 	case is("hide"):
 		return m.hide(p, r.notif)
+	case is("expand"):
+		return m.stepPane(p, 1)
+	case is("collapse"):
+		return m.stepPane(p, -1)
 	}
 	return nil
 }
