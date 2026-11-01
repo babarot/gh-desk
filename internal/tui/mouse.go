@@ -70,7 +70,7 @@ func (m *Model) mouse(msg tea.MouseMsg) tea.Cmd {
 			return m.listClick(msg.X, msg.Y)
 		case viewPR:
 			if msg.Y == m.top()+1 {
-				if i := spanAt(m.prTabWidths(), 3, msg.X); i >= 0 {
+				if i := spanAt(m.prTabWidths(), len(tabGap), msg.X); i >= 0 {
 					m.prv.tab, m.prv.scroll = i, 0
 				}
 			}
@@ -130,7 +130,7 @@ func (m *Model) listClick(x, y int) tea.Cmd {
 		for i := from; i < to; i++ {
 			ws = append(ws, lipgloss.Width(m.tabLabel(i)))
 		}
-		if i := spanAt(ws, 2, x-lipgloss.Width(m.headerLead())-lipgloss.Width(tabsBefore(from))); i >= 0 {
+		if i := spanAt(ws, len(tabGap), x-lipgloss.Width(m.headerLead())-lipgloss.Width(tabsBefore(from))); i >= 0 {
 			return m.switchTab(from + i)
 		}
 		return nil
@@ -141,7 +141,7 @@ func (m *Model) listClick(x, y int) tea.Cmd {
 		// a resize.
 		if p, _, ok := m.currentPR(); ok {
 			ws := []int{lipgloss.Width(" overview "), lipgloss.Width(" " + m.diffTabName(p) + " ")}
-			if i := spanAt(ws, 1, x-2); i >= 0 {
+			if i := spanAt(ws, len(tabGap), x-2); i >= 0 {
 				if mode := []paneMode{paneOverview, paneDiff}[i]; mode != m.pane.mode {
 					m.pane.toggleMode()
 					return m.ensure()

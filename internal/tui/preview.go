@@ -247,9 +247,9 @@ func (m *Model) fileTabLine(files []diff.File, cur, width int) (string, []fileTa
 			w = lipgloss.Width(more)
 		}
 		for _, x := range ws[from : cur+2] {
-			w += x + 1
+			w += x + len(tabGap)
 		}
-		if w-1 <= width {
+		if w-len(tabGap) <= width {
 			break
 		}
 		from++
@@ -263,14 +263,10 @@ func (m *Model) fileTabLine(files []diff.File, cur, width int) (string, []fileTa
 	}
 	for i := from; i < len(labels); i++ {
 		if i > from {
-			b.WriteString(" ")
-			at++
+			b.WriteString(tabGap)
+			at += len(tabGap)
 		}
-		style := st.muted
-		if i == cur+1 {
-			style = st.fileTab
-		}
-		b.WriteString(style.Render(" " + labels[i] + " "))
+		b.WriteString(pill(st.subOn, st.subOff, labels[i], i == cur+1))
 		spans = append(spans, fileTabSpan{x: at, w: ws[i], tab: i - 1})
 		at += ws[i]
 	}
@@ -443,13 +439,8 @@ func (m *Model) renderPane(b *strings.Builder, height int) {
 			files = e.val
 		}
 		diffTab := m.diffTabName(p)
-		pill := func(s string, on bool) string {
-			if on {
-				return st.tabPill.Render(" " + s + " ")
-			}
-			return st.tabPillOff.Render(" " + s + " ")
-		}
-		tabs = pill("overview", m.pane.mode == paneOverview) + " " + pill(diffTab, m.pane.mode == paneDiff)
+		tabs = pill(st.tabOn, st.tabOff, "overview", m.pane.mode == paneOverview) + tabGap +
+			pill(st.tabOn, st.tabOff, diffTab, m.pane.mode == paneDiff)
 		hint = p.Key.String() + " · " + m.firstKey("pane_down") + "/" + m.firstKey("pane_up") + " · " + m.firstKey("pane_tab")
 		body = m.paneBody(p, n, e, files, height-2)
 	}

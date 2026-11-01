@@ -128,7 +128,7 @@ func (m *Model) renderHeader() string {
 	for i := from; i < to; i++ {
 		tabs = append(tabs, m.tabLabel(i))
 	}
-	left := m.headerLead() + m.st.dim.Render(tabsBefore(from)) + strings.Join(tabs, "  ") + m.st.dim.Render(tabsAfter(to, len(m.tabs)))
+	left := m.headerLead() + m.st.dim.Render(tabsBefore(from)) + strings.Join(tabs, tabGap) + m.st.dim.Render(tabsAfter(to, len(m.tabs)))
 	right := m.headerRight()
 	gap := m.width - lipgloss.Width(left) - lipgloss.Width(right) - 1
 	return m.st.header.Render(fit(left+spaces(gap)+right, m.width))
@@ -145,7 +145,7 @@ func (m *Model) shownTabs() (from, to int) {
 	}
 	room := m.width - lipgloss.Width(m.headerLead()) - lipgloss.Width(m.headerRight()) - 1
 	width := func(from, to int) int {
-		w := lipgloss.Width(tabsBefore(from)) + lipgloss.Width(tabsAfter(to, n)) + 2*(to-from-1)
+		w := lipgloss.Width(tabsBefore(from)) + lipgloss.Width(tabsAfter(to, n)) + len(tabGap)*(to-from-1)
 		for _, x := range ws[from:to] {
 			w += x
 		}
@@ -163,6 +163,20 @@ func (m *Model) shownTabs() (from, to int) {
 		from--
 	}
 	return from, to
+}
+
+// tabGap is what comes between two tabs: the header's, the PR screen's,
+// the pane's and the diff's file tabs. The pills' own padding spaces them
+// out.
+const tabGap = " "
+
+// pill is a tab named s, drawn on if it is the one shown and off if not,
+// padded by a space on each side either way.
+func pill(on, off lipgloss.Style, s string, shown bool) string {
+	if shown {
+		return on.Render(" " + s + " ")
+	}
+	return off.Render(" " + s + " ")
 }
 
 // tabsBefore and tabsAfter mark the tabs the header leaves out.
@@ -207,18 +221,20 @@ func (m *Model) tabLabel(i int) string {
 	case t.err != nil:
 		count = "!"
 	}
-	// The key is dim, and so is the count in parentheses except on the
-	// tab shown, so neither reads as part of the name.
+	// The key is fainter than the name, and so is the count in parentheses
+	// except on the tab shown, so neither reads as part of the name. The
+	// key is inside the tab's pill, so that it reads as this tab's. Every
+	// tab is padded as the pill of the one shown is, so that none moves
+	// when it changes.
 	st := m.st
-	name, num := st.tabOff, st.dim
-	if i == m.cur {
-		name, num = st.tabOn, st.tabOn
-	}
-	label := name.Render(t.name) + name.Render(" ") + num.Render("("+count+")")
+	key := ""
 	if ks := m.keys.Keys(keymap.Action(fmt.Sprintf("tab_%d", i+1))); len(ks) > 0 {
-		label = st.dim.Render(ks[0]) + " " + label
+		key = " " + ks[0]
 	}
-	return label
+	if i == m.cur {
+		return st.tabKeyOn.Render(key) + st.tabOn.Render(" "+t.name+" ("+count+") ")
+	}
+	return st.dim.Render(key) + st.tabOff.Render(" "+t.name+" ") + st.dim.Render("("+count+")") + " "
 }
 
 func (m *Model) headerRight() string {

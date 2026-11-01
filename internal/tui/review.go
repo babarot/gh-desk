@@ -224,16 +224,13 @@ func (m *Model) renderCompose(b *strings.Builder, height int) {
 	b.WriteString(fit(st.sub1.Render(c.pr.Key.String())+"  "+st.muted.Render(c.pr.Title), m.width) + "\n")
 	var ks []string
 	for i, k := range kinds {
-		switch {
-		case c.own && k != model.EventComment:
-			ks = append(ks, st.dim.Render(kindWords[k]))
-		case i == c.kind:
-			ks = append(ks, st.tabOn.Render(kindWords[k]))
-		default:
-			ks = append(ks, st.muted.Render(kindWords[k]))
+		off := st.subOff
+		if c.own && k != model.EventComment {
+			off = st.dim
 		}
+		ks = append(ks, pill(st.subOn, off, kindWords[k], i == c.kind))
 	}
-	b.WriteString(strings.Join(ks, "   ") + "\n\n")
+	b.WriteString(strings.Join(ks, tabGap) + "\n\n")
 	view := c.ta.View()
 	b.WriteString(view + "\n")
 	for i := lipgloss.Height(view) + 3; i < height; i++ {

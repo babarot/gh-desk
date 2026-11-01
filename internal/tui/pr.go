@@ -72,11 +72,7 @@ func (m *Model) prKey(k string) tea.Cmd {
 func (m *Model) prTabLabels() []string {
 	var tabs []string
 	for i, t := range prTabs {
-		if i == m.prv.tab {
-			tabs = append(tabs, m.st.tabOn.Render(t))
-		} else {
-			tabs = append(tabs, m.st.tabOff.Render(t))
-		}
+		tabs = append(tabs, pill(m.st.tabOn, m.st.tabOff, t, i == m.prv.tab))
 	}
 	return tabs
 }
@@ -99,7 +95,7 @@ func (m *Model) renderPR(b *strings.Builder, height int) {
 	head := st.bold.Render(p.Title) + "  " + st.muted.Render(fmt.Sprintf("%s · %s → %s", p.Author, p.HeadRef, p.BaseRef)) +
 		"  " + m.heavyMarks(p)
 	b.WriteString(fit(head, m.width) + "\n")
-	b.WriteString(strings.Join(m.prTabLabels(), "   ") + "\n")
+	b.WriteString(strings.Join(m.prTabLabels(), tabGap) + "\n")
 	b.WriteString(st.border.Render(strings.Repeat("╌", max(m.width, 0))) + "\n")
 	ls := m.prLines(p)
 	rest := max(height-3, 1)

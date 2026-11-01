@@ -18,6 +18,9 @@ type palette struct {
 	// Claude selected; fresh is that of a row a reading again added or
 	// changed.
 	pick, pickSel, claude, claudeSel, fresh color.Color
+	// tab is the background of the tab shown: blue laid over base, as if
+	// at 35% (25% on a light terminal), which terminals cannot draw.
+	tab color.Color
 }
 
 var (
@@ -29,6 +32,7 @@ var (
 		yellow: lipgloss.Color("#ffe5a0"), peach: lipgloss.Color("#ffc49a"), red: lipgloss.Color("#f5a3b5"), teal: lipgloss.Color("#94e2d5"),
 		pick: lipgloss.Color("#3a3150"), pickSel: lipgloss.Color("#4d4068"),
 		claude: lipgloss.Color("#22393d"), claudeSel: lipgloss.Color("#2f4f54"), fresh: lipgloss.Color("#26324a"),
+		tab: lipgloss.Color("#485677"),
 	}
 	latte = palette{
 		base: lipgloss.Color("#eff1f5"), surface0: lipgloss.Color("#ccd0da"), surface1: lipgloss.Color("#bcc0cc"),
@@ -38,21 +42,29 @@ var (
 		yellow: lipgloss.Color("#df8e1d"), peach: lipgloss.Color("#fe640b"), red: lipgloss.Color("#d20f39"), teal: lipgloss.Color("#179299"),
 		pick: lipgloss.Color("#e6dcf7"), pickSel: lipgloss.Color("#d6c6f2"),
 		claude: lipgloss.Color("#d4eeee"), claudeSel: lipgloss.Color("#bde3e4"), fresh: lipgloss.Color("#dce6fb"),
+		tab: lipgloss.Color("#bbcef5"),
 	}
 )
 
 // styles are the styles drawn with one palette.
 type styles struct {
-	p                                        palette
-	header, app, tabOn, tabOff, colHeader    lipgloss.Style
-	sel, dim, muted, sub0, sub1, text, bold  lipgloss.Style
-	blue, mauve, green, yellow, peach, red   lipgloss.Style
-	teal, key, border, title, group, add     lipgloss.Style
-	del, hunk, file, tabPill, tabPillOff, me lipgloss.Style
-	picked, pickedSel, claude, claudeSel     lipgloss.Style
-	fresh                                    lipgloss.Style
-	// fileTab is the file tab of the diff shown.
-	fileTab lipgloss.Style
+	p                                       palette
+	header, app, colHeader                  lipgloss.Style
+	sel, dim, muted, sub0, sub1, text, bold lipgloss.Style
+	blue, mauve, green, yellow, peach, red  lipgloss.Style
+	teal, key, border, title, group, add    lipgloss.Style
+	del, hunk, file, me                     lipgloss.Style
+	picked, pickedSel, claude, claudeSel    lipgloss.Style
+	fresh                                   lipgloss.Style
+	// tabOn and tabOff are a tab that switches the screen or the pane
+	// (the header, the PR screen, the pane's overview and diff), shown or
+	// not; subOn and subOff a choice within one (a file of the diff, the
+	// kind of a review). Both are drawn as pills, the second on a fainter
+	// background, so that one reads as under the other.
+	tabOn, tabOff, subOn, subOff lipgloss.Style
+	// tabKeyOn is the key of the header's tab shown, inside its pill but
+	// fainter than its name.
+	tabKeyOn lipgloss.Style
 	// code is inline code in a description; block a code block, and
 	// blockLang its language.
 	code, block, blockLang lipgloss.Style
@@ -61,46 +73,46 @@ type styles struct {
 func newStyles(p palette) styles {
 	fg := func(c color.Color) lipgloss.Style { return lipgloss.NewStyle().Foreground(c) }
 	return styles{
-		p:          p,
-		header:     lipgloss.NewStyle().Background(p.surface0).Foreground(p.subtext0),
-		app:        fg(p.blue).Bold(true),
-		tabOn:      fg(p.blue).Bold(true).Underline(true),
-		tabOff:     fg(p.subtext0),
-		colHeader:  fg(p.subtext1).Bold(true),
-		sel:        lipgloss.NewStyle().Background(p.surface0),
-		dim:        fg(p.dim),
-		muted:      fg(p.overlay),
-		sub0:       fg(p.subtext0),
-		sub1:       fg(p.subtext1),
-		text:       fg(p.text),
-		bold:       fg(p.text).Bold(true),
-		blue:       fg(p.blue),
-		mauve:      fg(p.mauve),
-		green:      fg(p.green),
-		yellow:     fg(p.yellow),
-		peach:      fg(p.peach),
-		red:        fg(p.red),
-		teal:       fg(p.teal),
-		key:        fg(p.blue).Bold(true),
-		border:     fg(p.surface1),
-		title:      fg(p.subtext1).Bold(true),
-		group:      fg(p.subtext0).Bold(true),
-		add:        fg(p.green),
-		del:        fg(p.red),
-		hunk:       fg(p.teal),
-		file:       fg(p.mauve).Bold(true),
-		tabPill:    lipgloss.NewStyle().Background(p.blue).Foreground(p.base).Bold(true),
-		tabPillOff: fg(p.overlay),
-		me:         fg(p.peach).Bold(true),
-		picked:     lipgloss.NewStyle().Background(p.pick),
-		pickedSel:  lipgloss.NewStyle().Background(p.pickSel),
-		claude:     lipgloss.NewStyle().Background(p.claude),
-		claudeSel:  lipgloss.NewStyle().Background(p.claudeSel),
-		fresh:      lipgloss.NewStyle().Background(p.fresh),
-		fileTab:    lipgloss.NewStyle().Background(p.surface1).Foreground(p.mauve).Bold(true),
-		code:       lipgloss.NewStyle().Background(p.surface0).Foreground(p.peach),
-		block:      lipgloss.NewStyle().Background(p.surface0).Foreground(p.subtext1),
-		blockLang:  lipgloss.NewStyle().Background(p.surface0).Foreground(p.overlay),
+		p:         p,
+		header:    lipgloss.NewStyle().Background(p.surface0).Foreground(p.subtext0),
+		app:       fg(p.blue).Bold(true),
+		tabOn:     lipgloss.NewStyle().Background(p.tab).Foreground(p.text).Bold(true),
+		tabOff:    fg(p.subtext0),
+		tabKeyOn:  lipgloss.NewStyle().Background(p.tab).Foreground(p.subtext0),
+		subOn:     lipgloss.NewStyle().Background(p.surface0).Foreground(p.blue).Bold(true),
+		subOff:    fg(p.overlay),
+		colHeader: fg(p.subtext1).Bold(true),
+		sel:       lipgloss.NewStyle().Background(p.surface0),
+		dim:       fg(p.dim),
+		muted:     fg(p.overlay),
+		sub0:      fg(p.subtext0),
+		sub1:      fg(p.subtext1),
+		text:      fg(p.text),
+		bold:      fg(p.text).Bold(true),
+		blue:      fg(p.blue),
+		mauve:     fg(p.mauve),
+		green:     fg(p.green),
+		yellow:    fg(p.yellow),
+		peach:     fg(p.peach),
+		red:       fg(p.red),
+		teal:      fg(p.teal),
+		key:       fg(p.blue).Bold(true),
+		border:    fg(p.surface1),
+		title:     fg(p.subtext1).Bold(true),
+		group:     fg(p.subtext0).Bold(true),
+		add:       fg(p.green),
+		del:       fg(p.red),
+		hunk:      fg(p.teal),
+		file:      fg(p.mauve).Bold(true),
+		me:        fg(p.peach).Bold(true),
+		picked:    lipgloss.NewStyle().Background(p.pick),
+		pickedSel: lipgloss.NewStyle().Background(p.pickSel),
+		claude:    lipgloss.NewStyle().Background(p.claude),
+		claudeSel: lipgloss.NewStyle().Background(p.claudeSel),
+		fresh:     lipgloss.NewStyle().Background(p.fresh),
+		code:      lipgloss.NewStyle().Background(p.surface0).Foreground(p.peach),
+		block:     lipgloss.NewStyle().Background(p.surface0).Foreground(p.subtext1),
+		blockLang: lipgloss.NewStyle().Background(p.surface0).Foreground(p.overlay),
 	}
 }
 
