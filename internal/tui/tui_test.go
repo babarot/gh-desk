@@ -418,6 +418,19 @@ func TestGroupsOnlyWithRows(t *testing.T) {
 	}
 }
 
+func TestFilterKeptOnReentry(t *testing.T) {
+	// An accepted filter is there to edit when / is pressed again.
+	m := start(t, fixture(), keymap.Default())
+	press(m, "/", "o", "c", "enter", "/", "t", "o")
+	if m.filter != "octo" || !m.filtering {
+		t.Fatalf("filter = %q, filtering = %v; want %q and filtering", m.filter, m.filtering, "octo")
+	}
+	press(m, "esc")
+	if m.filter != "" || m.filtering {
+		t.Fatalf("after esc filter = %q, filtering = %v; want cleared", m.filter, m.filtering)
+	}
+}
+
 func TestFilterEraseWord(t *testing.T) {
 	m := start(t, fixture(), keymap.Default())
 	press(m, "/", "a", " ", "b", "c", " ", " ", "ctrl+w")

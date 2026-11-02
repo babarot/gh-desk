@@ -70,7 +70,7 @@ func (m *Model) listKey(k string) tea.Cmd {
 			return m.switchTab(i)
 		}
 	case is("filter"):
-		m.filtering, m.filter = true, ""
+		m.filtering = true
 	case is("refresh"):
 		return m.refresh()
 	case is("notifications"):
