@@ -381,7 +381,7 @@ func (m *Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.compose.resize(m.width, m.height)
 		}
 		for _, c := range m.chats {
-			c.input.SetWidth(max(m.width-4, 20))
+			c.input.SetWidth(chatInputWidth(m.width))
 		}
 		return m, nil
 	case tea.BackgroundColorMsg:

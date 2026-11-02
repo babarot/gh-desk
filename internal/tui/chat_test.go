@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
 
 	"github.com/babarot/gh-triage/internal/claude"
@@ -114,6 +115,33 @@ func TestChatAnswerWrapsAtMostWidth(t *testing.T) {
 	for _, l := range ls {
 		if w := ansi.StringWidth(strings.TrimRight(ansi.Strip(l), " ")); w > chatMaxWidth {
 			t.Errorf("a line is %d cells wide: %q", w, ansi.Strip(l))
+		}
+	}
+}
+
+// The text box stays in its box, as wide as the chat's text, when the
+// terminal is made narrower or wider while something is typed: what is
+// typed wraps inside the box rather than being cut at its edge.
+func TestChatInputStaysInItsBox(t *testing.T) {
+	m, _ := startWith(t, fixture(), keymap.Default())
+	fakeClaudeOf(t, m)
+	press(m, "i", "i")
+	typed := strings.Repeat("x", 120)
+	press(m, strings.Split(typed, "")...)
+	for _, w := range []int{60, 180} {
+		m.Update(tea.WindowSizeMsg{Width: w, Height: 30})
+		shown := 0
+		for l := range strings.SplitSeq(screen(m), "\n") {
+			if !strings.Contains(l, "xx") {
+				continue
+			}
+			shown += strings.Count(l, "x")
+			if row := strings.TrimRight(l, " "); !strings.HasPrefix(row, "│") || !strings.HasSuffix(row, "│") || ansi.StringWidth(row) != min(w, chatMaxWidth) {
+				t.Errorf("at %d a typed row is %q", w, row)
+			}
+		}
+		if shown != len(typed) {
+			t.Errorf("at %d %d of %d typed characters are shown", w, shown, len(typed))
 		}
 	}
 }

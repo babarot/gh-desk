@@ -154,7 +154,7 @@ func (m *Model) openChat(p model.PR) tea.Cmd {
 		ta.Placeholder = "Ask Claude"
 		ta.ShowLineNumbers = false
 		ta.SetHeight(3)
-		ta.SetWidth(max(m.width-4, 20))
+		ta.SetWidth(chatInputWidth(m.width))
 		c = &chat{input: ta, persist: m.set.Chats != nil}
 		m.chats[p.Key] = c
 	}
@@ -426,7 +426,7 @@ func (m *Model) chatKeyPress(msg tea.KeyPressMsg) tea.Cmd {
 		c.scroll = 1 << 30
 	case is("chat_more"):
 		c.typing = true
-		c.input.SetWidth(max(m.width-4, 20))
+		c.input.SetWidth(chatInputWidth(m.width))
 		return c.input.Focus()
 	case is("draft_review"):
 		return m.ask(c, "Draft the review.", claude.DraftPrompt, true)
@@ -706,6 +706,10 @@ func tools(n int) string {
 	return fmt.Sprintf("%d tools", n)
 }
 
+// chatInputWidth is the width of the text box in its box, as wide as the
+// text of the chat.
+func chatInputWidth(width int) int { return max(min(width, chatMaxWidth)-4, 10) }
+
 // elapsed is how long a question has waited, as the chat shows it.
 func elapsed(d time.Duration) string {
 	s := int(d.Seconds())
@@ -763,7 +767,8 @@ func (m *Model) renderChat(b *strings.Builder, height int) *tea.Cursor {
 	b.WriteString(st.dim.Render(strings.Repeat("╌", max(m.width-1, 0))) + "\n")
 	inputH := 0
 	if c.typing {
-		inputH = c.input.Height()
+		// The box's top and bottom edges.
+		inputH = c.input.Height() + 2
 	}
 	bodyH := max(height-2-inputH, 1)
 	L := m.chatLines(c, m.width)
@@ -776,11 +781,15 @@ func (m *Model) renderChat(b *strings.Builder, height int) *tea.Cursor {
 		b.WriteString("\n")
 	}
 	if c.typing {
+		top := strings.Count(b.String(), "\n")
+		box := box(st, "ask claude", strings.Split(c.input.View(), "\n"), min(m.width, chatMaxWidth))
+		b.WriteString(strings.Join(box, "\n") + "\n")
 		cur := c.input.Cursor()
 		if cur != nil {
-			cur.Y += strings.Count(b.String(), "\n")
+			// Inside the box: after its left edge, under its top edge.
+			cur.X += 2
+			cur.Y += top + 1
 		}
-		b.WriteString(c.input.View() + "\n")
 		return cur
 	}
 	return nil
