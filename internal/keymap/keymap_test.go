@@ -50,7 +50,14 @@ func TestApply(t *testing.T) {
 		{
 			name:  "scopes that do not meet keep their keys",
 			set:   map[string][]string{"approve": {"y"}},
-			check: map[Action][]string{"approve": {"y"}, "confirm": {"y"}},
+			check: map[Action][]string{"approve": {"y"}, "confirm": {"y", "enter"}},
+		},
+		{
+			// No popup reads both, so enter answers a confirm popup and
+			// picks in a menu.
+			name:  "confirm and choose share enter",
+			set:   map[string][]string{"choose": {"enter"}},
+			check: map[Action][]string{"choose": {"enter"}, "confirm": {"y", "enter"}},
 		},
 		{
 			name:    "two set actions on one key",
@@ -99,8 +106,8 @@ func TestMatches(t *testing.T) {
 	if !m.Matches("approve", "A") || m.Matches("approve", "a") {
 		t.Error("approve should match A only")
 	}
-	if got := m.Actions(ScopePopup); !slices.Equal(got, []Action{"confirm", "choose", "include_failing"}) {
-		t.Errorf("Actions(popup) = %v", got)
+	if got := m.Actions(ScopeConfirm); !slices.Equal(got, []Action{"confirm", "include_failing"}) {
+		t.Errorf("Actions(confirm) = %v", got)
 	}
 }
 

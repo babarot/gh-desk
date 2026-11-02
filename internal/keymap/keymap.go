@@ -28,6 +28,7 @@ const (
 	ScopeNav     Scope = "nav"
 	ScopeList    Scope = "list"
 	ScopePopup   Scope = "popup"
+	ScopeConfirm Scope = "confirm"
 	ScopeTriage  Scope = "triage"
 	ScopeChat    Scope = "chat"
 	ScopeCompose Scope = "compose"
@@ -97,9 +98,11 @@ var Defaults = []Def{
 	{"pane_grow", ScopeList, []string{"+"}, "taller pane"},
 	{"pane_shrink", ScopeList, []string{"-"}, "shorter pane"},
 
-	{"confirm", ScopePopup, []string{"y"}, "yes"},
 	{"choose", ScopePopup, []string{"enter"}, "choose"},
-	{"include_failing", ScopePopup, []string{"f"}, "include failing"},
+
+	// A confirm popup reads no choose, so enter answers it too.
+	{"confirm", ScopeConfirm, []string{"y", "enter"}, "yes"},
+	{"include_failing", ScopeConfirm, []string{"f"}, "include failing"},
 
 	{"triage_apply", ScopeTriage, []string{"enter"}, "apply"},
 	{"triage_more", ScopeTriage, []string{"i"}, "ask more"},

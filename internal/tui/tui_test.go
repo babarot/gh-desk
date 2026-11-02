@@ -1526,3 +1526,12 @@ func TestBulkRowsFit(t *testing.T) {
 		t.Errorf("got\n%s\nwant\n%s", strings.Join(plain, "\n"), strings.Join(want, "\n"))
 	}
 }
+
+// Enter answers a confirm popup as its yes does.
+func TestEnterConfirms(t *testing.T) {
+	m, r := startWith(t, fixture(), keymap.Default())
+	press(m, "A", "enter")
+	if len(r.items) != 1 || r.kinds[0] != runner.Approve {
+		t.Errorf("enter did not confirm the approve: batches = %+v", r.items)
+	}
+}

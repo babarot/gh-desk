@@ -30,7 +30,7 @@ var helpScopes = []struct {
 	title string
 }{
 	{keymap.ScopeGlobal, "anywhere"}, {keymap.ScopeNav, "moving"}, {keymap.ScopeList, "the list and its preview"},
-	{keymap.ScopePopup, "a confirm popup"},
+	{keymap.ScopePopup, "a menu or a list popup"}, {keymap.ScopeConfirm, "a confirm popup"},
 	{keymap.ScopeTriage, "claude on the list"}, {keymap.ScopeChat, "claude on a pull request"},
 	{keymap.ScopeCompose, "writing a review"},
 }
