@@ -404,7 +404,7 @@ func (m *Model) chatLines(c *chat, width int) []string {
 		if c.dir == "" {
 			what = "making the worktree…"
 		}
-		L = append(L, "  "+st.mauve.Render(m.spinner())+" "+st.muted.Render(what)+" "+st.dim.Render(elapsed(m.set.Now().Sub(c.since))))
+		L = append(L, "  "+m.working(st.muted, what)+" "+st.dim.Render(elapsed(m.set.Now().Sub(c.since))))
 	}
 	return L
 }

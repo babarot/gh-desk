@@ -115,6 +115,11 @@ type Settings struct {
 	// light one. ThemeDark is used until the terminal tells its
 	// background, and on one that does not.
 	ThemeDark, ThemeLight string
+	// Spinner is the name of the spinner shown while something is read.
+	Spinner string
+	// Shimmer runs a light over the text that says what is going on, and
+	// Wave puts each line of a table a frame of the spinner ahead.
+	Shimmer, Wave bool
 	// Editor is the command ctrl+e runs to edit a review, with its
 	// arguments; empty turns it off.
 	Editor string
@@ -259,6 +264,8 @@ type Model struct {
 	heavyBusy  int
 	// spinning is set while a spinner tick is on its way.
 	spinning bool
+	// spinStyle is the spinner of Settings.Spinner.
+	spinStyle spinnerStyle
 	// fresh are the rows a reading again added or changed, marked until
 	// the time given; freshGen tells the last mark's end from earlier ones.
 	fresh    map[model.PRKey]time.Time
@@ -278,6 +285,7 @@ func New(src Source, run Runner, cl Claude, km keymap.Map, log *slog.Logger, set
 		selected: map[model.PRKey]selection{}, progress: map[model.PRKey]progress{}, batches: map[string]*batchState{},
 		merged: map[model.PRKey]bool{}, refreshed: map[int]time.Time{}}
 	m.st = newStyles(theme(set.ThemeDark))
+	m.spinStyle = spinner(set.Spinner)
 	for i, t := range set.Tabs {
 		if t.Inbox {
 			m.inbox = i

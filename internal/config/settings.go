@@ -289,6 +289,12 @@ var settings = []setting{
 		Doc: `The color scheme on a dark terminal, and on one that does not tell its background.`},
 	{Key: "theme.light", Kind: enumKind{Themes}, Value: func(f File) any { return f.Theme.Light },
 		Doc: `The color scheme on a light terminal. Write the same theme as theme.dark to use it on any terminal.`},
+	{Key: "theme.spinner", Kind: enumKind{Spinners}, Value: func(f File) any { return f.Theme.Spinner },
+		Doc: `The spinner shown while something is read: "dots" (default) ⠋⠙⠹, "dense" ⣾⣽⣻, "bounce" ⠁⠂⠄, "snake" ⠉⠙⠚, "jump" ⢄⢂⢁, "fill" ⣀⣤⣶, "sand" ⡀⣀⣤, "line" |/-\, "arc" ◜◠◝, "quarter" ◴◷◶, "block" ▖▘▝, "star" ✶✸✹, or "off", a ⋯ that does not move and is left out before a line that says what is going on.`},
+	{Key: "theme.shimmer", Kind: boolKind{}, Value: func(f File) any { return f.Theme.Shimmer },
+		Doc: "Run a light over the text that says what is going on, such as refreshing… or thinking…; the screen is drawn more often while something is read."},
+	{Key: "theme.wave", Kind: boolKind{}, Value: func(f File) any { return f.Theme.Wave },
+		Doc: "Put each line of a table a frame of the spinner ahead of the one above it, so that a wave runs down a column being read."},
 
 	{Key: "log.level", Kind: stringKind{}, Value: func(f File) any { return f.Log.Level },
 		Doc: `How much goes to the log file: "debug", "info" (default), "warn" or "error". --debug and GH_TRIAGE_LOG_LEVEL take precedence. gh triage log prints where the file is.`},

@@ -460,13 +460,13 @@ func (m *Model) renderBulk() []string {
 		}
 	}
 	rows := make([]bulkRow, 0, len(b.items))
-	for _, it := range b.items {
+	for i, it := range b.items {
 		mark, title := st.dim.Render("·"), st.dim.Render(it.pr.Title)
 		var what string
 		switch {
 		case !it.read:
 			// Shown from the list until it is read again.
-			mark, title, what = st.dim.Render(m.spinner()), st.muted.Render(it.pr.Title), st.dim.Render("reading…")
+			mark, title, what = st.dim.Render(m.spinnerAt(i)), st.muted.Render(it.pr.Title), st.dim.Render("reading…")
 		case it.goes(b.kind):
 			mark, title = st.mauve.Render("✓"), st.sub1.Render(it.pr.Title)
 			switch b.kind {
@@ -564,7 +564,7 @@ func (m *Model) renderBulk() []string {
 		if len(b.items) > 1 {
 			what = fmt.Sprintf("reading %d pull requests again… %d of %d read", len(b.items), read, len(b.items))
 		}
-		foot := []string{st.mauve.Render(m.spinner()) + " " + st.muted.Render(what) +
+		foot := []string{m.working(st.muted, what) +
 			st.dim.Render(" · ") + st.key.Render(keymap.Back) + " " + st.muted.Render("cancel")}
 		title := verb + " " + m.spinner()
 		if len(b.items) > 1 {

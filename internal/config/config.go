@@ -33,7 +33,10 @@ import (
 var (
 	// Themes are the themes internal/tui draws; a test in internal/app
 	// keeps the two in step.
-	Themes            = []string{"default", "latte", "github-dark", "github-light", "tokyonight", "tokyonight-day", "gruvbox-dark", "gruvbox-light", "nord"}
+	Themes = []string{"default", "latte", "github-dark", "github-light", "tokyonight", "tokyonight-day", "gruvbox-dark", "gruvbox-light", "nord"}
+	// Spinners are the spinners internal/tui draws; a test in
+	// internal/app keeps the two in step.
+	Spinners          = []string{"dots", "dense", "bounce", "snake", "jump", "fill", "sand", "line", "arc", "quarter", "block", "star", "off"}
 	TabKinds          = []string{"search", "inbox"}
 	TabSorts          = []string{"updated", "drafts_last"}
 	GroupNames        = []string{"you", "team", "other", "bots"}
@@ -246,6 +249,13 @@ type Theme struct {
 	// light one, among Themes; the same theme in both is used on any.
 	Dark  string `toml:"dark"`
 	Light string `toml:"light"`
+	// Spinner is the spinner shown while something is read, among
+	// Spinners.
+	Spinner string `toml:"spinner"`
+	// Shimmer runs a light over the text that says what is going on.
+	Shimmer bool `toml:"shimmer"`
+	// Wave puts each line of a table a frame of the spinner ahead.
+	Wave bool `toml:"wave"`
 }
 
 // Log configures the log file.
@@ -324,7 +334,7 @@ func Default() File {
 			BlockedTimeout: dur("30m"), UpdateBranch: "humans"},
 		Bulk:   Bulk{AttentionPaths: globs(".github/workflows/*", "CODEOWNERS", ".github/CODEOWNERS", "docs/CODEOWNERS")},
 		Claude: Claude{Command: "claude", Model: "opus", AllowedTools: []string{"Read", "Grep", "Glob"}, Language: "English", ReleaseNotesCheck: true},
-		Theme:  Theme{Dark: "default", Light: "latte"},
+		Theme:  Theme{Dark: "default", Light: "latte", Spinner: "dots", Shimmer: true, Wave: true},
 		Log:    Log{Level: "info"},
 		Cache:  Cache{Dir: defaultCacheDir()},
 	}

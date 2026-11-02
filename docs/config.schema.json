@@ -458,6 +458,33 @@
             "nord"
           ],
           "type": "string"
+        },
+        "shimmer": {
+          "description": "Run a light over the text that says what is going on, such as refreshing… or thinking…; the screen is drawn more often while something is read.",
+          "type": "boolean"
+        },
+        "spinner": {
+          "description": "The spinner shown while something is read: \"dots\" (default) ⠋⠙⠹, \"dense\" ⣾⣽⣻, \"bounce\" ⠁⠂⠄, \"snake\" ⠉⠙⠚, \"jump\" ⢄⢂⢁, \"fill\" ⣀⣤⣶, \"sand\" ⡀⣀⣤, \"line\" |/-\\, \"arc\" ◜◠◝, \"quarter\" ◴◷◶, \"block\" ▖▘▝, \"star\" ✶✸✹, or \"off\", a ⋯ that does not move and is left out before a line that says what is going on.",
+          "enum": [
+            "dots",
+            "dense",
+            "bounce",
+            "snake",
+            "jump",
+            "fill",
+            "sand",
+            "line",
+            "arc",
+            "quarter",
+            "block",
+            "star",
+            "off"
+          ],
+          "type": "string"
+        },
+        "wave": {
+          "description": "Put each line of a table a frame of the spinner ahead of the one above it, so that a wave runs down a column being read.",
+          "type": "boolean"
         }
       },
       "type": "object"

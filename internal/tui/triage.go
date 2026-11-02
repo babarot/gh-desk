@@ -467,7 +467,7 @@ func (m *Model) renderTriage() ([]string, int) {
 	var foot []string
 	switch {
 	case tr.asking:
-		body = append(body, st.mauve.Render(m.spinner())+" "+st.muted.Render("thinking…")+" "+st.dim.Render(elapsed(m.set.Now().Sub(tr.since))))
+		body = append(body, m.working(st.muted, "thinking…")+" "+st.dim.Render(elapsed(m.set.Now().Sub(tr.since))))
 		foot = append(foot, st.key.Render(keymap.Back)+" "+st.muted.Render("stop"))
 	case tr.typing:
 		foot = append(foot, strings.Split(tr.input.View(), "\n")...)

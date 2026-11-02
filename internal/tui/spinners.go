@@ -1,0 +1,126 @@
+package tui
+
+import (
+	"maps"
+	"slices"
+	"strings"
+	"time"
+
+	"charm.land/lipgloss/v2"
+)
+
+// spinnerStyle is a spinner: its frames, each one cell wide, and how long
+// each is shown.
+type spinnerStyle struct {
+	frames []string
+	every  time.Duration
+	// still is set on the spinner that does not move. It leads no text:
+	// what is going on is written with a … of its own.
+	still bool
+}
+
+// pingpong is frames followed by them back down, without repeating the
+// ends.
+func pingpong(frames string) []string {
+	f := strings.Split(frames, "")
+	for i := len(f) - 2; i > 0; i-- {
+		f = append(f, f[i])
+	}
+	return f
+}
+
+// spinners are the spinners by name. A frame takes one cell on any
+// terminal, also where East Asian Ambiguous characters are drawn wide, so
+// that a spinner in a column keeps the columns in line; ◐, the block
+// elements of a bar and • are left out for that.
+var spinners = map[string]spinnerStyle{
+	"dots":    {frames: strings.Split("⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏", ""), every: 100 * time.Millisecond},
+	"dense":   {frames: strings.Split("⣾⣽⣻⢿⡿⣟⣯⣷", ""), every: 100 * time.Millisecond},
+	"bounce":  {frames: strings.Split("⠁⠂⠄⡀⢀⠠⠐⠈", ""), every: 100 * time.Millisecond},
+	"snake":   {frames: strings.Split("⠁⠉⠙⠚⠒⠂⠂⠒⠲⠴⠤⠄⠄⠤⠴⠲⠒⠂⠂⠒⠚⠙⠉⠁", ""), every: 80 * time.Millisecond},
+	"jump":    {frames: strings.Split("⢄⢂⢁⡁⡈⡐⡠", ""), every: 100 * time.Millisecond},
+	"fill":    {frames: pingpong("⣀⣄⣤⣦⣶⣷⣿"), every: 90 * time.Millisecond},
+	"sand":    {frames: strings.Split("⠁⠂⠄⡀⡈⡐⡠⣀⣁⣂⣄⣌⣔⣤⣥⣦⣮⣶⣷⣿⡿⠿⢟⠟⡛⠛⠫⢋⠋⠍⡉⠉⠑⠡⢁", ""), every: 80 * time.Millisecond},
+	"line":    {frames: []string{"|", "/", "-", `\`}, every: 130 * time.Millisecond},
+	"arc":     {frames: strings.Split("◜◠◝◞◡◟", ""), every: 100 * time.Millisecond},
+	"quarter": {frames: strings.Split("◴◷◶◵", ""), every: 150 * time.Millisecond},
+	"block":   {frames: strings.Split("▖▘▝▗", ""), every: 150 * time.Millisecond},
+	"star":    {frames: pingpong("✶✸✹✺"), every: 120 * time.Millisecond},
+	// off does not move. Its frame is ⋯, not …, which is East Asian
+	// Ambiguous. The screen is still drawn every second while something
+	// is read, for the seconds counted beside Claude's answers.
+	"off": {frames: []string{"⋯"}, every: time.Second, still: true},
+}
+
+// SpinnerNames are the names of the spinners, sorted.
+func SpinnerNames() []string { return slices.Sorted(maps.Keys(spinners)) }
+
+// spinner is the spinner named name, or dots if there is none by that
+// name; the config file's check keeps that from happening.
+func spinner(name string) spinnerStyle {
+	if s, ok := spinners[name]; ok {
+		return s
+	}
+	return spinners["dots"]
+}
+
+// spinner is the spinner's frame now, where it stands for a number that
+// is not known yet.
+func (m *Model) spinner() string { return m.spinnerAt(0) }
+
+// spinnerAt is the spinner's frame now in a cell on line i of a table.
+// With Settings.Wave each line is a frame ahead of the one above it.
+func (m *Model) spinnerAt(i int) string {
+	s := m.spinStyle
+	if !m.set.Wave {
+		i = 0
+	}
+	return s.frames[(int(m.set.Now().UnixMilli()/s.every.Milliseconds())+i)%len(s.frames)]
+}
+
+// working is text, which says what is going on, drawn in st and led by the
+// spinner; the spinner that does not move leads it by nothing. With
+// Settings.Shimmer a light runs over the text.
+func (m *Model) working(st lipgloss.Style, text string) string {
+	out := st.Render(text)
+	if m.set.Shimmer {
+		out = m.shimmer(st, text)
+	}
+	if m.spinStyle.still {
+		return out
+	}
+	return m.st.mauve.Render(m.spinner()) + " " + out
+}
+
+// shimmerStep is how long the light of a shimmer stays on a character;
+// the screen is drawn this often while something is read, when shimmer
+// is on.
+const shimmerStep = 45 * time.Millisecond
+
+// shimmer is text drawn in st with a light on it: text's brightest color
+// on one character, and mauve on those beside it. The light runs from
+// before the text to past its end, then starts again.
+func (m *Model) shimmer(st lipgloss.Style, text string) string {
+	const before, after = 4, 8
+	rs := []rune(text)
+	at := int(m.set.Now().UnixMilli()/shimmerStep.Milliseconds())%(len(rs)+before+after) - before
+	styleOf := func(i int) lipgloss.Style {
+		switch d := max(i-at, at-i); {
+		case d == 0:
+			return m.st.text
+		case d <= 2:
+			return m.st.mauve
+		}
+		return st
+	}
+	var b strings.Builder
+	for i := 0; i < len(rs); {
+		s, j := styleOf(i), i+1
+		for j < len(rs) && styleOf(j).GetForeground() == s.GetForeground() {
+			j++
+		}
+		b.WriteString(s.Render(string(rs[i:j])))
+		i = j
+	}
+	return b.String()
+}

@@ -432,7 +432,7 @@ func (m *Model) renderFilter() string {
 		}
 		rule := st.yellow.Render("rule: "+ruleNames(t.ruleFilter)) + st.dim.Render(fmt.Sprintf(" · %d PRs", n))
 		if t.readingBodies {
-			rule += " " + st.mauve.Render(m.spinner()) + " " + st.dim.Render("reading descriptions…")
+			rule += " " + m.working(st.dim, "reading descriptions…")
 		}
 		parts = append(parts, rule)
 	}

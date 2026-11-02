@@ -57,7 +57,7 @@ func (m *Model) statusText() string {
 	case statusline.Refusal:
 		return m.st.peach.Render(text)
 	case statusline.Activity:
-		return m.st.mauve.Render(m.spinner()) + " " + m.st.muted.Render(text)
+		return m.working(m.st.muted, text)
 	}
 	return m.st.muted.Render(text)
 }

@@ -136,22 +136,17 @@ func (m *Model) reading() bool {
 // spinMsg turns the spinner of what is being read.
 type spinMsg struct{}
 
-const spinEvery = 100 * time.Millisecond
-
-var spinFrames = []rune("⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏")
-
-// spinner is the spinner's frame now.
-func (m *Model) spinner() string {
-	return string(spinFrames[int(m.set.Now().UnixMilli()/spinEvery.Milliseconds())%len(spinFrames)])
-}
-
 // spin keeps the screen drawn while something is read, and only then.
 func (m *Model) spin() tea.Cmd {
 	if m.spinning || !m.reading() {
 		return nil
 	}
 	m.spinning = true
-	return tea.Tick(spinEvery, func(time.Time) tea.Msg { return spinMsg{} })
+	every := m.spinStyle.every
+	if m.set.Shimmer {
+		every = min(every, shimmerStep)
+	}
+	return tea.Tick(every, func(time.Time) tea.Msg { return spinMsg{} })
 }
 
 // freshMsg ends the mark on the rows a reading added or changed.

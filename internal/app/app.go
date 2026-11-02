@@ -295,7 +295,7 @@ func settings(cfg config.File) tui.Settings {
 	set := tui.Settings{
 		MarkDone: cfg.Review.MarkDone, HomeOwners: cfg.List.HomeOwners, Columns: cfg.List.Columns, Menu: cfg.Menu.Actions, PreviewHeight: cfg.Preview.Height,
 		DefaultPaneHeight: config.DefaultPreviewHeight,
-		Collapse:          config.Patterns(cfg.Diff.Collapse), ThemeDark: cfg.Theme.Dark, ThemeLight: cfg.Theme.Light, Editor: editor(cfg.Review.Editor, os.Getenv),
+		Collapse:          config.Patterns(cfg.Diff.Collapse), ThemeDark: cfg.Theme.Dark, ThemeLight: cfg.Theme.Light, Spinner: cfg.Theme.Spinner, Shimmer: cfg.Theme.Shimmer, Wave: cfg.Theme.Wave, Editor: editor(cfg.Review.Editor, os.Getenv),
 		Refresh: cfg.RefreshInterval(), ReleaseNotes: cfg.Claude.ReleaseNotesCheck, Language: cfg.Claude.Language,
 		OpenOnDiff: cfg.Preview.Tab == "diff", PlainDescription: cfg.Description.Style == "plain",
 		Plan: plan.Settings{AutoMerge: cfg.Merge.AutoMerge, UpdateBranch: cfg.Merge.UpdateBranch,

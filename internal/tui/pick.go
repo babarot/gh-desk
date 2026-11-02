@@ -314,7 +314,7 @@ func (m *Model) renderPick() []string {
 		if !m.tabDone(m.tab()) {
 			what = "checks and sizes"
 		}
-		lines = append(lines, "  "+st.mauve.Render(m.spinner())+" "+st.dim.Render("reading "+what+"…"))
+		lines = append(lines, "  "+m.working(st.dim, "reading "+what+"…"))
 	} else {
 		hits := m.ruleMatches(chosen...)
 		if len(hits) == 0 {

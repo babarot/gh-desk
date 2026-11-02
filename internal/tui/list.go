@@ -418,7 +418,7 @@ func (m *Model) renderList(b *strings.Builder, height int) {
 	case !t.loaded && t.loading:
 		// No group heads yet: their counts are not known, and a 0 there
 		// looks like the list stopped.
-		b.WriteString("  " + m.st.mauve.Render(m.spinner()) + " " + m.st.muted.Render("reading "+t.name+"… GitHub's search takes a few seconds") + "\n")
+		b.WriteString("  " + m.working(m.st.muted, "reading "+t.name+"… GitHub's search takes a few seconds") + "\n")
 		for lines = 1; lines < height; lines++ {
 			b.WriteString("\n")
 		}
@@ -431,7 +431,7 @@ func (m *Model) renderList(b *strings.Builder, height int) {
 		lines++
 	}
 	for i := t.offset; i < len(rs) && lines < height; i++ {
-		b.WriteString(m.renderRow(rs[i], cols, i == t.sel) + "\n")
+		b.WriteString(m.renderRow(rs[i], cols, i == t.sel, i) + "\n")
 		lines++
 	}
 	if t.inbox && !t.showSettled && lines < height {
@@ -450,7 +450,8 @@ func (m *Model) renderList(b *strings.Builder, height int) {
 	}
 }
 
-func (m *Model) renderRow(r row, cols []column, sel bool) string {
+// renderRow is r drawn on line n of the list.
+func (m *Model) renderRow(r row, cols []column, sel bool, n int) string {
 	if r.kind == rowGroup {
 		cursor := " "
 		if sel {
@@ -483,7 +484,7 @@ func (m *Model) renderRow(r row, cols []column, sel bool) string {
 			i = to - 1
 			continue
 		}
-		s := m.cell(c.id, r, sel)
+		s := m.cell(c.id, r, sel, n)
 		width := c.width
 		if running && c.id == "title" {
 			width -= steal
@@ -578,7 +579,7 @@ func (m *Model) repoName(p model.PR) string {
 	return p.Key.Repository()
 }
 
-func (m *Model) cell(id string, r row, sel bool) string {
+func (m *Model) cell(id string, r row, sel bool, n int) string {
 	p, st := r.pr, m.st
 	switch id {
 	case "pr":
@@ -617,7 +618,7 @@ func (m *Model) cell(id string, r row, sel bool) string {
 		return m.author(p).text
 	case "ci", "review", "size":
 		if !p.HeavyRead() {
-			return st.dim.Render(m.spinner())
+			return st.dim.Render(m.spinnerAt(n))
 		}
 	}
 	switch id {
