@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"os"
 	"os/exec"
 	"strings"
 	"time"
@@ -185,6 +186,10 @@ func (c *Claude) run(ctx context.Context, log *slog.Logger, dir string, args []s
 	start := time.Now()
 	cmd := exec.CommandContext(ctx, bin, args...)
 	cmd.Dir = dir
+	// Stopped, Claude Code is interrupted rather than killed, so it closes
+	// the session it keeps, which may be resumed later.
+	cmd.Cancel = func() error { return cmd.Process.Signal(os.Interrupt) }
+	cmd.WaitDelay = 5 * time.Second
 	// The prompt goes in on stdin: a diff can be longer than a command
 	// line may be.
 	cmd.Stdin = strings.NewReader(prompt)
