@@ -794,7 +794,7 @@ func (m *Model) swap(i int) tea.Cmd {
 	if fresh {
 		m.freshGen++
 		gen := m.freshGen
-		cmds = append(cmds, tea.Tick(freshFor, func(time.Time) tea.Msg { return freshMsg{gen} }))
+		cmds = append(cmds, m.after(freshFor, freshMsg{gen}))
 	}
 	return tea.Batch(cmds...)
 }

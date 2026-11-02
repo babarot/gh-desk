@@ -149,7 +149,7 @@ func (m *Model) spin() tea.Cmd {
 	if m.set.Shimmer {
 		every = min(every, shimmerStep)
 	}
-	return tea.Tick(every, func(time.Time) tea.Msg { return spinMsg{} })
+	return m.after(every, spinMsg{})
 }
 
 // freshMsg ends the mark on the rows a reading added or changed.

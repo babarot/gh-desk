@@ -1294,7 +1294,7 @@ func TestFilterByRuleOnDays(t *testing.T) {
 func TestResumeAtStart(t *testing.T) {
 	f := fixture()
 	set := Settings{Tabs: []Tab{{Name: "review", Query: "review", Groups: plan.Groups, Limit: 100}, {Name: "inbox", Inbox: true, Limit: 100}},
-		ThemeDark: "default", ThemeLight: "default", Now: func() time.Time { return now }, CanWait: true,
+		ThemeDark: "default", ThemeLight: "default", Now: func() time.Time { return now }, CanWait: true, Tick: func(time.Duration, tea.Msg) tea.Cmd { return nil },
 		Resume: []model.Pending{{Key: key("acme", "api", 12), ID: "1", Head: "aaaaaaa1", Author: "alice"}}}
 	r := &fakeRunner{results: map[model.PRKey]runner.Event{}}
 	m := New(f, r, &fakeClaude{}, keymap.Default(), nil, set)

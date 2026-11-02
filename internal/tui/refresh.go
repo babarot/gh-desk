@@ -2,7 +2,6 @@ package tui
 
 import (
 	"fmt"
-	"time"
 
 	tea "charm.land/bubbletea/v2"
 
@@ -16,7 +15,7 @@ func (m *Model) tick() tea.Cmd {
 	if m.set.Refresh <= 0 {
 		return nil
 	}
-	return tea.Tick(m.set.Refresh, func(time.Time) tea.Msg { return tickMsg{} })
+	return m.after(m.set.Refresh, tickMsg{})
 }
 
 // autoRefresh reads the shown tab and the notifications again. It leaves
