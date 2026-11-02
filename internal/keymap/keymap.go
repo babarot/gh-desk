@@ -77,9 +77,9 @@ var Defaults = []Def{
 	{"clear_selection", ScopeList, []string{"u"}, "clear selection"},
 	{"approve", ScopeList, []string{"A"}, "approve"},
 	{"merge", ScopeList, []string{"M"}, "merge"},
-	{"ready_for_review", ScopeList, []string{"R"}, "ready for review"},
+	{"ready_for_review", ScopeList, []string{"D"}, "ready for review"},
 	{"comment", ScopeList, []string{"c"}, "comment"},
-	{"request_changes", ScopeList, []string{"X"}, "request changes"},
+	{"review", ScopeList, []string{"R"}, "review"},
 	{"claude", ScopeList, []string{"C"}, "ask claude"},
 	{"pr_claude", ScopeList, []string{"i"}, "ask claude about it"},
 	{"browse", ScopeList, []string{"o"}, "browser"},
@@ -105,7 +105,7 @@ var Defaults = []Def{
 	{"triage_more", ScopeTriage, []string{"i"}, "ask more"},
 
 	{"ask_more", ScopeChat, []string{"i"}, "ask more"},
-	{"draft_review", ScopeChat, []string{"D"}, "draft review"},
+	{"draft_review", ScopeChat, []string{"R"}, "draft review"},
 	{"open_claude", ScopeChat, []string{"O"}, "open in claude code"},
 	{"chat_approve", ScopeChat, []string{"A"}, "approve"},
 

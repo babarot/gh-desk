@@ -591,6 +591,23 @@ func (c *Client) Review(ctx context.Context, pr model.PR, event model.ReviewEven
 	return nil
 }
 
+// PostComment adds a comment to the pull request's conversation. It is not
+// a review: a review request from the viewer stays.
+func (c *Client) PostComment(ctx context.Context, pr model.PR, body string) error {
+	ctx, reqID := withRequestID(ctx)
+	var resp struct{}
+	err := c.gql.DoWithContext(ctx, `mutation($id: ID!, $body: String!) {
+  addComment(input: {subjectId: $id, body: $body}) { clientMutationId }
+}`, map[string]any{"id": pr.ID, "body": body}, &resp)
+	attrs := []any{logging.KeyPR, pr.Key.String(), logging.KeyStep, "comment", logging.KeyGHRequestID, *reqID}
+	if err != nil {
+		c.log.Info("comment failed", append(attrs, "err", err.Error())...)
+		return err
+	}
+	c.log.Info("comment posted", attrs...)
+	return nil
+}
+
 // MarkDone marks a notification thread done, as the inbox's Done does.
 func (c *Client) MarkDone(ctx context.Context, n model.Notification) error {
 	ctx, reqID := withRequestID(ctx)

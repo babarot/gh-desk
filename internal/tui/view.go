@@ -297,7 +297,7 @@ var ready = map[keymap.Action]bool{
 	"quit": true, "help": true, "refresh": true,
 	"up": true, "down": true, "top": true, "bottom": true, "page_up": true, "page_down": true,
 	"next_tab": true, "prev_tab": true, "tab_1": true, "tab_2": true, "tab_3": true, "tab_4": true, "tab_5": true, "tab_6": true, "tab_7": true, "tab_8": true, "tab_9": true,
-	"open": true, "expand": true, "collapse": true, "approve": true, "comment": true, "request_changes": true, "browse": true, "hide": true,
+	"open": true, "expand": true, "collapse": true, "approve": true, "comment": true, "review": true, "browse": true, "hide": true,
 	"notifications": true, "select": true, "select_shown": true, "clear_selection": true, "merge": true, "ready_for_review": true,
 	"include_failing": true, "choose": true, "select_rule": true,
 	"toggle_bots": true, "show_settled": true, "filter": true,
@@ -337,7 +337,7 @@ func (m *Model) hints() string {
 	case m.view == viewChat:
 		as = []keymap.Action{"ask_more", "draft_review", "chat_approve", "open_claude", "down", "help"}
 	default:
-		as = []keymap.Action{"open", "select", "select_rule", "approve", "merge", "comment", "claude", "browse", "pane_tab", "help"}
+		as = []keymap.Action{"open", "select", "select_rule", "approve", "merge", "comment", "review", "claude", "browse", "pane_tab", "help"}
 		if m.tab().inbox {
 			as = append(as[:len(as)-1], "hide", "show_settled", "help")
 		}

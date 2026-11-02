@@ -6,7 +6,7 @@ Accepted
 
 ## Context
 
-gh-triage has over fifty actions across its screens (the list, the preview pane, the pull request screen, confirm popups, the Claude screen, review writing). Several defaults are near each other and easy to confuse (`c` comments, `C` asks Claude), and irreversible actions use capital letters (`A` approve, `M` merge, `X` request changes). Users will want to change some of them, and a key written into a view or an update function cannot be changed without editing code; it also tends to drift from the key hints and the help screen.
+gh-triage has over fifty actions across its screens (the list, the preview pane, the pull request screen, confirm popups, the Claude screen, review writing). Several defaults are near each other and easy to confuse (`c` comments, `C` asks Claude), and irreversible actions use capital letters (`A` approve, `M` merge, `R` review). Users will want to change some of them, and a key written into a view or an update function cannot be changed without editing code; it also tends to drift from the key hints and the help screen.
 
 ## Decision
 

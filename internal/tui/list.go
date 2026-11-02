@@ -174,9 +174,9 @@ func (m *Model) listKey(k string) tea.Cmd {
 	case is("approve"):
 		return m.askApprove(p)
 	case is("comment"):
+		return m.startComment(p)
+	case is("review"):
 		return m.startCompose(p, model.EventComment)
-	case is("request_changes"):
-		return m.startCompose(p, model.EventRequestChanges)
 	case is("pr_claude"):
 		return m.openChat(p)
 	case is("browse"):

@@ -25,11 +25,14 @@ var kindWords = map[model.ReviewEvent]string{
 	model.EventRequestChanges: "request changes",
 }
 
-// compose is a review being written, in a popup over the screen it was
-// opened from.
+// compose is a comment or a review being written, in a popup over the
+// screen it was opened from.
 type compose struct {
-	pr   model.PR
-	kind int
+	pr model.PR
+	// single is a comment on the conversation, not a review: it has no
+	// kind, and leaves a review request from the viewer as it is.
+	single bool
+	kind   int
 	// own is the viewer's own pull request, which can only be commented
 	// on.
 	own bool
@@ -40,7 +43,7 @@ type compose struct {
 func composeWidth(w int) int { return min(max(w-8, 40), 100) }
 
 // resize fits the text area in the popup on a screen w by h: the popup
-// takes seven lines besides it, and leaves the status and key lines under
+// takes up to seven lines besides it, and leaves the status and key lines under
 // it in sight. A longer review is written in $EDITOR.
 func (c *compose) resize(w, h int) {
 	c.ta.SetWidth(composeWidth(w) - 4)
@@ -53,11 +56,24 @@ func (c *compose) update(msg tea.Msg) tea.Cmd {
 	return cmd
 }
 
-// confirm asks before a review is sent: GitHub cannot take one back.
+// confirm asks before a comment or a review is sent: GitHub cannot take a
+// review back.
 type confirm struct {
-	pr    model.PR
-	event model.ReviewEvent
-	body  string
+	pr     model.PR
+	single bool
+	event  model.ReviewEvent
+	body   string
+}
+
+// sentWord names what is sent: a comment, or a review of its kind.
+func sentWord(single bool, ev model.ReviewEvent) string {
+	switch {
+	case single:
+		return "comment"
+	case ev == model.EventComment:
+		return "review comment"
+	}
+	return kindWords[ev]
 }
 
 func (m *Model) own(p model.PR) bool { return m.viewer != "" && p.Author == m.viewer }
@@ -68,7 +84,7 @@ func (m *Model) busy() bool {
 	if m.sending == nil {
 		return false
 	}
-	m.setStatus(fmt.Sprintf("a review of %s is being sent; wait for it", *m.sending), true)
+	m.setStatus(fmt.Sprintf("a comment or review of %s is being sent; wait for it", *m.sending), true)
 	return true
 }
 
@@ -78,6 +94,14 @@ func (m *Model) askApprove(model.PR) tea.Cmd {
 	return m.startBulk(runner.Approve)
 }
 
+// startComment opens the popup for a comment on p's conversation.
+func (m *Model) startComment(p model.PR) tea.Cmd {
+	c := &compose{pr: p, single: true, own: m.own(p), ta: textarea.New()}
+	c.ta.Placeholder = "Write the comment (markdown)"
+	return m.openCompose(c)
+}
+
+// startCompose opens the popup for a review of p, of the kind event.
 func (m *Model) startCompose(p model.PR, event model.ReviewEvent) tea.Cmd {
 	if m.own(p) && event != model.EventComment {
 		m.setStatus("you cannot request changes on your own pull request", true)
@@ -90,6 +114,10 @@ func (m *Model) startCompose(p model.PR, event model.ReviewEvent) tea.Cmd {
 		}
 	}
 	c.ta.Placeholder = "Write the review (markdown)"
+	return m.openCompose(c)
+}
+
+func (m *Model) openCompose(c *compose) tea.Cmd {
 	c.ta.ShowLineNumbers = false
 	c.resize(m.width, m.height)
 	m.compose = c
@@ -102,10 +130,10 @@ func (m *Model) composeKey(msg tea.KeyPressMsg) tea.Cmd {
 	switch {
 	case k == keymap.Back:
 		m.compose = nil
-		m.setStatus("review discarded", false)
+		m.setStatus(sentWord(c.single, kinds[c.kind])+" discarded", false)
 		return nil
 	case m.keys.Matches("next_kind", k):
-		if !c.own {
+		if !c.own && !c.single {
 			c.kind = (c.kind + 1) % len(kinds)
 		}
 		return nil
@@ -115,11 +143,11 @@ func (m *Model) composeKey(msg tea.KeyPressMsg) tea.Cmd {
 		}
 		ev := kinds[c.kind]
 		body := strings.TrimSpace(c.ta.Value())
-		if body == "" && ev != model.EventApprove {
-			m.setStatus("write the review first", true)
+		if body == "" && (c.single || ev != model.EventApprove) {
+			m.setStatus("write the "+sentWord(c.single, ev)+" first", true)
 			return nil
 		}
-		m.confirm = &confirm{pr: c.pr, event: ev, body: body}
+		m.confirm = &confirm{pr: c.pr, single: c.single, event: ev, body: body}
 		return nil
 	case m.keys.Matches("editor", k):
 		return m.openEditor()
@@ -181,8 +209,11 @@ func (m *Model) confirmKey(k string) tea.Cmd {
 		m.confirm = nil
 		key := c.pr.Key
 		m.sending = &key
-		m.setStatus(fmt.Sprintf("sending %s to %s…", kindWords[c.event], c.pr.Key), false)
-		return func() tea.Msg { return reviewMsg{c.pr, c.event, m.src.Review(m.ctx, c.pr, c.event, c.body)} }
+		m.setStatus(fmt.Sprintf("sending %s to %s…", sentWord(c.single, c.event), c.pr.Key), false)
+		if c.single {
+			return func() tea.Msg { return reviewMsg{c.pr, true, "", m.src.PostComment(m.ctx, c.pr, c.body)} }
+		}
+		return func() tea.Msg { return reviewMsg{c.pr, false, c.event, m.src.Review(m.ctx, c.pr, c.event, c.body)} }
 	case k == keymap.Back:
 		m.confirm = nil
 		m.setStatus("canceled", false)
@@ -190,16 +221,22 @@ func (m *Model) confirmKey(k string) tea.Cmd {
 	return nil
 }
 
-// reviewed takes in a sent review: the row shows it, the review popup
-// closes, and the notification is marked done when the settings say so.
+// reviewed takes in a sent comment or review: the popup closes; a review
+// shows on the row, and marks the notification done when the settings say
+// so.
 func (m *Model) reviewed(msg reviewMsg) tea.Cmd {
 	m.sending = nil
+	what := sentWord(msg.single, msg.event)
 	if msg.err != nil {
-		m.setStatus(fmt.Sprintf("%s on %s failed: %v", kindWords[msg.event], msg.pr.Key, msg.err), true)
+		m.setStatus(fmt.Sprintf("%s on %s failed: %v", what, msg.pr.Key, msg.err), true)
 		return nil
 	}
 	if m.compose != nil && m.compose.pr.Key == msg.pr.Key {
 		m.compose = nil
+	}
+	if msg.single {
+		m.setStatus(fmt.Sprintf("✓ comment sent to %s", msg.pr.Key), false)
+		return nil
 	}
 	state := map[model.ReviewEvent]model.ReviewState{
 		model.EventApprove: model.ReviewApproved, model.EventComment: model.ReviewCommented, model.EventRequestChanges: model.ReviewChangesRequested,
@@ -214,7 +251,7 @@ func (m *Model) reviewed(msg reviewMsg) tea.Cmd {
 		p.Reviews = append(rs, model.Review{Author: m.viewer, State: state})
 		m.updatePR(p)
 	}
-	m.setStatus(fmt.Sprintf("✓ %s sent to %s", kindWords[msg.event], msg.pr.Key), false)
+	m.setStatus(fmt.Sprintf("✓ %s sent to %s", what, msg.pr.Key), false)
 	n, ok := m.unread[msg.pr.Key]
 	if !ok || !m.set.MarkDone {
 		return nil
@@ -224,32 +261,39 @@ func (m *Model) reviewed(msg reviewMsg) tea.Cmd {
 	return func() tea.Msg { return doneMsg{n, m.src.MarkDone(m.ctx, n)} }
 }
 
-// renderCompose draws the popup a review is written in.
+// renderCompose draws the popup a comment or a review is written in.
 func (m *Model) renderCompose() []string {
 	c, st := m.compose, m.st
 	lines := []string{st.muted.Render(c.pr.Title)}
-	var ks []string
-	for i, k := range kinds {
-		off := st.subOff
-		if c.own && k != model.EventComment {
-			off = st.dim
+	title := c.pr.Key.String() + " · review"
+	keys := st.key.Render(m.firstKey("post")) + " " + st.muted.Render("post")
+	if c.single {
+		title = c.pr.Key.String() + " · comment"
+		lines = append(lines, "")
+	} else {
+		var ks []string
+		for i, k := range kinds {
+			off := st.subOff
+			if c.own && k != model.EventComment {
+				off = st.dim
+			}
+			ks = append(ks, pill(st.subOn, off, kindWords[k], i == c.kind))
 		}
-		ks = append(ks, pill(st.subOn, off, kindWords[k], i == c.kind))
+		lines = append(lines, strings.Join(ks, tabGap), "")
+		keys += st.dim.Render(" · ") + st.key.Render(m.firstKey("next_kind")) + " " + st.muted.Render("kind")
 	}
-	lines = append(lines, strings.Join(ks, tabGap), "")
 	lines = append(lines, strings.Split(c.ta.View(), "\n")...)
-	lines = append(lines, "", st.key.Render(m.firstKey("post"))+" "+st.muted.Render("post")+
-		st.dim.Render(" · ")+st.key.Render(m.firstKey("next_kind"))+" "+st.muted.Render("kind")+
+	lines = append(lines, "", keys+
 		st.dim.Render(" · ")+st.key.Render(m.firstKey("editor"))+" "+st.muted.Render("$EDITOR")+
 		st.dim.Render(" · ")+st.key.Render(keymap.Back)+" "+st.muted.Render("discard"))
-	return box(st, c.pr.Key.String(), lines, composeWidth(m.width))
+	return box(st, title, lines, composeWidth(m.width))
 }
 
 // renderConfirm draws the popup over the screen's lines.
 func (m *Model) renderConfirm() []string {
 	c, st := m.confirm, m.st
 	w := min(max(m.width-8, 30), 100)
-	title := kindWords[c.event]
+	title := sentWord(c.single, c.event)
 	lines := []string{
 		st.sub1.Render(c.pr.Key.String()) + " " + st.muted.Render(c.pr.Author),
 		st.muted.Render(c.pr.Title),
@@ -264,8 +308,12 @@ func (m *Model) renderConfirm() []string {
 			lines = append(lines, st.sub0.Render("  "+l))
 		}
 	}
-	lines = append(lines, "", st.dim.Render(fmt.Sprintf("Reviews the head you saw (%s). GitHub cannot take a review back.", short(c.pr.HeadOID))))
-	if _, ok := m.unread[c.pr.Key]; ok && m.set.MarkDone {
+	if c.single {
+		lines = append(lines, "", st.dim.Render("Adds a comment to its conversation; a review asked of you stays asked."))
+	} else {
+		lines = append(lines, "", st.dim.Render(fmt.Sprintf("Reviews the head you saw (%s). GitHub cannot take a review back.", short(c.pr.HeadOID))))
+	}
+	if _, ok := m.unread[c.pr.Key]; ok && m.set.MarkDone && !c.single {
 		lines = append(lines, st.dim.Render("Its notification is marked done after."))
 	}
 	lines = append(lines, "", st.sub0.Render("send "+title+"? ")+st.key.Render(m.firstKey("confirm"))+" "+st.muted.Render("yes")+

@@ -321,9 +321,12 @@ type (
 		err error
 	}
 	reviewMsg struct {
-		pr    model.PR
-		event model.ReviewEvent
-		err   error
+		pr model.PR
+		// single is a comment on the conversation; event is the kind of a
+		// review.
+		single bool
+		event  model.ReviewEvent
+		err    error
 	}
 	doneMsg struct {
 		n   model.Notification

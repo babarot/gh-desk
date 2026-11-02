@@ -34,6 +34,7 @@ type Source interface {
 	Diff(ctx context.Context, pr model.PR) ([]byte, error)
 	Comment(ctx context.Context, apiURL string) (model.Comment, error)
 	Review(ctx context.Context, pr model.PR, event model.ReviewEvent, body string) error
+	PostComment(ctx context.Context, pr model.PR, body string) error
 	MarkDone(ctx context.Context, n model.Notification) error
 	Browse(url string) error
 	// MergeInfo reads what deciding a merge needs, by node ID; with

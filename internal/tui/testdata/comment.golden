@@ -1,0 +1,34 @@
+triage // @me    1 review (3)   2 mine (1)   3 involved (0)   4 inbox (2)                         1 to you · 1 to a team · 1 bots 
+    PR                        TITLE                                  AUTHOR          CI  REVIEW   WHY         SIZE          AGE
+  ▾ requested f╭ acme/api#12 · comment ───────────────────────────────────────────────────────────────────────────╮
+▎ ● api#12     │ Add retries to the client                                                                        │3         3h   
+  ▸ requested f│                                                                                                  │
+  ▸ bots 1     │ ┃ Does this retry on a 429?                                                                      │
+               │ ┃                                                                                                │
+               │ ┃                                                                                                │
+               │ ┃                                                                                                │
+               │ ┃                                                                                                │
+               │ ┃                                                                                                │
+               │ ┃                                                                                                │
+               │ ┃                                                                                                │
+               │ ┃                                                                                                │
+               │ ┃                                                                                                │
+               │                                                                                                  │
+               │ ctrl+s post · ctrl+e $EDITOR · esc discard                                                       │
+               ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
+
+
+╭  overview   diff (2)  ────────────────────────────────────────────────────────────────────────────────── acme/api#12 · J/K · v ╮
+│ #12 Add retries to the client                                                       alice │ status    open                     │
+│ ▾ description ─────────────────────────────────────────────────────────────────────────── │ requested me @core                 │
+│ │ What                                                                                    │ checks    ✓1                       │
+│ │ Retry failed requests.                                                                  │ size      +40 −3 · 2 files         │
+│ ╵                                                                                         │ branch    retries                  │
+│                                                                                           │           → main                   │
+│ ▾ checks (1)  ✓1 ──────────────────────────────────────────────────────────────────────── │ updated   3h ago                   │
+│ │ ✓ test                                                                                  │                                    │
+│ ╵                                                                                         │                                    │
+│                                                                                           │                                    │
+╰────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+                                                                                                                                  
+tab kind · ctrl+s post · ctrl+e $EDITOR · esc back                                                                                

@@ -85,6 +85,7 @@ type fakeSource struct {
 	comments map[string]model.Comment
 
 	reviews []string
+	posted  []string
 	done    []string
 	browsed []string
 	// info overrides what MergeInfo says of a pull request, by key.
@@ -247,6 +248,10 @@ func (f *fakeSource) Comment(_ context.Context, url string) (model.Comment, erro
 }
 func (f *fakeSource) Review(_ context.Context, p model.PR, ev model.ReviewEvent, body string) error {
 	f.reviews = append(f.reviews, p.Key.String()+" "+string(ev)+" "+p.HeadOID+" "+body)
+	return nil
+}
+func (f *fakeSource) PostComment(_ context.Context, p model.PR, body string) error {
+	f.posted = append(f.posted, p.Key.String()+" "+body)
 	return nil
 }
 func (f *fakeSource) MarkDone(_ context.Context, n model.Notification) error {
@@ -691,20 +696,50 @@ func TestApprove(t *testing.T) {
 	}
 }
 
+// c comments on the conversation: no review is sent, so the review asked
+// of the viewer stays, and the notification is not marked done.
 func TestCommentWithBody(t *testing.T) {
 	f := fixture()
 	m := start(t, f, keymap.Default())
-	press(m, "c", "ctrl+s")
-	if !strings.Contains(m.status, "write the review first") {
+	press(m, "c", "tab", "ctrl+s")
+	if !strings.Contains(m.status, "write the comment first") {
 		t.Errorf("empty comment was not refused: %q", m.status)
+	}
+	run(m, m.paste(tea.PasteMsg{Content: "Does this retry on a 429?"}))
+	press(m, "ctrl+s")
+	if !strings.Contains(screen(m), "a review asked of you stays asked") {
+		t.Errorf("the confirm popup does not tell a comment from a review:\n%s", screen(m))
+	}
+	press(m, "y")
+	if len(f.posted) != 1 || f.posted[0] != "acme/api#12 Does this retry on a 429?" || len(f.reviews) != 0 {
+		t.Errorf("posted = %q, reviews = %q", f.posted, f.reviews)
+	}
+	if m.compose != nil {
+		t.Error("the popup stayed open")
+	}
+	if len(f.done) != 0 {
+		t.Errorf("a comment marked the notification done: %v", f.done)
+	}
+	if p, _ := m.knownPR(key("acme", "api", 12)); len(p.Reviews) != 0 {
+		t.Errorf("a comment shows as a review: %+v", p.Reviews)
+	}
+}
+
+// R writes a review: a comment in it is a review of the head seen.
+func TestReviewWithBody(t *testing.T) {
+	f := fixture()
+	m := start(t, f, keymap.Default())
+	press(m, "R", "ctrl+s")
+	if !strings.Contains(m.status, "write the review comment first") {
+		t.Errorf("empty review was not refused: %q", m.status)
 	}
 	run(m, m.paste(tea.PasteMsg{Content: "Looks good, one question."}))
 	press(m, "ctrl+s", "y")
-	if len(f.reviews) != 1 || !strings.HasSuffix(f.reviews[0], "COMMENT aaaaaaa1 Looks good, one question.") {
-		t.Errorf("reviews = %q", f.reviews)
+	if len(f.reviews) != 1 || !strings.HasSuffix(f.reviews[0], "COMMENT aaaaaaa1 Looks good, one question.") || len(f.posted) != 0 {
+		t.Errorf("reviews = %q, posted = %q", f.reviews, f.posted)
 	}
-	if m.view != viewList {
-		t.Error("the writing screen stayed open")
+	if m.compose != nil {
+		t.Error("the popup stayed open")
 	}
 }
 
@@ -750,11 +785,15 @@ func TestTitleEscapesNeverReachTheScreen(t *testing.T) {
 	}
 }
 
-// c writes a review in a popup over the list, which stays in sight
-// dimmed; esc puts it away and leaves the list as it was.
+// R writes a review in a popup over the list, which stays in sight
+// dimmed; esc puts it away and leaves the list as it was. c's popup has no
+// kinds.
 func TestComposePopup(t *testing.T) {
 	m := start(t, fixture(), keymap.Default())
 	press(m, "c")
+	run(m, m.paste(tea.PasteMsg{Content: "Does this retry on a 429?"}))
+	golden(t, "comment", screen(m))
+	press(m, "esc", "R")
 	run(m, m.paste(tea.PasteMsg{Content: "Does this retry on a 429?"}))
 	golden(t, "compose", screen(m))
 	press(m, "esc")
@@ -766,7 +805,7 @@ func TestComposePopup(t *testing.T) {
 func TestOneReviewAtATime(t *testing.T) {
 	f := fixture()
 	m := start(t, f, keymap.Default())
-	press(m, "c")
+	press(m, "R")
 	run(m, m.paste(tea.PasteMsg{Content: "once"}))
 	// y without running the command: the review is still on its way.
 	press(m, "ctrl+s")
@@ -893,7 +932,7 @@ func TestMarkReady(t *testing.T) {
 		}
 		press(m, "j")
 	}
-	press(m, "R")
+	press(m, "D")
 	if !strings.Contains(screen(m), "mark ready this pull request?") {
 		t.Fatalf("no popup:\n%s", screen(m))
 	}
@@ -911,7 +950,7 @@ func TestMarkReady(t *testing.T) {
 
 func TestMarkReadySkipsNonDraft(t *testing.T) {
 	m, r := startWith(t, fixture(), keymap.Default())
-	press(m, "R")
+	press(m, "D")
 	if !strings.Contains(screen(m), "not a draft") {
 		t.Errorf("popup does not say why:\n%s", screen(m))
 	}
@@ -1140,7 +1179,7 @@ func TestClaudeAnsweringElsewhere(t *testing.T) {
 
 func TestClaudeDraft(t *testing.T) {
 	m, _ := startWith(t, fixture(), keymap.Default())
-	press(m, "i", "D")
+	press(m, "i", "R")
 	if m.compose == nil {
 		t.Fatalf("view %v", m.view)
 	}

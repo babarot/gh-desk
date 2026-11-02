@@ -46,7 +46,7 @@ The log is JSON lines written with `log/slog` to `$XDG_STATE_HOME/gh-triage/logs
 
 Every line carries `run`, an ID for the process. Code that starts an operation adds `op`, and bulk approve and merge add `batch`, `pr` and `step`, with `logger.With`, and passes the logger down. Calls to GitHub log `gh_request_id`, `gql_cost`, `gql_remaining` and `duration_ms`.
 
-Every write to GitHub (approve, comment, request changes, merge, enabling auto-merge, updating a branch, marking a notification done) is logged at `info` with its pull request, result and request ID. Reads are logged at `debug`.
+Every write to GitHub (a comment, a review, merge, enabling auto-merge, updating a branch, marking a draft ready for review, marking a notification done) is logged at `info` with its pull request, result and request ID. Reads are logged at `debug`.
 
 Tokens, pull request bodies, diffs, comments, review bodies and Claude conversations are never logged; a pull request is named as `owner/repo#n`, not by its title. A log pasted into an issue must not carry anyone's work.
 

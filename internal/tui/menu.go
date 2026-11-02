@@ -20,7 +20,7 @@ type actionMenu struct {
 }
 
 // menuActions are the actions the menu offers, in its order.
-var menuActions = []keymap.Action{"approve", "merge", "ready_for_review", "comment", "request_changes", "pr_claude", "browse", "hide"}
+var menuActions = []keymap.Action{"approve", "merge", "ready_for_review", "comment", "review", "pr_claude", "browse", "hide"}
 
 // menuItem is one line of the menu: what the action would do, or why it
 // cannot run.
@@ -104,12 +104,12 @@ func (m *Model) aboutOne(a keymap.Action, p model.PR) (string, bool) {
 	case "ready_for_review":
 		return m.aboutReady(p)
 	case "comment":
-		return "write a comment", false
-	case "request_changes":
+		return "comment on its conversation", false
+	case "review":
 		if m.own(p) {
-			return "your own pull request", true
+			return "comment in a review of your own pull request", false
 		}
-		return "ask for changes in a review", false
+		return "comment, approve or request changes in a review", false
 	case "pr_claude":
 		if m.claude == nil {
 			return "claude is not available", true
@@ -262,9 +262,9 @@ func (m *Model) runMenu(it menuItem) tea.Cmd {
 	}
 	switch it.action {
 	case "comment":
+		return m.startComment(p)
+	case "review":
 		return m.startCompose(p, model.EventComment)
-	case "request_changes":
-		return m.startCompose(p, model.EventRequestChanges)
 	case "pr_claude":
 		return m.openChat(p)
 	case "browse":
