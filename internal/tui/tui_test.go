@@ -1139,6 +1139,33 @@ func TestSelectByRulesTogether(t *testing.T) {
 	}
 }
 
+// Adding keeps the selection and adds what the rules match, so rules put
+// together and then added make (A AND B) OR C.
+func TestAddByRule(t *testing.T) {
+	set := testSettings()
+	set.Rules = []plan.Rule{{Name: "small", MaxLines: 100}, {Name: "bots", Bot: true}, {Name: "alice", Author: "alice"}}
+	m := startSet(t, set, 130)
+	press(m, "S", "j", "space", "j", "space", "enter")
+	if len(m.selected) != 1 || !m.isSelected(key("acme", "api", 30)) {
+		t.Fatalf("selected = %v, want the small bot pull request", m.selected)
+	}
+	press(m, "S", "j", "j", "j", "a")
+	if len(m.selected) != 2 || !m.isSelected(key("acme", "api", 12)) || !m.isSelected(key("acme", "api", 30)) {
+		t.Fatalf("selected = %v, want alice's added to the bot's", m.selected)
+	}
+	if got := status(m); !strings.Contains(got, "alice: added 1, selected 2") {
+		t.Errorf("status = %q", got)
+	}
+	if r, ok := m.current(); !ok || r.pr.Key != key("acme", "api", 12) {
+		t.Errorf("cursor on %v, want the pull request added", r.pr.Key)
+	}
+	// What is already selected is not counted again.
+	press(m, "S", "j", "a")
+	if len(m.selected) != 2 || !strings.Contains(status(m), "small: added 0, selected 2") {
+		t.Errorf("selected = %v, status = %q", m.selected, status(m))
+	}
+}
+
 func TestResumeAtStart(t *testing.T) {
 	f := fixture()
 	set := Settings{Tabs: []Tab{{Name: "review", Query: "review", Groups: plan.Groups, Limit: 100}, {Name: "inbox", Inbox: true, Limit: 100}},

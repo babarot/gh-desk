@@ -14,7 +14,8 @@ import (
 // pick is the popup of S: the rules, how many pull requests of the tab each
 // matches, and those the rules chosen match together: the rules checked,
 // or with none checked the one under the cursor. Choosing replaces the
-// selection with them; approving and merging stay with A and M.
+// selection with them, and adding keeps the selection and adds them;
+// approving and merging stay with A and M.
 type pick struct {
 	sel     int
 	loading bool
@@ -174,23 +175,32 @@ func (m *Model) pickKey(k string) tea.Cmd {
 		} else {
 			v.checked[v.sel] = true
 		}
-	case is("choose") && m.pickReady():
+	case (is("choose") || is("add_to_selection")) && m.pickReady():
 		chosen := m.chosen()
 		m.picker = nil
-		return m.applyRules(chosen)
+		return m.applyRules(chosen, is("add_to_selection"))
 	}
 	return nil
 }
 
-// applyRules replaces the selection with what the rules match together,
-// unfolds their groups, and puts the cursor on the first.
-func (m *Model) applyRules(rs []plan.Rule) tea.Cmd {
+// applyRules selects what the rules match together, replacing the
+// selection or, with add, keeping it; it unfolds their groups and puts the
+// cursor on the first of them.
+func (m *Model) applyRules(rs []plan.Rule, add bool) tea.Cmd {
 	hits := m.ruleMatches(rs...)
 	name := ruleNames(rs)
-	clear(m.selected)
+	if !add {
+		clear(m.selected)
+	}
+	added := 0
 	t := m.tab()
+	in := map[model.PRKey]bool{}
 	for _, p := range hits {
-		m.selected[p.Key] = byHand
+		in[p.Key] = true
+		if !m.isSelected(p.Key) {
+			added++
+			m.selected[p.Key] = byHand
+		}
 		if t.grouped {
 			t.folded[plan.GroupOf(p, m.viewer)] = false
 		}
@@ -200,12 +210,16 @@ func (m *Model) applyRules(rs []plan.Rule) tea.Cmd {
 		return nil
 	}
 	for i, row := range m.rows(t) {
-		if row.kind == rowPR && m.isSelected(row.pr.Key) {
+		if row.kind == rowPR && in[row.pr.Key] {
 			t.sel = i
 			break
 		}
 	}
-	m.say(fmt.Sprintf("%s: selected %d · %s to merge, %s to approve", name, len(hits), m.firstKey("merge"), m.firstKey("approve")))
+	what := fmt.Sprintf("selected %d", len(hits))
+	if add {
+		what = fmt.Sprintf("added %d, selected %d", added, len(m.selected))
+	}
+	m.say(fmt.Sprintf("%s: %s · %s to merge, %s to approve", name, what, m.firstKey("merge"), m.firstKey("approve")))
 	return m.ensure()
 }
 
@@ -267,7 +281,8 @@ func (m *Model) renderPick() []string {
 		}
 	}
 	foot := []string{"", st.key.Render(m.firstKey("toggle_rule")) + " " + st.muted.Render("check") + st.dim.Render(" · ") +
-		st.key.Render(m.firstKey("choose")) + " " + st.muted.Render("select these") +
+		st.key.Render(m.firstKey("choose")) + " " + st.muted.Render("select these") + st.dim.Render(" · ") +
+		st.key.Render(m.firstKey("add_to_selection")) + " " + st.muted.Render("add them") +
 		st.dim.Render(" · ") + st.key.Render(keymap.Back) + " " + st.muted.Render("cancel")}
 	out, top := scrollBox(st, "select by rule", lines, foot, w, m.popupHeight(), v.top, keep, "")
 	v.top = top
