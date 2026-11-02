@@ -72,6 +72,9 @@ func TestTemplateValuesAreTheDefaults(t *testing.T) {
 		switch {
 		case line == "[keys]":
 			inTables = false
+		case strings.HasPrefix(line, "[["):
+			// The [[select]] rules written live run to a blank line too.
+			inExample = true
 		case strings.HasPrefix(line, "["):
 			inTables = true
 			b.WriteString(line + "\n")

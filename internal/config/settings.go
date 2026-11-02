@@ -370,26 +370,33 @@ const selectExamples = `# Rules S offers to select pull requests, besides "appro
 # checks.approval pending), and approved_by_me = true (your latest review
 # approves it; a person's pull request matches too).
 #
-# [[select]]
-# name = "approved, small"
-# approved_by_me = true
-# max_lines = 300
-#
-# [[select]]
-# name = "dependency bots"
-# authors = ["renovate", "dependabot"]
-# checks = "passing"
+# The rules below are written to start with, not commented out: S offers
+# only the rules in this file, so delete or comment out one you do not want.
+
+[[select]]
+name = "small"
+max_lines = 300
+
+[[select]]
+name = "dependency bots"
+authors = ["renovate", "dependabot"]
+checks = "passing"
+
+[[select]]
+name = "approved"
+approved_by_me = true
+
+[[select]]
+name = "lock files"
+authors = ["renovate"]
+title = "(?i)lock file maintenance"
+
+# A rule on the packages a bot's pull request updates:
 #
 # [[select]]
 # name = "safe renovate"
 # authors = ["renovate"]
 # packages = ["actions/checkout", "songmu/tagpr"]
-# checks = "passing"
-#
-# [[select]]
-# name = "lock files"
-# authors = ["renovate"]
-# title = "(?i)lock file maintenance"
 # checks = "passing"
 `
 
@@ -408,8 +415,10 @@ const SchemaURL = "https://raw.githubusercontent.com/babarot/gh-triage/main/docs
 
 // Template is the config file written on first run: every setting at its
 // default, commented out, so a default changed later still applies until
-// the user picks a value. keys is the [keys] part, every action with its
-// default keys, which the caller writes from the keymap.
+// the user picks a value. The [[select]] rules alone are written live, as
+// rules to start with that the user deletes or comments out (ADR-028).
+// keys is the [keys] part, every action with its default keys, which the
+// caller writes from the keymap.
 func Template(keys string) string {
 	def := Default()
 	var b strings.Builder

@@ -53,6 +53,19 @@ func TestTemplateLoadsAsDefault(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	// The rules to start with are the only part written live (ADR-028);
+	// none of them is a default.
+	var names []string
+	for _, s := range cfg.Select {
+		names = append(names, s.Name)
+	}
+	if want := []string{"small", "dependency bots", "approved", "lock files"}; !reflect.DeepEqual(names, want) {
+		t.Errorf("rules = %v, want %v", names, want)
+	}
+	if len(Default().Select) != 0 {
+		t.Errorf("Default() has rules: %+v", Default().Select)
+	}
+	cfg.Select = nil
 	if !reflect.DeepEqual(cfg, Default()) {
 		t.Errorf("cfg = %+v\nwant %+v", cfg, Default())
 	}
