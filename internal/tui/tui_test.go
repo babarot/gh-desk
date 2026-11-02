@@ -1759,3 +1759,30 @@ func TestRefreshStatus(t *testing.T) {
 	}
 	run(m, cmd)
 }
+
+// esc at the top of the list does nothing: only q and ctrl+c quit.
+func TestBackDoesNotQuitAtTop(t *testing.T) {
+	m := startSet(t, testSettings(), 100)
+	_, cmd := m.Update(keyMsg("esc"))
+	if quits(cmd) {
+		t.Error("esc at the top of the list quit")
+	}
+	_, cmd = m.Update(keyMsg("q"))
+	if !quits(cmd) {
+		t.Error("q did not quit")
+	}
+}
+
+// quits reports whether cmd, or a command it batches, quits.
+func quits(cmd tea.Cmd) bool {
+	if cmd == nil {
+		return false
+	}
+	switch msg := cmd().(type) {
+	case tea.QuitMsg:
+		return true
+	case tea.BatchMsg:
+		return slices.ContainsFunc(msg, quits)
+	}
+	return false
+}

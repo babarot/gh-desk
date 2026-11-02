@@ -147,7 +147,7 @@ var renamed = map[string]Action{
 const (
 	// Interrupt quits from anywhere.
 	Interrupt = "ctrl+c"
-	// Back steps back one level everywhere, and quits from the top.
+	// Back steps back one level everywhere, and does nothing at the top.
 	Back = "esc"
 )
 

@@ -92,8 +92,8 @@ func TestHelpScrolls(t *testing.T) {
 }
 
 // The key line keeps ? at any width, and esc where it steps back: the
-// hints that do not fit go from before them. On the list esc would quit,
-// and is not told until there is a selection or a filter to clear.
+// hints that do not fit go from before them. On the list esc does
+// nothing, and is not told until there is a selection or a filter to clear.
 func TestHintsKeepHelpAndBack(t *testing.T) {
 	last := func(m *Model) string {
 		lines := strings.Split(screen(m), "\n")

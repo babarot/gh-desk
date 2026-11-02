@@ -45,8 +45,6 @@ func (m *Model) listKey(k string) tea.Cmd {
 			clear(m.selected)
 		case m.filter != "" || t.ruleFilter != nil:
 			m.filter, t.ruleFilter = "", nil
-		default:
-			return tea.Quit
 		}
 		return nil
 	case is("down"):
