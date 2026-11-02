@@ -1760,12 +1760,15 @@ func TestRefreshStatus(t *testing.T) {
 	run(m, cmd)
 }
 
-// esc at the top of the list does nothing: only q and ctrl+c quit.
+// esc at the top of the list does not quit; it says q does.
 func TestBackDoesNotQuitAtTop(t *testing.T) {
 	m := startSet(t, testSettings(), 100)
 	_, cmd := m.Update(keyMsg("esc"))
 	if quits(cmd) {
 		t.Error("esc at the top of the list quit")
+	}
+	if s := screen(m); !strings.Contains(s, "esc: nothing to clear; q quits") {
+		t.Errorf("esc at the top did not say how to quit:\n%s", s)
 	}
 	_, cmd = m.Update(keyMsg("q"))
 	if !quits(cmd) {

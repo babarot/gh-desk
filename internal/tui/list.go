@@ -45,6 +45,8 @@ func (m *Model) listKey(k string) tea.Cmd {
 			clear(m.selected)
 		case m.filter != "" || t.ruleFilter != nil:
 			m.filter, t.ruleFilter = "", nil
+		default:
+			m.say(m.nothingToClear())
 		}
 		return nil
 	case is("down"):
@@ -252,6 +254,16 @@ func (m *Model) filterKey(msg tea.KeyPressMsg) tea.Cmd {
 	}
 	m.tab().sel, m.tab().offset = 0, 0
 	return m.ensure()
+}
+
+// nothingToClear tells why esc did nothing at the top of the list, and
+// how to quit instead.
+func (m *Model) nothingToClear() string {
+	quit := keymap.Interrupt
+	if ks := m.keys.Keys("quit"); len(ks) > 0 {
+		quit = ks[0]
+	}
+	return fmt.Sprintf("esc: nothing to clear; %s quits", quit)
 }
 
 // eraseWord drops the last word of s and the spaces after it, as ctrl+w
