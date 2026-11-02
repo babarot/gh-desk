@@ -180,7 +180,7 @@ func (m *Model) inboxRows(t *tab, filter string) ([]row, int) {
 		if !ok {
 			p = model.PR{Key: n.Key, Title: n.Title, State: model.StateOpen}
 		}
-		if p.State != model.StateOpen && p.State != "" {
+		if settled(p) {
 			closed++
 			if !t.showSettled {
 				continue
@@ -193,6 +193,29 @@ func (m *Model) inboxRows(t *tab, filter string) ([]row, int) {
 		out = append(out, row{kind: rowPR, pr: p, notif: n})
 	}
 	return out, closed
+}
+
+// settled reports whether p is merged or closed.
+func settled(p model.PR) bool {
+	return p.State != model.StateOpen && p.State != ""
+}
+
+// unreadShown is how many unread notifications the inbox t shows: those
+// on merged or closed pull requests count only while they are shown, so
+// that the tab's count is what its rows hold. The filter is left out, as
+// it only looks for rows for a moment.
+func (m *Model) unreadShown(t *tab) int {
+	if t.showSettled {
+		return len(m.unread)
+	}
+	n := 0
+	for k := range m.unread {
+		if p, ok := m.knownPR(k); ok && settled(p) {
+			continue
+		}
+		n++
+	}
+	return n
 }
 
 // knownPR finds a pull request in any tab: in the inbox first, which reads

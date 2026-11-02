@@ -219,7 +219,7 @@ func (m *Model) tabLabel(i int) string {
 	case !m.tabDone(t):
 		count = m.spinner()
 	case t.inbox && t.loaded:
-		count = fmt.Sprint(len(m.unread))
+		count = fmt.Sprint(m.unreadShown(t))
 	case t.loaded && t.err == nil:
 		count = fmt.Sprint(t.total)
 	case t.err != nil:

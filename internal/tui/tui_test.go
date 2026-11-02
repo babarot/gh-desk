@@ -670,9 +670,17 @@ func TestInbox(t *testing.T) {
 	m := start(t, f, keymap.Default())
 	press(m, "4")
 	golden(t, "inbox", screen(m))
+	// The tab counts the unread notifications its rows hold: the one on a
+	// merged pull request only while it is shown.
+	if s := screen(m); !strings.Contains(s, "inbox (1)") {
+		t.Errorf("the hidden merged notification is counted:\n%s", s)
+	}
 	press(m, "a", "j")
 	if s := screen(m); !strings.Contains(s, "Does this cover the timeout?") || !strings.Contains(s, "merged") {
 		t.Errorf("closed notification or its comment not shown:\n%s", s)
+	}
+	if s := screen(m); !strings.Contains(s, "inbox (2)") {
+		t.Errorf("the shown merged notification is not counted:\n%s", s)
 	}
 	press(m, "d")
 	if len(f.done) != 1 || f.done[0] != "acme/api#9" {
