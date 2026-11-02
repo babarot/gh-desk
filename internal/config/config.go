@@ -529,7 +529,7 @@ func warnings(cfg File) Problems {
 	for i, s := range cfg.Select {
 		for j, a := range s.Authors {
 			if login, ok := strings.CutPrefix(a, "app/"); ok {
-				warn([]string{"select", "authors"}, i+1, "select[%d].authors[%d] %q never matches: a bot's login is written without app/, as %q", i, j, a, login)
+				warn([]string{"select", "authors"}, i+1, "select[%d].authors[%d] %q: a bot's login is written without app/, as %q; app/ is dropped when it is compared", i, j, a, login)
 			}
 		}
 	}

@@ -384,7 +384,7 @@ authors = ["renovate", "app/renovate"]
 		"config.toml:8:9: tabs[1].query has no is:pr",
 		"config.toml:8:9: tabs[1].query is the same as tabs[0]'s",
 		`config.toml:14:13: checks.approval[0] "*" matches every check`,
-		`config.toml:18:1: select[0].authors[1] "app/renovate" never matches`,
+		`config.toml:18:1: select[0].authors[1] "app/renovate": a bot's login is written without app/`,
 	} {
 		if !strings.Contains(got, want) {
 			t.Errorf("warnings =\n%s\nwant one containing %q", got, want)
