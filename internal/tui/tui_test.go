@@ -1369,3 +1369,37 @@ func TestFileTabLineKeepsTheTabShownInSight(t *testing.T) {
 		t.Errorf("last span = %+v on %q; want README.md", last, s)
 	}
 }
+
+// A long name, title and step do not push what is done off the popup:
+// it goes under the pull request, and the name keeps its number.
+func TestBulkRowsFit(t *testing.T) {
+	m := start(t, fixture(), keymap.Default())
+	long := model.PR{Key: key("octo-org", "platform-bootstrap-templates", 1287),
+		Title: "chore(deps): update octo-org/reusable-workflows action to v4.12.0"}
+	rows := []bulkRow{
+		{pr: model.PR{Key: key("acme", "api", 12), Title: "Add retries to the client"}, mark: "✓", title: "Add retries to the client", what: "approve → merge now (squash)"},
+		{pr: long, mark: "✓", title: long.Title, what: "approve → wait for checks, then merge (merge commit)",
+			notes: []bulkNote{{"⚑", "v4 drops the node16 runtime; jobs that still pin node16 stop running after this update", m.st.peach}}},
+	}
+	const inner = 90
+	got := m.layoutBulk(rows, inner, false)
+	var plain []string
+	for _, l := range got {
+		p := ansi.Strip(l)
+		if w := ansi.StringWidth(p); w > inner {
+			t.Errorf("%d cells, over %d: %q", w, inner, p)
+		}
+		plain = append(plain, p)
+	}
+	want := []string{
+		"✓ acme/api#12                          Add retries to the client",
+		"  └ approve → merge now (squash)",
+		"✓ octo-org/platform-bootstrap-te…#1287 chore(deps): update octo-org/reusable-workflows ac…",
+		"  ├ approve → wait for checks, then merge (merge commit)",
+		"  └ ⚑ v4 drops the node16 runtime; jobs that still pin node16 stop running after this",
+		"      update",
+	}
+	if strings.Join(plain, "\n") != strings.Join(want, "\n") {
+		t.Errorf("got\n%s\nwant\n%s", strings.Join(plain, "\n"), strings.Join(want, "\n"))
+	}
+}

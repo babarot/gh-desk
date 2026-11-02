@@ -3,13 +3,13 @@ triage // @me    1 review (3)   2 mine (1)   3 involved (0)   4 inbox (2)       
   ▾╭ approve ─────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
   ●│ ✧ picked by Claude: “bots”                                                                                               │
   ▸│                                                                                                                          │
-  ▾│ ✓ acme/api#30                    Update dependency octo/app to v0.13.2         approve                                   │
-▎ ✓│                                                                                                                          │   
+  ▾│ ✓ acme/api#30 Update dependency octo/app to v0.13.2                                                                      │
+▎ ✓│   └ approve                                                                                                              │   
+   │                                                                                                                          │
    │ GitHub cannot take an approval or a merge back. Each acts only on the head shown when it was read.                       │
    │                                                                                                                          │
    │ approve this pull request? y yes · esc no                                                                                │
    ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
-
 
 
 

@@ -3,8 +3,11 @@ package tui
 import (
 	"fmt"
 	"slices"
+	"strings"
 
 	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
+	"github.com/charmbracelet/x/ansi"
 
 	"github.com/babarot/gh-triage/internal/claude"
 	"github.com/babarot/gh-triage/internal/keymap"
@@ -422,6 +425,7 @@ func (m *Model) renderBulk() []string {
 		}
 	}
 	end := min(len(b.items), b.offset+bulkRows)
+	rows := make([]bulkRow, 0, end-b.offset)
 	for _, it := range b.items[b.offset:end] {
 		mark, title := st.dim.Render("·"), st.dim.Render(it.pr.Title)
 		var what string
@@ -445,20 +449,30 @@ func (m *Model) renderBulk() []string {
 		default:
 			what = st.dim.Render("skip · ") + st.red.Render(it.why(m.firstKey("refresh")))
 		}
-		if len(it.d.Notes) > 0 && it.goes(b.kind) {
-			what += " " + st.yellow.Render("⚠ "+it.d.Notes[0])
+		r := bulkRow{pr: it.pr, mark: mark, title: title, what: what}
+		if it.goes(b.kind) {
+			// On lines of their own, so a long one does not take the
+			// width of the title or of what is done.
+			if len(it.d.Notes) > 0 {
+				r.notes = append(r.notes, bulkNote{"⚠", it.d.Notes[0], st.yellow})
+			}
+			// The reason is what to read before merging.
+			if why := m.cautions[notesID(it.pr)]; why != "" {
+				r.notes = append(r.notes, bulkNote{"⚑", why, st.peach})
+			}
 		}
-		name := fit(st.sub1.Render(it.pr.Key.Repository())+st.muted.Render(fmt.Sprintf("#%d", it.pr.Key.Number)), 30)
-		lines = append(lines, mark+" "+name+" "+fit(title, max(w-80, 20))+"  "+what)
-		// On a line of its own: the reason is what to read before merging.
-		if why := m.cautions[notesID(it.pr)]; why != "" && it.goes(b.kind) {
-			lines = append(lines, "  "+st.peach.Render("⚑ "+safeLine(why)))
+		rows = append(rows, r)
+	}
+	lines = append(lines, m.layoutBulk(rows, w-4, len(b.items) == 1)...)
+	lines = append(lines, "")
+	prose := func(s styleFn, text string) {
+		for _, l := range wrapText(text, w-4) {
+			lines = append(lines, s.Render(l))
 		}
 	}
-	lines = append(lines, "")
 	switch b.notes {
 	case notesReading:
-		lines = append(lines, st.dim.Render("Claude is reading the release notes of the bot pull requests…"))
+		prose(st.dim, "Claude is reading the release notes of the bot pull requests…")
 	case notesRead:
 		n := 0
 		for _, it := range b.items {
@@ -470,26 +484,26 @@ func (m *Model) renderBulk() []string {
 		if n > 0 {
 			text = fmt.Sprintf("Claude read the release notes: %d marked ⚑ call for care.", n)
 		}
-		lines = append(lines, st.dim.Render(text))
+		prose(st.dim, text)
 	case notesFailed:
-		lines = append(lines, st.yellow.Render("Claude could not read the release notes: "+safeLine(b.notesErr)))
+		prose(st.yellow, "Claude could not read the release notes: "+safeLine(b.notesErr))
 	}
 	if auto {
-		lines = append(lines, st.dim.Render("Auto-merge also merges commits pushed after it is on, as GitHub does."))
+		prose(st.dim, "Auto-merge also merges commits pushed after it is on, as GitHub does.")
 	}
 	if b.kind == runner.Approve && failing > 0 && !b.loading {
 		state := "left out"
 		if b.includeFailing {
 			state = "included"
 		}
-		lines = append(lines, st.dim.Render(fmt.Sprintf("%d with failing checks are %s · %s to change", failing, state, m.firstKey("include_failing"))))
+		prose(st.dim, fmt.Sprintf("%d with failing checks are %s · %s to change", failing, state, m.firstKey("include_failing")))
 	}
 	switch {
 	case b.loading:
 	case b.kind == runner.Ready:
-		lines = append(lines, st.dim.Render("Its reviewers are asked for a review once it is ready. Each acts only on the head shown when it was read."))
+		prose(st.dim, "Its reviewers are asked for a review once it is ready. Each acts only on the head shown when it was read.")
 	default:
-		lines = append(lines, st.dim.Render("GitHub cannot take an approval or a merge back. Each acts only on the head shown when it was read."))
+		prose(st.dim, "GitHub cannot take an approval or a merge back. Each acts only on the head shown when it was read.")
 	}
 	hint := fmt.Sprintf("%s %d of %d? ", verb, goes, len(b.items))
 	if len(b.items) == 1 {
@@ -530,6 +544,90 @@ func (m *Model) renderBulk() []string {
 	}
 	return box(st, title, lines, w)
 }
+
+// bulkRow is a pull request in the confirm popup, styled: what is done
+// with it and the notes to read before it is done.
+type bulkRow struct {
+	pr                model.PR
+	mark, title, what string
+	notes             []bulkNote
+}
+
+type bulkNote struct {
+	icon, text string
+	style      styleFn
+}
+
+// Below these the name and the title are cut too far to tell the pull
+// requests apart.
+const (
+	bulkNameMax  = 36
+	bulkTitleMin = 20
+)
+
+// layoutBulk lays out the rows of the confirm popup inner cells wide. What
+// is done is never cut: it gets its width first, the name its own up to
+// bulkNameMax, and the title the rest. When the title would get less than
+// bulkTitleMin, and always for a single pull request, what is done goes on
+// a line under the pull request's, hung from it like its notes.
+func (m *Model) layoutBulk(rows []bulkRow, inner int, single bool) []string {
+	st := m.st
+	nameW, whatW := 0, 0
+	for _, r := range rows {
+		nameW = max(nameW, ansi.StringWidth(bulkNumber(r.pr))+ansi.StringWidth(r.pr.Key.Repository()))
+		whatW = max(whatW, lipgloss.Width(r.what))
+	}
+	nameW = min(nameW, bulkNameMax)
+	titleW := inner - 2 - nameW - 1 - 2 - whatW
+	under := single || titleW < bulkTitleMin
+	var lines []string
+	for _, r := range rows {
+		head := r.mark + " " + m.bulkName(r.pr, nameW) + " "
+		var subs []string
+		if under {
+			head += ansi.Truncate(r.title, max(inner-lipgloss.Width(head), 1), "…")
+			subs = append(subs, "")
+		} else {
+			head += fit(r.title, titleW) + "  " + r.what
+		}
+		lines = append(lines, head)
+		for _, n := range r.notes {
+			subs = append(subs, n.icon)
+		}
+		for i := range subs {
+			first, rest := "  ├ ", "  │ "
+			if i == len(subs)-1 {
+				first, rest = "  └ ", "    "
+			}
+			first, rest = st.border.Render(first), st.border.Render(rest)
+			if under && i == 0 {
+				lines = append(lines, first+r.what)
+				continue
+			}
+			n := r.notes[i-len(subs)+len(r.notes)]
+			for j, l := range wrapText(n.text, inner-4-ansi.StringWidth(n.icon)-1) {
+				if j == 0 {
+					lines = append(lines, first+n.style.Render(n.icon+" "+l))
+				} else {
+					lines = append(lines, rest+strings.Repeat(" ", ansi.StringWidth(n.icon)+1)+n.style.Render(l))
+				}
+			}
+		}
+	}
+	return lines
+}
+
+// bulkName is the pull request's owner/repo#n w cells wide. It cuts the
+// repository, never the number, which is what tells it apart.
+func (m *Model) bulkName(pr model.PR, w int) string {
+	repo, num := pr.Key.Repository(), bulkNumber(pr)
+	if room := w - ansi.StringWidth(num); ansi.StringWidth(repo) > room {
+		repo = ansi.Truncate(repo, max(room, 1), "…")
+	}
+	return fit(m.st.sub1.Render(repo)+m.st.muted.Render(num), w)
+}
+
+func bulkNumber(pr model.PR) string { return fmt.Sprintf("#%d", pr.Key.Number) }
 
 // bulkVerbs name what a popup of each kind does, in its title and question.
 var bulkVerbs = map[runner.Kind]string{runner.Approve: "approve", runner.Merge: "merge", runner.Ready: "mark ready"}
