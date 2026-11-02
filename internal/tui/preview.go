@@ -457,7 +457,7 @@ func (m *Model) renderPane(b *strings.Builder, height int) {
 		tabs = st.title.Render("preview")
 		if r, isRow := m.current(); isRow && r.kind == rowGroup {
 			hint = fmt.Sprintf("%d pull requests", r.count)
-			body = []string{st.muted.Render(m.firstKey("open") + " to fold or unfold")}
+			body = []string{st.muted.Render(m.firstKey("menu") + " to fold or unfold")}
 		}
 	} else {
 		var files []diff.File
@@ -468,7 +468,7 @@ func (m *Model) renderPane(b *strings.Builder, height int) {
 		diffTab := m.diffTabName(p)
 		tabs = pill(st.tabOn, st.tabOff, "overview", m.pane.mode == paneOverview) + tabGap +
 			pill(st.tabOn, st.tabOff, diffTab, m.pane.mode == paneDiff)
-		hint = p.Key.String() + " · " + m.firstKey("pane_down") + "/" + m.firstKey("pane_up") + " · " + m.firstKey("pane_tab")
+		hint = p.Key.String() + " · " + m.firstKey("preview_down") + "/" + m.firstKey("preview_up") + " · " + m.firstKey("preview_tab")
 		body = m.paneBody(p, n, e, files, height-2)
 	}
 	top := st.border.Render("╭ ") + tabs + " "

@@ -73,7 +73,7 @@ func (m *Model) listKey(k string) tea.Cmd {
 		m.filtering = true
 	case is("refresh"):
 		return tea.Batch(m.refresh(), m.takeLock())
-	case is("notifications"):
+	case is("events"):
 		m.openNotes()
 		return nil
 	case is("select_shown"):
@@ -88,7 +88,7 @@ func (m *Model) listKey(k string) tea.Cmd {
 		return nil
 	case is("select_rule"):
 		return m.openPick()
-	case is("claude"):
+	case is("triage"):
 		return m.openTriage()
 	case is("approve") && len(m.selected) > 0:
 		return m.startBulk(runner.Approve)
@@ -101,7 +101,7 @@ func (m *Model) listKey(k string) tea.Cmd {
 	case is("review") && len(m.selected) > 0:
 		m.setStatus("review: one pull request at a time", true)
 		return nil
-	case is("toggle_bots"):
+	case is("fold_bots"):
 		if t.grouped {
 			t.folded[plan.GroupBots] = !t.folded[plan.GroupBots]
 		}
@@ -110,31 +110,31 @@ func (m *Model) listKey(k string) tea.Cmd {
 			t.showSettled = !t.showSettled
 			t.sel = 0
 		}
-	case is("toggle_pane"):
+	case is("preview"):
 		m.pane.on = !m.pane.on
-	case is("pane_grow"):
+	case is("preview_grow"):
 		return m.resizePane(m.pane.height + 1)
-	case is("pane_shrink"):
+	case is("preview_shrink"):
 		return m.resizePane(m.pane.height - 1)
-	case is("pane_tab"):
+	case is("preview_tab"):
 		m.pane.toggleMode()
 		return m.ensure()
-	case is("pane_down"):
+	case is("preview_down"):
 		m.pane.scroll += 3
-	case is("pane_up"):
+	case is("preview_up"):
 		m.pane.scroll = max(0, m.pane.scroll-3)
 	case is("next_file"):
 		m.jumpFile(1)
 	case is("prev_file"):
 		m.jumpFile(-1)
-	case is("unfold"):
+	case is("fold"):
 		m.foldPart()
 	}
 	r, ok := m.current()
 	if !ok {
 		return nil
 	}
-	if is("open") {
+	if is("menu") {
 		return m.openRow(r)
 	}
 	if r.kind == rowGroup {
@@ -180,7 +180,7 @@ func (m *Model) listKey(k string) tea.Cmd {
 		return m.askApprove(p)
 	case is("review"):
 		return m.startCompose(p, model.EventComment)
-	case is("pr_claude"):
+	case is("ask_claude"):
 		return m.openChat(p)
 	case is("browse"):
 		return m.browse(p)

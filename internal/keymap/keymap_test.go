@@ -39,8 +39,8 @@ func TestApply(t *testing.T) {
 		},
 		{
 			name:  "turn off",
-			set:   map[string][]string{"claude": {}},
-			check: map[Action][]string{"claude": {}},
+			set:   map[string][]string{"triage": {}},
+			check: map[Action][]string{"triage": {}},
 		},
 		{
 			name:  "set key takes it from a default nav key",
@@ -137,6 +137,23 @@ func TestCheckKey(t *testing.T) {
 			t.Errorf("CheckKey(%q) = %v; want nil", tt.key, err)
 		case tt.want != "" && (err == nil || !strings.Contains(err.Error(), tt.want)):
 			t.Errorf("CheckKey(%q) = %v; want one containing %q", tt.key, err, tt.want)
+		}
+	}
+}
+
+// An old name is told with the new one, and every new one is an action.
+func TestRenamed(t *testing.T) {
+	_, ps := Apply(Default(), map[string][]string{"open": {"x"}})
+	if len(ps) != 1 || !ps[0].AtKey || ps[0].Message != `keys.open: "open" was renamed to "menu"` {
+		t.Errorf("problems = %+v", ps)
+	}
+	m := Default()
+	for old, to := range renamed {
+		if _, ok := m.defs[Action(old)]; ok {
+			t.Errorf("%q is both an action and an old name", old)
+		}
+		if _, ok := m.defs[to]; !ok {
+			t.Errorf("%q was renamed to %q, which is not an action", old, to)
 		}
 	}
 }

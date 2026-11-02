@@ -15,7 +15,7 @@ Turning the mouse on in a terminal has a cost: the terminal no longer selects te
 - The TUI takes the mouse always: clicks, the wheel and drags. There is no setting to turn it off.
 - The mouse only points and moves: it picks, opens, folds and scrolls what is on the screen, resizes the preview pane, and opens pages in the browser on the host gh is logged in to. Nothing that writes to GitHub (approve, comment, merge, marking done) is done with the mouse; those stay on keys, which are rebindable and shown in the hints.
 - A popup, the filter being typed and the review being written take no mouse input, so a click never acts behind what has the focus.
-- The preview pane's height can also be changed with keys (`pane_grow`, `pane_shrink`), so resizing it does not need the mouse.
+- The preview pane's height can also be changed with keys (`preview_grow`, `preview_shrink`), so resizing it does not need the mouse.
 - A height set with the mouse or those keys is kept in `layout.json` in the state directory and is used over `preview.height` at the next launch. `internal/state` owns the file, as it owns the other state kept between launches; it is not locked, and when two gh-triage write it the last write is kept.
 
 ## Consequences

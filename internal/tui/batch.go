@@ -300,7 +300,7 @@ func (m *Model) notesKey(k string) tea.Cmd {
 	v := m.notesAt
 	is := func(a keymap.Action) bool { return m.keys.Matches(a, k) }
 	switch {
-	case k == keymap.Back, is("notifications"), is("quit"):
+	case k == keymap.Back, is("events"), is("quit"):
 		m.notesAt = nil
 	case is("down"):
 		v.sel = min(v.sel+1, max(len(ls)-1, 0))

@@ -49,14 +49,14 @@ var Defaults = []Def{
 	{"quit", ScopeGlobal, []string{"q"}, "quit"},
 	{"help", ScopeGlobal, []string{"?"}, "keys"},
 	{"refresh", ScopeGlobal, []string{"r"}, "refresh"},
-	{"notifications", ScopeGlobal, []string{"n"}, "notifications"},
+	{"events", ScopeGlobal, []string{"n"}, "notifications"},
 
 	{"up", ScopeNav, []string{"up", "k"}, "up"},
 	{"down", ScopeNav, []string{"down", "j"}, "down"},
 	{"top", ScopeNav, []string{"home", "g"}, "top"},
 	{"bottom", ScopeNav, []string{"end", "G"}, "bottom"},
-	{"page_up", ScopeNav, []string{"pgup"}, "page up"},
-	{"page_down", ScopeNav, []string{"pgdown"}, "page down"},
+	{"page_up", ScopeNav, []string{"pgup", "ctrl+u"}, "page up"},
+	{"page_down", ScopeNav, []string{"pgdown", "ctrl+d"}, "page down"},
 
 	{"next_tab", ScopeList, []string{"tab"}, "next tab"},
 	{"prev_tab", ScopeList, []string{"shift+tab"}, "previous tab"},
@@ -69,7 +69,7 @@ var Defaults = []Def{
 	{"tab_7", ScopeList, []string{"7"}, "tab 7"},
 	{"tab_8", ScopeList, []string{"8"}, "tab 8"},
 	{"tab_9", ScopeList, []string{"9"}, "tab 9"},
-	{"open", ScopeList, []string{"enter"}, "actions"},
+	{"menu", ScopeList, []string{"enter"}, "actions"},
 	{"expand", ScopeList, []string{"l", "right"}, "unfold group / next pane tab"},
 	{"collapse", ScopeList, []string{"h", "left"}, "fold group / previous pane tab"},
 	{"select", ScopeList, []string{"space"}, "select"},
@@ -81,22 +81,22 @@ var Defaults = []Def{
 	{"ready_for_review", ScopeList, []string{"D"}, "ready for review"},
 	{"comment", ScopeList, []string{"c"}, "comment"},
 	{"review", ScopeList, []string{"R"}, "review"},
-	{"claude", ScopeList, []string{"C"}, "ask claude"},
-	{"pr_claude", ScopeList, []string{"i"}, "ask claude about it"},
+	{"triage", ScopeList, []string{"C"}, "triage"},
+	{"ask_claude", ScopeList, []string{"i"}, "ask claude about it"},
 	{"browse", ScopeList, []string{"o"}, "browser"},
 	{"hide", ScopeList, []string{"d"}, "hide / done"},
-	{"toggle_bots", ScopeList, []string{"b"}, "bots"},
+	{"fold_bots", ScopeList, []string{"b"}, "fold bots"},
 	{"show_settled", ScopeList, []string{"a"}, "settled"},
 	{"filter", ScopeList, []string{"/"}, "filter"},
-	{"pane_down", ScopeList, []string{"J"}, "scroll pane down"},
-	{"pane_up", ScopeList, []string{"K"}, "scroll pane up"},
+	{"preview_down", ScopeList, []string{"J"}, "scroll pane down"},
+	{"preview_up", ScopeList, []string{"K"}, "scroll pane up"},
 	{"next_file", ScopeList, []string{"]"}, "next file tab / part"},
 	{"prev_file", ScopeList, []string{"["}, "previous file tab / part"},
-	{"pane_tab", ScopeList, []string{"v"}, "overview / diff"},
-	{"unfold", ScopeList, []string{"z"}, "fold file / part"},
-	{"toggle_pane", ScopeList, []string{"p"}, "preview pane"},
-	{"pane_grow", ScopeList, []string{"+"}, "taller pane"},
-	{"pane_shrink", ScopeList, []string{"-"}, "shorter pane"},
+	{"preview_tab", ScopeList, []string{"v"}, "overview / diff"},
+	{"fold", ScopeList, []string{"z"}, "fold file / part"},
+	{"preview", ScopeList, []string{"p"}, "preview pane"},
+	{"preview_grow", ScopeList, []string{"+"}, "taller pane"},
+	{"preview_shrink", ScopeList, []string{"-"}, "shorter pane"},
 
 	{"choose", ScopePopup, []string{"enter"}, "choose"},
 
@@ -107,7 +107,7 @@ var Defaults = []Def{
 	{"triage_apply", ScopeTriage, []string{"enter"}, "apply"},
 	{"triage_more", ScopeTriage, []string{"i"}, "ask more"},
 
-	{"ask_more", ScopeChat, []string{"i"}, "ask more"},
+	{"chat_more", ScopeChat, []string{"i"}, "ask more"},
 	{"draft_review", ScopeChat, []string{"R"}, "draft review"},
 	{"open_claude", ScopeChat, []string{"O"}, "open in claude code"},
 	{"chat_approve", ScopeChat, []string{"A"}, "approve"},
@@ -119,6 +119,25 @@ var Defaults = []Def{
 	{"accept", ScopeInput, []string{"enter"}, "accept"},
 	{"erase", ScopeInput, []string{"backspace"}, "erase"},
 	{"erase_word", ScopeInput, []string{"ctrl+w"}, "erase word"},
+}
+
+// renamed are the actions that were renamed, by their old name. A [keys]
+// entry under an old name is a mistake that names the new one; the old name
+// is not read (ADR-023).
+var renamed = map[string]Action{
+	"open":          "menu",
+	"claude":        "triage",
+	"pr_claude":     "ask_claude",
+	"ask_more":      "chat_more",
+	"unfold":        "fold",
+	"toggle_bots":   "fold_bots",
+	"toggle_pane":   "preview",
+	"pane_tab":      "preview_tab",
+	"pane_grow":     "preview_grow",
+	"pane_shrink":   "preview_shrink",
+	"pane_down":     "preview_down",
+	"pane_up":       "preview_up",
+	"notifications": "events",
 }
 
 // The fixed keys are read before any action and cannot be bound.
@@ -205,6 +224,10 @@ func Apply(base Map, set map[string][]string) (Map, []Problem) {
 	var ps []Problem
 	for _, n := range names {
 		a := Action(n)
+		if to, ok := renamed[n]; ok {
+			ps = append(ps, Problem{Action: n, Index: -1, AtKey: true, Message: fmt.Sprintf("keys.%s: %q was renamed to %q", n, n, to)})
+			continue
+		}
 		if _, ok := m.defs[a]; !ok {
 			ps = append(ps, Problem{Action: n, Index: -1, AtKey: true, Message: fmt.Sprintf("keys.%s: %s", n, unknownAction(n))})
 			continue

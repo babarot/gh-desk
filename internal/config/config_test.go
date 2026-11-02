@@ -104,7 +104,7 @@ checks_timeout = "1h30m"
 [keys]
 approve = "a"
 merge = ["m", "M"]
-claude = 1
+triage = 1
 [claude]
 language = "Japanese"
 `))
@@ -125,8 +125,8 @@ language = "Japanese"
 	if got := cfg.Keys["merge"].Keys; len(got) != 2 {
 		t.Errorf("merge = %v", got)
 	}
-	if cfg.Keys["claude"].Err == nil {
-		t.Error("claude = 1 should be kept as an error")
+	if cfg.Keys["triage"].Err == nil {
+		t.Error("triage = 1 should be kept as an error")
 	}
 }
 
@@ -398,6 +398,6 @@ func TestMenuActions(t *testing.T) {
 	}
 	wantErrs(t, "[menu]\nactions = [\"merge\", \"merge\", \"aprove\"]\n",
 		`config.toml:2:21: menu.actions names "merge" twice`,
-		`menu.actions[2] must be one of "pr_claude", "browse", "review", "comment", "approve", "merge", "ready_for_review", "hide", got "aprove"; did you mean "approve"?`)
+		`menu.actions[2] must be one of "ask_claude", "browse", "review", "comment", "approve", "merge", "ready_for_review", "hide", got "aprove"; did you mean "approve"?`)
 	wantErrs(t, "[menu]\nactions = []\n", `menu.actions must name at least one of`)
 }

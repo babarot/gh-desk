@@ -192,7 +192,7 @@
           "description": "The actions the menu of enter offers, in the order given. One left out is not in the menu; its key still runs it from the list.",
           "items": {
             "enum": [
-              "pr_claude",
+              "ask_claude",
               "browse",
               "review",
               "comment",

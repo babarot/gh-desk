@@ -84,7 +84,7 @@ func (m *Model) render() string {
 		lines = m.renderHelp(lines)
 	case m.toast != nil && len(lines) > 3:
 		toast := m.st.border.Render("╭ ") + m.noteIcon(m.toast.icon) + " " + m.st.sub1.Render(m.toast.title) + " " +
-			m.st.dim.Render("· "+m.firstKey("notifications")+" to see") + m.st.border.Render(" ╮")
+			m.st.dim.Render("· "+m.firstKey("events")+" to see") + m.st.border.Render(" ╮")
 		at := len(lines) - 3
 		lines[at] = place(lines[at], toast, max(m.width-lipgloss.Width(toast)-1, 0))
 	}
@@ -260,7 +260,7 @@ func (m *Model) headerRight() string {
 		parts = append(parts, st.yellow.Render("as of "+t.asOf.Local().Format("15:04")))
 	}
 	if n := m.unseen(); n > 0 {
-		parts = append(parts, st.mauve.Render(fmt.Sprintf("✦%d", n))+" "+st.dim.Render(m.firstKey("notifications")))
+		parts = append(parts, st.mauve.Render(fmt.Sprintf("✦%d", n))+" "+st.dim.Render(m.firstKey("events")))
 	}
 	if s := m.tally(); s != "" {
 		parts = append(parts, s)
@@ -299,13 +299,13 @@ var ready = map[keymap.Action]bool{
 	"quit": true, "help": true, "refresh": true,
 	"up": true, "down": true, "top": true, "bottom": true, "page_up": true, "page_down": true,
 	"next_tab": true, "prev_tab": true, "tab_1": true, "tab_2": true, "tab_3": true, "tab_4": true, "tab_5": true, "tab_6": true, "tab_7": true, "tab_8": true, "tab_9": true,
-	"open": true, "expand": true, "collapse": true, "approve": true, "comment": true, "review": true, "browse": true, "hide": true,
-	"notifications": true, "select": true, "select_shown": true, "clear_selection": true, "merge": true, "ready_for_review": true,
+	"menu": true, "expand": true, "collapse": true, "approve": true, "comment": true, "review": true, "browse": true, "hide": true,
+	"events": true, "select": true, "select_shown": true, "clear_selection": true, "merge": true, "ready_for_review": true,
 	"include_failing": true, "choose": true, "select_rule": true,
-	"toggle_bots": true, "show_settled": true, "filter": true,
-	"pane_down": true, "pane_up": true, "pane_grow": true, "pane_shrink": true, "next_file": true, "prev_file": true, "pane_tab": true, "unfold": true, "toggle_pane": true,
+	"fold_bots": true, "show_settled": true, "filter": true,
+	"preview_down": true, "preview_up": true, "preview_grow": true, "preview_shrink": true, "next_file": true, "prev_file": true, "preview_tab": true, "fold": true, "preview": true,
 	"confirm": true, "next_kind": true, "post": true, "editor": true, "accept": true, "erase": true, "erase_word": true,
-	"claude": true, "triage_apply": true, "triage_more": true, "pr_claude": true, "ask_more": true, "draft_review": true, "open_claude": true, "chat_approve": true,
+	"triage": true, "triage_apply": true, "triage_more": true, "ask_claude": true, "chat_more": true, "draft_review": true, "open_claude": true, "chat_approve": true,
 }
 
 // hints is the key line of what has the focus.
@@ -331,20 +331,20 @@ func (m *Model) hints() string {
 			as = []keymap.Action{"triage_more"}
 		}
 	case m.view == viewList && len(m.selected) > 0:
-		as = []keymap.Action{"select", "select_shown", "clear_selection", "approve", "merge", "comment", "pane_tab", "filter", "help"}
+		as = []keymap.Action{"select", "select_shown", "clear_selection", "approve", "merge", "comment", "preview_tab", "filter", "help"}
 	case m.filtering:
 		as = []keymap.Action{"accept"}
 	case m.view == viewChat && m.chat() != nil && m.chat().typing:
 		as = []keymap.Action{"accept"}
 	case m.view == viewChat:
-		as = []keymap.Action{"ask_more", "draft_review", "chat_approve", "open_claude", "down", "help"}
+		as = []keymap.Action{"chat_more", "draft_review", "chat_approve", "open_claude", "down", "help"}
 	default:
-		as = []keymap.Action{"open", "select", "select_rule", "approve", "merge", "comment", "review", "claude", "browse", "pane_tab", "help"}
+		as = []keymap.Action{"menu", "select", "select_rule", "approve", "merge", "comment", "review", "triage", "browse", "preview_tab", "help"}
 		if m.tab().inbox {
 			as = append(as[:len(as)-1], "hide", "show_settled", "help")
 		}
 		if p, _, ok := m.currentPR(); ok && m.own(p) {
-			as = []keymap.Action{"open", "select", "merge", "comment", "browse", "pane_tab", "filter", "help"}
+			as = []keymap.Action{"menu", "select", "merge", "comment", "browse", "preview_tab", "filter", "help"}
 		}
 	}
 	var parts []string

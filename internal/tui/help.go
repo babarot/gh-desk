@@ -220,7 +220,7 @@ func (m *Model) helpKey(k string) {
 	switch {
 	case k == keymap.Back || m.keys.Matches("help", k) || m.keys.Matches("quit", k):
 		m.help = false
-	case m.keys.Matches("unfold", k):
+	case m.keys.Matches("fold", k):
 		m.foldHelp()
 	case m.keys.Matches("down", k):
 		m.scrollHelp(1)
@@ -265,7 +265,7 @@ func (m *Model) renderHelp(lines []string) []string {
 	st := m.st
 	all, heads, top, h := m.helpShown()
 	w := m.helpWidth()
-	box := box(st, "keys · "+m.firstKey("unfold")+" fold · "+m.firstKey("help")+" esc close", all[top:top+h], w)
+	box := box(st, "keys · "+m.firstKey("fold")+" fold · "+m.firstKey("help")+" esc close", all[top:top+h], w)
 	if len(all) > h {
 		box[len(box)-1] = scrollEdge(st, w, top, len(all)-top-h, m.scrollKeys()+" wheel")
 	}

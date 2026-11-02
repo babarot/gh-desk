@@ -321,7 +321,7 @@ func (m *Model) chatKeyPress(msg tea.KeyPressMsg) tea.Cmd {
 		c.scroll = 0
 	case is("top"):
 		c.scroll = 1 << 30
-	case is("ask_more"):
+	case is("chat_more"):
 		c.typing = true
 		c.input.SetWidth(max(m.width-4, 20))
 		return c.input.Focus()
@@ -476,5 +476,5 @@ func (m *Model) renderChat(b *strings.Builder, height int) {
 		b.WriteString(c.input.View() + "\n")
 		return
 	}
-	b.WriteString(fit(st.dim.Render(fmt.Sprintf("› %s to ask more · %s to draft a review", m.firstKey("ask_more"), m.firstKey("draft_review"))), m.width) + "\n")
+	b.WriteString(fit(st.dim.Render(fmt.Sprintf("› %s to ask more · %s to draft a review", m.firstKey("chat_more"), m.firstKey("draft_review"))), m.width) + "\n")
 }
