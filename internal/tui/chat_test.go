@@ -10,6 +10,9 @@ import (
 
 	"github.com/babarot/gh-triage/internal/claude"
 	"github.com/babarot/gh-triage/internal/keymap"
+	"github.com/babarot/gh-triage/internal/logging"
+	"github.com/babarot/gh-triage/internal/model"
+	"github.com/babarot/gh-triage/internal/tui/chat"
 )
 
 func stripped(ls []string) string {
@@ -25,12 +28,12 @@ func stripped(ls []string) string {
 // it took.
 func TestChatAnswerCountsItsTools(t *testing.T) {
 	m := start(t, fixture(), keymap.Default())
-	c := &chat{turns: []turn{
-		{you: true, text: "Review this pull request.", at: now},
-		{text: "Fine.", steps: []claude.Step{{Tool: "Grep"}, {Tool: "Read"}, {Tool: "Grep"}}, at: now.Add(72 * time.Second), cost: 0.41},
-		{you: true, text: "And the tests?", at: now.Add(5 * time.Minute)},
-		{text: "Fine too.", at: now.Add(5*time.Minute + 3*time.Second)},
-	}}
+	c := kept(t, "",
+		chat.Turn{You: true, Text: "Review this pull request.", At: now},
+		chat.Turn{Text: "Fine.", Steps: []claude.Step{{Tool: "Grep"}, {Tool: "Read"}, {Tool: "Grep"}}, At: now.Add(72 * time.Second), Cost: 0.41},
+		chat.Turn{You: true, Text: "And the tests?", At: now.Add(5 * time.Minute)},
+		chat.Turn{Text: "Fine too.", At: now.Add(5*time.Minute + 3*time.Second)},
+	)
 	want := strings.Join([]string{
 		"> Review this pull request.",
 		"",
@@ -58,12 +61,12 @@ func TestChatAnswerCountsItsTools(t *testing.T) {
 func TestChatShowsTheLastToolsWhileAnswering(t *testing.T) {
 	m := start(t, fixture(), keymap.Default())
 	dir := "/cache/worktrees/acme/api/12"
-	c := &chat{dir: dir, running: true, since: now.Add(-11 * time.Second), turns: []turn{{you: true, text: "Why?"}}, steps: []claude.Step{
-		{Tool: "Grep", Arg: "retry"},
-		{Tool: "Read", Arg: dir + "/a.go"},
-		{Tool: "Grep", Arg: "func Do"},
-		{Tool: "Read", Arg: dir + "/internal/retry/retry.go"},
-	}}
+	c := answering(t, dir, "Why?", now.Add(-11*time.Second),
+		claude.Step{Tool: "Grep", Arg: "retry"},
+		claude.Step{Tool: "Read", Arg: dir + "/a.go"},
+		claude.Step{Tool: "Grep", Arg: "func Do"},
+		claude.Step{Tool: "Read", Arg: dir + "/internal/retry/retry.go"},
+	)
 	got := stripped(m.chatLines(c, 60))
 	for _, w := range []string{
 		"  … 1 earlier\n  ⏺ Read(a.go)\n  ⏺ Grep(func Do)\n  ⏺ Read(internal/retry/retry.go)\n\n",
@@ -97,7 +100,7 @@ func TestStepArgKeepsTheFileName(t *testing.T) {
 // first.
 func TestChatShowsTheWholeQuestion(t *testing.T) {
 	m := start(t, fixture(), keymap.Default())
-	c := &chat{turns: []turn{{you: true, text: "日本語でまとめ直して。\nあと 2 の件、影響範囲はどこまで？"}}}
+	c := kept(t, "", chat.Turn{You: true, Text: "日本語でまとめ直して。\nあと 2 の件、影響範囲はどこまで？"})
 	want := "> 日本語でまとめ直して。\n  あと 2 の件、影響範囲はどこまで？\n"
 	if got := stripped(m.chatLines(c, 60)); !strings.HasPrefix(got, want) {
 		t.Errorf("lines:\n%s\nwant them to start with:\n%s", got, want)
@@ -107,7 +110,7 @@ func TestChatShowsTheWholeQuestion(t *testing.T) {
 // On a wide terminal an answer is wrapped at chatMaxWidth.
 func TestChatAnswerWrapsAtMostWidth(t *testing.T) {
 	m := start(t, fixture(), keymap.Default())
-	c := &chat{turns: []turn{{text: strings.Repeat("word ", 80)}}}
+	c := kept(t, "", chat.Turn{Text: strings.Repeat("word ", 80)})
 	ls := m.chatLines(c, 180)
 	if len(ls) < 3 {
 		t.Fatalf("not wrapped:\n%s", stripped(ls))
@@ -144,4 +147,44 @@ func TestChatInputStaysInItsBox(t *testing.T) {
 			t.Errorf("at %d %d of %d typed characters are shown", w, shown, len(typed))
 		}
 	}
+}
+
+// testKey is the pull request the conversations built here are about.
+var testKey = model.PRKey{Owner: "acme", Repo: "api", Number: 12}
+
+// noStatus drops what a conversation says went wrong.
+type noStatus struct{}
+
+func (noStatus) Fail(string)   {}
+func (noStatus) Refuse(string) {}
+
+// kept is a conversation as read from what is kept: its worktree and
+// its turns.
+func kept(t *testing.T, dir string, turns ...chat.Turn) *chatScreen {
+	t.Helper()
+	store := newFakeChats()
+	store.recs[testKey] = chat.Record{Key: testKey, Dir: dir, Rev: 1, Turns: turns}
+	s := chat.NewState(store, logging.Discard(), func() time.Time { return now }, noStatus{})
+	c := s.New(model.PR{Key: testKey})
+	s.Sync(c)
+	if len(c.Turns()) != len(turns) {
+		t.Fatalf("read %d turns of %d", len(c.Turns()), len(turns))
+	}
+	return &chatScreen{Conversation: c}
+}
+
+// answering is a conversation whose question was asked at since in the
+// worktree dir, with what Claude did for it so far.
+func answering(t *testing.T, dir, question string, since time.Time, steps ...claude.Step) *chatScreen {
+	t.Helper()
+	s := chat.NewState(nil, logging.Discard(), func() time.Time { return since }, noStatus{})
+	c := s.New(model.PR{Key: testKey})
+	c.Prepared(dir, "")
+	if _, ok := s.Begin(c, question); !ok {
+		t.Fatal("the question was not asked")
+	}
+	for _, st := range steps {
+		c.AddStep(st)
+	}
+	return &chatScreen{Conversation: c}
 }

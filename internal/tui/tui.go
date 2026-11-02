@@ -17,6 +17,7 @@ import (
 	"github.com/babarot/gh-triage/internal/plan"
 	"github.com/babarot/gh-triage/internal/runner"
 	"github.com/babarot/gh-triage/internal/statusline"
+	"github.com/babarot/gh-triage/internal/tui/chat"
 )
 
 // Source is what the TUI needs from GitHub. The app package passes the
@@ -158,7 +159,7 @@ type Settings struct {
 	Lists Lists
 	// Chats keep the conversations with Claude; nil keeps them only while
 	// gh-triage runs.
-	Chats Chats
+	Chats chat.Store
 	// Refresh is how often the shown tab is read again; zero turns it off.
 	Refresh time.Duration
 	// Now is the clock, for tests; nil is time.Now.
@@ -251,8 +252,12 @@ type Model struct {
 	refreshing *refreshRun
 	compose    *compose
 	confirm    *confirm
-	// chats are the conversations with Claude.
-	chats *chatState
+	// chats are the conversations with Claude, by pull request, and
+	// chatKey the one on screen; chatState keeps them and takes their
+	// locks.
+	chats     map[model.PRKey]*chatScreen
+	chatKey   model.PRKey
+	chatState *chat.State
 	// triage is the conversation with Claude about the lists, once begun.
 	triage *triage
 	// cautions are what Claude said of release notes, by notesID; empty
@@ -285,7 +290,8 @@ func New(src Source, run Runner, cl Claude, km keymap.Map, log *slog.Logger, set
 	m := &Model{src: src, run: run, claude: cl, cautions: map[string]string{}, fresh: map[model.PRKey]time.Time{}, keys: km, log: log, set: set, ctx: context.Background(), unread: map[model.PRKey]model.Notification{},
 		selected: map[model.PRKey]selection{}, progress: map[model.PRKey]progress{}, batches: map[string]*batchState{},
 		merged: map[model.PRKey]bool{}, refreshed: map[int]time.Time{}}
-	m.chats = newChatState(set.Chats, log, set.Now, m)
+	m.chats = map[model.PRKey]*chatScreen{}
+	m.chatState = chat.NewState(set.Chats, log, set.Now, chatStatus{m})
 	m.st = newStyles(theme(set.ThemeDark))
 	m.spinStyle = spinner(set.Spinner)
 	for i, t := range set.Tabs {
@@ -301,7 +307,7 @@ func New(src Source, run Runner, cl Claude, km keymap.Map, log *slog.Logger, set
 	m.cache = newCache()
 	m.viewer = set.Viewer
 	m.loadCached()
-	m.chats.loadKeys()
+	m.chatState.LoadKeys()
 	return m
 }
 
@@ -319,7 +325,7 @@ func Run(ctx context.Context, src Source, run Runner, cl Claude, km keymap.Map, 
 	cancel()
 	done := make(chan struct{})
 	go func() {
-		m.chats.asking.Wait()
+		m.chatState.Asking().Wait()
 		close(done)
 	}()
 	select {
@@ -370,7 +376,7 @@ func (m *Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.compose != nil {
 			m.compose.resize(m.width, m.height)
 		}
-		for _, c := range m.chats.all {
+		for _, c := range m.chats {
 			c.input.SetWidth(chatInputWidth(m.width))
 		}
 		return m, nil

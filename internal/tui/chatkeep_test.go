@@ -11,12 +11,13 @@ import (
 	"github.com/babarot/gh-triage/internal/keymap"
 	"github.com/babarot/gh-triage/internal/model"
 	"github.com/babarot/gh-triage/internal/runner"
+	"github.com/babarot/gh-triage/internal/tui/chat"
 )
 
 // fakeChats keeps conversations in memory. Two Models given one stand for
 // two gh-triage sharing the state directory.
 type fakeChats struct {
-	recs map[model.PRKey]ChatRecord
+	recs map[model.PRKey]chat.Record
 	// held names who holds each lock.
 	held    map[model.PRKey]string
 	saveErr error
@@ -24,15 +25,15 @@ type fakeChats struct {
 }
 
 func newFakeChats() *fakeChats {
-	return &fakeChats{recs: map[model.PRKey]ChatRecord{}, held: map[model.PRKey]string{}}
+	return &fakeChats{recs: map[model.PRKey]chat.Record{}, held: map[model.PRKey]string{}}
 }
 
-func (f *fakeChats) Load(k model.PRKey) (ChatRecord, bool, error) {
+func (f *fakeChats) Load(k model.PRKey) (chat.Record, bool, error) {
 	r, ok := f.recs[k]
 	return r, ok, nil
 }
 
-func (f *fakeChats) Save(r ChatRecord) error {
+func (f *fakeChats) Save(r chat.Record) error {
 	if f.saveErr != nil {
 		return f.saveErr
 	}
@@ -76,7 +77,7 @@ func TestConversationGoesOnInAnotherLaunch(t *testing.T) {
 	if len(fc1.asked) != 2 {
 		t.Fatalf("asked %d", len(fc1.asked))
 	}
-	k := m1.chats.key
+	k := m1.chatKey
 	if r := chats.recs[k]; len(r.Turns) != 4 || !r.Started || r.Session != fc1.asked[0].Session || r.Rev == 0 {
 		t.Fatalf("kept %+v", r)
 	}
@@ -110,8 +111,8 @@ func TestConversationGoesOnInAnotherLaunch(t *testing.T) {
 func TestConversationCutShort(t *testing.T) {
 	chats := newFakeChats()
 	k := key("acme", "api", 12)
-	chats.recs[k] = ChatRecord{Key: k, Session: "taken", Dir: "/cache/worktrees/acme/api#12", Head: "aaaaaaa1", Rev: 1,
-		Turns: []ChatTurn{{You: true, Text: "Review this pull request.", Head: "aaaaaaa1"}}}
+	chats.recs[k] = chat.Record{Key: k, Session: "taken", Dir: "/cache/worktrees/acme/api#12", Head: "aaaaaaa1", Rev: 1,
+		Turns: []chat.Turn{{You: true, Text: "Review this pull request.", Head: "aaaaaaa1"}}}
 	m, fc := startKept(t, chats)
 	press(m, "i")
 	if len(fc.asked) != 0 {
@@ -134,8 +135,8 @@ func TestConversationCutShort(t *testing.T) {
 func TestConversationWorkedOnElsewhere(t *testing.T) {
 	chats := newFakeChats()
 	k := key("acme", "api", 12)
-	chats.recs[k] = ChatRecord{Key: k, Session: "s1", Dir: "/cache/worktrees/acme/api#12", Head: "aaaaaaa1", Rev: 1,
-		Turns: []ChatTurn{{You: true, Text: "Review this pull request.", Head: "aaaaaaa1"}}}
+	chats.recs[k] = chat.Record{Key: k, Session: "s1", Dir: "/cache/worktrees/acme/api#12", Head: "aaaaaaa1", Rev: 1,
+		Turns: []chat.Turn{{You: true, Text: "Review this pull request.", Head: "aaaaaaa1"}}}
 	chats.held[k] = "pid 42 in /there"
 	m, fc := startKept(t, chats)
 	press(m, "i")
@@ -153,10 +154,11 @@ func TestConversationWorkedOnElsewhere(t *testing.T) {
 	// The other one answers and lets go; the screen reads it again.
 	r := chats.recs[k]
 	r.Started, r.Rev = true, 2
-	r.Turns = append(r.Turns, ChatTurn{Text: "Answered over there."})
+	r.Turns = append(r.Turns, chat.Turn{Text: "Answered over there."})
 	chats.recs[k] = r
 	delete(chats.held, k)
-	m.chat().probed = time.Time{}
+	// A second later, as the spinner turns.
+	m.set.Now = func() time.Time { return now.Add(watchEvery) }
 	m.watchChat()
 	if s := screen(m); !strings.Contains(s, "Answered over there.") || strings.Contains(s, "answering in another") {
 		t.Errorf("the answer is not shown:\n%s", s)
@@ -166,8 +168,8 @@ func TestConversationWorkedOnElsewhere(t *testing.T) {
 func TestConversationAfterTheHeadMoved(t *testing.T) {
 	chats := newFakeChats()
 	k := key("acme", "api", 12)
-	chats.recs[k] = ChatRecord{Key: k, Session: "s1", Started: true, Dir: "/cache/worktrees/acme/api#12", Head: "0000old", Rev: 2,
-		Turns: []ChatTurn{{You: true, Text: "Review this pull request.", Head: "0000old"}, {Text: "Fine."}}}
+	chats.recs[k] = chat.Record{Key: k, Session: "s1", Started: true, Dir: "/cache/worktrees/acme/api#12", Head: "0000old", Rev: 2,
+		Turns: []chat.Turn{{You: true, Text: "Review this pull request.", Head: "0000old"}, {Text: "Fine."}}}
 	m, fc := startKept(t, chats)
 	press(m, "i")
 	if s := screen(m); !strings.Contains(s, "(was 0000old)") {
@@ -190,7 +192,7 @@ func TestConversationStartedOver(t *testing.T) {
 	chats := newFakeChats()
 	m, fc := startKept(t, chats)
 	press(m, "i")
-	k := m.chats.key
+	k := m.chatKey
 	before := chats.recs[k].Rev
 	press(m, "N")
 	if len(fc.asked) != 1 {
@@ -224,7 +226,7 @@ func TestConversationRemovedByGC(t *testing.T) {
 	chats := newFakeChats()
 	m, fc := startKept(t, chats)
 	press(m, "i")
-	k := m.chats.key
+	k := m.chatKey
 	press(m, "esc")
 	delete(chats.recs, k)
 	press(m, "i")
@@ -236,8 +238,8 @@ func TestConversationRemovedByGC(t *testing.T) {
 func TestConversationKeptInThePane(t *testing.T) {
 	chats := newFakeChats()
 	k := key("acme", "api", 12)
-	chats.recs[k] = ChatRecord{Key: k, Session: "s1", Started: true, Head: "aaaaaaa1", Rev: 2,
-		Turns: []ChatTurn{{You: true, Text: "Review this pull request."}, {Text: "Fine."}}}
+	chats.recs[k] = chat.Record{Key: k, Session: "s1", Started: true, Head: "aaaaaaa1", Rev: 2,
+		Turns: []chat.Turn{{You: true, Text: "Review this pull request."}, {Text: "Fine."}}}
 	m, _ := startKept(t, chats)
 	if s := screen(m); !strings.Contains(s, "1 question · at aaaaaaa") {
 		t.Errorf("the pane does not say a conversation is kept:\n%s", s)
@@ -257,7 +259,7 @@ func TestConversationAskedAfterAnotherAdded(t *testing.T) {
 		t.Fatalf("asked %d", len(fc1.asked))
 	}
 	var asked []string
-	for _, tr := range chats.recs[m1.chats.key].Turns {
+	for _, tr := range chats.recs[m1.chatKey].Turns {
 		if tr.You {
 			asked = append(asked, tr.Text)
 		}

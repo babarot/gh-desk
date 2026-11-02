@@ -420,14 +420,14 @@ func (m *Model) facts(p model.PR, d *entry[model.Detail], width int) []line {
 	if !p.Updated.IsZero() {
 		add("updated", plain(st.sub0.Render(shortAge(m.set.Now().Sub(p.Updated))+" ago"))...)
 	}
-	if ci, ok := m.chats.keptInfo(p.Key); ok {
-		asked := fmt.Sprintf("%d questions", ci.questions)
-		if ci.questions == 1 {
+	if ci, ok := m.chatState.KeptInfo(p.Key); ok {
+		asked := fmt.Sprintf("%d questions", ci.Questions)
+		if ci.Questions == 1 {
 			asked = "1 question"
 		}
 		at := ""
-		if ci.head != "" {
-			at = " · at " + short(ci.head)
+		if ci.Head != "" {
+			at = " · at " + short(ci.Head)
 		}
 		add("claude", plain(st.sub0.Render(asked)+st.muted.Render(at))...)
 	}

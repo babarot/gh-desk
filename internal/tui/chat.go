@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os/exec"
+	"slices"
 	"strings"
 	"time"
 
@@ -16,6 +17,7 @@ import (
 	"github.com/babarot/gh-triage/internal/keymap"
 	"github.com/babarot/gh-triage/internal/model"
 	"github.com/babarot/gh-triage/internal/runner"
+	"github.com/babarot/gh-triage/internal/tui/chat"
 )
 
 // Claude asks Claude Code about pull requests. The app package passes the
@@ -35,33 +37,14 @@ type Claude interface {
 	Triage(ctx context.Context, r claude.Request) (claude.Answer, error)
 }
 
-// chat is a conversation with Claude about one pull request. It stays
-// when the screen is left, and goes on when it is opened again; when kept
-// (ADR-031), also after gh-triage quits and in another gh-triage.
-type chat struct {
-	pr model.PR
-	// session is made when a question starts it, as an ID Claude Code
-	// may have taken is not used again.
-	session string
-	// dir is the worktree, once made.
-	dir string
-	// started is set once Claude Code has the session.
-	started bool
-	// head is the head of the pull request at the last question.
-	head  string
-	turns []turn
-	// running is the question on its way, and steps what Claude did for
-	// it so far.
-	running bool
-	steps   []claude.Step
-	cancel  context.CancelFunc
-	// since is when the question on its way was asked.
-	since time.Time
+// chatScreen is a conversation with Claude as the screen shows it: the
+// conversation, which internal/tui/chat holds and changes, and what is
+// the screen's own.
+type chatScreen struct {
+	*chat.Conversation
 	// unseen is set when an answer came while the screen was elsewhere,
 	// until the conversation is opened.
 	unseen bool
-	cost   float64
-	model  string
 	// scroll is how many lines up from the end the screen shows.
 	scroll int
 	// draft is a review drafted while the screen was elsewhere, opened
@@ -70,36 +53,15 @@ type chat struct {
 	typing bool
 	input  textarea.Model
 	back   view
-
-	// persist is set while the conversation is kept; a write that failed
-	// clears it for this run. rev is the rev of the last write that
-	// succeeded, 0 when none has.
-	persist bool
-	rev     int
-	// lock releases the conversation's lock, held while Claude Code works
-	// on its session: a question on its way, or Claude Code in the
-	// terminal.
-	lock func()
-	// elsewhere names the gh-triage that holds the lock, when another one
-	// does, as last found at probed.
-	elsewhere string
-	probed    time.Time
 	// restart is set by a first press of chat_restart, until the next key.
 	restart bool
 }
 
-// turn is a question or an answer.
-type turn struct {
-	you   bool
-	text  string
-	steps []claude.Step
-	err   bool
-	// head is the head of the pull request a question was asked at.
-	head string
-	at   time.Time
-	// cost is what an answer cost, told under it.
-	cost float64
-}
+// chatStatus puts what a conversation says went wrong on the status line.
+type chatStatus struct{ m *Model }
+
+func (s chatStatus) Fail(text string)   { s.m.fail(text) }
+func (s chatStatus) Refuse(text string) { s.m.refuse(text) }
 
 // Messages of a question on its way.
 type (
@@ -146,24 +108,25 @@ func (m *Model) openChat(p model.PR) tea.Cmd {
 	if back == viewChat {
 		back = viewList
 	}
-	c, ok := m.chats.all[p.Key]
+	c, ok := m.chats[p.Key]
 	if !ok {
 		ta := newInput()
 		ta.Placeholder = "Ask Claude"
 		ta.ShowLineNumbers = false
 		ta.SetHeight(3)
 		ta.SetWidth(chatInputWidth(m.width))
-		c = &chat{input: ta, persist: m.chats.store != nil}
-		m.chats.all[p.Key] = c
+		c = &chatScreen{Conversation: m.chatState.New(p), input: ta}
+		m.chats[p.Key] = c
 	}
 	// The pull request as the list has it now, whose head may have moved.
-	c.pr, c.back, c.unseen = p, back, false
-	m.chats.key, m.view = p.Key, viewChat
+	c.SetPR(p)
+	c.back, c.unseen = back, false
+	m.chatKey, m.view = p.Key, viewChat
 	// Probed before reading: a lock found free means what is read is
 	// what the other gh-triage left.
-	m.chats.probe(c)
-	m.chats.sync(c)
-	if len(c.turns) == 0 && !c.running && c.elsewhere == "" {
+	m.chatState.Probe(c.Conversation)
+	m.chatState.Sync(c.Conversation)
+	if len(c.Turns()) == 0 && !c.Running() && c.Elsewhere() == "" {
 		return m.ask(c, "Review this pull request.", "", false)
 	}
 	if d := c.draft; d != nil {
@@ -173,7 +136,8 @@ func (m *Model) openChat(p model.PR) tea.Cmd {
 	return nil
 }
 
-func (m *Model) chat() *chat { return m.chats.current() }
+// chat is the conversation on screen, nil when none was opened.
+func (m *Model) chat() *chatScreen { return m.chats[m.chatKey] }
 
 // watchEvery is how often a conversation on screen is read again while
 // another gh-triage works on it. A constant: reading is a stat and a small
@@ -185,34 +149,35 @@ const watchEvery = time.Second
 // it comes. It only reads; nothing is written on a timer.
 func (m *Model) watchChat() {
 	c := m.chat()
-	if m.view != viewChat || c == nil || c.elsewhere == "" || m.set.Now().Sub(c.probed) < watchEvery {
+	if m.view != viewChat || c == nil || c.Elsewhere() == "" || m.set.Now().Sub(c.Probed()) < watchEvery {
 		return
 	}
 	// Probed first: found free, the reading after it has the answer.
-	m.chats.probe(c)
-	m.chats.sync(c)
+	m.chatState.Probe(c.Conversation)
+	m.chatState.Sync(c.Conversation)
 }
 
 // ask sends a question under the conversation's lock; the first one
 // carries the pull request, and one asked after the head moved says so.
 // The worktree is moved to the head shown before each question, as
 // another gh-triage or gh triage gc may have moved or removed it.
-func (m *Model) ask(c *chat, shown, prompt string, draft bool) tea.Cmd {
-	moved, ok := m.chats.begin(c, shown)
+func (m *Model) ask(c *chatScreen, shown, prompt string, draft bool) tea.Cmd {
+	moved, ok := m.chatState.Begin(c.Conversation, shown)
 	if !ok {
 		return nil
 	}
-	first, dir, key, pr, session := !c.started, c.dir, c.pr.Key, c.pr, c.session
+	c.scroll = 0
+	first, dir, key, pr, session := !c.Started(), c.Dir(), c.PR().Key, c.PR(), c.Session()
 	ctx, cancel := context.WithCancel(m.ctx)
-	c.cancel = cancel
 	ch := make(chan tea.Msg, 16)
 	schema := ""
 	if draft {
 		schema = claude.DraftSchema
 	}
-	m.chats.asking.Add(1)
+	asking := m.chatState.Asking()
+	asking.Add(1)
 	go func() {
-		defer m.chats.asking.Done()
+		defer asking.Done()
 		defer close(ch)
 		defer cancel()
 		send := func(msg tea.Msg) {
@@ -274,42 +239,45 @@ func (m *Model) ask(c *chat, shown, prompt string, draft bool) tea.Cmd {
 }
 
 func (m *Model) chatStep(msg chatStepMsg) tea.Cmd {
-	m.chats.step(msg.key, msg.step)
+	if c, ok := m.chats[msg.key]; ok {
+		c.AddStep(msg.step)
+	}
 	return listenChat(msg.ch)
 }
 
 func (m *Model) chatPrepared(msg chatPreparedMsg) tea.Cmd {
-	if m.chats.prepared(msg.key, msg.dir, msg.session) {
+	if c, ok := m.chats[msg.key]; ok && c.Prepared(msg.dir, msg.session) {
 		m.say("the session kept was started in another cache; this question starts a new one")
 	}
 	return listenChat(msg.ch)
 }
 
 func (m *Model) chatAnswer(msg chatAnswerMsg) tea.Cmd {
-	c, ok := m.chats.all[msg.key]
+	c, ok := m.chats[msg.key]
 	if !ok {
 		return nil
 	}
-	c.running, c.cancel = false, nil
-	c.unseen = m.view != viewChat || m.chats.key != msg.key
+	c.Finish()
+	c.unseen = m.view != viewChat || m.chatKey != msg.key
 	add := func(text string, err bool) {
 		cost := 0.0
 		if !err {
 			cost = msg.answer.Cost
 		}
-		c.reply(text, err, cost, m.set.Now())
+		c.Reply(text, err, cost, m.set.Now())
 	}
-	defer m.chats.end(c)
+	// Kept with the answer, then the session is free for another
+	// gh-triage.
+	defer m.chatState.Keep(c.Conversation)
 	if msg.err != nil {
 		// A session not started is made anew at the next question, as
 		// Claude Code may have taken its ID before failing.
 		if m.ctx.Err() == nil {
 			add(msg.err.Error(), true)
 		}
-		c.steps = nil
 		return nil
 	}
-	c.answered(msg.answer)
+	c.Answered(msg.answer)
 	if msg.draft {
 		d, err := claude.ParseDraft(msg.answer)
 		if err != nil {
@@ -317,7 +285,7 @@ func (m *Model) chatAnswer(msg chatAnswerMsg) tea.Cmd {
 			return nil
 		}
 		add("Drafted a review ("+kindWords[d.Event]+").", false)
-		if m.view != viewChat || m.chats.key != msg.key {
+		if m.view != viewChat || m.chatKey != msg.key {
 			c.draft = &d
 			m.say(fmt.Sprintf("the review of %s is drafted; open Claude to see it", msg.key))
 			return nil
@@ -325,19 +293,20 @@ func (m *Model) chatAnswer(msg chatAnswerMsg) tea.Cmd {
 		return m.draftCompose(c, d)
 	}
 	add(msg.answer.Text, false)
-	if m.view != viewChat || m.chats.key != msg.key {
+	if m.view != viewChat || m.chatKey != msg.key {
 		m.say(fmt.Sprintf("Claude answered on %s", msg.key))
 	}
 	return nil
 }
 
 // draftCompose opens the review popup with Claude's draft.
-func (m *Model) draftCompose(c *chat, d claude.Draft) tea.Cmd {
+func (m *Model) draftCompose(c *chatScreen, d claude.Draft) tea.Cmd {
 	ev := d.Event
-	if m.own(c.pr) || c.pr.State != model.StateOpen {
+	pr := c.PR()
+	if m.own(pr) || pr.State != model.StateOpen {
 		ev = model.EventComment
 	}
-	cmd := m.startCompose(c.pr, ev)
+	cmd := m.startCompose(pr, ev)
 	if m.compose != nil {
 		m.compose.ta.SetValue(d.Body)
 	}
@@ -362,7 +331,7 @@ func (m *Model) chatKeyPress(msg tea.KeyPressMsg) tea.Cmd {
 			if q == "" {
 				return nil
 			}
-			if c.running {
+			if c.Running() {
 				m.refuse("Claude is still answering")
 				return nil
 			}
@@ -381,7 +350,7 @@ func (m *Model) chatKeyPress(msg tea.KeyPressMsg) tea.Cmd {
 	switch {
 	case is("chat_restart"):
 		switch {
-		case c.running:
+		case c.Running():
 			m.refuse("wait for Claude to answer first")
 		case !armed:
 			c.restart = true
@@ -413,30 +382,30 @@ func (m *Model) chatKeyPress(msg tea.KeyPressMsg) tea.Cmd {
 	case is("draft_review"):
 		return m.ask(c, "Draft the review.", claude.DraftPrompt, true)
 	case is("chat_approve"):
-		if m.own(c.pr) {
+		if m.own(c.PR()) {
 			m.refuse("you cannot approve your own pull request")
 			return nil
 		}
 		if m.busy() {
 			return nil
 		}
-		return m.startBulkFor(runner.Approve, []model.PR{c.pr})
+		return m.startBulkFor(runner.Approve, []model.PR{c.PR()})
 	case is("open_claude"):
 		switch {
-		case c.running:
+		case c.Running():
 			m.refuse("wait for Claude to answer first")
-		case !m.chats.lock(c):
+		case !m.chatState.Lock(c.Conversation):
 		default:
-			m.chats.reload(c)
-			if !c.started {
-				c.unlockChat()
+			m.chatState.Reload(c.Conversation)
+			if !c.Started() {
+				c.Unlock()
 				m.refuse("the conversation has not started")
 				return nil
 			}
 			// Held while Claude Code has the session, so no other
 			// gh-triage resumes it meanwhile.
-			key := c.pr.Key
-			return tea.ExecProcess(m.claude.Interactive(c.dir, c.session), func(err error) tea.Msg { return claudeExitMsg{key: key, err: err} })
+			key := c.PR().Key
+			return tea.ExecProcess(m.claude.Interactive(c.Dir(), c.Session()), func(err error) tea.Msg { return claudeExitMsg{key: key, err: err} })
 		}
 	}
 	return nil
@@ -449,7 +418,9 @@ type claudeExitMsg struct {
 }
 
 func (m *Model) claudeExited(msg claudeExitMsg) tea.Cmd {
-	m.chats.unlock(msg.key)
+	if c, ok := m.chats[msg.key]; ok {
+		c.Unlock()
+	}
 	if msg.err != nil {
 		m.fail("Claude Code: " + msg.err.Error())
 		return nil
@@ -459,10 +430,11 @@ func (m *Model) claudeExited(msg claudeExitMsg) tea.Cmd {
 }
 
 // restartChat starts the conversation over and asks for a review again.
-func (m *Model) restartChat(c *chat) tea.Cmd {
-	if !m.chats.restart(c) {
+func (m *Model) restartChat(c *chatScreen) tea.Cmd {
+	if !m.chatState.Restart(c.Conversation) {
 		return nil
 	}
+	c.draft, c.scroll = nil, 0
 	return m.ask(c, "Review this pull request.", "", false)
 }
 
@@ -482,7 +454,7 @@ const (
 
 // chatLines are the conversation, wrapped to width, with Claude's answers
 // drawn from their Markdown.
-func (m *Model) chatLines(c *chat, width int) []string {
+func (m *Model) chatLines(c *chatScreen, width int) []string {
 	st := m.st
 	textW := min(width, chatMaxWidth)
 	margin, indent := spaces(chatMargin), spaces(chatIndent)
@@ -512,30 +484,31 @@ func (m *Model) chatLines(c *chat, width int) []string {
 	head := ""
 	// asked is when the question an answer is to was asked.
 	var asked time.Time
-	for i, t := range c.turns {
+	turns := c.Turns()
+	for i, t := range turns {
 		switch {
-		case t.you:
-			if head != "" && t.head != "" && t.head != head {
-				L = append(L, st.dim.Render("── head moved "+short(head)+" → "+short(t.head)+" ──"), "")
+		case t.You:
+			if head != "" && t.Head != "" && t.Head != head {
+				L = append(L, st.dim.Render("── head moved "+short(head)+" → "+short(t.Head)+" ──"), "")
 			}
-			if t.head != "" {
-				head = t.head
+			if t.Head != "" {
+				head = t.Head
 			}
-			asked = t.at
-			L = append(L, m.questionLines(t.text, width, textW)...)
-			if i == len(c.turns)-1 && !c.running {
+			asked = t.At
+			L = append(L, m.questionLines(t.Text, width, textW)...)
+			if i == len(turns)-1 && !c.Running() {
 				// A question with no answer is on its way in another
 				// gh-triage, or was cut short when one quit.
-				if c.elsewhere != "" {
-					L = append(L, "", margin+m.working(st.muted, "answering in another gh-triage ("+c.elsewhere+")…"))
+				if c.Elsewhere() != "" {
+					L = append(L, "", margin+m.working(st.muted, "answering in another gh-triage ("+c.Elsewhere()+")…"))
 				} else {
 					L = append(L, "", margin+st.dim.Render("interrupted: gh-triage was closed before the answer"))
 				}
 			}
-		case t.err:
-			steps(t.steps, false)
+		case t.Err:
+			steps(t.Steps, false)
 			var ls []string
-			for i, para := range strings.Split(strings.TrimRight(safe(t.text), " \t\n"), "\n") {
+			for i, para := range strings.Split(strings.TrimRight(safe(t.Text), " \t\n"), "\n") {
 				if i == 0 {
 					para = "claude failed: " + para
 				}
@@ -545,17 +518,17 @@ func (m *Model) chatLines(c *chat, width int) []string {
 			}
 			lead(ls, st.red)
 		default:
-			steps(t.steps, false)
+			steps(t.Steps, false)
 			// An answer is Markdown, drawn as a description is.
-			text := zeroWidth.Replace(mdLinkRe.ReplaceAllString(safe(t.text), "$1"))
+			text := zeroWidth.Replace(mdLinkRe.ReplaceAllString(safe(t.Text), "$1"))
 			var ls []string
 			for _, l := range m.markdownLines(strings.TrimRight(text, " \t\n"), max(textW-chatIndent, 10)) {
 				ls = append(ls, l.text)
 			}
 			lead(ls, st.text)
 			var took time.Duration
-			if !asked.IsZero() && t.at.After(asked) {
-				took = t.at.Sub(asked)
+			if !asked.IsZero() && t.At.After(asked) {
+				took = t.At.Sub(asked)
 			}
 			if info := turnInfo(t, took); info != "" {
 				L = append(L, "", indent+st.dim.Render(info))
@@ -563,13 +536,13 @@ func (m *Model) chatLines(c *chat, width int) []string {
 		}
 		L = append(L, "")
 	}
-	if c.running {
-		steps(c.steps, true)
+	if c.Running() {
+		steps(c.Steps(), true)
 		what := "thinking…"
-		if c.dir == "" {
+		if c.Dir() == "" {
 			what = "making the worktree…"
 		}
-		L = append(L, margin+m.working(st.muted, what)+" "+st.dim.Render(elapsed(m.set.Now().Sub(c.since))), "")
+		L = append(L, margin+m.working(st.muted, what)+" "+st.dim.Render(elapsed(m.set.Now().Sub(c.Since()))), "")
 	}
 	return L
 }
@@ -592,7 +565,7 @@ func (m *Model) questionLines(text string, width, textW int) []string {
 
 // stepLines are the tools Claude used: while it answers, the last few
 // with what each was used on; once it has, one line that counts them.
-func (m *Model) stepLines(c *chat, ss []claude.Step, live bool, width int) []string {
+func (m *Model) stepLines(c *chatScreen, ss []claude.Step, live bool, width int) []string {
 	if len(ss) == 0 {
 		return nil
 	}
@@ -625,7 +598,7 @@ func (m *Model) stepLines(c *chat, ss []claude.Step, live bool, width int) []str
 		// The room for the argument is what is left after the tool and
 		// its parentheses.
 		room := width - chatMargin - 2 - ansi.StringWidth(tool) - 2
-		if arg := stepArg(c.dir, safeLine(s.Arg), room); arg != "" {
+		if arg := stepArg(c.Dir(), safeLine(s.Arg), room); arg != "" {
 			line += st.dim.Render("(" + arg + ")")
 		}
 		out = append(out, line)
@@ -656,16 +629,16 @@ func stepArg(dir, arg string, w int) string {
 }
 
 // turnInfo is what an answer took: the tools, the time and the cost.
-func turnInfo(t turn, took time.Duration) string {
+func turnInfo(t chat.Turn, took time.Duration) string {
 	var parts []string
-	if n := len(t.steps); n > 0 {
+	if n := len(t.Steps); n > 0 {
 		parts = append(parts, tools(n))
 	}
 	if took > 0 {
 		parts = append(parts, elapsed(took))
 	}
-	if t.cost > 0 {
-		parts = append(parts, fmt.Sprintf("$%.2f", t.cost))
+	if t.Cost > 0 {
+		parts = append(parts, fmt.Sprintf("$%.2f", t.Cost))
 	}
 	return strings.Join(parts, " · ")
 }
@@ -693,14 +666,16 @@ func elapsed(d time.Duration) string {
 // claudeActivity is Claude answering about a pull request whose
 // conversation is not shown.
 func (m *Model) claudeActivity() string {
-	var shown *model.PRKey
-	if m.view == viewChat {
-		shown = &m.chats.key
+	var away []model.PRKey
+	for k, c := range m.chats {
+		if c.Running() && (m.view != viewChat || m.chatKey != k) {
+			away = append(away, k)
+		}
 	}
-	away := m.chats.answering(shown)
 	if len(away) == 0 {
 		return ""
 	}
+	slices.SortFunc(away, func(a, b model.PRKey) int { return strings.Compare(a.String(), b.String()) })
 	what := "Claude is answering on " + away[0].String()
 	if n := len(away) - 1; n > 0 {
 		what += fmt.Sprintf(" and %d more", n)
@@ -720,18 +695,18 @@ func (m *Model) renderChat(b *strings.Builder, height int) *tea.Cursor {
 	if c == nil {
 		return nil
 	}
-	at := "at " + short(c.pr.HeadOID)
-	if c.head != "" && c.head != c.pr.HeadOID {
-		at += " (was " + short(c.head) + ")"
+	at := "at " + short(c.PR().HeadOID)
+	if c.Head() != "" && c.Head() != c.PR().HeadOID {
+		at += " (was " + short(c.Head()) + ")"
 	}
 	info := []string{at, "read-only"}
-	if c.model != "" {
-		info = append([]string{c.model}, info...)
+	if c.Model() != "" {
+		info = append([]string{c.Model()}, info...)
 	}
-	if c.cost > 0 {
-		info = append(info, fmt.Sprintf("$%.2f", c.cost))
+	if c.Cost() > 0 {
+		info = append(info, fmt.Sprintf("$%.2f", c.Cost()))
 	}
-	b.WriteString(fit(st.mauve.Render("claude")+" "+st.muted.Render("on")+" "+st.sub1.Render(c.pr.Key.String())+"  "+
+	b.WriteString(fit(st.mauve.Render("claude")+" "+st.muted.Render("on")+" "+st.sub1.Render(c.PR().Key.String())+"  "+
 		st.dim.Render(strings.Join(info, " · ")), m.width) + "\n")
 	b.WriteString(st.dim.Render(strings.Repeat("╌", max(m.width-1, 0))) + "\n")
 	inputH := 0

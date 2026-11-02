@@ -36,9 +36,10 @@ var layers = []layer{
 	{"internal/claude", 2, []string{"model", "logging"}, nil, "Running claude -p and the pull request worktrees"},
 	{"internal/listcache", 2, []string{"model"}, nil, "The lists last read, kept on disk for the next launch"},
 	{"internal/runner", 3, []string{"model", "logging", "plan"}, nil, "Bulk approve and merge, auto-merge watching, resuming"},
-	{"internal/tui", 4, []string{"model", "logging", "plan", "diff", "keymap", "runner", "claude", "listcache", "statusline"},
+	{"internal/tui/chat", 3, []string{"model", "logging", "claude"}, nil, "The conversations with Claude about pull requests: what each holds, keeping them and their locks"},
+	{"internal/tui", 4, []string{"model", "logging", "plan", "diff", "keymap", "runner", "claude", "listcache", "statusline", "tui/chat"},
 		[]string{"charm.land/bubbletea/v2", "charm.land/bubbles/v2", "charm.land/lipgloss/v2", "github.com/charmbracelet/x/ansi", "golang.org/x/net/html"}, "The terminal UI"},
-	{"internal/app", 5, []string{"model", "logging", "config", "keymap", "plan", "github", "state", "claude", "listcache", "runner", "tui"}, nil, "Putting it together: flags, config, log, and starting the TUI"},
+	{"internal/app", 5, []string{"model", "logging", "config", "keymap", "plan", "github", "state", "claude", "listcache", "runner", "tui", "tui/chat"}, nil, "Putting it together: flags, config, log, and starting the TUI"},
 	{"", 6, []string{"app"}, nil, "Calls app.Run"},
 }
 

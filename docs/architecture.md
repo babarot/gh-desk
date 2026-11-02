@@ -18,8 +18,9 @@ gh-triage is split into packages by layer. A package imports only packages of lo
 | 2 | `internal/claude` | Running claude -p and the pull request worktrees | `model`, `logging` | - |
 | 2 | `internal/listcache` | The lists last read, kept on disk for the next launch | `model` | - |
 | 3 | `internal/runner` | Bulk approve and merge, auto-merge watching, resuming | `model`, `logging`, `plan` | - |
-| 4 | `internal/tui` | The terminal UI | `model`, `logging`, `plan`, `diff`, `keymap`, `runner`, `claude`, `listcache`, `statusline` | `charm.land/bubbletea/v2`, `charm.land/bubbles/v2`, `charm.land/lipgloss/v2`, `github.com/charmbracelet/x/ansi`, `golang.org/x/net/html` |
-| 5 | `internal/app` | Putting it together: flags, config, log, and starting the TUI | `model`, `logging`, `config`, `keymap`, `plan`, `github`, `state`, `claude`, `listcache`, `runner`, `tui` | - |
+| 3 | `internal/tui/chat` | The conversations with Claude about pull requests: what each holds, keeping them and their locks | `model`, `logging`, `claude` | - |
+| 4 | `internal/tui` | The terminal UI | `model`, `logging`, `plan`, `diff`, `keymap`, `runner`, `claude`, `listcache`, `statusline`, `tui/chat` | `charm.land/bubbletea/v2`, `charm.land/bubbles/v2`, `charm.land/lipgloss/v2`, `github.com/charmbracelet/x/ansi`, `golang.org/x/net/html` |
+| 5 | `internal/app` | Putting it together: flags, config, log, and starting the TUI | `model`, `logging`, `config`, `keymap`, `plan`, `github`, `state`, `claude`, `listcache`, `runner`, `tui`, `tui/chat` | - |
 | 6 | `main` | Calls app.Run | `app` | - |
 
 Standard library packages that reach outside the process:

@@ -120,12 +120,12 @@ func (m *Model) reading() bool {
 			return true
 		}
 	}
-	for _, c := range m.chats.all {
-		if c.running {
+	for _, c := range m.chats {
+		if c.Running() {
 			return true
 		}
 	}
-	if c := m.chat(); m.view == viewChat && c != nil && c.elsewhere != "" {
+	if c := m.chat(); m.view == viewChat && c != nil && c.Elsewhere() != "" {
 		return true
 	}
 	for _, t := range m.tabs {

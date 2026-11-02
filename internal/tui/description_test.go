@@ -9,6 +9,7 @@ import (
 
 	"github.com/babarot/gh-triage/internal/keymap"
 	"github.com/babarot/gh-triage/internal/model"
+	"github.com/babarot/gh-triage/internal/tui/chat"
 )
 
 func TestMarkdownLines(t *testing.T) {
@@ -208,7 +209,7 @@ func TestCommentIsDrawn(t *testing.T) {
 
 func TestChatAnswerIsDrawnFromMarkdown(t *testing.T) {
 	m := start(t, fixture(), keymap.Default())
-	c := &chat{turns: []turn{{text: "## Verdict\n\n**Safe** to merge, see [the docs](https://example.com).\n\n- `go test` passes"}}}
+	c := kept(t, "", chat.Turn{Text: "## Verdict\n\n**Safe** to merge, see [the docs](https://example.com).\n\n- `go test` passes"})
 	var got []string
 	for _, l := range m.chatLines(c, 40) {
 		got = append(got, ansi.Strip(l))

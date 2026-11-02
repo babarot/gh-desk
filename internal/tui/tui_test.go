@@ -19,10 +19,12 @@ import (
 	"github.com/babarot/gh-triage/internal/claude"
 	"github.com/babarot/gh-triage/internal/diff"
 	"github.com/babarot/gh-triage/internal/keymap"
+	"github.com/babarot/gh-triage/internal/logging"
 	"github.com/babarot/gh-triage/internal/model"
 	"github.com/babarot/gh-triage/internal/plan"
 	"github.com/babarot/gh-triage/internal/runner"
 	"github.com/babarot/gh-triage/internal/statusline"
+	"github.com/babarot/gh-triage/internal/tui/chat"
 )
 
 var update = flag.Bool("update", false, "rewrite the golden files")
@@ -1532,9 +1534,10 @@ func TestClaudeConversation(t *testing.T) {
 func TestClaudeAnsweringElsewhere(t *testing.T) {
 	m, _ := startWith(t, fixture(), keymap.Default())
 	press(m, "i")
-	k := m.chats.key
+	k := m.chatKey
 	c := m.chat()
-	c.running, c.since = true, now.Add(-75*time.Second)
+	// A question asked 75 seconds ago, still on its way.
+	chat.NewState(nil, logging.Discard(), func() time.Time { return now.Add(-75 * time.Second) }, noStatus{}).Begin(c.Conversation, "And then?")
 	if s := screen(m); !strings.Contains(s, "thinking… 1m15s") {
 		t.Errorf("no time waited:\n%s", s)
 	}

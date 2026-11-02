@@ -602,7 +602,7 @@ func (m *Model) cell(id string, r row, sel bool, n int) string {
 			mark = st.mauve.Render("✓")
 		case m.selected[p.Key] == byClaude:
 			mark = st.teal.Render("✓")
-		case m.chats.all[p.Key] != nil && m.chats.all[p.Key].unseen:
+		case m.chats[p.Key] != nil && m.chats[p.Key].unseen:
 			mark = st.mauve.Render("✦")
 		case func() bool { _, ok := m.unread[p.Key]; return ok }():
 			mark = st.blue.Render("●")

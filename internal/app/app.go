@@ -30,6 +30,7 @@ import (
 	"github.com/babarot/gh-triage/internal/runner"
 	"github.com/babarot/gh-triage/internal/state"
 	"github.com/babarot/gh-triage/internal/tui"
+	"github.com/babarot/gh-triage/internal/tui/chat"
 )
 
 // Version is set at build time.
@@ -304,23 +305,23 @@ func gc(ctx context.Context, ws *claude.Workspace, chats *state.Chats, gh prRead
 // chatStore is the conversations kept as the TUI asks for them.
 type chatStore struct{ *state.Chats }
 
-func (c chatStore) Load(k model.PRKey) (tui.ChatRecord, bool, error) {
+func (c chatStore) Load(k model.PRKey) (chat.Record, bool, error) {
 	r, ok, err := c.Chats.Load(k)
 	if !ok || err != nil {
-		return tui.ChatRecord{}, ok, err
+		return chat.Record{}, ok, err
 	}
-	out := tui.ChatRecord{Key: r.Key, Session: r.Session, Started: r.Started, Dir: r.Dir, Head: r.Head, Model: r.Model, Cost: r.Cost, Rev: r.Rev}
+	out := chat.Record{Key: r.Key, Session: r.Session, Started: r.Started, Dir: r.Dir, Head: r.Head, Model: r.Model, Cost: r.Cost, Rev: r.Rev}
 	for _, t := range r.Turns {
 		var steps []claude.Step
 		for _, s := range t.Steps {
 			steps = append(steps, claude.Step{Tool: s.Tool, Arg: s.Arg})
 		}
-		out.Turns = append(out.Turns, tui.ChatTurn{You: t.You, Text: t.Text, Steps: steps, Err: t.Err, Head: t.Head, At: t.At, Cost: t.Cost})
+		out.Turns = append(out.Turns, chat.Turn{You: t.You, Text: t.Text, Steps: steps, Err: t.Err, Head: t.Head, At: t.At, Cost: t.Cost})
 	}
 	return out, true, nil
 }
 
-func (c chatStore) Save(r tui.ChatRecord) error {
+func (c chatStore) Save(r chat.Record) error {
 	in := state.ChatRecord{Key: r.Key, Session: r.Session, Started: r.Started, Dir: r.Dir, Head: r.Head, Model: r.Model, Cost: r.Cost, Rev: r.Rev}
 	for _, t := range r.Turns {
 		var steps []state.ChatStep
