@@ -203,6 +203,7 @@ func tomlList(ss []string) string {
 // them.
 var tables = []table{
 	{Name: "list"},
+	{Name: "menu"},
 	{Name: "preview"},
 	{Name: "description"},
 	{Name: "diff"},
@@ -226,6 +227,9 @@ var settings = []setting{
 		Doc: "Owners whose name is left out of the PR column, such as your company."},
 	{Key: "list.columns", Kind: listKind{Values: Columns, NonEmpty: true}, Value: func(f File) any { return f.List.Columns },
 		Doc: `The columns shown, in the order given; "pr" and "title" are needed. WHY shows on grouped tabs and the inbox only, and AUTHOR not on a tab of your own pull requests. On a narrow terminal SIZE goes first, then AUTHOR.`},
+
+	{Key: "menu.actions", Kind: listKind{Values: MenuActions, NonEmpty: true}, Value: func(f File) any { return f.Menu.Actions },
+		Doc: `The actions the menu of enter offers, in the order given. One left out is not in the menu; its key still runs it from the list.`},
 
 	{Key: "preview.height", Kind: intKind{Min: 0}, Value: func(f File) any { return f.Preview.Height },
 		Doc: "Lines of the preview pane under the list; 0 hides it until it is shown with a key. Dragging the pane's top edge, or + and -, changes them, and the lines set that way are kept over this one."},

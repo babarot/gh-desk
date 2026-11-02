@@ -185,6 +185,30 @@
       },
       "type": "object"
     },
+    "menu": {
+      "additionalProperties": false,
+      "properties": {
+        "actions": {
+          "description": "The actions the menu of enter offers, in the order given. One left out is not in the menu; its key still runs it from the list.",
+          "items": {
+            "enum": [
+              "pr_claude",
+              "browse",
+              "review",
+              "comment",
+              "approve",
+              "merge",
+              "ready_for_review",
+              "hide"
+            ],
+            "type": "string"
+          },
+          "minItems": 1,
+          "type": "array"
+        }
+      },
+      "type": "object"
+    },
     "merge": {
       "additionalProperties": false,
       "properties": {

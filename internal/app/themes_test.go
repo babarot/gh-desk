@@ -15,3 +15,11 @@ func TestThemesInStep(t *testing.T) {
 		t.Errorf("config.Themes = %q, the TUI draws %q", got, want)
 	}
 }
+
+// TestMenuActionsInStep keeps the actions the config file takes for the
+// menu, and their default order, the same as those the TUI offers.
+func TestMenuActionsInStep(t *testing.T) {
+	if got, want := config.MenuActions, tui.MenuActions(); !slices.Equal(got, want) {
+		t.Errorf("config.MenuActions = %q, the TUI offers %q", got, want)
+	}
+}

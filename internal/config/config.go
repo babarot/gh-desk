@@ -41,7 +41,10 @@ var (
 	DescriptionStyles = []string{"rendered", "plain"}
 	MergeMethods      = []string{"merge", "squash", "rebase"}
 	// Columns are the list's columns, in their default order.
-	Columns            = []string{"pr", "title", "author", "ci", "review", "why", "size", "age"}
+	Columns = []string{"pr", "title", "author", "ci", "review", "why", "size", "age"}
+	// MenuActions are the actions the menu of enter offers, in their
+	// default order; a test in internal/app keeps them the TUI's.
+	MenuActions        = []string{"pr_claude", "browse", "review", "comment", "approve", "merge", "ready_for_review", "hide"}
 	UpdateBranchValues = []string{"humans", "all", "never"}
 )
 
@@ -58,6 +61,7 @@ type File struct {
 	// in the file, they replace the default ones.
 	Tabs        []Tab
 	List        List
+	Menu        Menu
 	Preview     Preview
 	Description Description
 	Diff        Diff
@@ -110,6 +114,12 @@ type List struct {
 	// Columns are the columns shown, in their order; pr and title among
 	// them.
 	Columns []string
+}
+
+// Menu configures the menu of enter.
+type Menu struct {
+	// Actions are the actions offered, in their order, among MenuActions.
+	Actions []string
 }
 
 // Preview configures the pane under the list.
@@ -289,6 +299,7 @@ func Default() File {
 			{Kind: "inbox", Name: "inbox", Limit: 100},
 		},
 		List:        List{Refresh: dur("3m"), StaleDays: days(30), Columns: slices.Clone(Columns)},
+		Menu:        Menu{Actions: slices.Clone(MenuActions)},
 		Preview:     Preview{Height: DefaultPreviewHeight, Tab: "overview"},
 		Description: Description{Style: "rendered"},
 		Diff:        Diff{Collapse: globs("*.lock", "go.sum", "pnpm-lock.yaml", "package-lock.json", "yarn.lock")},
@@ -344,6 +355,7 @@ type (
 	doc struct {
 		Tabs        []tabDoc       `toml:"tabs"`
 		List        listDoc        `toml:"list"`
+		Menu        menuDoc        `toml:"menu"`
 		Preview     previewDoc     `toml:"preview"`
 		Description descriptionDoc `toml:"description"`
 		Diff        diffDoc        `toml:"diff"`
@@ -373,6 +385,9 @@ type (
 		StaleDays  *Days     `toml:"stale_days"`
 		HomeOwners *[]string `toml:"home_owners"`
 		Columns    *[]string `toml:"columns"`
+	}
+	menuDoc struct {
+		Actions *[]string `toml:"actions"`
 	}
 	previewDoc struct {
 		Height *int    `toml:"height"`
@@ -448,6 +463,7 @@ func Load(path string) (File, Problems, error) {
 	set(&cfg.List.StaleDays, d.List.StaleDays)
 	set(&cfg.List.HomeOwners, d.List.HomeOwners)
 	set(&cfg.List.Columns, d.List.Columns)
+	set(&cfg.Menu.Actions, d.Menu.Actions)
 	set(&cfg.Preview.Height, d.Preview.Height)
 	set(&cfg.Preview.Tab, d.Preview.Tab)
 	set(&cfg.Description.Style, d.Description.Style)
@@ -469,6 +485,7 @@ func Load(path string) (File, Problems, error) {
 
 	ps = append(ps, checkSettings(cfg)...)
 	ps = append(ps, checkColumns(cfg.List.Columns)...)
+	ps = append(ps, namedTwice("menu.actions", cfg.Menu.Actions)...)
 	if d.Review.Editor != nil && strings.TrimSpace(*d.Review.Editor) == "" {
 		ps = append(ps, problem("review.editor", "review.editor must not be empty; leave it out to take $VISUAL, then $EDITOR"))
 	}
@@ -848,15 +865,21 @@ func goTypeWords(t string) string {
 	return t
 }
 
+// namedTwice reports the values of the list at key named twice.
+func namedTwice(key string, ss []string) Problems {
+	var ps Problems
+	for i, s := range ss {
+		if slices.Contains(ss[:i], s) {
+			ps = append(ps, Problem{Key: strings.Split(key, "."), Index: i, Message: fmt.Sprintf("%s names %q twice", key, s)})
+		}
+	}
+	return ps
+}
+
 // checkColumns reports the columns named twice, and pr or title left out:
 // without them a row does not say which pull request it is.
 func checkColumns(cols []string) Problems {
-	var ps Problems
-	for i, c := range cols {
-		if slices.Contains(cols[:i], c) {
-			ps = append(ps, Problem{Key: []string{"list", "columns"}, Index: i, Message: fmt.Sprintf("list.columns names %q twice", c)})
-		}
-	}
+	ps := namedTwice("list.columns", cols)
 	for _, c := range []string{"pr", "title"} {
 		if !slices.Contains(cols, c) {
 			ps = append(ps, problem("list.columns", "list.columns must have %q", c))

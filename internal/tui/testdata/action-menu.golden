@@ -3,13 +3,13 @@ triage // @me    1 review (3)   2 mine (1)   3 involved (0)   4 inbox (2)       
   ▾ requested from you ╭ acme/api#12 ─────────────────────────────────────────────────────────────────────╮
 ▎ ● api#12             │ Add retries to the client                                                        │   +40 −3         3h   
   ▸ requested from a te│                                                                                  │
-  ▸ bots 1             │ ▎ approve               A      send an approving review                          │
+  ▸ bots 1             │ ▎ ask claude about it   i      talk with claude about its diff                   │
+                       │   browser               o      open it on github.com                             │
+                       │   review                R      comment, approve or request changes in a review   │
+                       │   comment               c      comment on its conversation                       │
+                       │   approve               A      send an approving review                          │
                        │   merge                 M      merge it, as the next popup decides               │
                        │   ready for review      D      not a draft                                       │
-                       │   comment               c      comment on its conversation                       │
-                       │   review                R      comment, approve or request changes in a review   │
-                       │   ask claude about it   i      talk with claude about its diff                   │
-                       │   browser               o      open it on github.com                             │
                        │   hide / done           d      hide it from this tab                             │
                        │                                                                                  │
                        │ enter run · or the action's key · esc close                                      │

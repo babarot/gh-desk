@@ -20,8 +20,31 @@ type actionMenu struct {
 	top int
 }
 
-// menuActions are the actions the menu offers, in its order.
-var menuActions = []keymap.Action{"approve", "merge", "ready_for_review", "comment", "review", "pr_claude", "browse", "hide"}
+// menuActions are the actions the menu can offer, in their default order:
+// what reads a pull request, then what answers it, then what finishes it.
+var menuActions = []keymap.Action{"pr_claude", "browse", "review", "comment", "approve", "merge", "ready_for_review", "hide"}
+
+// MenuActions are the actions the menu can offer, in their default order.
+func MenuActions() []string {
+	out := make([]string, len(menuActions))
+	for i, a := range menuActions {
+		out[i] = string(a)
+	}
+	return out
+}
+
+// menuOrder is the actions the menu offers, in their order: the config
+// file's, or all of them in the default order.
+func (m *Model) menuOrder() []keymap.Action {
+	if m.set.Menu == nil {
+		return menuActions
+	}
+	out := make([]keymap.Action, len(m.set.Menu))
+	for i, a := range m.set.Menu {
+		out[i] = keymap.Action(a)
+	}
+	return out
+}
 
 // menuItem is one line of the menu: what the action would do, or why it
 // cannot run.
@@ -62,7 +85,7 @@ func (m *Model) menuItems() []menuItem {
 		return nil
 	}
 	var out []menuItem
-	for _, a := range menuActions {
+	for _, a := range m.menuOrder() {
 		it := menuItem{action: a}
 		if len(m.selected) > 0 {
 			it.about, it.off = m.aboutMany(a, prs)

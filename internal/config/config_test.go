@@ -390,3 +390,14 @@ func TestColumns(t *testing.T) {
 		`list.columns must have "title"`,
 		`list.columns[3] must be one of "pr", "title", "author", "ci", "review", "why", "size", "age", got "authr"; did you mean "author"?`)
 }
+
+func TestMenuActions(t *testing.T) {
+	cfg, _, err := Load(write(t, "[menu]\nactions = [\"merge\", \"approve\"]\n"))
+	if err != nil || !slices.Equal(cfg.Menu.Actions, []string{"merge", "approve"}) {
+		t.Fatalf("menu.actions = %v, %v", cfg.Menu.Actions, err)
+	}
+	wantErrs(t, "[menu]\nactions = [\"merge\", \"merge\", \"aprove\"]\n",
+		`config.toml:2:21: menu.actions names "merge" twice`,
+		`menu.actions[2] must be one of "pr_claude", "browse", "review", "comment", "approve", "merge", "ready_for_review", "hide", got "aprove"; did you mean "approve"?`)
+	wantErrs(t, "[menu]\nactions = []\n", `menu.actions must name at least one of`)
+}

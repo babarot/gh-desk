@@ -614,7 +614,8 @@ func TestActionMenu(t *testing.T) {
 		t.Fatal("esc did not close the menu")
 	}
 
-	press(m, "enter", "j", "enter")
+	// merge is the sixth.
+	press(m, "enter", "j", "j", "j", "j", "j", "enter")
 	if m.menu != nil || m.bulk == nil || m.bulk.kind != runner.Merge {
 		t.Fatalf("choosing merge did not open the merge popup: menu %v, bulk %v", m.menu, m.bulk)
 	}
