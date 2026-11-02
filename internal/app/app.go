@@ -110,7 +110,8 @@ func Run(args []string, stdout, stderr io.Writer) int {
 	}
 	if flags.Arg(0) == "gc" {
 		ws := &claude.Workspace{Dir: cfg.CacheDir(), Log: log}
-		if err := gc(context.Background(), ws, gh, stdout); err != nil {
+		chats := state.OpenChats(state.DefaultDir(), github.DefaultHost())
+		if err := gc(context.Background(), ws, chats, gh, stdout); err != nil {
 			log.Error("gc", "err", err.Error())
 			fmt.Fprintf(stderr, "gh-triage: gc: %v\n", err)
 			return 1
@@ -129,6 +130,7 @@ func Run(args []string, stdout, stderr io.Writer) int {
 	}
 	set.Viewer = viewer
 	set.Host = github.DefaultHost()
+	set.Chats = chatStore{state.OpenChats(state.DefaultDir(), set.Host)}
 	if !*noCache {
 		set.Lists = openLists(cfg, viewer, log)
 	}
@@ -204,16 +206,29 @@ type prReader interface {
 	PullRequests(ctx context.Context, keys []model.PRKey) (map[model.PRKey]model.PR, error)
 }
 
-// gc removes the worktrees of pull requests that are no longer open. A
-// pull request GitHub does not return (deleted, or out of reach) is kept.
-func gc(ctx context.Context, ws *claude.Workspace, gh prReader, out io.Writer) error {
+// gc removes the worktrees and the conversations kept of pull requests
+// that are no longer open. A pull request GitHub does not return (deleted,
+// or out of reach) is kept, and so is one whose conversation a gh-triage
+// is working on: its lock is taken first, without waiting.
+func gc(ctx context.Context, ws *claude.Workspace, chats *state.Chats, gh prReader, out io.Writer) error {
 	wts, err := ws.Worktrees()
 	if err != nil {
 		return err
 	}
 	var keys []model.PRKey
+	hasWorktree := map[model.PRKey]bool{}
 	for _, w := range wts {
 		keys = append(keys, w.Key)
+		hasWorktree[w.Key] = true
+	}
+	ck, err := chats.Keys()
+	if err != nil {
+		return err
+	}
+	for _, k := range ck {
+		if !hasWorktree[k] {
+			keys = append(keys, k)
+		}
 	}
 	removed := 0
 	for chunk := range slices.Chunk(keys, 50) {
@@ -226,7 +241,24 @@ func gc(ctx context.Context, ws *claude.Workspace, gh prReader, out io.Writer) e
 			if !ok || p.State == model.StateOpen {
 				continue
 			}
-			if err := ws.Remove(ctx, k); err != nil {
+			unlock, held, who, err := chats.Lock(k)
+			if err != nil {
+				return fmt.Errorf("%s: %w", k, err)
+			}
+			if !held {
+				fmt.Fprintf(out, "kept %s: a gh-triage (%s) is talking with Claude about it\n", k, cmp.Or(who, "another process"))
+				continue
+			}
+			err = func() error {
+				defer unlock()
+				if hasWorktree[k] {
+					if err := ws.Remove(ctx, k); err != nil {
+						return err
+					}
+				}
+				return chats.Remove(k)
+			}()
+			if err != nil {
 				return fmt.Errorf("%s: %w", k, err)
 			}
 			fmt.Fprintf(out, "removed %s (%s)\n", k, strings.ToLower(string(p.State)))
@@ -235,6 +267,37 @@ func gc(ctx context.Context, ws *claude.Workspace, gh prReader, out io.Writer) e
 	}
 	fmt.Fprintf(out, "%d removed, %d kept, in %s\n", removed, len(keys)-removed, ws.Dir)
 	return nil
+}
+
+// chatStore is the conversations kept as the TUI asks for them.
+type chatStore struct{ *state.Chats }
+
+func (c chatStore) Load(k model.PRKey) (tui.ChatRecord, bool, error) {
+	r, ok, err := c.Chats.Load(k)
+	if !ok || err != nil {
+		return tui.ChatRecord{}, ok, err
+	}
+	out := tui.ChatRecord{Key: r.Key, Session: r.Session, Started: r.Started, Dir: r.Dir, Head: r.Head, Model: r.Model, Cost: r.Cost, Rev: r.Rev}
+	for _, t := range r.Turns {
+		var steps []claude.Step
+		for _, s := range t.Steps {
+			steps = append(steps, claude.Step{Tool: s.Tool, Arg: s.Arg})
+		}
+		out.Turns = append(out.Turns, tui.ChatTurn{You: t.You, Text: t.Text, Steps: steps, Err: t.Err, Head: t.Head, At: t.At})
+	}
+	return out, true, nil
+}
+
+func (c chatStore) Save(r tui.ChatRecord) error {
+	in := state.ChatRecord{Key: r.Key, Session: r.Session, Started: r.Started, Dir: r.Dir, Head: r.Head, Model: r.Model, Cost: r.Cost, Rev: r.Rev}
+	for _, t := range r.Turns {
+		var steps []state.ChatStep
+		for _, s := range t.Steps {
+			steps = append(steps, state.ChatStep{Tool: s.Tool, Arg: s.Arg})
+		}
+		in.Turns = append(in.Turns, state.ChatTurn{You: t.You, Text: t.Text, Steps: steps, Err: t.Err, Head: t.Head, At: t.At})
+	}
+	return c.Chats.Save(in)
 }
 
 // source is the GitHub client as the TUI asks for it.

@@ -125,6 +125,9 @@ func (m *Model) reading() bool {
 			return true
 		}
 	}
+	if c := m.chat(); m.view == viewChat && c != nil && c.elsewhere != "" {
+		return true
+	}
 	for _, t := range m.tabs {
 		if !m.tabDone(t) {
 			return true

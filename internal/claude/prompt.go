@@ -45,6 +45,26 @@ func ReviewPrompt(p model.PR, d model.Detail, diff []byte) string {
 		}
 		b.WriteString("</checks>\n\n")
 	}
+	writeDiff(&b, diff)
+	b.WriteString("</diff>\n")
+	return b.String()
+}
+
+// HeadMovedPrompt goes before a question asked after the pull request's
+// head moved from old to now since the last one: the worktree has moved
+// with it, and diff is the pull request's diff at now. A head pushed over
+// may be gone, and Claude cannot run git, so the whole diff is given
+// rather than what changed between the two.
+func HeadMovedPrompt(old, now string, diff []byte) string {
+	var b strings.Builder
+	fmt.Fprintf(&b, "The pull request's head moved from %s to %s since the last question. The working directory is now at %s, so files you read before may have changed. The pull request's diff at %s follows.\n\n", old, now, now, now)
+	writeDiff(&b, diff)
+	b.WriteString("</diff>\n\n")
+	return b.String()
+}
+
+// writeDiff writes diff in <diff>, cut at maxDiff.
+func writeDiff(b *strings.Builder, diff []byte) {
 	b.WriteString("<diff>\n")
 	if len(diff) > maxDiff {
 		b.Write(diff[:maxDiff])
@@ -52,8 +72,6 @@ func ReviewPrompt(p model.PR, d model.Detail, diff []byte) string {
 	} else {
 		b.Write(diff)
 	}
-	b.WriteString("</diff>\n")
-	return b.String()
 }
 
 // DraftPrompt asks for the review to post, as DraftSchema.

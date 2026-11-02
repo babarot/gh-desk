@@ -1510,8 +1510,9 @@ func TestClaudeConversation(t *testing.T) {
 	if r := fc.asked[1]; r.First || r.Session != first.Session || r.Prompt != "why?" || r.Dir != first.Dir {
 		t.Errorf("second request %+v", r)
 	}
-	if len(fc.prepared) != 1 {
-		t.Errorf("the worktree was made %d times", len(fc.prepared))
+	// The worktree is put at the head shown before each question.
+	if len(fc.prepared) != 2 {
+		t.Errorf("the worktree was prepared %d times", len(fc.prepared))
 	}
 
 	// Leaving and coming back keeps the conversation.

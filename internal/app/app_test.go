@@ -14,6 +14,7 @@ import (
 	"github.com/babarot/gh-triage/internal/keymap"
 	"github.com/babarot/gh-triage/internal/logging"
 	"github.com/babarot/gh-triage/internal/model"
+	"github.com/babarot/gh-triage/internal/state"
 )
 
 func TestKeysTemplateLoadsUncommented(t *testing.T) {
@@ -178,9 +179,25 @@ func TestGCRemovesClosedOnly(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	prs := fakePRs{open: {Key: open, State: model.StateOpen}, merged: {Key: merged, State: model.StateMerged}}
+	// Conversations kept: one of the merged pull request, one of a closed
+	// pull request with no worktree, and one of a closed pull request a
+	// gh-triage is talking about.
+	closed, talking := model.PRKey{Owner: "acme", Repo: "web", Number: 4}, model.PRKey{Owner: "acme", Repo: "web", Number: 5}
+	chats := state.OpenChats(t.TempDir(), "github.com")
+	for _, k := range []model.PRKey{open, merged, closed, talking} {
+		if err := chats.Save(state.ChatRecord{Key: k, Rev: 1}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	unlock, _, _, err := chats.Lock(talking)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer unlock()
+	prs := fakePRs{open: {Key: open, State: model.StateOpen}, merged: {Key: merged, State: model.StateMerged},
+		closed: {Key: closed, State: model.StateClosed}, talking: {Key: talking, State: model.StateClosed}}
 	var out bytes.Buffer
-	if err := gc(context.Background(), ws, prs, &out); err != nil {
+	if err := gc(context.Background(), ws, chats, prs, &out); err != nil {
 		t.Fatal(err)
 	}
 	for k, want := range map[model.PRKey]bool{open: true, merged: false, gone: true} {
@@ -189,7 +206,12 @@ func TestGCRemovesClosedOnly(t *testing.T) {
 			t.Errorf("%s kept = %v, want %v", k, err == nil, want)
 		}
 	}
-	if !strings.Contains(out.String(), "1 removed, 2 kept") {
+	for k, want := range map[model.PRKey]bool{open: true, merged: false, closed: false, talking: true} {
+		if _, ok, _ := chats.Load(k); ok != want {
+			t.Errorf("conversation of %s kept = %v, want %v", k, ok, want)
+		}
+	}
+	if !strings.Contains(out.String(), "2 removed, 3 kept") || !strings.Contains(out.String(), "kept acme/web#5") {
 		t.Errorf("out = %s", out.String())
 	}
 }

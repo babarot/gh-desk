@@ -7,6 +7,7 @@ import (
 	"cmp"
 	"context"
 	"log/slog"
+	"sync"
 	"time"
 
 	tea "charm.land/bubbletea/v2"
@@ -156,6 +157,9 @@ type Settings struct {
 	Viewer string
 	// Lists are the lists last read; nil keeps none.
 	Lists Lists
+	// Chats keep the conversations with Claude; nil keeps them only while
+	// gh-triage runs.
+	Chats Chats
 	// Refresh is how often the shown tab is read again; zero turns it off.
 	Refresh time.Duration
 	// Now is the clock, for tests; nil is time.Now.
@@ -252,6 +256,14 @@ type Model struct {
 	// the one on screen.
 	chats   map[model.PRKey]*chat
 	chatKey model.PRKey
+	// chatInfo is what the pane says of each conversation kept, its
+	// questions -1 until it is read; chatProblem the conversations kept
+	// that could not be read, said once.
+	chatInfo    map[model.PRKey]chatInfo
+	chatProblem map[model.PRKey]bool
+	// asking counts the questions to Claude on their way, which quitting
+	// waits for a moment, so Claude Code closes the sessions it keeps.
+	asking *sync.WaitGroup
 	// triage is the conversation with Claude about the lists, once begun.
 	triage *triage
 	// cautions are what Claude said of release notes, by notesID; empty
@@ -281,7 +293,7 @@ func New(src Source, run Runner, cl Claude, km keymap.Map, log *slog.Logger, set
 	if log == nil {
 		log = logging.Discard()
 	}
-	m := &Model{src: src, run: run, claude: cl, chats: map[model.PRKey]*chat{}, cautions: map[string]string{}, fresh: map[model.PRKey]time.Time{}, keys: km, log: log, set: set, ctx: context.Background(), unread: map[model.PRKey]model.Notification{},
+	m := &Model{src: src, run: run, claude: cl, chats: map[model.PRKey]*chat{}, chatInfo: map[model.PRKey]chatInfo{}, chatProblem: map[model.PRKey]bool{}, asking: &sync.WaitGroup{}, cautions: map[string]string{}, fresh: map[model.PRKey]time.Time{}, keys: km, log: log, set: set, ctx: context.Background(), unread: map[model.PRKey]model.Notification{},
 		selected: map[model.PRKey]selection{}, progress: map[model.PRKey]progress{}, batches: map[string]*batchState{},
 		merged: map[model.PRKey]bool{}, refreshed: map[int]time.Time{}}
 	m.st = newStyles(theme(set.ThemeDark))
@@ -299,14 +311,31 @@ func New(src Source, run Runner, cl Claude, km keymap.Map, log *slog.Logger, set
 	m.cache = newCache()
 	m.viewer = set.Viewer
 	m.loadCached()
+	m.loadChatKeys()
 	return m
 }
 
-// Run shows the TUI until it quits. Quitting stops every batch.
+// quitWait is how long quitting waits for Claude Code to stop, after
+// interrupting it. A constant: it only keeps quitting from hanging.
+const quitWait = 2 * time.Second
+
+// Run shows the TUI until it quits. Quitting stops every batch, and
+// interrupts Claude, waiting for it a moment.
 func Run(ctx context.Context, src Source, run Runner, cl Claude, km keymap.Map, log *slog.Logger, set Settings) error {
+	ctx, cancel := context.WithCancel(ctx)
 	m := New(src, run, cl, km, log, set)
 	m.ctx = ctx
 	_, err := tea.NewProgram(m, tea.WithContext(ctx)).Run()
+	cancel()
+	done := make(chan struct{})
+	go func() {
+		m.asking.Wait()
+		close(done)
+	}()
+	select {
+	case <-done:
+	case <-time.After(quitWait):
+	}
 	return err
 }
 
@@ -375,6 +404,7 @@ func (m *Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case spinMsg:
 		m.spinning = false
+		m.watchChat()
 		return m, nil
 	case statusTickMsg:
 		m.statusTickAt = time.Time{}
