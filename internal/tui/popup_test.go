@@ -1,0 +1,164 @@
+package tui
+
+import (
+	"fmt"
+	"strings"
+	"testing"
+	"time"
+
+	tea "charm.land/bubbletea/v2"
+	"github.com/charmbracelet/x/ansi"
+
+	"github.com/babarot/gh-triage/internal/keymap"
+	"github.com/babarot/gh-triage/internal/model"
+	"github.com/babarot/gh-triage/internal/plan"
+	"github.com/babarot/gh-triage/internal/runner"
+)
+
+// longFixture adds pull requests with long names and titles, all made up.
+func longFixture() (*fakeSource, []model.PRKey) {
+	f := fixture()
+	var keys []model.PRKey
+	for i := range 20 {
+		k := key("acme", fmt.Sprintf("a-repository-with-a-rather-long-name-%02d", i), 1000+i)
+		f.searches["review"] = append(f.searches["review"], model.PR{
+			ID: fmt.Sprintf("long%d", i), Key: k, Title: "Update the dependency that has a very long name to its latest version", Author: "renovate",
+			AuthorIsBot: true, State: model.StateOpen, HeadRef: "renovate/long", HeadOID: fmt.Sprintf("eeeeee%02d", i), BaseRef: "main",
+			Additions: 1, Deletions: 1, ChangedFiles: 1, Decision: model.DecisionReviewRequired, Checks: model.CheckSuccess,
+			Requested: []model.Reviewer{{Login: "me"}}, Updated: now.Add(-time.Duration(i) * time.Minute),
+		})
+		keys = append(keys, k)
+	}
+	return f, keys
+}
+
+// startSmall starts the TUI over f on a small terminal.
+func startSmall(t *testing.T, f *fakeSource) *Model {
+	t.Helper()
+	m := start(t, f, keymap.Default())
+	m.Update(tea.WindowSizeMsg{Width: 80, Height: 24})
+	return m
+}
+
+// readPopup reads all of a popup: what it shows, then again after down
+// while its bottom edge tells of lines below. Every time, the popup must
+// fit the screen and show its foot. It returns the text, spaces collapsed.
+func readPopup(t *testing.T, m *Model, render func() []string, foot string, down string) string {
+	t.Helper()
+	var text []string
+	for range 80 {
+		ls := render()
+		if len(ls) > m.popupHeight() {
+			t.Fatalf("%d lines, over the %d a popup may take:\n%s", len(ls), m.popupHeight(), ansi.Strip(strings.Join(ls, "\n")))
+		}
+		for _, l := range ls {
+			if w := ansi.StringWidth(l); w > m.width {
+				t.Fatalf("%d cells, wider than the screen: %q", w, ansi.Strip(l))
+			}
+		}
+		if f := ansi.Strip(ls[len(ls)-2]); !strings.Contains(f, foot) {
+			t.Fatalf("the foot is not in sight: %q", f)
+		}
+		for _, l := range ls[1 : len(ls)-1] {
+			l = ansi.Strip(l)
+			l = strings.TrimSuffix(strings.TrimPrefix(l, "│ "), " │")
+			text = append(text, l)
+		}
+		if !strings.Contains(ansi.Strip(ls[len(ls)-1]), "↓") {
+			return strings.Join(strings.Fields(strings.Join(text, " ")), " ")
+		}
+		press(m, down)
+	}
+	t.Fatal("the popup did not reach its end")
+	return ""
+}
+
+// has fails when text does not hold want whole, spaces collapsed.
+func has(t *testing.T, text, want string) {
+	t.Helper()
+	if want = strings.Join(strings.Fields(want), " "); !strings.Contains(text, want) {
+		t.Errorf("%q is not read whole in:\n%s", want, text)
+	}
+}
+
+func selectAll(m *Model, keys []model.PRKey) {
+	for _, k := range keys {
+		m.selected[k] = byHand
+	}
+}
+
+// On a small terminal, what must be read in a popup is wrapped, not cut,
+// and a popup taller than the screen scrolls, keeping its question and
+// keys in sight.
+func TestPopupsOnASmallScreen(t *testing.T) {
+	t.Run("bulk", func(t *testing.T) {
+		f, keys := longFixture()
+		m := startSmall(t, f)
+		selectAll(m, keys)
+		press(m, "A")
+		text := readPopup(t, m, m.renderBulk, "yes", "j")
+		has(t, text, "GitHub cannot take an approval or a merge back. Each acts only on the head shown when it was read.")
+		// A name may be cut, but never its number.
+		has(t, text, "#1019")
+	})
+	t.Run("comment", func(t *testing.T) {
+		f, keys := longFixture()
+		m := startSmall(t, f)
+		selectAll(m, keys)
+		press(m, "c")
+		readPopup(t, m, m.renderCompose, "discard", "j")
+		body := "First line of a comment that is long enough to be wrapped in the popup, then more.\nsecond line"
+		run(m, m.paste(tea.PasteMsg{Content: body}))
+		press(m, "ctrl+s")
+		text := readPopup(t, m, m.renderConfirm, "yes", "j")
+		has(t, text, "First line of a comment that is long enough to be wrapped in the popup, then more.")
+		has(t, text, "Adds the comment to each conversation; a review asked of you stays asked.")
+		has(t, text, "more")
+	})
+	t.Run("menu", func(t *testing.T) {
+		f, keys := longFixture()
+		m := startSmall(t, f)
+		selectAll(m, keys)
+		press(m, "enter")
+		text := readPopup(t, m, m.renderMenu, "close", "j")
+		for _, it := range m.menuItems() {
+			has(t, text, it.about)
+		}
+	})
+	t.Run("notifications", func(t *testing.T) {
+		m := startSmall(t, fixture())
+		long := "GraphQL: Pull request is not mergeable: the base branch policy prohibits the merge, and a required status check is expected."
+		m.pushNote("✗", "merge failed", []noteItem{{key: key("acme", "api", 12), text: long, result: runner.Failed}})
+		m.openNotes()
+		has(t, readPopup(t, m, m.renderNotes, "close", "j"), long)
+	})
+	t.Run("select by rule", func(t *testing.T) {
+		m := startSmall(t, fixture())
+		m.set.Rules = append(m.set.Rules, plan.Rule{Name: "many bumps", Author: "renovate",
+			Packages: []string{"octo/app", "octo/cli", "octo/server", "octo/client", "octo/release-tools", "octo/schema"}})
+		press(m, "S")
+		text := readPopup(t, m, m.renderPick, "cancel", "j")
+		has(t, text, ruleWords(m.set.Rules[len(m.set.Rules)-1]))
+	})
+	t.Run("claude", func(t *testing.T) {
+		m, _ := startTriage(t, `{"reply":"Nothing to do.","actions":[]}`)
+		m.Update(tea.WindowSizeMsg{Width: 80, Height: 24})
+		long := "show the bot pull requests whose checks pass and which change nothing but the lock files of the repository"
+		m.triage.turns = append([]triageTurn{{request: long, reply: strings.Repeat("A reply of many lines. ", 30)}}, m.triage.turns...)
+		m.triage.top, m.triage.follow = 0, false
+		has(t, readPopup(t, m, m.renderTriage, "close", "j"), long)
+	})
+	t.Run("help", func(t *testing.T) {
+		m := startSmall(t, fixture())
+		m.Update(tea.WindowSizeMsg{Width: 50, Height: 24})
+		press(m, "?")
+		clear(m.helpFolded)
+		all, _, _, _ := m.helpShown()
+		text := strings.Join(strings.Fields(ansi.Strip(strings.Join(all, " "))), " ")
+		for _, s := range m.helpSections() {
+			for _, r := range s.rows {
+				has(t, text, r[1])
+			}
+		}
+	})
+}

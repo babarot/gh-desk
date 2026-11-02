@@ -17,6 +17,8 @@ import (
 type pick struct {
 	sel     int
 	loading bool
+	// top is the first line shown, kept by renderPick so sel is in sight.
+	top int
 }
 
 // ready reports whether the rules can be matched: the bodies they read are
@@ -163,8 +165,10 @@ func (m *Model) applyRule(r plan.Rule) tea.Cmd {
 func (m *Model) renderPick() []string {
 	st, v := m.st, m.picker
 	w := min(max(m.width-8, 40), 110)
+	inner := w - 4
 	rs := m.rules()
 	var lines []string
+	var keep keepLines
 	for i, r := range rs {
 		cursor := " "
 		if i == v.sel {
@@ -175,11 +179,14 @@ func (m *Model) renderPick() []string {
 		if n > 0 {
 			count = st.mauve.Render(fmt.Sprintf("%d", n))
 		}
-		line := cursor + " " + fit(st.sub1.Render(r.Name), 22) + fit(count+st.dim.Render(" PRs"), 9) + st.muted.Render(ruleWords(r))
+		rule := hang(cursor+" "+fit(st.sub1.Render(r.Name), 22)+fit(count+st.dim.Render(" PRs"), 9), st.muted.Render(ruleWords(r)), inner)
 		if i == v.sel {
-			line = onBackground(line, st.sel, w-4)
+			for j := range rule {
+				rule[j] = onBackground(rule[j], st.sel, inner)
+			}
+			keep = keepLines{len(lines), len(rule)}
 		}
-		lines = append(lines, line)
+		lines = append(lines, rule...)
 	}
 	lines = append(lines, "", st.group.Render("matches"))
 	if !m.pickReady() {
@@ -195,16 +202,19 @@ func (m *Model) renderPick() []string {
 		}
 		for i, p := range hits {
 			if i == 8 {
-				lines = append(lines, st.dim.Render(fmt.Sprintf("  … %d more; the approve and merge popups list them all", len(hits)-8)))
+				lines = append(lines, hang("  ", st.dim.Render(fmt.Sprintf("… %d more; the approve and merge popups list them all", len(hits)-8)), inner)...)
 				break
 			}
 			name := st.sub1.Render(p.Key.Repository()) + st.muted.Render(fmt.Sprintf("#%d", p.Key.Number))
+			// A title may be cut: the name beside it tells the pull request.
 			lines = append(lines, "  "+fit(name, 30)+" "+st.sub0.Render(p.Title))
 		}
 	}
-	lines = append(lines, "", st.key.Render(m.firstKey("choose"))+" "+st.muted.Render("select these")+
-		st.dim.Render(" · ")+st.key.Render(keymap.Back)+" "+st.muted.Render("cancel"))
-	return box(st, "select by rule", lines, w)
+	foot := []string{"", st.key.Render(m.firstKey("choose")) + " " + st.muted.Render("select these") +
+		st.dim.Render(" · ") + st.key.Render(keymap.Back) + " " + st.muted.Render("cancel")}
+	out, top := scrollBox(st, "select by rule", lines, foot, w, m.popupHeight(), v.top, keep, "")
+	v.top = top
+	return out
 }
 
 // ruleWords says what a rule asks for.

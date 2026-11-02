@@ -45,11 +45,28 @@ type compose struct {
 func composeWidth(w int) int { return min(max(w-8, 40), 100) }
 
 // resize fits the text area in the popup on a screen w by h: the popup
-// takes up to seven lines besides it, and leaves the status and key lines under
+// takes up to seven lines besides it, more when the keys of its pull
+// requests take more than a line, and leaves the status and key lines under
 // it in sight. A longer review is written in $EDITOR.
 func (c *compose) resize(w, h int) {
 	c.ta.SetWidth(composeWidth(w) - 4)
-	c.ta.SetHeight(min(max(h-12, 3), 10))
+	c.ta.SetHeight(min(max(h-12-max(c.headHeight(composeWidth(w)-4)-3, 0), 3), 10))
+}
+
+// composeKeysLines is how many lines the keys of a comment's pull
+// requests take at most.
+const composeKeysLines = 3
+
+// headHeight is how many lines are above the text area in a popup inner
+// cells wide: the pull requests and the kinds of a review, and a blank.
+func (c *compose) headHeight(inner int) int {
+	if !c.single {
+		return 3
+	}
+	if len(c.prs) > 1 {
+		return len(keysLines(lipgloss.NewStyle(), c.prs, inner, composeKeysLines)) + 1
+	}
+	return 2
 }
 
 func (c *compose) update(msg tea.Msg) tea.Cmd {
@@ -67,6 +84,8 @@ type confirm struct {
 	prs   []model.PR
 	event model.ReviewEvent
 	body  string
+	// top is the first line of the popup's body shown.
+	top int
 }
 
 // sentWord names what is sent: a comment, or a review of its kind.
@@ -234,6 +253,11 @@ func (m *Model) confirmKey(k string) tea.Cmd {
 	case k == keymap.Back:
 		m.confirm = nil
 		m.setStatus("canceled", false)
+	case m.keys.Matches("down", k):
+		// Kept within the body when it is drawn.
+		c.top++
+	case m.keys.Matches("up", k):
+		c.top = max(c.top-1, 0)
 	}
 	return nil
 }
@@ -359,7 +383,7 @@ func (m *Model) renderCompose() []string {
 	if c.single {
 		title = prsWord(c.prs) + " · comment"
 		if len(c.prs) > 1 {
-			lines = []string{st.sub0.Render(keysOf(c.prs))}
+			lines = keysLines(st.sub0, c.prs, composeWidth(m.width)-4, composeKeysLines)
 		}
 		lines = append(lines, "")
 	} else {
@@ -385,37 +409,48 @@ func (m *Model) renderCompose() []string {
 func (m *Model) renderConfirm() []string {
 	c, st := m.confirm, m.st
 	w := min(max(m.width-8, 30), 100)
+	inner := w - 4
 	title := sentWord(c.single, c.event)
 	lines := []string{
 		st.sub1.Render(c.pr.Key.String()) + " " + st.muted.Render(c.pr.Author),
+		// The title may be cut: the key above names the pull request.
 		st.muted.Render(c.pr.Title),
 	}
 	if len(c.prs) > 1 {
 		title = fmt.Sprintf("comment on %d pull requests", len(c.prs))
-		lines = []string{st.sub0.Render(keysOf(c.prs))}
+		lines = keysLines(st.sub0, c.prs, inner, 3)
 	}
 	if c.body != "" {
 		lines = append(lines, "")
-		for i, l := range strings.Split(c.body, "\n") {
-			if i == 6 {
-				lines = append(lines, st.dim.Render("  …"))
-				break
-			}
-			lines = append(lines, st.sub0.Render("  "+l))
+		var body []string
+		for l := range strings.SplitSeq(c.body, "\n") {
+			body = append(body, hang("  ", st.sub0.Render(safeLine(l)), inner)...)
 		}
+		if len(body) > confirmBodyLines {
+			body = append(body[:confirmBodyLines], st.dim.Render("  …"))
+		}
+		lines = append(lines, body...)
 	}
 	if c.single {
-		lines = append(lines, "", st.dim.Render("Adds the comment to each conversation; a review asked of you stays asked."))
+		lines = append(lines, "")
+		lines = append(lines, wrapped(st.dim, "Adds the comment to each conversation; a review asked of you stays asked.", inner)...)
 	} else {
-		lines = append(lines, "", st.dim.Render(fmt.Sprintf("Reviews the head you saw (%s). GitHub cannot take a review back.", short(c.pr.HeadOID))))
+		lines = append(lines, "")
+		lines = append(lines, wrapped(st.dim, fmt.Sprintf("Reviews the head you saw (%s). GitHub cannot take a review back.", short(c.pr.HeadOID)), inner)...)
 	}
 	if _, ok := m.unread[c.pr.Key]; ok && m.set.MarkDone && !c.single {
-		lines = append(lines, st.dim.Render("Its notification is marked done after."))
+		lines = append(lines, wrapped(st.dim, "Its notification is marked done after.", inner)...)
 	}
-	lines = append(lines, "", st.sub0.Render("send "+title+"? ")+st.key.Render(m.firstKey("confirm"))+" "+st.muted.Render("yes")+
-		st.dim.Render(" · ")+st.key.Render(keymap.Back)+" "+st.muted.Render("no"))
-	return box(st, title, lines, w)
+	foot := []string{"", st.sub0.Render("send "+title+"? ") + st.key.Render(m.firstKey("confirm")) + " " + st.muted.Render("yes") +
+		st.dim.Render(" · ") + st.key.Render(keymap.Back) + " " + st.muted.Render("no")}
+	out, top := scrollBox(st, title, lines, foot, w, m.popupHeight(), c.top, keepLines{}, m.scrollKeys())
+	c.top = top
+	return out
 }
+
+// confirmBodyLines is how much of a comment the confirm popup shows; the
+// rest was read where it was written.
+const confirmBodyLines = 6
 
 // keysOf names pull requests by their keys, on one line.
 func keysOf(prs []model.PR) string {

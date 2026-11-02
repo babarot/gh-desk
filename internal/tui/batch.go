@@ -216,7 +216,11 @@ type noteItem struct {
 	result runner.Result
 }
 
-type notesView struct{ sel int }
+type notesView struct {
+	sel int
+	// top is the first line shown, kept by renderNotes so sel is in sight.
+	top int
+}
 
 type toastMsg struct{ n *note }
 
@@ -337,38 +341,43 @@ func (m *Model) jumpTo(k model.PRKey) tea.Cmd {
 func (m *Model) renderNotes() []string {
 	st := m.st
 	w := min(max(m.width-8, 40), 110)
+	inner := w - 4
 	ls := m.noteLines()
 	v := m.notesAt
-	var lines []string
+	var body []string
 	if len(ls) == 0 {
-		lines = append(lines, st.dim.Render("nothing yet"))
+		body = append(body, st.dim.Render("nothing yet"))
 	}
-	h := max(m.height-8, 5)
-	off := max(0, min(v.sel-h/2, len(ls)-h))
-	for i := off; i < len(ls) && i < off+h; i++ {
-		l := ls[i]
+	var keep keepLines
+	for i, l := range ls {
 		cursor := " "
 		if i == v.sel {
 			cursor = st.blue.Render("▎")
 		}
-		var s string
-		if l.item == nil {
-			s = cursor + " " + m.noteIcon(l.n.icon) + " " + st.sub1.Render(l.n.title) + "  " + st.dim.Render(shortAge(m.set.Now().Sub(l.n.at))+" ago")
-		} else if l.item.key == (model.PRKey{}) {
+		var item []string
+		switch {
+		case l.item == nil:
+			item = hang(cursor+" "+m.noteIcon(l.n.icon)+" ", st.sub1.Render(safeLine(l.n.title))+"  "+st.dim.Render(shortAge(m.set.Now().Sub(l.n.at))+" ago"), inner)
+		case l.item.key == (model.PRKey{}):
 			// An item about no pull request, as a warning of the config file.
-			s = cursor + "     " + st.yellow.Render(l.item.text)
-		} else {
+			item = hang(cursor+"     ", st.yellow.Render(safeLine(l.item.text)), inner)
+		default:
 			name := st.sub1.Render(l.item.key.Repository()) + st.muted.Render(fmt.Sprintf("#%d", l.item.key.Number))
-			s = cursor + "     " + fit(name, 30) + " " + m.resultStyle(l.item.result).Render(l.item.text)
+			item = hang(cursor+"     "+fit(name, 30)+" ", m.resultStyle(l.item.result).Render(safeLine(l.item.text)), inner)
 		}
 		if i == v.sel {
-			s = onBackground(s, st.sel, w-4)
+			for j := range item {
+				item[j] = onBackground(item[j], st.sel, inner)
+			}
+			keep = keepLines{len(body), len(item)}
 		}
-		lines = append(lines, s)
+		body = append(body, item...)
 	}
-	lines = append(lines, "", st.key.Render(m.firstKey("choose"))+" "+st.muted.Render("go to the pull request")+
-		st.dim.Render(" · ")+st.key.Render(keymap.Back)+" "+st.muted.Render("close"))
-	return box(st, "notifications", lines, w)
+	foot := []string{"", st.key.Render(m.firstKey("choose")) + " " + st.muted.Render("go to the pull request") +
+		st.dim.Render(" · ") + st.key.Render(keymap.Back) + " " + st.muted.Render("close")}
+	out, top := scrollBox(st, "notifications", body, foot, w, m.popupHeight(), v.top, keep, "")
+	v.top = top
+	return out
 }
 
 func (m *Model) noteIcon(icon string) string {

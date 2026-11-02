@@ -24,9 +24,10 @@ type bulk struct {
 	kind  runner.Kind
 	items []bulkItem
 	// loading is set until every read is back; left counts them.
-	loading        bool
-	left           int
-	err            error
+	loading bool
+	left    int
+	err     error
+	// offset is the first line of the popup's body shown.
 	offset         int
 	includeFailing bool
 	// notes is how far Claude has read the release notes of the bot pull
@@ -334,8 +335,6 @@ func (m *Model) decideBulk() {
 	}
 }
 
-const bulkRows = 12
-
 func (m *Model) bulkKey(k string) tea.Cmd {
 	b := m.bulk
 	is := func(a keymap.Action) bool { return m.keys.Matches(a, k) }
@@ -344,7 +343,8 @@ func (m *Model) bulkKey(k string) tea.Cmd {
 		m.bulk = nil
 		m.setStatus("canceled", false)
 	case is("down"):
-		b.offset = min(b.offset+1, max(len(b.items)-bulkRows, 0))
+		// Kept within the body when it is drawn.
+		b.offset++
 	case is("up"):
 		b.offset = max(b.offset-1, 0)
 	case is("include_failing") && b.kind == runner.Approve && !b.loading:
@@ -405,12 +405,14 @@ func (m *Model) renderBulk() []string {
 			}
 		}
 	}
+	inner := w - 4
 	var lines []string
 	if b.by != "" {
-		lines = append(lines, st.teal.Render("✧ picked by Claude")+st.muted.Render(": “"+safeLine(firstLine(b.by))+"”"), "")
+		lines = append(lines, hang(st.teal.Render("✧ picked by Claude")+st.muted.Render(": "), st.muted.Render("“"+safeLine(firstLine(b.by))+"”"), inner)...)
+		lines = append(lines, "")
 	}
 	if b.err != nil {
-		lines = append(lines, st.red.Render("could not read them all: "+b.err.Error()))
+		lines = append(lines, wrapped(st.red, "could not read them all: "+b.err.Error(), inner)...)
 	}
 	goes := 0
 	auto := false
@@ -424,9 +426,8 @@ func (m *Model) renderBulk() []string {
 			failing++
 		}
 	}
-	end := min(len(b.items), b.offset+bulkRows)
-	rows := make([]bulkRow, 0, end-b.offset)
-	for _, it := range b.items[b.offset:end] {
+	rows := make([]bulkRow, 0, len(b.items))
+	for _, it := range b.items {
 		mark, title := st.dim.Render("·"), st.dim.Render(it.pr.Title)
 		var what string
 		switch {
@@ -463,12 +464,10 @@ func (m *Model) renderBulk() []string {
 		}
 		rows = append(rows, r)
 	}
-	lines = append(lines, m.layoutBulk(rows, w-4, len(b.items) == 1)...)
+	lines = append(lines, m.layoutBulk(rows, inner, len(b.items) == 1)...)
 	lines = append(lines, "")
 	prose := func(s styleFn, text string) {
-		for _, l := range wrapText(text, w-4) {
-			lines = append(lines, s.Render(l))
-		}
+		lines = append(lines, wrapped(s, text, inner)...)
 	}
 	switch b.notes {
 	case notesReading:
@@ -512,10 +511,6 @@ func (m *Model) renderBulk() []string {
 	if goes == 0 {
 		hint = "nothing to do "
 	}
-	scroll := ""
-	if len(b.items) > bulkRows {
-		scroll = st.dim.Render(fmt.Sprintf("  %d–%d of %d · %s/%s", b.offset+1, end, len(b.items), m.firstKey("down"), m.firstKey("up")))
-	}
 	if b.loading {
 		// Nothing can be confirmed until every pull request is read again.
 		read := 0
@@ -528,21 +523,25 @@ func (m *Model) renderBulk() []string {
 		if len(b.items) > 1 {
 			what = fmt.Sprintf("reading %d pull requests again… %d of %d read", len(b.items), read, len(b.items))
 		}
-		lines = append(lines, st.mauve.Render(m.spinner())+" "+st.muted.Render(what)+
-			st.dim.Render(" · ")+st.key.Render(keymap.Back)+" "+st.muted.Render("cancel")+scroll)
+		foot := []string{st.mauve.Render(m.spinner()) + " " + st.muted.Render(what) +
+			st.dim.Render(" · ") + st.key.Render(keymap.Back) + " " + st.muted.Render("cancel")}
 		title := verb + " " + m.spinner()
 		if len(b.items) > 1 {
 			title = fmt.Sprintf("%s %s of %d", verb, m.spinner(), len(b.items))
 		}
-		return box(st, title, lines, w)
+		out, top := scrollBox(st, title, lines, foot, w, m.popupHeight(), b.offset, keepLines{}, m.scrollKeys())
+		b.offset = top
+		return out
 	}
-	lines = append(lines, "", st.sub0.Render(hint)+st.key.Render(m.firstKey("confirm"))+" "+st.muted.Render("yes")+
-		st.dim.Render(" · ")+st.key.Render(keymap.Back)+" "+st.muted.Render("no")+scroll)
+	foot := []string{"", st.sub0.Render(hint) + st.key.Render(m.firstKey("confirm")) + " " + st.muted.Render("yes") +
+		st.dim.Render(" · ") + st.key.Render(keymap.Back) + " " + st.muted.Render("no")}
 	title := verb
 	if len(b.items) > 1 {
 		title = fmt.Sprintf("%s %d of %d", verb, goes, len(b.items))
 	}
-	return box(st, title, lines, w)
+	out, top := scrollBox(st, title, lines, foot, w, m.popupHeight(), b.offset, keepLines{}, m.scrollKeys())
+	b.offset = top
+	return out
 }
 
 // bulkRow is a pull request in the confirm popup, styled: what is done

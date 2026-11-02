@@ -2,7 +2,6 @@ package tui
 
 import (
 	"fmt"
-	"strings"
 
 	tea "charm.land/bubbletea/v2"
 
@@ -17,6 +16,8 @@ import (
 // would do now. An action that cannot run is shown with the reason.
 type actionMenu struct {
 	sel int
+	// top is the first line shown, kept by renderMenu so sel is in sight.
+	top int
 }
 
 // menuActions are the actions the menu offers, in its order.
@@ -287,13 +288,10 @@ func (m *Model) renderMenu() []string {
 	var lines []string
 	if len(m.selected) > 0 {
 		title = fmt.Sprintf("%d selected", len(prs))
-		var names []string
-		for _, p := range prs {
-			names = append(names, p.Key.String())
-		}
-		lines = append(lines, st.sub0.Render(strings.Join(names, "  ")))
+		lines = append(lines, keysLines(st.sub0, prs, inner, 3)...)
 	} else if len(prs) > 0 {
 		title = prs[0].Key.String()
+		// The title may be cut: the popup's title names the pull request.
 		lines = append(lines, st.sub0.Render(prs[0].Title))
 	}
 	lines = append(lines, "")
@@ -301,6 +299,7 @@ func (m *Model) renderMenu() []string {
 	if m.menu != nil {
 		sel = min(m.menu.sel, len(its)-1)
 	}
+	var keep keepLines
 	for i, it := range its {
 		cursor := " "
 		if i == sel {
@@ -310,14 +309,25 @@ func (m *Model) renderMenu() []string {
 		if it.off {
 			label, key, about = st.dim, st.dim, st.dim
 		}
-		line := cursor + " " + fit(label.Render(m.keys.Help(it.action)), 22) + fit(key.Render(m.firstKey(it.action)), 7) + about.Render(it.about)
+		item := hang(cursor+" "+fit(label.Render(m.keys.Help(it.action)), 22)+fit(key.Render(m.firstKey(it.action)), 7), about.Render(it.about), inner)
 		if i == sel {
-			line = onBackground(line, st.sel, inner)
+			for j := range item {
+				item[j] = onBackground(item[j], st.sel, inner)
+			}
+			keep = keepLines{len(lines), len(item)}
 		}
-		lines = append(lines, line)
+		lines = append(lines, item...)
 	}
-	lines = append(lines, "", st.key.Render(m.firstKey("choose"))+" "+st.muted.Render("run")+
-		st.dim.Render(" · ")+st.muted.Render("or the action's key")+
-		st.dim.Render(" · ")+st.key.Render(keymap.Back)+" "+st.muted.Render("close"))
-	return box(st, title, lines, w)
+	foot := []string{"", st.key.Render(m.firstKey("choose")) + " " + st.muted.Render("run") +
+		st.dim.Render(" · ") + st.muted.Render("or the action's key") +
+		st.dim.Render(" · ") + st.key.Render(keymap.Back) + " " + st.muted.Render("close")}
+	top := 0
+	if m.menu != nil {
+		top = m.menu.top
+	}
+	out, top := scrollBox(st, title, lines, foot, w, m.popupHeight(), top, keep, "")
+	if m.menu != nil {
+		m.menu.top = top
+	}
+	return out
 }

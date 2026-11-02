@@ -148,8 +148,9 @@ func (m *Model) helpLines(w int) ([]string, []string) {
 		lines, heads = append(lines, h), append(heads, s.title)
 		if !m.helpFolded[s.title] {
 			for _, r := range s.rows {
-				lines = append(lines, "  "+fit(key.Render(r[0]), helpKeyWidth)+what.Render(r[1]))
-				heads = append(heads, "")
+				for _, l := range hang("  "+fit(key.Render(r[0]), helpKeyWidth), what.Render(r[1]), w) {
+					lines, heads = append(lines, l), append(heads, "")
+				}
 			}
 		}
 	}
@@ -266,16 +267,7 @@ func (m *Model) renderHelp(lines []string) []string {
 	w := m.helpWidth()
 	box := box(st, "keys · "+m.firstKey("unfold")+" fold · "+m.firstKey("help")+" esc close", all[top:top+h], w)
 	if len(all) > h {
-		var parts []string
-		if top > 0 {
-			parts = append(parts, fmt.Sprintf("↑ %d", top))
-		}
-		if below := len(all) - top - h; below > 0 {
-			parts = append(parts, fmt.Sprintf("↓ %d", below))
-		}
-		tell := " " + strings.Join(parts, "  ") + " · " + m.lastKey("down") + " " + m.lastKey("up") + " wheel "
-		fill := max(w-2-lipgloss.Width(tell)-1, 0)
-		box[len(box)-1] = st.border.Render("╰"+strings.Repeat("─", fill)) + st.dim.Render(tell) + st.border.Render("─╯")
+		box[len(box)-1] = scrollEdge(st, w, top, len(all)-top-h, m.scrollKeys()+" wheel")
 	}
 	y := max((len(lines)-len(box))/2, 0)
 	m.helpBox = helpBox{x: max((m.width-w)/2, 0), y: y, w: w, h: len(box), heads: heads[top : top+h]}

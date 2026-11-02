@@ -43,6 +43,11 @@ type triage struct {
 	seen map[model.PRKey]model.PR
 	// actions are the last plan's, until it is applied or closed.
 	actions []claude.Action
+	// top is the first line of the conversation shown once the user
+	// scrolls it; until then, and again after each request, the latest is
+	// shown (follow).
+	top    int
+	follow bool
 }
 
 // triageTurn is a request and Claude's reply, or why there is none.
@@ -69,7 +74,7 @@ func (m *Model) openTriage() tea.Cmd {
 		ta.Placeholder = "Ask Claude to find or select pull requests"
 		ta.ShowLineNumbers = false
 		ta.SetHeight(3)
-		m.triage = &triage{session: claude.NewSession(), input: ta}
+		m.triage = &triage{session: claude.NewSession(), input: ta, follow: true}
 	}
 	m.triage.open = true
 	return m.typeTriage()
@@ -128,6 +133,13 @@ func (m *Model) triageKey(msg tea.KeyPressMsg) tea.Cmd {
 		return m.applyTriage()
 	case is("triage_more"):
 		return m.typeTriage()
+	case is("down"):
+		// Kept within the conversation when it is drawn.
+		tr.top++
+		tr.follow = false
+	case is("up"):
+		tr.top = max(tr.top-1, 0)
+		tr.follow = false
 	}
 	return nil
 }
@@ -139,6 +151,7 @@ func (m *Model) askTriage(request string) tea.Cmd {
 	tr.turns = append(tr.turns, triageTurn{request: request})
 	tr.seen, tr.actions = seen, nil
 	tr.asking, tr.since = true, m.set.Now()
+	tr.follow = true
 	tr.asked++
 	ctx, cancel := context.WithCancel(m.ctx)
 	tr.cancel = cancel
@@ -429,7 +442,7 @@ func (m *Model) renderTriage() []string {
 	inner := w - 4
 	var body []string
 	for _, t := range tr.turns {
-		body = append(body, st.blue.Render("you")+"  "+st.sub1.Render(safeLine(t.request)))
+		body = append(body, hang(st.blue.Render("you")+"  ", st.sub1.Render(safeLine(t.request)), inner)...)
 		style := st.sub1
 		if t.err {
 			style = st.red
@@ -449,7 +462,7 @@ func (m *Model) renderTriage() []string {
 		foot = append(foot, m.footKeys([]keymap.Action{"accept"}, "send", "back"))
 	default:
 		for i, s := range m.checkPlan() {
-			body = append(body, m.stepLine(i, s))
+			body = append(body, hang(st.dim.Render(fmt.Sprintf("%d ", i+1)), m.stepLine(s), inner)...)
 		}
 		if len(tr.actions) > 0 {
 			body = append(body, "")
@@ -460,14 +473,22 @@ func (m *Model) renderTriage() []string {
 		}
 		foot = append(foot, m.footKeys(append(as, "triage_more"), "", "close"))
 	}
-	// The latest is kept when the conversation is longer than the screen.
-	if room := max(m.height-6-len(foot), 3); len(body) > room {
-		body = body[len(body)-room:]
-	}
 	if len(tr.turns) == 0 && !tr.asking {
-		body = append(body, st.dim.Render("Ask what to show or select: \"bots with passing checks\", \"what has waited longest\"."), "")
+		body = append(body, wrapped(st.dim, "Ask what to show or select: \"bots with passing checks\", \"what has waited longest\".", inner)...)
+		body = append(body, "")
 	}
-	return box(st, "claude · "+m.tab().name, append(body, foot...), w)
+	// The latest is shown until the user scrolls up.
+	top := tr.top
+	if tr.follow {
+		top = len(body)
+	}
+	keys := ""
+	if !tr.typing && !tr.asking {
+		keys = m.scrollKeys()
+	}
+	out, top := scrollBox(st, "claude · "+m.tab().name, body, foot, w, m.popupHeight(), top, keepLines{}, keys)
+	tr.top = top
+	return out
 }
 
 // footKeys are the keys of a popup's last line; accept, when given, is
@@ -485,15 +506,16 @@ func (m *Model) footKeys(as []keymap.Action, accept, back string) string {
 	return strings.Join(parts, m.st.dim.Render(" · "))
 }
 
-// stepLine is a step of the plan, numbered, with what is left out of it.
-func (m *Model) stepLine(i int, s step) string {
+// stepLine is a step of the plan with what is left out of it; the caller
+// numbers it.
+func (m *Model) stepLine(s step) string {
 	st := m.st
 	words := st.teal.Render(m.stepWords(s))
 	if s.skip != "" {
 		words = st.dim.Render(m.stepWords(s))
 	}
 	var line strings.Builder
-	line.WriteString(st.dim.Render(fmt.Sprintf("%d ", i+1)) + words)
+	line.WriteString(words)
 	for _, g := range s.gone {
 		line.WriteString("  " + st.red.Render("✗ "+safeLine(g.key)) + " " + st.muted.Render(g.why))
 	}
