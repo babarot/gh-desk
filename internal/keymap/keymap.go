@@ -81,7 +81,7 @@ var Defaults = []Def{
 	{"ready_for_review", ScopeList, []string{"D"}, "ready for review"},
 	{"comment", ScopeList, []string{"c"}, "comment"},
 	{"review", ScopeList, []string{"R"}, "review"},
-	{"triage", ScopeList, []string{"C"}, "triage"},
+	{"triage", ScopeList, []string{"C"}, "triage with claude"},
 	{"ask_claude", ScopeList, []string{"i"}, "ask claude about it"},
 	{"browse", ScopeList, []string{"o"}, "browser"},
 	{"hide", ScopeList, []string{"d"}, "hide / done"},

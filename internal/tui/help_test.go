@@ -90,3 +90,19 @@ func TestHelpScrolls(t *testing.T) {
 		t.Errorf("? again opens the popup at %d, want its top", m.helpTop)
 	}
 }
+
+// The key line keeps ? and esc at any width: the hints that do not fit go
+// from before them.
+func TestHintsKeepHelpAndBack(t *testing.T) {
+	for _, w := range []int{130, 80, 50} {
+		m := startSet(t, testSettings(), w)
+		lines := strings.Split(screen(m), "\n")
+		last := strings.TrimSpace(lines[len(lines)-1])
+		if !strings.HasSuffix(last, "? keys · esc back") {
+			t.Errorf("width %d: key line = %q, want it to end with ? and esc", w, last)
+		}
+		if ansi.StringWidth(lines[len(lines)-1]) > w {
+			t.Errorf("width %d: key line is wider than the screen: %q", w, last)
+		}
+	}
+}

@@ -2,6 +2,7 @@ package tui
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
@@ -339,20 +340,37 @@ func (m *Model) hints() string {
 	case m.view == viewChat:
 		as = []keymap.Action{"chat_more", "draft_review", "chat_approve", "open_claude", "down", "help"}
 	default:
-		as = []keymap.Action{"menu", "select", "select_rule", "approve", "merge", "comment", "review", "triage", "browse", "preview_tab", "help"}
+		// What the menu does not offer comes first; the rest can be reached
+		// through it when the line is short.
+		as = []keymap.Action{"menu", "select", "select_rule", "triage"}
 		if m.tab().inbox {
-			as = append(as[:len(as)-1], "hide", "show_settled", "help")
+			as = append(as, "hide", "show_settled")
 		}
+		as = append(as, "approve", "merge", "comment", "review", "browse", "preview_tab", "help")
 		if p, _, ok := m.currentPR(); ok && m.own(p) {
 			as = []keymap.Action{"menu", "select", "merge", "comment", "browse", "preview_tab", "filter", "help"}
 		}
 	}
-	var parts []string
+	// The keys of ? and esc are kept: the hints that do not fit go from
+	// before them, the last first, since ? tells every key.
+	var head, tail []string
 	for _, a := range as {
-		if ks := m.keys.Keys(a); len(ks) > 0 {
-			parts = append(parts, m.st.key.Render(ks[0])+" "+m.st.muted.Render(m.keys.Help(a)))
+		ks := m.keys.Keys(a)
+		if len(ks) == 0 {
+			continue
+		}
+		part := m.st.key.Render(ks[0]) + " " + m.st.muted.Render(m.keys.Help(a))
+		if a == "help" {
+			tail = append(tail, part)
+		} else {
+			head = append(head, part)
 		}
 	}
-	parts = append(parts, m.st.key.Render(keymap.Back)+" "+m.st.muted.Render("back"))
-	return strings.Join(parts, m.st.dim.Render(" · "))
+	tail = append(tail, m.st.key.Render(keymap.Back)+" "+m.st.muted.Render("back"))
+	sep := m.st.dim.Render(" · ")
+	join := func() string { return strings.Join(append(slices.Clone(head), tail...), sep) }
+	for len(head) > 0 && ansi.StringWidth(join()) > m.width {
+		head = head[:len(head)-1]
+	}
+	return join()
 }
