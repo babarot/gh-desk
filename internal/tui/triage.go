@@ -211,6 +211,9 @@ func (m *Model) triageAnswered(msg triageMsg) {
 func (m *Model) snapshot() (claude.Snapshot, map[model.PRKey]model.PR) {
 	t := m.tab()
 	s := claude.Snapshot{Now: m.set.Now(), Tab: t.name, Grouped: t.grouped, Filter: m.filter, Pane: "off"}
+	if t.ruleFilter != nil {
+		s.RuleFilter = ruleNames(t.ruleFilter)
+	}
 	if m.pane.on {
 		s.Pane = paneWords[m.pane.mode]
 	}
@@ -225,7 +228,8 @@ func (m *Model) snapshot() (claude.Snapshot, map[model.PRKey]model.PR) {
 	seen := map[model.PRKey]model.PR{}
 	for _, r := range m.listed(t) {
 		p := m.fullPR(r.pr)
-		row := claude.SnapshotRow{PR: p, Why: m.why(r), Selected: m.isSelected(p.Key)}
+		row := claude.SnapshotRow{PR: p, Why: m.why(r), Selected: m.isSelected(p.Key),
+			Narrowed: t.ruleFilter != nil && !m.passes(r.pr, "", t.ruleFilter)}
 		if t.grouped {
 			row.Group = string(plan.GroupOf(p, m.viewer))
 		}
@@ -361,7 +365,7 @@ func (m *Model) resolve(keys []string, now map[model.PRKey]model.PR, do claude.D
 
 // inTab reports whether t shows k under filter, its group unfolded.
 func (m *Model) inTab(t *tab, k model.PRKey, filter string) bool {
-	return slices.ContainsFunc(m.rowsOf(t, filter, nil), func(r row) bool { return r.kind == rowPR && r.pr.Key == k })
+	return slices.ContainsFunc(m.rowsOf(t, filter, t.ruleFilter, nil), func(r row) bool { return r.kind == rowPR && r.pr.Key == k })
 }
 
 // applicable reports whether the plan has an action that applies.

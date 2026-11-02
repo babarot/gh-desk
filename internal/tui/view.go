@@ -35,15 +35,14 @@ func (m *Model) render() (string, *tea.Cursor) {
 	var b strings.Builder
 	var cur *tea.Cursor
 	b.WriteString(m.renderHeader() + "\n")
-	if m.filtering || m.filter != "" {
-		line := "/ " + m.filter
+	if m.filterLine() {
 		if m.filtering {
-			cur = tea.NewCursor(min(lipgloss.Width(line), max(m.width-1, 0)), 1)
+			cur = tea.NewCursor(min(lipgloss.Width("/ "+m.filter), max(m.width-1, 0)), 1)
 		}
-		b.WriteString(m.st.yellow.Render(line) + "\n")
+		b.WriteString(m.renderFilter() + "\n")
 	}
 	body := m.height - 3
-	if m.filtering || m.filter != "" {
+	if m.filterLine() {
 		body--
 	}
 	switch m.view {
@@ -326,7 +325,7 @@ var ready = map[keymap.Action]bool{
 	"next_tab": true, "prev_tab": true, "tab_1": true, "tab_2": true, "tab_3": true, "tab_4": true, "tab_5": true, "tab_6": true, "tab_7": true, "tab_8": true, "tab_9": true,
 	"menu": true, "expand": true, "collapse": true, "approve": true, "comment": true, "review": true, "browse": true, "hide": true,
 	"events": true, "select": true, "select_shown": true, "clear_selection": true, "merge": true, "ready_for_review": true,
-	"include_failing": true, "choose": true, "select_rule": true, "toggle_rule": true, "add_to_selection": true,
+	"include_failing": true, "choose": true, "select_rule": true, "toggle_rule": true, "add_to_selection": true, "filter_by_rule": true,
 	"fold_bots": true, "show_settled": true, "filter": true,
 	"preview_down": true, "preview_up": true, "preview_grow": true, "preview_shrink": true, "next_file": true, "prev_file": true, "preview_tab": true, "fold": true, "preview": true,
 	"confirm": true, "next_kind": true, "post": true, "editor": true, "accept": true, "erase": true, "erase_word": true,
@@ -346,7 +345,7 @@ func (m *Model) hints() string {
 	case m.bulk != nil:
 		as = []keymap.Action{"confirm", "include_failing"}
 	case m.picker != nil:
-		as = []keymap.Action{"toggle_rule", "choose", "add_to_selection"}
+		as = []keymap.Action{"toggle_rule", "choose", "add_to_selection", "filter_by_rule"}
 	case m.notesAt != nil, m.menu != nil:
 		as = []keymap.Action{"choose"}
 	case m.confirm != nil:
@@ -379,7 +378,7 @@ func (m *Model) hints() string {
 		}
 		as = append(as, "filter", "help")
 		back = ""
-		if m.filter != "" {
+		if m.filter != "" || m.tab().ruleFilter != nil {
 			back = "clear"
 		}
 	}
@@ -407,4 +406,35 @@ func (m *Model) hints() string {
 		head = head[:len(head)-1]
 	}
 	return join()
+}
+
+// filterLine reports whether the line under the header shows a filter: the
+// one typed, or the rules the tab's rows are narrowed to.
+func (m *Model) filterLine() bool {
+	return m.filtering || m.filter != "" || m.tab().ruleFilter != nil
+}
+
+// renderFilter is the line of the filters: the text typed, and the rules
+// the tab is narrowed to with how many rows they leave.
+func (m *Model) renderFilter() string {
+	st, t := m.st, m.tab()
+	var parts []string
+	if m.filtering || m.filter != "" {
+		// No cursor is drawn: render gives the terminal's to the end of it.
+		parts = append(parts, st.yellow.Render("/ "+m.filter))
+	}
+	if t.ruleFilter != nil {
+		n := 0
+		for _, r := range m.rowsOf(t, m.filter, t.ruleFilter, nil) {
+			if r.kind == rowPR {
+				n++
+			}
+		}
+		rule := st.yellow.Render("rule: "+ruleNames(t.ruleFilter)) + st.dim.Render(fmt.Sprintf(" · %d PRs", n))
+		if t.readingBodies {
+			rule += " " + st.mauve.Render(m.spinner()) + " " + st.dim.Render("reading descriptions…")
+		}
+		parts = append(parts, rule)
+	}
+	return strings.Join(parts, st.dim.Render("   "))
 }

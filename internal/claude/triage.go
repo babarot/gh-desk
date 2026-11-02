@@ -50,6 +50,9 @@ type Snapshot struct {
 	Folded  []string
 	// Filter is the filter typed, empty when there is none.
 	Filter string
+	// RuleFilter names the rules the rows are narrowed to, empty when
+	// there are none; the rows they leave out are marked Narrowed.
+	RuleFilter string
 	// Cursor is the pull request under the cursor, the zero key when the
 	// cursor is not on one.
 	Cursor model.PRKey
@@ -68,6 +71,9 @@ type SnapshotRow struct {
 	// Mine is the viewer's own review, empty when there is none.
 	Mine     model.ReviewState
 	Selected bool
+	// Narrowed is set when the rules the tab is narrowed to leave the row
+	// out of the screen.
+	Narrowed bool
 }
 
 // maxTriageRows is how many rows of the tab go into a triage prompt.
@@ -100,7 +106,11 @@ func TriagePrompt(s Snapshot, request string) string {
 	if s.Cursor != (model.PRKey{}) {
 		cursor = s.Cursor.String()
 	}
-	fmt.Fprintf(&b, "filter: %s\ncursor: %s\npane: %s\n</list>\n\n", filter, cursor, s.Pane)
+	fmt.Fprintf(&b, "filter: %s\n", filter)
+	if s.RuleFilter != "" {
+		fmt.Fprintf(&b, "narrowed to the rules: %s (the screen does not show the rows marked hidden_by_rules; clearing the filter does not show them)\n", data(s.RuleFilter))
+	}
+	fmt.Fprintf(&b, "cursor: %s\npane: %s\n</list>\n\n", cursor, s.Pane)
 	fmt.Fprintf(&b, "<request>\n%s\n</request>\n", strings.TrimSpace(request))
 	return b.String()
 }
@@ -142,6 +152,9 @@ func triageRow(r SnapshotRow, now time.Time) string {
 	}
 	if r.Selected {
 		f = append(f, "selected")
+	}
+	if r.Narrowed {
+		f = append(f, "hidden_by_rules")
 	}
 	return strings.Join(f, " ")
 }

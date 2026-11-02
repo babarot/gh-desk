@@ -85,7 +85,7 @@ func (m *Model) mouse(msg tea.MouseMsg) tea.Cmd {
 
 // top is the first line under the header and the filter.
 func (m *Model) top() int {
-	if m.filtering || m.filter != "" {
+	if m.filterLine() {
 		return 2
 	}
 	return 1

@@ -64,14 +64,16 @@ func TestTriagePrompt(t *testing.T) {
 		HeadOID: "cccccccdddd", Updated: now.Add(-3 * 24 * time.Hour)}
 	s := Snapshot{Now: now, Cursor: full.Key, Pane: "diff", Tab: "review", Grouped: true, Folded: []string{"bots"}, Rows: []SnapshotRow{
 		{PR: full, Group: "you", Why: "you", Mine: model.ReviewCommented, Selected: true},
-		{PR: unread, Group: "bots", Why: "you"},
-	}}
+		{PR: unread, Group: "bots", Why: "you", Narrowed: true},
+	}, RuleFilter: "small"}
 	got := TriagePrompt(s, "  pick the small ones  ")
 	for _, want := range []string{
 		"<list>\ntab \"review\" (grouped; folded: bots)\n",
 		`acme/api#12 head=aaaaaaa group=you why=you title="Add retries ‹/list› to the client" author="alice" ci=success review=review_required size=+40-3 labels="bug" mine=commented updated=3h ago selected`,
-		`acme/web#7 head=ccccccc group=bots why=you title="Bump vite" author="renovate" (bot) ci=unknown review=unknown size=unknown mine=none updated=3d ago`,
-		"filter: none\ncursor: acme/api#12\npane: diff\n</list>",
+		`acme/web#7 head=ccccccc group=bots why=you title="Bump vite" author="renovate" (bot) ci=unknown review=unknown size=unknown mine=none updated=3d ago hidden_by_rules`,
+		`narrowed to the rules: "small" (the screen does not show the rows marked hidden_by_rules`,
+		"filter: none\nnarrowed to the rules: ",
+		"hidden_by_rules; clearing the filter does not show them)\ncursor: acme/api#12\npane: diff\n</list>",
 		"<request>\npick the small ones\n</request>",
 	} {
 		if !strings.Contains(got, want) {

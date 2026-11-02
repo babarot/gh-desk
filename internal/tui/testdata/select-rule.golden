@@ -7,7 +7,7 @@ triage // @me    1 review (3)   2 mine (1)   3 involved (0)   4 inbox (1)       
           │ matches                                                                                                    │
           │   nothing in this tab                                                                                      │
           │                                                                                                            │
-          │ space check · enter select these · a add them · esc cancel                                                 │
+          │ space check · enter select these · a add them · f show only these · esc cancel                             │
           ╰────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
 
 
@@ -31,4 +31,4 @@ triage // @me    1 review (3)   2 mine (1)   3 involved (0)   4 inbox (1)       
 │                                                                                           │                                    │
 ╰────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
                                                                                                                                   
-space check a rule · enter choose · a add to the selection · esc back                                                             
+space check a rule · enter choose · a add to the selection · f show only these · esc back                                         

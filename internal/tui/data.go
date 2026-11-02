@@ -42,6 +42,13 @@ type tab struct {
 	// hidden are pull requests put away here: hidden in a section, done in
 	// the inbox.
 	hidden map[model.PRKey]bool
+	// ruleFilter are the rules the rows are narrowed to, all of which a row
+	// must match; nil for none. They are matched again at every draw, and
+	// kept per tab since the bodies and heavy fields they read are read per
+	// tab.
+	ruleFilter []plan.Rule
+	// readingBodies is set while the bodies a rule reads are on their way.
+	readingBodies bool
 
 	sel, offset int
 	// keep is the pull request the cursor was on when a reading started.
@@ -102,13 +109,13 @@ type row struct {
 }
 
 // rows are the lines of t as shown: filtered, sorted, grouped and folded.
-func (m *Model) rows(t *tab) []row { return m.rowsOf(t, m.filter, t.folded) }
+func (m *Model) rows(t *tab) []row { return m.rowsOf(t, m.filter, t.ruleFilter, t.folded) }
 
 // listed are the pull requests of t in the order its rows show them, with
 // no filter and no group folded; hidden ones are left out.
 func (m *Model) listed(t *tab) []row {
 	var out []row
-	for _, r := range m.rowsOf(t, "", nil) {
+	for _, r := range m.rowsOf(t, "", nil, nil) {
 		if r.kind == rowPR {
 			out = append(out, r)
 		}
@@ -116,15 +123,16 @@ func (m *Model) listed(t *tab) []row {
 	return out
 }
 
-// rowsOf are the lines of t under filter, with the groups in folded folded.
-func (m *Model) rowsOf(t *tab, filter string, folded map[plan.Group]bool) []row {
+// rowsOf are the lines of t under filter and rules, with the groups in
+// folded folded.
+func (m *Model) rowsOf(t *tab, filter string, rules []plan.Rule, folded map[plan.Group]bool) []row {
 	if t.inbox {
-		rs, _ := m.inboxRows(t, filter)
+		rs, _ := m.inboxRows(t, filter, rules)
 		return rs
 	}
 	var prs []model.PR
 	for _, p := range t.prs {
-		if !t.hidden[p.Key] && matches(p, filter) {
+		if !t.hidden[p.Key] && m.passes(p, filter, rules) {
 			prs = append(prs, p)
 		}
 	}
@@ -166,9 +174,9 @@ func (m *Model) rowsOf(t *tab, filter string, folded map[plan.Group]bool) []row 
 	return out
 }
 
-// inboxRows are the inbox's lines under filter, and how many
+// inboxRows are the inbox's lines under filter and rules, and how many
 // notifications on merged or closed pull requests they leave out.
-func (m *Model) inboxRows(t *tab, filter string) ([]row, int) {
+func (m *Model) inboxRows(t *tab, filter string, rules []plan.Rule) ([]row, int) {
 	var out []row
 	closed := 0
 	for i := range t.notifs {
@@ -186,7 +194,7 @@ func (m *Model) inboxRows(t *tab, filter string) ([]row, int) {
 				continue
 			}
 		}
-		if !matches(p, filter) {
+		if !m.passes(p, filter, rules) {
 			continue
 		}
 		p.Updated = n.Updated
@@ -246,6 +254,13 @@ func (m *Model) updatePR(p model.PR) {
 			}
 		}
 	}
+}
+
+// passes reports whether p is shown under the filter typed and the rules
+// the rows are narrowed to. Every place that asks whether a row is shown
+// asks this, so nothing hidden by a filter is acted on.
+func (m *Model) passes(p model.PR, filter string, rules []plan.Rule) bool {
+	return matches(p, filter) && (len(rules) == 0 || matchesAll(rules, p, m.viewer, m.ruleFacts(p)))
 }
 
 // matches reports whether p's key, title or author contains filter,
@@ -460,7 +475,7 @@ func (m *Model) handleData(msg tea.Msg) tea.Cmd {
 			return m.ensure()
 		}
 		t.asOf, t.readAt = time.Time{}, m.set.Now()
-		return tea.Batch(m.ensure(), m.saveInbox(t))
+		return tea.Batch(m.ensure(), m.saveInbox(t), m.readBodies(m.inbox))
 	case diffMsg:
 		e := m.cache.diffs[msg.id]
 		e.loading, e.err, e.val = false, msg.err, safeFiles(msg.files)
@@ -701,7 +716,7 @@ func (m *Model) tabRead(msg tabMsg) tea.Cmd {
 	}
 	t.loading, t.readAt = false, now
 	m.refreshed[msg.tab] = now
-	cmds = append(cmds, m.dropGone(t))
+	cmds = append(cmds, m.dropGone(t), m.readBodies(msg.tab))
 	if m.tabDone(t) {
 		// No heavy fields to wait for: an empty list, or all back.
 		cmds = append(cmds, m.saveTab(msg.tab))
@@ -756,7 +771,7 @@ func (m *Model) swap(i int) tea.Cmd {
 	t.loading, t.loaded, t.err, t.asOf, t.readAt, t.failing = false, true, nil, time.Time{}, now, false
 	m.refreshed[i] = now
 	m.restoreCursor(t)
-	cmds := []tea.Cmd{m.ensure(), m.queueHeavy(i, t.gen, p.prs), m.dropGone(t)}
+	cmds := []tea.Cmd{m.ensure(), m.queueHeavy(i, t.gen, p.prs), m.dropGone(t), m.readBodies(i)}
 	if m.tabDone(t) {
 		cmds = append(cmds, m.saveTab(i))
 	}

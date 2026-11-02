@@ -336,6 +336,7 @@ func (m *Model) notesKey(k string) tea.Cmd {
 func (m *Model) jumpTo(k model.PRKey) tea.Cmd {
 	m.filter, m.filtering = "", false
 	for i, t := range m.tabs {
+		t.ruleFilter = nil
 		if t.grouped {
 			for _, p := range t.prs {
 				if p.Key == k {

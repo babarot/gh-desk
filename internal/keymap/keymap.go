@@ -101,6 +101,7 @@ var Defaults = []Def{
 	{"choose", ScopePopup, []string{"enter"}, "choose"},
 	{"toggle_rule", ScopePopup, []string{"space"}, "check a rule"},
 	{"add_to_selection", ScopePopup, []string{"a"}, "add to the selection"},
+	{"filter_by_rule", ScopePopup, []string{"f"}, "show only these"},
 
 	// A confirm popup reads no choose, so enter answers it too.
 	{"confirm", ScopeConfirm, []string{"y", "enter"}, "yes"},

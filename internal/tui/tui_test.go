@@ -4,6 +4,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"maps"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -1163,6 +1164,110 @@ func TestAddByRule(t *testing.T) {
 	press(m, "S", "j", "a")
 	if len(m.selected) != 2 || !strings.Contains(status(m), "small: added 0, selected 2") {
 		t.Errorf("selected = %v, status = %q", m.selected, status(m))
+	}
+}
+
+// shownKeys are the pull requests the tab's rows show.
+func shownKeys(m *Model) []model.PRKey {
+	var out []model.PRKey
+	t := m.tab()
+	for _, r := range m.rowsOf(t, m.filter, t.ruleFilter, nil) {
+		if r.kind == rowPR {
+			out = append(out, r.pr.Key)
+		}
+	}
+	return out
+}
+
+// f in the popup of S narrows the tab's rows to what the rules chosen
+// match, with the filter typed, and esc takes both away.
+func TestFilterByRule(t *testing.T) {
+	f := fixture()
+	big := f.searches["review"][2]
+	big.ID, big.Key, big.Additions, big.Deletions = "9", key("acme", "api", 31), 800, 200
+	f.searches["review"] = append(f.searches["review"], big)
+	m := start(t, f, keymap.Default())
+	m.set.Rules = []plan.Rule{{Name: "small", MaxLines: 100}, {Name: "bots", Bot: true}}
+	m.selected[key("acme", "api", 12)] = byHand
+	press(m, "S", "j", "space", "j", "space", "f")
+	if got := shownKeys(m); len(got) != 1 || got[0] != key("acme", "api", 30) {
+		t.Fatalf("shown = %v, want the small bot pull request", got)
+	}
+	if !strings.Contains(screen(m), "rule: small + bots · 1 PRs") {
+		t.Errorf("no line names the rules:\n%s", screen(m))
+	}
+	if len(m.selected) != 1 || !m.isSelected(key("acme", "api", 12)) {
+		t.Errorf("selected = %v; filtering changed the selection", m.selected)
+	}
+	// The other tabs are not narrowed.
+	if m.tabs[1].ruleFilter != nil {
+		t.Error("another tab was narrowed")
+	}
+	// A group's header selects only the rows shown, not the big bot
+	// pull request the rules hide.
+	press(m, "esc", "S", "j", "space", "f")
+	for range 10 {
+		if r, _ := m.current(); r.kind == rowGroup && r.group == plan.GroupBots {
+			break
+		}
+		press(m, "j")
+	}
+	press(m, "space")
+	if !m.isSelected(key("acme", "api", 30)) || m.isSelected(key("acme", "api", 31)) {
+		t.Errorf("selected = %v, want only the shown bot pull request", m.selected)
+	}
+	// With a filter typed, a row must pass both.
+	press(m, "esc", "/", "r", "e", "t", "r", "enter")
+	if got := shownKeys(m); len(got) != 1 || got[0] != key("acme", "api", 12) {
+		t.Errorf("shown = %v, want the small one with retr in its title", got)
+	}
+	// esc clears the selection first, then both filters.
+	press(m, "space", "esc")
+	if len(m.selected) != 0 || m.filter == "" {
+		t.Fatalf("selected = %v, filter = %q", m.selected, m.filter)
+	}
+	press(m, "esc")
+	if m.filter != "" || m.tab().ruleFilter != nil || len(shownKeys(m)) < 3 {
+		t.Errorf("filter = %q, rules = %v, shown = %v", m.filter, m.tab().ruleFilter, shownKeys(m))
+	}
+}
+
+// A tab narrowed to a rule on the packages reads the bodies of the pull
+// requests a reading again brings, so a new one that matches is shown.
+func TestFilterByRuleReadsNewBodies(t *testing.T) {
+	f := fixture()
+	m := start(t, f, keymap.Default())
+	press(m, "S", "j", "f")
+	if got := shownKeys(m); len(got) != 1 || got[0] != key("acme", "api", 30) {
+		t.Fatalf("shown = %v, want the octo bump", got)
+	}
+	next := f.searches["review"][2]
+	next.ID, next.Key, next.HeadOID = "9", key("acme", "api", 33), "eeeeeee9"
+	f.searches["review"] = append(f.searches["review"], next)
+	f.details[next.Key] = f.details[key("acme", "api", 30)]
+	press(m, "r")
+	if got := shownKeys(m); len(got) != 2 {
+		t.Errorf("shown = %v, want the new octo bump too", got)
+	}
+}
+
+// The inbox narrowed to a rule on the packages reads the bodies of the
+// pull requests a reading again brings, as a search tab does.
+func TestFilterByRuleReadsNewBodiesInTheInbox(t *testing.T) {
+	f := fixture()
+	m := start(t, f, keymap.Default())
+	in := m.inboxTab()
+	in.ruleFilter = []plan.Rule{m.set.Rules[0]}
+	p := f.searches["review"][2]
+	delete(m.cache.bodies, p.Key)
+	delete(m.cache.details, p.Key)
+	in.notifs = append(in.notifs, model.Notification{ThreadID: "n9", Key: p.Key, Title: p.Title, Reason: "review_requested", Updated: now})
+	prs := map[model.PRKey]model.PR{p.Key: p}
+	maps.Copy(prs, in.inboxPRs)
+	_, cmd := m.Update(inboxPRsMsg{prs: prs})
+	run(m, cmd)
+	if _, ok := m.cache.bodies[p.Key]; !ok {
+		t.Error("the body of the inbox's new bot pull request was not read")
 	}
 }
 

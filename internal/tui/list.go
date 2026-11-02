@@ -43,8 +43,8 @@ func (m *Model) listKey(k string) tea.Cmd {
 		switch {
 		case len(m.selected) > 0:
 			clear(m.selected)
-		case m.filter != "":
-			m.filter = ""
+		case m.filter != "" || t.ruleFilter != nil:
+			m.filter, t.ruleFilter = "", nil
 		default:
 			return tea.Quit
 		}
@@ -148,7 +148,7 @@ func (m *Model) listKey(k string) tea.Cmd {
 			// them when all are selected.
 			var in []model.PRKey
 			for _, p := range t.prs {
-				if !t.hidden[p.Key] && matches(p, m.filter) && plan.GroupOf(p, m.viewer) == r.group {
+				if !t.hidden[p.Key] && m.passes(p, m.filter, t.ruleFilter) && plan.GroupOf(p, m.viewer) == r.group {
 					in = append(in, p.Key)
 				}
 			}
@@ -295,7 +295,7 @@ type layout struct {
 func (m *Model) layout() layout {
 	// header, column header, status line, key line
 	rest := m.height - 4
-	if m.filtering || m.filter != "" {
+	if m.filterLine() {
 		rest--
 	}
 	pane := 0
@@ -434,7 +434,7 @@ func (m *Model) renderList(b *strings.Builder, height int) {
 		lines++
 	}
 	if t.inbox && !t.showSettled && lines < height {
-		if _, closed := m.inboxRows(t, m.filter); closed > 0 && len(rs) < height {
+		if _, closed := m.inboxRows(t, m.filter, t.ruleFilter); closed > 0 && len(rs) < height {
 			noun := "notifications"
 			if closed == 1 {
 				noun = "notification"
