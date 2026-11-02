@@ -44,6 +44,30 @@ func TestMarkdownLines(t *testing.T) {
 	}
 }
 
+// A line does not start with the comma after code, nor with a Japanese
+// full stop; each goes down with what comes before it, and the lines of
+// a list item stay under its text.
+func TestWrapKeepsWhatMayNotStartALine(t *testing.T) {
+	m := start(t, fixture(), keymap.Default())
+	for _, tc := range []struct {
+		body  string
+		width int
+		want  []string
+	}{
+		{"through `validator.ts`, then `open.ts`", 20, []string{"through", "validator.ts, then", "open.ts"}},
+		{"読み込みを直しました。", 20, []string{"読み込みを直しまし", "た。"}},
+		{"1. see `a.go`, `b.go`, and `c.go`", 11, []string{"1. see", "   a.go,", "   b.go,", "   and c.go"}},
+	} {
+		var got []string
+		for _, l := range m.markdownLines(tc.body, tc.width) {
+			got = append(got, ansi.Strip(l.text))
+		}
+		if strings.Join(got, "\n") != strings.Join(tc.want, "\n") {
+			t.Errorf("%q at %d:\n%s\nwant:\n%s", tc.body, tc.width, strings.Join(got, "\n"), strings.Join(tc.want, "\n"))
+		}
+	}
+}
+
 func TestPlainDescriptionIsAsWritten(t *testing.T) {
 	m := start(t, fixture(), keymap.Default())
 	m.set.PlainDescription = true

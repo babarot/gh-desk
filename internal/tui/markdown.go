@@ -3,6 +3,7 @@ package tui
 import (
 	"regexp"
 	"strings"
+	"unicode/utf8"
 
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
@@ -36,6 +37,51 @@ func renderSpans(ss []span) string {
 // of a Japanese sentence, which may break anywhere.
 var token = regexp.MustCompile(`[!-~]+|\s+|.`)
 
+// noLineStart are the characters a line may not start with; each goes to
+// the next line with what comes before it.
+const noLineStart = "、。，．）」』】,.;:)!?！？"
+
+// piece is a token of the span from.
+type piece struct {
+	text string
+	from int
+}
+
+// units are the tokens of ss, joined where a line may not break between
+// them: a word that goes on in the next span with no space between, such
+// as code and the comma after it, and a character a line may not start
+// with and what comes before it.
+func units(ss []span) [][]piece {
+	var out [][]piece
+	word := false
+	for i, s := range ss {
+		for _, tok := range token.FindAllString(s.text, -1) {
+			space := strings.TrimSpace(tok) == ""
+			if k := len(out) - 1; k >= 0 && word && !space && joined(out[k][len(out[k])-1].text, tok) {
+				out[k] = append(out[k], piece{tok, i})
+			} else {
+				out = append(out, []piece{{tok, i}})
+			}
+			word = !space
+		}
+	}
+	return out
+}
+
+func joined(prev, next string) bool {
+	r, _ := utf8.DecodeRuneInString(next)
+	return ascii(prev) && ascii(next) || strings.ContainsRune(noLineStart, r)
+}
+
+func ascii(s string) bool {
+	for i := range len(s) {
+		if s[i] < '!' || s[i] > '~' {
+			return false
+		}
+	}
+	return true
+}
+
 // wrapSpans breaks spans into lines width cells wide. Lines after the first
 // are indented by hang cells, under the text after a bullet.
 func wrapSpans(ss []span, width, hang int) [][]span {
@@ -61,31 +107,36 @@ func wrapSpans(ss []span, width, hang int) [][]span {
 			cur, n = []span{{text: strings.Repeat(" ", hang), from: -1}}, hang
 		}
 	}
-	for i, s := range ss {
-		for _, tok := range token.FindAllString(s.text, -1) {
-			w := ansi.StringWidth(tok)
-			switch {
-			case strings.TrimSpace(tok) == "":
-				if n+w > width {
-					newLine()
-					continue
-				}
-				if n == hang && len(out) > 0 {
-					continue
-				}
-			case n+w > width && w > width-hang:
-				// A word longer than a line breaks where it reaches the edge.
-				for _, r := range tok {
+	for _, u := range units(ss) {
+		w := 0
+		for _, p := range u {
+			w += ansi.StringWidth(p.text)
+		}
+		switch {
+		case strings.TrimSpace(u[0].text) == "":
+			if n+w > width {
+				newLine()
+				continue
+			}
+			if n == hang && len(out) > 0 {
+				continue
+			}
+		case n+w > width && w > width-hang:
+			// A word longer than a line breaks where it reaches the edge.
+			for _, p := range u {
+				for _, r := range p.text {
 					if n+ansi.StringWidth(string(r)) > width {
 						newLine()
 					}
-					add(string(r), s, i)
+					add(string(r), ss[p.from], p.from)
 				}
-				continue
-			case n+w > width:
-				newLine()
 			}
-			add(tok, s, i)
+			continue
+		case n+w > width:
+			newLine()
+		}
+		for _, p := range u {
+			add(p.text, ss[p.from], p.from)
 		}
 	}
 	return append(out, cur)
