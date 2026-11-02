@@ -191,8 +191,9 @@ type Bulk struct {
 // Select is a rule S offers: a pull request matches when it meets every
 // key given.
 type Select struct {
-	Name   string
-	Author string
+	Name string
+	// Authors are the logins the author must be one of; bots without app/.
+	Authors []string
 	// Packages are the dependencies a bot's pull request may update, read
 	// from its body.
 	Packages []string
@@ -424,7 +425,7 @@ type (
 	}
 	selectDoc struct {
 		Name         string   `toml:"name"`
-		Author       string   `toml:"author"`
+		Authors      []string `toml:"authors"`
 		Packages     []string `toml:"packages"`
 		Title        *Regexp  `toml:"title"`
 		MaxFiles     *int     `toml:"max_files"`
@@ -526,8 +527,10 @@ func warnings(cfg File) Problems {
 		}
 	}
 	for i, s := range cfg.Select {
-		if login, ok := strings.CutPrefix(s.Author, "app/"); ok {
-			warn([]string{"select", "author"}, i+1, "select[%d].author %q never matches: a bot's login is written without app/, as %q", i, s.Author, login)
+		for j, a := range s.Authors {
+			if login, ok := strings.CutPrefix(a, "app/"); ok {
+				warn([]string{"select", "authors"}, i+1, "select[%d].authors[%d] %q never matches: a bot's login is written without app/, as %q", i, j, a, login)
+			}
 		}
 	}
 	for i, g := range cfg.Checks.Approval {
@@ -672,7 +675,10 @@ func selectFrom(ds []selectDoc) ([]Select, Problems) {
 	var out []Select
 	seen := map[string]bool{"approved by me": true}
 	for i, d := range ds {
-		s := Select{Name: d.Name, Author: d.Author, Packages: d.Packages, Bot: d.Bot, ApprovedByMe: d.ApprovedByMe}
+		s := Select{Name: d.Name, Authors: d.Authors, Packages: d.Packages, Bot: d.Bot, ApprovedByMe: d.ApprovedByMe}
+		if d.Authors != nil && len(d.Authors) == 0 {
+			at(i, "authors", "must name at least one login")
+		}
 		switch {
 		case strings.TrimSpace(s.Name) == "":
 			at(i, "name", "must not be empty")
@@ -704,7 +710,7 @@ func selectFrom(ds []selectDoc) ([]Select, Problems) {
 			}
 			s.Checks = *d.Checks
 		}
-		if s.Author == "" && len(s.Packages) == 0 && d.Title == nil && d.MaxFiles == nil && d.MaxLines == nil && !s.Bot && d.Checks == nil && !s.ApprovedByMe {
+		if d.Authors == nil && len(s.Packages) == 0 && d.Title == nil && d.MaxFiles == nil && d.MaxLines == nil && !s.Bot && d.Checks == nil && !s.ApprovedByMe {
 			at(i, "", "%q matches every pull request; give it at least one condition", s.Name)
 		}
 		out = append(out, s)

@@ -292,9 +292,13 @@
             "description": "Your latest review must approve it; a person's pull request matches too, unlike the built-in \"approved by me\".",
             "type": "boolean"
           },
-          "author": {
-            "description": "A login; bots without app/.",
-            "type": "string"
+          "authors": {
+            "description": "The logins the author must be one of; bots without app/.",
+            "items": {
+              "type": "string"
+            },
+            "minItems": 1,
+            "type": "array"
           },
           "bot": {
             "description": "The author must be a bot.",

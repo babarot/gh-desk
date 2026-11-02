@@ -303,7 +303,7 @@ var elems = map[string][]elem{
 	},
 	"select": {
 		{Key: "name", Kind: stringKind{NonEmpty: true}, Doc: "The rule's name, as S lists it."},
-		{Key: "author", Kind: stringKind{}, Doc: "A login; bots without app/."},
+		{Key: "authors", Kind: listKind{NonEmpty: true}, Doc: "The logins the author must be one of; bots without app/."},
 		{Key: "packages", Kind: listKind{}, Doc: "The dependencies a renovate or dependabot pull request updates, read from its body; every one it updates must be listed."},
 		{Key: "title", Kind: stringKind{}, Doc: "A regular expression the title must match."},
 		{Key: "max_files", Kind: intKind{Min: 1}, Doc: "The most files it may change."},
@@ -361,13 +361,14 @@ const templateHead = `# gh-triage settings. Uncomment a line to change it.
 
 const selectExamples = `# Rules S offers to select pull requests, besides "approved by me" (bot pull
 # requests you approved that are still open). A pull request matches when it
-# meets every key given: author (a login; bots without app/), packages (the
-# dependencies a renovate or dependabot pull request updates, read from its
-# body; every one it updates must be listed), title (a regular expression),
-# max_files (1 or more), max_lines (1 or more; the lines added and deleted
-# together, the sum of the two numbers SIZE shows), bot = true, checks =
-# "passing" (passed, or only checks.approval pending), and approved_by_me =
-# true (your latest review approves it; a person's pull request matches too).
+# meets every key given: authors (the logins it may be by; bots without
+# app/), packages (the dependencies a renovate or dependabot pull request
+# updates, read from its body; every one it updates must be listed), title
+# (a regular expression), max_files (1 or more), max_lines (1 or more; the
+# lines added and deleted together, the sum of the two numbers SIZE shows), a
+# bot as the author with bot = true, checks = "passing" (passed, or only
+# checks.approval pending), and approved_by_me = true (your latest review
+# approves it; a person's pull request matches too).
 #
 # [[select]]
 # name = "approved, small"
@@ -375,14 +376,19 @@ const selectExamples = `# Rules S offers to select pull requests, besides "appro
 # max_lines = 300
 #
 # [[select]]
+# name = "dependency bots"
+# authors = ["renovate", "dependabot"]
+# checks = "passing"
+#
+# [[select]]
 # name = "safe renovate"
-# author = "renovate"
+# authors = ["renovate"]
 # packages = ["actions/checkout", "songmu/tagpr"]
 # checks = "passing"
 #
 # [[select]]
 # name = "lock files"
-# author = "renovate"
+# authors = ["renovate"]
 # title = "(?i)lock file maintenance"
 # checks = "passing"
 `
@@ -534,8 +540,8 @@ func Show(f File, onlyDiff bool) string {
 	for _, s := range f.Select {
 		b.WriteString("[[select]]\n")
 		fmt.Fprintf(&b, "name = %q\n", s.Name)
-		if s.Author != "" {
-			fmt.Fprintf(&b, "author = %q\n", s.Author)
+		if len(s.Authors) > 0 {
+			b.WriteString("authors = " + tomlList(s.Authors) + "\n")
 		}
 		if len(s.Packages) > 0 {
 			b.WriteString("packages = " + tomlList(s.Packages) + "\n")

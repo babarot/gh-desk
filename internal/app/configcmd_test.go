@@ -72,7 +72,7 @@ groups = ["bots"]
 
 [[select]]
 name = "lock files"
-author = "renovate"
+authors = ["renovate"]
 title = "(?i)lock file"
 checks = "passing"
 

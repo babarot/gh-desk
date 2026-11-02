@@ -12,8 +12,9 @@ import (
 // every condition the rule sets.
 type Rule struct {
 	Name string
-	// Author is the author's login, without app/ for a bot.
-	Author string
+	// Authors are logins the author's must be one of, without app/ for a
+	// bot.
+	Authors []string
 	// Packages are dependencies a bot's pull request must update; one of
 	// them is enough, and every one it updates must be among them.
 	Packages []string
@@ -58,7 +59,9 @@ func (r Rule) Match(pr model.PR, viewer string, f Facts) bool {
 	switch {
 	case pr.Draft || pr.State != model.StateOpen && pr.State != "":
 		return false
-	case r.Author != "" && !strings.EqualFold(strings.TrimPrefix(pr.Author, "app/"), strings.TrimPrefix(r.Author, "app/")):
+	case len(r.Authors) > 0 && !slices.ContainsFunc(r.Authors, func(a string) bool {
+		return strings.EqualFold(strings.TrimPrefix(pr.Author, "app/"), strings.TrimPrefix(a, "app/"))
+	}):
 		return false
 	case r.Bot && !pr.AuthorIsBot:
 		return false

@@ -292,7 +292,7 @@ func testSettings() Settings {
 		PreviewHeight: 10, Collapse: []string{"go.sum"}, ThemeDark: "default", ThemeLight: "default", Now: func() time.Time { return now },
 		Plan: plan.Settings{Methods: []model.MergeMethod{model.MethodMerge}, AutoMerge: true, UpdateBranch: "humans",
 			AttentionPaths: []string{".github/workflows/*"}},
-		Rules:   []plan.Rule{{Name: "octo bumps", Author: "renovate", Packages: []string{"octo/app"}}},
+		Rules:   []plan.Rule{{Name: "octo bumps", Authors: []string{"renovate"}, Packages: []string{"octo/app"}}},
 		CanWait: true, Language: "English",
 		// Ticks only redraw; tests read the screen when they like.
 		Tick: func(time.Duration, tea.Msg) tea.Cmd { return nil },
@@ -1131,7 +1131,7 @@ func TestSelectByRulesTogether(t *testing.T) {
 		t.Errorf("selected = %v, want both small pull requests", m.selected)
 	}
 	// Rules that share nothing select nothing, and say so.
-	set.Rules = append(set.Rules, plan.Rule{Name: "alice", Author: "alice"})
+	set.Rules = append(set.Rules, plan.Rule{Name: "alice", Authors: []string{"alice"}})
 	m = startSet(t, set, 130)
 	press(m, "S", "j", "j", "space", "j", "space", "enter")
 	if len(m.selected) != 0 || !strings.Contains(status(m), "bots + alice: nothing matches in this tab") {
@@ -1143,7 +1143,7 @@ func TestSelectByRulesTogether(t *testing.T) {
 // together and then added make (A AND B) OR C.
 func TestAddByRule(t *testing.T) {
 	set := testSettings()
-	set.Rules = []plan.Rule{{Name: "small", MaxLines: 100}, {Name: "bots", Bot: true}, {Name: "alice", Author: "alice"}}
+	set.Rules = []plan.Rule{{Name: "small", MaxLines: 100}, {Name: "bots", Bot: true}, {Name: "alice", Authors: []string{"alice"}}}
 	m := startSet(t, set, 130)
 	press(m, "S", "j", "space", "j", "space", "enter")
 	if len(m.selected) != 1 || !m.isSelected(key("acme", "api", 30)) {

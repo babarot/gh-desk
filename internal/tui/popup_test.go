@@ -139,7 +139,7 @@ func TestPopupsOnASmallScreen(t *testing.T) {
 	})
 	t.Run("select by rule", func(t *testing.T) {
 		m := startSmall(t, fixture())
-		m.set.Rules = append(m.set.Rules, plan.Rule{Name: "many bumps", Author: "renovate",
+		m.set.Rules = append(m.set.Rules, plan.Rule{Name: "many bumps", Authors: []string{"renovate"},
 			Packages: []string{"octo/app", "octo/cli", "octo/server", "octo/client", "octo/release-tools", "octo/schema"}})
 		press(m, "S")
 		text := readPopup(t, m, m.renderPick, "cancel", "j")

@@ -250,14 +250,14 @@ func TestSelectRules(t *testing.T) {
 	cfg, _, err := Load(write(t, `
 [[select]]
 name = "safe renovate"
-author = "renovate"
+authors = ["renovate", "dependabot"]
 packages = ["actions/checkout"]
 title = "(?i)bump"
 checks = "passing"
 max_lines = 500
 approved_by_me = true
 `))
-	if err != nil || len(cfg.Select) != 1 || cfg.Select[0].Packages[0] != "actions/checkout" || !cfg.Select[0].Title.MatchString("Bump x") || cfg.Select[0].MaxLines != 500 || !cfg.Select[0].ApprovedByMe {
+	if err != nil || len(cfg.Select) != 1 || cfg.Select[0].Packages[0] != "actions/checkout" || !cfg.Select[0].Title.MatchString("Bump x") || cfg.Select[0].MaxLines != 500 || !cfg.Select[0].ApprovedByMe || len(cfg.Select[0].Authors) != 2 {
 		t.Fatalf("cfg.Select = %+v, %v", cfg.Select, err)
 	}
 	wantErrs(t, `
@@ -278,6 +278,10 @@ max_lines = 500
 [[select]]
 name = "mine"
 approved_by_me = true
+
+[[select]]
+name = "nobody"
+authors = []
 `,
 		`config.toml:3:8: select[0].name "approved by me" is used twice`,
 		`config.toml:4:9: select[0].title is not a regular expression`,
@@ -285,7 +289,12 @@ approved_by_me = true
 		`config.toml:6:13: select[0].max_files must be 1 or more, got 0`,
 		`config.toml:7:13: select[0].max_lines must be 1 or more, got 0`,
 		`config.toml:9:3: select[1]: "all" matches every pull request`,
+		`config.toml:22:1: select[4].authors must name at least one login`,
 	)
+}
+
+func TestAuthorIsNotASetting(t *testing.T) {
+	wantErrs(t, "[[select]]\nname = \"bots\"\nauthor = \"renovate\"\n", `did you mean "select.authors"?`)
 }
 
 func TestCacheDir(t *testing.T) {
@@ -360,7 +369,7 @@ approval = ["*"]
 
 [[select]]
 name = "bots"
-author = "app/renovate"
+authors = ["renovate", "app/renovate"]
 `)
 	cfg, warns, err := Load(path)
 	if err != nil {
@@ -375,7 +384,7 @@ author = "app/renovate"
 		"config.toml:8:9: tabs[1].query has no is:pr",
 		"config.toml:8:9: tabs[1].query is the same as tabs[0]'s",
 		`config.toml:14:13: checks.approval[0] "*" matches every check`,
-		`config.toml:18:10: select[0].author "app/renovate" never matches`,
+		`config.toml:18:1: select[0].authors[1] "app/renovate" never matches`,
 	} {
 		if !strings.Contains(got, want) {
 			t.Errorf("warnings =\n%s\nwant one containing %q", got, want)

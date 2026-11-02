@@ -25,8 +25,9 @@ func TestRuleMatch(t *testing.T) {
 		f    Facts
 		want bool
 	}{
-		{"author", Rule{Author: "app/renovate"}, bot, Facts{}, true},
-		{"other author", Rule{Author: "dependabot"}, bot, Facts{}, false},
+		{"author", Rule{Authors: []string{"app/renovate"}}, bot, Facts{}, true},
+		{"one of the authors", Rule{Authors: []string{"dependabot", "Renovate"}}, bot, Facts{}, true},
+		{"other author", Rule{Authors: []string{"dependabot"}}, bot, Facts{}, false},
 		{"title", Rule{Title: regexp.MustCompile(`^Update actions/`)}, bot, Facts{}, true},
 		{"max files", Rule{MaxFiles: 0}, bot, Facts{}, true},
 		{"too many files", Rule{MaxFiles: 1}, model.PR{AuthorIsBot: true, ChangedFiles: 3}, Facts{}, false},

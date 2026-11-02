@@ -298,8 +298,8 @@ func ruleWords(r plan.Rule) string {
 	if r.Bot {
 		parts = append(parts, "bots")
 	}
-	if r.Author != "" {
-		parts = append(parts, r.Author)
+	if len(r.Authors) > 0 {
+		parts = append(parts, strings.Join(r.Authors, ", "))
 	}
 	if len(r.Packages) > 0 {
 		noun := "packages"
