@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"net/http"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/babarot/gh-triage/internal/logging"
@@ -17,6 +18,7 @@ import (
 // fake answers requests with canned bodies, by the first rule whose match
 // returns true, and keeps what was sent.
 type fake struct {
+	mu    sync.Mutex
 	rules []rule
 	sent  []sent
 }
@@ -36,6 +38,8 @@ func (f *fake) RoundTrip(r *http.Request) (*http.Response, error) {
 		b, _ := io.ReadAll(r.Body)
 		body = string(b)
 	}
+	f.mu.Lock()
+	defer f.mu.Unlock()
 	f.sent = append(f.sent, sent{r.Method, r.URL.Path, r.Header.Get("Accept"), body})
 	for _, ru := range f.rules {
 		if ru.match(r, body) {
@@ -203,5 +207,24 @@ func TestPullRequestsSkipsMissing(t *testing.T) {
 	got, err := newClient(t, f, logging.Discard()).PullRequests(context.Background(), keys)
 	if err != nil || len(got) != 1 || got[keys[0]].State != model.StateMerged {
 		t.Errorf("got %+v, %v", got, err)
+	}
+}
+
+func TestPullRequestsSplitsQueries(t *testing.T) {
+	f := &fake{rules: []rule{{gqlHas("p0: repository"), `{"data": {}}`}}}
+	keys := make([]model.PRKey, 2*prsPerQuery+1)
+	for i := range keys {
+		keys[i] = model.PRKey{Owner: "acme", Repo: "tool", Number: i + 1}
+	}
+	if _, err := newClient(t, f, logging.Discard()).PullRequests(context.Background(), keys); err != nil {
+		t.Fatal(err)
+	}
+	if len(f.sent) != 3 {
+		t.Fatalf("sent %d queries, want 3", len(f.sent))
+	}
+	for _, s := range f.sent {
+		if n := strings.Count(s.body, "repository(owner:"); n > prsPerQuery {
+			t.Errorf("a query read %d pull requests, more than %d", n, prsPerQuery)
+		}
 	}
 }

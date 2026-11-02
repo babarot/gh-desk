@@ -9,9 +9,12 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"maps"
 	"net/http"
 	"net/url"
+	"slices"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/cli/go-gh/v2/pkg/api"
@@ -340,13 +343,40 @@ func (c *Client) Search(ctx context.Context, query string, limit int) (Result, e
 	return out, nil
 }
 
-// PullRequests reads the pull requests named by keys, in one query; a key
-// that names no pull request (deleted, or not visible) is left out.
+// prsPerQuery is how many pull requests one query reads with every field.
+// GitHub answers 502 to a query it takes more than about ten seconds over,
+// and 90 took eight on a quiet day; 25 take about three.
+const prsPerQuery = 25
+
+// PullRequests reads the pull requests named by keys, prsPerQuery to a
+// query, the queries at once; a key that names no pull request (deleted, or
+// not visible) is left out. When a query fails, the rest are still read and
+// the first error is returned with them.
 func (c *Client) PullRequests(ctx context.Context, keys []model.PRKey) (map[model.PRKey]model.PR, error) {
 	out := map[model.PRKey]model.PR{}
-	if len(keys) == 0 {
-		return out, nil
+	var (
+		mu       sync.Mutex
+		wg       sync.WaitGroup
+		firstErr error
+	)
+	for chunk := range slices.Chunk(keys, prsPerQuery) {
+		wg.Go(func() {
+			prs, err := c.pullRequests(ctx, chunk)
+			mu.Lock()
+			defer mu.Unlock()
+			maps.Copy(out, prs)
+			if err != nil && firstErr == nil {
+				firstErr = err
+			}
+		})
 	}
+	wg.Wait()
+	return out, firstErr
+}
+
+// pullRequests reads the pull requests named by keys in one query.
+func (c *Client) pullRequests(ctx context.Context, keys []model.PRKey) (map[model.PRKey]model.PR, error) {
+	out := map[model.PRKey]model.PR{}
 	var b strings.Builder
 	b.WriteString("query {\n  rateLimit { cost remaining }\n")
 	for i, k := range keys {
