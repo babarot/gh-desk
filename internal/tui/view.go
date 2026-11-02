@@ -212,7 +212,7 @@ func tabsAfter(to, n int) string {
 
 // headerLead is what the header shows before the tabs.
 func (m *Model) headerLead() string {
-	return m.st.app.Render("triage") + m.st.dim.Render(" // ") + m.st.sub0.Render(m.viewerName()) + "   "
+	return m.st.app.Render("triage") + m.st.dim.Render(" // ") + m.st.muted.Render(m.viewerName()) + "   "
 }
 
 // viewerName is the viewer as the header shows it, which a click opens.
