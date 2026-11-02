@@ -726,7 +726,9 @@ func TestCommentWithBody(t *testing.T) {
 }
 
 // c with a selection sends the same comment to each selected pull
-// request, and keeps in the popup only those it failed on.
+// request. The popup closes at once and the status line counts the
+// comment through them; those it failed on are selected again, and c
+// starts with the comment for them.
 func TestCommentOnSelection(t *testing.T) {
 	f := fixture()
 	m := start(t, f, keymap.Default())
@@ -738,16 +740,28 @@ func TestCommentOnSelection(t *testing.T) {
 	if s := screen(m); !strings.Contains(s, "comment on 2 pull requests") || !strings.Contains(s, "acme/api#12  acme/web#7") {
 		t.Fatalf("the confirm popup does not name both:\n%s", s)
 	}
-	press(m, "y")
+	// y without running the command: the comment is on its way.
+	_, cmd := m.Update(keyMsg("y"))
+	if m.compose != nil || !strings.Contains(screen(m), "sending the comment… 1/2") {
+		t.Fatalf("the popup did not close for the comment to go behind it:\n%s", screen(m))
+	}
+	press(m, "c")
+	run(m, m.paste(tea.PasteMsg{Content: "again"}))
+	press(m, "ctrl+s")
+	if m.confirm != nil || !strings.Contains(m.status, "being sent") {
+		t.Errorf("a second comment was let through while one was on its way: %q", m.status)
+	}
+	press(m, "esc")
+	run(m, cmd)
 	if len(f.posted) != 1 || f.posted[0] != "acme/api#12 @dependabot rebase" {
 		t.Errorf("posted = %q", f.posted)
 	}
-	if m.compose == nil || len(m.compose.prs) != 1 || m.compose.pr.Key != key("acme", "web", 7) || !strings.Contains(m.status, "failed on 1") {
-		t.Fatalf("the popup does not keep the one it failed on: %+v, %q", m.compose, m.status)
+	if !strings.Contains(m.status, "failed on 1 of 2") || len(m.selected) != 1 || !m.isSelected(key("acme", "web", 7)) {
+		t.Fatalf("the one it failed on is not selected again: %v, %q", m.selected, m.status)
 	}
-	press(m, "R")
-	if m.compose == nil || !m.compose.single {
-		t.Error("R inside the comment popup did not stay text")
+	press(m, "c")
+	if m.compose == nil || len(m.compose.prs) != 1 || m.compose.ta.Value() != "@dependabot rebase" {
+		t.Fatalf("c does not write the comment again for the one it failed on: %+v", m.compose)
 	}
 	press(m, "esc", "R")
 	if m.compose != nil || !strings.Contains(m.status, "one pull request at a time") {

@@ -442,8 +442,8 @@ func (m *Model) handleData(msg tea.Msg) tea.Cmd {
 		e.loading, e.err, e.val = false, msg.err, safeComment(msg.c)
 	case reviewMsg:
 		return m.reviewed(msg)
-	case commentsMsg:
-		return m.commented(msg)
+	case postedMsg:
+		return m.posted(msg)
 	case doneMsg:
 		if msg.err != nil {
 			m.setStatus(fmt.Sprintf("could not mark %s done: %v", msg.n.Key, msg.err), true)

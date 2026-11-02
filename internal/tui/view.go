@@ -52,9 +52,11 @@ func (m *Model) render() string {
 	if m.statusErr {
 		st = m.st.red
 	}
-	// Claude answering elsewhere takes the line until it is done, unless
-	// the line tells of a failure.
-	if s := m.claudeStatus(); s != "" && !m.statusErr {
+	// A comment on its way, then Claude answering elsewhere, takes the
+	// line until it is done, unless the line tells of a failure.
+	if s := m.postingStatus(); s != "" && !m.statusErr {
+		b.WriteString(fit(s, m.width) + "\n")
+	} else if s := m.claudeStatus(); s != "" && !m.statusErr {
 		b.WriteString(fit(s, m.width) + "\n")
 	} else {
 		b.WriteString(fit(st.Render(m.status), m.width) + "\n")

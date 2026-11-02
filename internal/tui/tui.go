@@ -199,6 +199,10 @@ type Model struct {
 	// sending names the pull requests a comment or a review is on its way
 	// to; none other is sent until it is back. Empty when none is.
 	sending string
+	// posting is the comment on its way, and unsent the text of one that
+	// failed on some, which the next comment starts with.
+	posting *posting
+	unsent  string
 
 	selected map[model.PRKey]selection
 	bulk     *bulk

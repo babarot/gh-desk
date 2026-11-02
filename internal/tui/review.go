@@ -63,9 +63,8 @@ func (c *compose) update(msg tea.Msg) tea.Cmd {
 type confirm struct {
 	pr     model.PR
 	single bool
-	// prs and from are a comment's pull requests and its popup.
+	// prs are a comment's pull requests.
 	prs   []model.PR
-	from  *compose
 	event model.ReviewEvent
 	body  string
 }
@@ -108,6 +107,9 @@ func (m *Model) startComment() tea.Cmd {
 	}
 	c := &compose{pr: prs[0], prs: prs, single: true, ta: textarea.New()}
 	c.ta.Placeholder = "Write the comment (markdown)"
+	// A comment that failed comes back to be sent again.
+	c.ta.SetValue(m.unsent)
+	m.unsent = ""
 	return m.openCompose(c)
 }
 
@@ -157,7 +159,7 @@ func (m *Model) composeKey(msg tea.KeyPressMsg) tea.Cmd {
 			m.setStatus("write the "+sentWord(c.single, ev)+" first", true)
 			return nil
 		}
-		m.confirm = &confirm{pr: c.pr, single: c.single, prs: c.prs, from: c, event: ev, body: body}
+		m.confirm = &confirm{pr: c.pr, single: c.single, prs: c.prs, event: ev, body: body}
 		return nil
 	case m.keys.Matches("editor", k):
 		return m.openEditor()
@@ -218,9 +220,13 @@ func (m *Model) confirmKey(k string) tea.Cmd {
 	case m.keys.Matches("confirm", k):
 		m.confirm = nil
 		if c.single {
+			// The popup closes at once; the status line follows the
+			// comment to each pull request.
+			m.compose = nil
 			m.sending = prsWord(c.prs)
-			m.setStatus(fmt.Sprintf("sending the comment to %s…", m.sending), false)
-			return m.postComments(c)
+			m.posting = &posting{body: c.body, prs: c.prs}
+			m.setStatus("", false)
+			return m.postNext(m.posting)
 		}
 		m.sending = c.pr.Key.String()
 		m.setStatus(fmt.Sprintf("sending %s to %s…", sentWord(false, c.event), c.pr.Key), false)
@@ -240,53 +246,73 @@ func prsWord(prs []model.PR) string {
 	return fmt.Sprintf("%d pull requests", len(prs))
 }
 
-// commentsMsg is a comment sent to each of its popup's pull requests, one
-// after another: those it reached, and those it failed on with why.
-type commentsMsg struct {
-	from   *compose
-	sent   []model.PR
+// posting is a comment on its way to its pull requests, one after
+// another, while the screen is free.
+type posting struct {
+	body   string
+	prs    []model.PR
+	next   int
+	sent   int
 	failed []model.PR
-	errs   []error
+	err    error
 }
 
-// postComments sends a comment to its pull requests one at a time, as
-// GitHub asks of writes, and goes on past one that fails.
-func (m *Model) postComments(c *confirm) tea.Cmd {
-	return func() tea.Msg {
-		msg := commentsMsg{from: c.from}
-		for _, p := range c.prs {
-			if err := m.src.PostComment(m.ctx, p, c.body); err != nil {
-				msg.failed, msg.errs = append(msg.failed, p), append(msg.errs, err)
-				continue
-			}
-			msg.sent = append(msg.sent, p)
+// postedMsg is the comment sent to one pull request of a posting.
+type postedMsg struct {
+	p   *posting
+	err error
+}
+
+// postNext sends the comment to the posting's next pull request. GitHub
+// asks for writes one at a time.
+func (m *Model) postNext(p *posting) tea.Cmd {
+	pr := p.prs[p.next]
+	return func() tea.Msg { return postedMsg{p, m.src.PostComment(m.ctx, pr, p.body)} }
+}
+
+// posted takes in one comment sent and sends the next. When the last is
+// back, those it failed on are selected and the comment is kept, so c
+// writes it again for them.
+func (m *Model) posted(msg postedMsg) tea.Cmd {
+	p := msg.p
+	if msg.err != nil {
+		p.failed = append(p.failed, p.prs[p.next])
+		if p.err == nil {
+			p.err = msg.err
 		}
-		return msg
+	} else {
+		p.sent++
 	}
-}
-
-// commented takes in a comment sent: the popup closes once it reached
-// every pull request; otherwise it stays, with only those it failed on, to
-// send again.
-func (m *Model) commented(msg commentsMsg) tea.Cmd {
-	m.sending = ""
-	if len(msg.failed) == 0 {
-		if m.compose == msg.from {
-			m.compose = nil
-		}
-		m.setStatus(fmt.Sprintf("✓ comment sent to %s", prsWord(msg.sent)), false)
+	p.next++
+	if p.next < len(p.prs) {
+		return m.postNext(p)
+	}
+	m.posting, m.sending = nil, ""
+	if len(p.failed) == 0 {
+		m.setStatus(fmt.Sprintf("✓ comment sent to %s", prsWord(p.prs)), false)
 		return nil
 	}
-	if m.compose == msg.from {
-		m.compose.prs, m.compose.pr = msg.failed, msg.failed[0]
+	clear(m.selected)
+	for _, f := range p.failed {
+		m.selected[f.Key] = byHand
 	}
-	text := fmt.Sprintf("comment on %s failed: %v", msg.failed[0].Key, msg.errs[0])
-	if len(msg.sent) > 0 || len(msg.failed) > 1 {
-		text = fmt.Sprintf("comment sent to %d, failed on %d (%s: %v); the popup keeps those it failed on",
-			len(msg.sent), len(msg.failed), msg.failed[0].Key, msg.errs[0])
-	}
-	m.setStatus(text, true)
+	m.unsent = p.body
+	m.setStatus(fmt.Sprintf("comment failed on %d of %d (%s: %v) · they are selected; %s to send it again",
+		len(p.failed), len(p.prs), p.failed[0].Key, p.err, m.firstKey("comment")), true)
 	return nil
+}
+
+// postingStatus is the status line while a comment is on its way.
+func (m *Model) postingStatus() string {
+	p := m.posting
+	if p == nil {
+		return ""
+	}
+	text := "sending the comment to " + prsWord(p.prs) + "…"
+	if len(p.prs) > 1 {
+		text = fmt.Sprintf("sending the comment… %d/%d", p.next+1, len(p.prs))
+	}
+	return m.st.mauve.Render(m.spinner()) + " " + m.st.muted.Render(text)
 }
 
 // reviewed takes in a sent review: the popup closes, the row shows it, and
