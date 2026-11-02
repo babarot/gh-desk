@@ -118,8 +118,6 @@ func Run(args []string, stdout, stderr io.Writer) int {
 		}
 		return 0
 	}
-	set := settings(cfg)
-	set.ConfigWarnings = warns
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	viewer, err := gh.Viewer(ctx)
@@ -128,13 +126,64 @@ func Run(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintf(stderr, "gh-triage: could not read who you are on GitHub: %v\n", err)
 		return 1
 	}
-	set.Viewer = viewer
-	set.Host = github.DefaultHost()
-	set.Chats = chatStore{state.OpenChats(state.DefaultDir(), set.Host)}
-	if !*noCache {
-		set.Lists = openLists(cfg, viewer, log)
+	p := assemble(cfg, warns, env{gh: gh, host: github.DefaultHost(), viewer: viewer, stateDir: state.DefaultDir(),
+		borrow: claude.GhqRoots(ctx), noCache: *noCache}, log)
+	start := time.Now()
+	err = tui.Run(ctx, source{gh}, p.rn, p.cl, km, log, p.set)
+	// Stop the batches and wait for them to stop writing the record before
+	// the lock goes, so another gh-triage never shares it.
+	cancel()
+	p.rn.Wait()
+	if p.store != nil {
+		p.store.Close()
 	}
-	layout := state.OpenLayout(state.DefaultDir())
+	if p.lock != nil {
+		p.lock.close()
+	}
+	log.Info("exit", logging.KeyDurationMS, time.Since(start).Milliseconds(), "err", errString(err))
+	if err != nil {
+		fmt.Fprintf(stderr, "gh-triage: %v (run %s)\n", err, run)
+		return 1
+	}
+	return 0
+}
+
+// env is what assemble takes besides the config: the GitHub client, the
+// host it talks to and the account logged in there, the directory the
+// state is kept in, the directories a worktree may borrow clones from, and
+// whether the lists last read are left alone.
+type env struct {
+	gh       *github.Client
+	host     string
+	viewer   string
+	stateDir string
+	borrow   []string
+	noCache  bool
+}
+
+// parts are what the TUI runs with. store and lock, when set, are closed
+// once it has quit and rn has stopped.
+type parts struct {
+	set   tui.Settings
+	rn    *runner.Runner
+	cl    asker
+	store *state.Store
+	lock  *pendingLock
+}
+
+// assemble puts together what the TUI runs with from the config and e. It
+// reads and writes only under e.stateDir and the cache directory; nothing
+// is sent to GitHub.
+func assemble(cfg config.File, warns []string, e env, log *slog.Logger) parts {
+	set := settings(cfg)
+	set.ConfigWarnings = warns
+	set.Viewer = e.viewer
+	set.Host = e.host
+	set.Chats = chatStore{state.OpenChats(e.stateDir, e.host)}
+	if !e.noCache {
+		set.Lists = openLists(cfg, e.host, e.viewer, log)
+	}
+	layout := state.OpenLayout(e.stateDir)
 	set.Layout = layout
 	if h, err := layout.PreviewHeight(); err != nil {
 		log.Warn("could not read the pane's height last set", "err", err.Error())
@@ -143,10 +192,10 @@ func Run(args []string, stdout, stderr io.Writer) int {
 	}
 	// One gh-triage at a time keeps the record of merges it waits for;
 	// another one runs without waiting merges.
-	store, err := state.Open(state.DefaultDir())
+	store, err := state.Open(e.stateDir)
 	if err != nil {
 		log.Warn("could not open the record of pending merges", "err", err.Error())
-		set.StoreProblem = "could not open " + state.DefaultDir() + ": " + err.Error()
+		set.StoreProblem = "could not open " + e.stateDir + ": " + err.Error()
 	}
 	var rstore runner.Store
 	if store != nil {
@@ -157,44 +206,27 @@ func Run(args []string, stdout, stderr io.Writer) int {
 	} else {
 		log.Info("another gh-triage holds the record of pending merges")
 	}
-	rn := runner.New(runnerGitHub{gh}, log, runner.Options{Settings: set.Plan, Viewer: viewer, Store: rstore, CanWait: rstore != nil,
+	rn := runner.New(runnerGitHub{e.gh}, log, runner.Options{Settings: set.Plan, Viewer: e.viewer, Store: rstore, CanWait: rstore != nil,
 		ChecksTimeout: cfg.Merge.ChecksTimeout.D, BlockedTimeout: cfg.Merge.BlockedTimeout.D})
 	var lock *pendingLock
 	if store == nil && err == nil {
 		// Taken over once the other gh-triage quits.
-		lock = &pendingLock{dir: state.DefaultDir(), rn: rn}
+		lock = &pendingLock{dir: e.stateDir, rn: rn}
 		set.Lock = lock
 	}
 	cl := asker{
 		Claude: claude.New(claude.Options{Bin: cfg.ClaudeCommand(), Model: cfg.Claude.Model, Tools: cfg.Claude.AllowedTools, Language: cfg.Claude.Language, Instructions: cfg.Claude.Instructions, Log: log}),
-		ws:     &claude.Workspace{Dir: cfg.CacheDir(), Borrow: claude.GhqRoots(ctx), Log: log},
+		ws:     &claude.Workspace{Dir: cfg.CacheDir(), Borrow: e.borrow, Log: log},
 	}
-	start := time.Now()
-	err = tui.Run(ctx, source{gh}, rn, cl, km, log, set)
-	// Stop the batches and wait for them to stop writing the record before
-	// the lock goes, so another gh-triage never shares it.
-	cancel()
-	rn.Wait()
-	if store != nil {
-		store.Close()
-	}
-	if lock != nil {
-		lock.close()
-	}
-	log.Info("exit", logging.KeyDurationMS, time.Since(start).Milliseconds(), "err", errString(err))
-	if err != nil {
-		fmt.Fprintf(stderr, "gh-triage: %v (run %s)\n", err, run)
-		return 1
-	}
-	return 0
+	return parts{set: set, rn: rn, cl: cl, store: store, lock: lock}
 }
 
 // openLists opens the lists last read by this account on this host. The
 // viewer is the one just read, never the cached one: the lists of another
 // account are not shown, and nothing is done in its name.
-func openLists(cfg config.File, viewer string, log *slog.Logger) tui.Lists {
+func openLists(cfg config.File, host, viewer string, log *slog.Logger) tui.Lists {
 	path := filepath.Join(cfg.CacheDir(), "lists.json")
-	c, err := listcache.Open(path, github.DefaultHost(), viewer)
+	c, err := listcache.Open(path, host, viewer)
 	if err != nil {
 		log.Warn("could not read the lists last read", "err", err.Error())
 	}
