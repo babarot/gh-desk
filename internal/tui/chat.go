@@ -10,6 +10,7 @@ import (
 
 	"charm.land/bubbles/v2/textarea"
 	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
 
 	"github.com/babarot/gh-triage/internal/claude"
@@ -98,6 +99,8 @@ type turn struct {
 	// head is the head of the pull request a question was asked at.
 	head string
 	at   time.Time
+	// cost is what an answer cost, told under it.
+	cost float64
 }
 
 // Messages of a question on its way.
@@ -297,7 +300,11 @@ func (m *Model) chatAnswer(msg chatAnswerMsg) tea.Cmd {
 	c.running, c.cancel = false, nil
 	c.unseen = m.view != viewChat || m.chatKey != msg.key
 	add := func(text string, err bool) {
-		c.turns = append(c.turns, turn{text: text, steps: c.steps, err: err, at: m.set.Now()})
+		t := turn{text: text, steps: c.steps, err: err, at: m.set.Now()}
+		if !err {
+			t.cost = msg.answer.Cost
+		}
+		c.turns = append(c.turns, t)
 		c.steps = nil
 	}
 	// Kept with the answer, then the session is free for another
@@ -488,26 +495,52 @@ func (m *Model) restartChat(c *chat) tea.Cmd {
 	return m.ask(c, "Review this pull request.", "", false)
 }
 
+// The chat is laid out as Claude Code lays out a conversation: a question
+// on a band from the left edge, and Claude's lines after a margin, each
+// answer led by ⏺ with its text under the text after it.
+const (
+	chatMargin = 2
+	chatIndent = 4
+	// chatMaxWidth is the widest a line of text is wrapped at, however
+	// wide the terminal.
+	chatMaxWidth = 100
+	// chatLiveSteps is how many of the tools used so far are shown while
+	// Claude answers.
+	chatLiveSteps = 3
+)
+
 // chatLines are the conversation, wrapped to width, with Claude's answers
 // drawn from their Markdown.
 func (m *Model) chatLines(c *chat, width int) []string {
 	st := m.st
-	wrap := func(s string) []string {
-		var out []string
-		for l := range strings.SplitSeq(ansi.Wrap(safe(s), max(width-2, 10), " "), "\n") {
-			out = append(out, "  "+l)
-		}
-		return out
-	}
-	steps := func(ss []claude.Step) []string {
-		var out []string
-		for _, s := range ss {
-			out = append(out, "  "+st.mauve.Render("⏺ "+s.Tool)+" "+st.dim.Render(safeLine(s.Arg)))
-		}
-		return out
-	}
+	textW := min(width, chatMaxWidth)
+	margin, indent := spaces(chatMargin), spaces(chatIndent)
 	var L []string
+	// lead puts ⏺ before the first line that has text, and the others
+	// under its text.
+	lead := func(lines []string, mark lipgloss.Style) {
+		first := true
+		for _, l := range lines {
+			switch {
+			case l == "":
+				L = append(L, "")
+			case first:
+				L = append(L, margin+mark.Render("⏺")+" "+l)
+				first = false
+			default:
+				L = append(L, indent+l)
+			}
+		}
+	}
+	steps := func(ss []claude.Step, live bool) {
+		if s := m.stepLines(c, ss, live, width); len(s) > 0 {
+			L = append(L, s...)
+			L = append(L, "")
+		}
+	}
 	head := ""
+	// asked is when the question an answer is to was asked.
+	var asked time.Time
 	for i, t := range c.turns {
 		switch {
 		case t.you:
@@ -517,46 +550,160 @@ func (m *Model) chatLines(c *chat, width int) []string {
 			if t.head != "" {
 				head = t.head
 			}
-			L = append(L, st.blue.Render("you")+"  "+st.sub1.Render(safeLine(firstLine(t.text))))
+			asked = t.at
+			L = append(L, m.questionLines(t.text, width, textW)...)
 			if i == len(c.turns)-1 && !c.running {
 				// A question with no answer is on its way in another
 				// gh-triage, or was cut short when one quit.
 				if c.elsewhere != "" {
-					L = append(L, "", "  "+m.working(st.muted, "answering in another gh-triage ("+c.elsewhere+")…"))
+					L = append(L, "", margin+m.working(st.muted, "answering in another gh-triage ("+c.elsewhere+")…"))
 				} else {
-					L = append(L, "", "  "+st.dim.Render("interrupted: gh-triage was closed before the answer"))
+					L = append(L, "", margin+st.dim.Render("interrupted: gh-triage was closed before the answer"))
 				}
 			}
 		case t.err:
-			L = append(L, steps(t.steps)...)
-			L = append(L, st.red.Render("claude failed"))
-			for _, l := range wrap(t.text) {
-				L = append(L, st.red.Render(l))
+			steps(t.steps, false)
+			var ls []string
+			for i, para := range strings.Split(strings.TrimRight(safe(t.text), " \t\n"), "\n") {
+				if i == 0 {
+					para = "claude failed: " + para
+				}
+				for _, l := range wrapSpans([]span{{text: para, style: st.red}}, max(textW-chatIndent, 10), 0) {
+					ls = append(ls, renderSpans(l))
+				}
 			}
+			lead(ls, st.red)
 		default:
-			L = append(L, steps(t.steps)...)
-			L = append(L, st.mauve.Render("claude"))
+			steps(t.steps, false)
 			// An answer is Markdown, drawn as a description is.
 			text := zeroWidth.Replace(mdLinkRe.ReplaceAllString(safe(t.text), "$1"))
-			for _, l := range m.markdownLines(strings.TrimRight(text, " \t\n"), max(width-2, 10)) {
-				if l.text == "" {
-					L = append(L, "")
-					continue
-				}
-				L = append(L, "  "+l.text)
+			var ls []string
+			for _, l := range m.markdownLines(strings.TrimRight(text, " \t\n"), max(textW-chatIndent, 10)) {
+				ls = append(ls, l.text)
+			}
+			lead(ls, st.text)
+			var took time.Duration
+			if !asked.IsZero() && t.at.After(asked) {
+				took = t.at.Sub(asked)
+			}
+			if info := turnInfo(t, took); info != "" {
+				L = append(L, "", indent+st.dim.Render(info))
 			}
 		}
 		L = append(L, "")
 	}
 	if c.running {
-		L = append(L, steps(c.steps)...)
+		steps(c.steps, true)
 		what := "thinking…"
 		if c.dir == "" {
 			what = "making the worktree…"
 		}
-		L = append(L, "  "+m.working(st.muted, what)+" "+st.dim.Render(elapsed(m.set.Now().Sub(c.since))))
+		L = append(L, margin+m.working(st.muted, what)+" "+st.dim.Render(elapsed(m.set.Now().Sub(c.since))), "")
 	}
 	return L
+}
+
+// questionLines are a question in full, on a band as wide as the screen.
+func (m *Model) questionLines(text string, width, textW int) []string {
+	st := m.st
+	var out []string
+	for i, para := range strings.Split(strings.TrimRight(safe(text), " \t\n"), "\n") {
+		for j, l := range wrapSpans([]span{{text: para, style: st.text}}, max(textW-2, 10), 0) {
+			lead := "  "
+			if i == 0 && j == 0 {
+				lead = st.dim.Render(">") + " "
+			}
+			out = append(out, onBackground(lead+renderSpans(l), st.band, width))
+		}
+	}
+	return out
+}
+
+// stepLines are the tools Claude used: while it answers, the last few
+// with what each was used on; once it has, one line that counts them.
+func (m *Model) stepLines(c *chat, ss []claude.Step, live bool, width int) []string {
+	if len(ss) == 0 {
+		return nil
+	}
+	st := m.st
+	margin, mark := spaces(chatMargin), st.mauve.Render("⏺")+" "
+	if !live {
+		var names []string
+		count := map[string]int{}
+		for _, s := range ss {
+			n := safeLine(s.Tool)
+			if count[n] == 0 {
+				names = append(names, n)
+			}
+			count[n]++
+		}
+		parts := make([]string, len(names))
+		for i, n := range names {
+			parts[i] = fmt.Sprintf("%s ×%d", n, count[n])
+		}
+		return []string{margin + mark + st.text.Render(tools(len(ss))) + "  " + st.dim.Render(strings.Join(parts, " · "))}
+	}
+	var out []string
+	if k := len(ss) - chatLiveSteps; k > 0 {
+		out = append(out, margin+st.dim.Render(fmt.Sprintf("… %d earlier", k)))
+		ss = ss[k:]
+	}
+	for _, s := range ss {
+		tool := safeLine(s.Tool)
+		line := margin + mark + st.bold.Render(tool)
+		// The room for the argument is what is left after the tool and
+		// its parentheses.
+		room := width - chatMargin - 2 - ansi.StringWidth(tool) - 2
+		if arg := stepArg(c.dir, safeLine(s.Arg), room); arg != "" {
+			line += st.dim.Render("(" + arg + ")")
+		}
+		out = append(out, line)
+	}
+	return out
+}
+
+// stepArg is what a tool was used on, w cells wide at most: a path in the
+// worktree from the worktree, and a path cut in the middle so its file
+// name stays.
+func stepArg(dir, arg string, w int) string {
+	path := strings.HasPrefix(arg, "/")
+	if dir != "" && strings.HasPrefix(arg, dir+"/") {
+		arg = arg[len(dir)+1:]
+	}
+	if w <= 0 || ansi.StringWidth(arg) <= w {
+		return arg
+	}
+	if !path {
+		return ansi.Truncate(arg, w, "…")
+	}
+	i := strings.LastIndex(arg, "/")
+	tail := arg[i:]
+	if i <= 0 || ansi.StringWidth(tail)+1 >= w {
+		return ansi.Truncate(arg[i+1:], w, "…")
+	}
+	return ansi.Truncate(arg[:i], w-ansi.StringWidth(tail)-1, "") + "…" + tail
+}
+
+// turnInfo is what an answer took: the tools, the time and the cost.
+func turnInfo(t turn, took time.Duration) string {
+	var parts []string
+	if n := len(t.steps); n > 0 {
+		parts = append(parts, tools(n))
+	}
+	if took > 0 {
+		parts = append(parts, elapsed(took))
+	}
+	if t.cost > 0 {
+		parts = append(parts, fmt.Sprintf("$%.2f", t.cost))
+	}
+	return strings.Join(parts, " · ")
+}
+
+func tools(n int) string {
+	if n == 1 {
+		return "1 tool"
+	}
+	return fmt.Sprintf("%d tools", n)
 }
 
 // elapsed is how long a question has waited, as the chat shows it.
@@ -614,7 +761,7 @@ func (m *Model) renderChat(b *strings.Builder, height int) *tea.Cursor {
 	b.WriteString(fit(st.mauve.Render("claude")+" "+st.muted.Render("on")+" "+st.sub1.Render(c.pr.Key.String())+"  "+
 		st.dim.Render(strings.Join(info, " · ")), m.width) + "\n")
 	b.WriteString(st.dim.Render(strings.Repeat("╌", max(m.width-1, 0))) + "\n")
-	inputH := 1
+	inputH := 0
 	if c.typing {
 		inputH = c.input.Height()
 	}
@@ -636,6 +783,5 @@ func (m *Model) renderChat(b *strings.Builder, height int) *tea.Cursor {
 		b.WriteString(c.input.View() + "\n")
 		return cur
 	}
-	b.WriteString(fit(st.dim.Render(fmt.Sprintf("› %s to ask more · %s to draft a review", m.firstKey("chat_more"), m.firstKey("draft_review"))), m.width) + "\n")
 	return nil
 }

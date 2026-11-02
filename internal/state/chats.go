@@ -56,6 +56,8 @@ type ChatTurn struct {
 	// Head is the head of the pull request a question was asked at.
 	Head string    `json:"head,omitempty"`
 	At   time.Time `json:"at"`
+	// Cost is what an answer cost, in US dollars.
+	Cost float64 `json:"cost,omitempty"`
 }
 
 // ChatStep is a tool Claude used, and on what.

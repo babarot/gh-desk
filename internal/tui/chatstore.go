@@ -49,6 +49,7 @@ type ChatTurn struct {
 	Err   bool
 	Head  string
 	At    time.Time
+	Cost  float64
 }
 
 // chatInfo is what the pane says of a conversation kept.
@@ -61,7 +62,7 @@ func (c *chat) record() ChatRecord {
 	r := ChatRecord{Key: c.pr.Key, Session: c.session, Started: c.started, Dir: c.dir, Head: c.head,
 		Model: c.model, Cost: c.cost, Rev: c.rev}
 	for _, t := range c.turns {
-		r.Turns = append(r.Turns, ChatTurn{You: t.you, Text: t.text, Steps: t.steps, Err: t.err, Head: t.head, At: t.at})
+		r.Turns = append(r.Turns, ChatTurn{You: t.you, Text: t.text, Steps: t.steps, Err: t.err, Head: t.head, At: t.at, Cost: t.cost})
 	}
 	return r
 }
@@ -72,7 +73,7 @@ func (c *chat) load(r ChatRecord) {
 	c.session, c.started, c.dir, c.head, c.model, c.cost, c.rev = r.Session, r.Started, r.Dir, r.Head, r.Model, r.Cost, r.Rev
 	c.turns = nil
 	for _, t := range r.Turns {
-		c.turns = append(c.turns, turn{you: t.You, text: t.Text, steps: t.Steps, err: t.Err, head: t.Head, at: t.At})
+		c.turns = append(c.turns, turn{you: t.You, text: t.Text, steps: t.Steps, err: t.Err, head: t.Head, at: t.At, cost: t.Cost})
 	}
 }
 

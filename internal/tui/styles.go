@@ -80,6 +80,8 @@ type styles struct {
 	// code is inline code in a description; block a code block, and
 	// blockLang its language.
 	code, block, blockLang lipgloss.Style
+	// band is the background of a question in the chat.
+	band lipgloss.Style
 }
 
 func newStyles(p palette) styles {
@@ -126,6 +128,7 @@ func newStyles(p palette) styles {
 		code:      lipgloss.NewStyle().Background(p.surface0).Foreground(p.peach),
 		block:     lipgloss.NewStyle().Background(p.surface0).Foreground(p.subtext1),
 		blockLang: lipgloss.NewStyle().Background(p.surface0).Foreground(p.overlay),
+		band:      lipgloss.NewStyle().Background(mix(p.surface0, p.base, 0.5)),
 	}
 }
 

@@ -214,11 +214,10 @@ func TestChatAnswerIsDrawnFromMarkdown(t *testing.T) {
 		got = append(got, ansi.Strip(l))
 	}
 	want := []string{
-		"claude",
-		"  Verdict",
-		"  Safe to merge, see the docs.",
+		"  ⏺ Verdict",
+		"    Safe to merge, see the docs.",
 		"",
-		"  • go test passes",
+		"    • go test passes",
 		"",
 	}
 	if strings.Join(got, "\n") != strings.Join(want, "\n") {

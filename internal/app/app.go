@@ -283,7 +283,7 @@ func (c chatStore) Load(k model.PRKey) (tui.ChatRecord, bool, error) {
 		for _, s := range t.Steps {
 			steps = append(steps, claude.Step{Tool: s.Tool, Arg: s.Arg})
 		}
-		out.Turns = append(out.Turns, tui.ChatTurn{You: t.You, Text: t.Text, Steps: steps, Err: t.Err, Head: t.Head, At: t.At})
+		out.Turns = append(out.Turns, tui.ChatTurn{You: t.You, Text: t.Text, Steps: steps, Err: t.Err, Head: t.Head, At: t.At, Cost: t.Cost})
 	}
 	return out, true, nil
 }
@@ -295,7 +295,7 @@ func (c chatStore) Save(r tui.ChatRecord) error {
 		for _, s := range t.Steps {
 			steps = append(steps, state.ChatStep{Tool: s.Tool, Arg: s.Arg})
 		}
-		in.Turns = append(in.Turns, state.ChatTurn{You: t.You, Text: t.Text, Steps: steps, Err: t.Err, Head: t.Head, At: t.At})
+		in.Turns = append(in.Turns, state.ChatTurn{You: t.You, Text: t.Text, Steps: steps, Err: t.Err, Head: t.Head, At: t.At, Cost: t.Cost})
 	}
 	return c.Chats.Save(in)
 }
