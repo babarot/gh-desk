@@ -11,13 +11,13 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/babarot/gh-triage/internal/keymap"
 	"github.com/babarot/gh-triage/internal/logging"
 	"github.com/babarot/gh-triage/internal/model"
 	"github.com/babarot/gh-triage/internal/plan"
 	"github.com/babarot/gh-triage/internal/runner"
-	"github.com/babarot/gh-triage/internal/statusline"
 	"github.com/babarot/gh-triage/internal/tui/chat"
+	"github.com/babarot/gh-triage/internal/tui/keymap"
+	"github.com/babarot/gh-triage/internal/tui/statusline"
 )
 
 // Source is what the TUI needs from GitHub. The app package passes the

@@ -26,9 +26,9 @@ var layers = []layer{
 	{"internal/model", 0, nil, nil, "Shared types: pull requests and their names"},
 	{"internal/logging", 0, nil, nil, "The slog logger and the log file"},
 	{"internal/near", 0, nil, nil, "The closest of a few names to one mistyped, for a did-you-mean"},
-	{"internal/statusline", 0, nil, nil, "What the status line shows: events for a moment, work in progress, the row's result"},
+	{"internal/tui/statusline", 0, nil, nil, "What the status line shows: events for a moment, work in progress, the row's result"},
 	{"internal/config", 1, []string{"near"}, []string{"github.com/pelletier/go-toml/v2"}, "Reading the config file and reporting its mistakes"},
-	{"internal/keymap", 1, []string{"near"}, nil, "Keys bound to actions by name"},
+	{"internal/tui/keymap", 1, []string{"near"}, nil, "Keys bound to actions by name"},
 	{"internal/plan", 1, []string{"model"}, nil, "Deciding how to merge each pull request; selection rules"},
 	{"internal/diff", 1, nil, nil, "Reading patches and the words that changed"},
 	{"internal/github", 2, []string{"model", "logging"}, []string{"github.com/cli/go-gh/v2"}, "GitHub's GraphQL and REST APIs"},
@@ -37,9 +37,9 @@ var layers = []layer{
 	{"internal/listcache", 2, []string{"model"}, nil, "The lists last read, kept on disk for the next launch"},
 	{"internal/runner", 3, []string{"model", "logging", "plan"}, nil, "Bulk approve and merge, auto-merge watching, resuming"},
 	{"internal/tui/chat", 3, []string{"model", "logging", "claude"}, nil, "The conversations with Claude about pull requests: what each holds, keeping them and their locks"},
-	{"internal/tui", 4, []string{"model", "logging", "plan", "diff", "keymap", "runner", "claude", "listcache", "statusline", "tui/chat"},
+	{"internal/tui", 4, []string{"model", "logging", "plan", "diff", "tui/keymap", "runner", "claude", "listcache", "tui/statusline", "tui/chat"},
 		[]string{"charm.land/bubbletea/v2", "charm.land/bubbles/v2", "charm.land/lipgloss/v2", "github.com/charmbracelet/x/ansi", "golang.org/x/net/html"}, "The terminal UI"},
-	{"internal/app", 5, []string{"model", "logging", "config", "keymap", "plan", "github", "state", "claude", "listcache", "runner", "tui", "tui/chat"}, nil, "Putting it together: flags, config, log, and starting the TUI"},
+	{"internal/app", 5, []string{"model", "logging", "config", "tui/keymap", "plan", "github", "state", "claude", "listcache", "runner", "tui", "tui/chat"}, nil, "Putting it together: flags, config, log, and starting the TUI"},
 	{"", 6, []string{"app"}, nil, "Calls app.Run"},
 }
 

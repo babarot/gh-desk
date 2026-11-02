@@ -12,11 +12,11 @@ import (
 	"github.com/charmbracelet/x/ansi"
 
 	"github.com/babarot/gh-triage/internal/claude"
-	"github.com/babarot/gh-triage/internal/keymap"
 	"github.com/babarot/gh-triage/internal/logging"
 	"github.com/babarot/gh-triage/internal/model"
 	"github.com/babarot/gh-triage/internal/plan"
 	"github.com/babarot/gh-triage/internal/runner"
+	"github.com/babarot/gh-triage/internal/tui/keymap"
 )
 
 // triage is the conversation with Claude about the lists, opened by C on

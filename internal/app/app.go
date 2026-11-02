@@ -22,7 +22,6 @@ import (
 	"github.com/babarot/gh-triage/internal/claude"
 	"github.com/babarot/gh-triage/internal/config"
 	"github.com/babarot/gh-triage/internal/github"
-	"github.com/babarot/gh-triage/internal/keymap"
 	"github.com/babarot/gh-triage/internal/listcache"
 	"github.com/babarot/gh-triage/internal/logging"
 	"github.com/babarot/gh-triage/internal/model"
@@ -31,6 +30,7 @@ import (
 	"github.com/babarot/gh-triage/internal/state"
 	"github.com/babarot/gh-triage/internal/tui"
 	"github.com/babarot/gh-triage/internal/tui/chat"
+	"github.com/babarot/gh-triage/internal/tui/keymap"
 )
 
 // Version is set at build time.

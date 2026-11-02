@@ -5,9 +5,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/babarot/gh-triage/internal/keymap"
 	"github.com/babarot/gh-triage/internal/model"
-	"github.com/babarot/gh-triage/internal/statusline"
+	"github.com/babarot/gh-triage/internal/tui/keymap"
+	"github.com/babarot/gh-triage/internal/tui/statusline"
 )
 
 // clockAt sets the model's clock d after the tests' now.

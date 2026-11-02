@@ -6,7 +6,7 @@ import (
 
 	"github.com/charmbracelet/x/ansi"
 
-	"github.com/babarot/gh-triage/internal/keymap"
+	"github.com/babarot/gh-triage/internal/tui/keymap"
 )
 
 func TestHTMLToMarkdown(t *testing.T) {

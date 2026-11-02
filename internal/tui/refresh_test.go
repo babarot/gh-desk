@@ -3,8 +3,8 @@ package tui
 import (
 	"testing"
 
-	"github.com/babarot/gh-triage/internal/keymap"
 	"github.com/babarot/gh-triage/internal/model"
+	"github.com/babarot/gh-triage/internal/tui/keymap"
 )
 
 // A refresh reads the description pane of the pull request under the

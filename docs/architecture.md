@@ -8,9 +8,9 @@ gh-triage is split into packages by layer. A package imports only packages of lo
 | 0 | `internal/model` | Shared types: pull requests and their names | - | - |
 | 0 | `internal/logging` | The slog logger and the log file | - | - |
 | 0 | `internal/near` | The closest of a few names to one mistyped, for a did-you-mean | - | - |
-| 0 | `internal/statusline` | What the status line shows: events for a moment, work in progress, the row's result | - | - |
+| 0 | `internal/tui/statusline` | What the status line shows: events for a moment, work in progress, the row's result | - | - |
 | 1 | `internal/config` | Reading the config file and reporting its mistakes | `near` | `github.com/pelletier/go-toml/v2` |
-| 1 | `internal/keymap` | Keys bound to actions by name | `near` | - |
+| 1 | `internal/tui/keymap` | Keys bound to actions by name | `near` | - |
 | 1 | `internal/plan` | Deciding how to merge each pull request; selection rules | `model` | - |
 | 1 | `internal/diff` | Reading patches and the words that changed | - | - |
 | 2 | `internal/github` | GitHub's GraphQL and REST APIs | `model`, `logging` | `github.com/cli/go-gh/v2` |
@@ -19,8 +19,8 @@ gh-triage is split into packages by layer. A package imports only packages of lo
 | 2 | `internal/listcache` | The lists last read, kept on disk for the next launch | `model` | - |
 | 3 | `internal/runner` | Bulk approve and merge, auto-merge watching, resuming | `model`, `logging`, `plan` | - |
 | 3 | `internal/tui/chat` | The conversations with Claude about pull requests: what each holds, keeping them and their locks | `model`, `logging`, `claude` | - |
-| 4 | `internal/tui` | The terminal UI | `model`, `logging`, `plan`, `diff`, `keymap`, `runner`, `claude`, `listcache`, `statusline`, `tui/chat` | `charm.land/bubbletea/v2`, `charm.land/bubbles/v2`, `charm.land/lipgloss/v2`, `github.com/charmbracelet/x/ansi`, `golang.org/x/net/html` |
-| 5 | `internal/app` | Putting it together: flags, config, log, and starting the TUI | `model`, `logging`, `config`, `keymap`, `plan`, `github`, `state`, `claude`, `listcache`, `runner`, `tui`, `tui/chat` | - |
+| 4 | `internal/tui` | The terminal UI | `model`, `logging`, `plan`, `diff`, `tui/keymap`, `runner`, `claude`, `listcache`, `tui/statusline`, `tui/chat` | `charm.land/bubbletea/v2`, `charm.land/bubbles/v2`, `charm.land/lipgloss/v2`, `github.com/charmbracelet/x/ansi`, `golang.org/x/net/html` |
+| 5 | `internal/app` | Putting it together: flags, config, log, and starting the TUI | `model`, `logging`, `config`, `tui/keymap`, `plan`, `github`, `state`, `claude`, `listcache`, `runner`, `tui`, `tui/chat` | - |
 | 6 | `main` | Calls app.Run | `app` | - |
 
 Standard library packages that reach outside the process:
@@ -38,9 +38,9 @@ Standard library packages that reach outside the process:
 - Each part of the outside world has one package. The network is `internal/github`, the `claude` command and `git` are `internal/claude`, the pending-merge record and its lock, the conversations with Claude and their locks, and the screen layout kept between launches are `internal/state`, and the terminal is `internal/tui`. The standard library packages that reach outside the process are limited to them in the table above; besides `internal/claude`, `os/exec` is allowed in `internal/github` to open the browser and in `internal/tui` to open `$EDITOR`.
 - `internal/runner` does not import Bubble Tea. It reports progress as events of its own type; `internal/tui` turns them into messages. This keeps the bulk approve and merge logic testable without a terminal.
 - Interfaces are defined where they are used. `internal/runner` defines the GitHub operations it needs, and `internal/tui` the ones it needs (fetching lists, a diff, a single review, a notification done, the Claude conversation); `internal/app` passes the concrete clients. `internal/github` and `internal/claude` return concrete types.
-- `internal/config` returns plain values. It holds the settings as basic Go types, which `internal/app` turns into what `internal/plan`, `internal/keymap` and `internal/tui` take, and leaves checks that need another package's knowledge (a log level, a key) to that package, reported as `config.Problem` so every mistake is still shown where it is in the file.
+- `internal/config` returns plain values. It holds the settings as basic Go types, which `internal/app` turns into what `internal/plan`, `internal/tui/keymap` and `internal/tui` take, and leaves checks that need another package's knowledge (a log level, a key) to that package, reported as `config.Problem` so every mistake is still shown where it is in the file.
 - No package keeps state in package variables. The logger, the config and the clients are built in `internal/app` and passed as arguments and fields. `slog.SetDefault` is not used.
-- Keys are never written in the TUI's code. The TUI asks `internal/keymap` for an action by name, and draws the key hints and the `?` list from it.
+- Keys are never written in the TUI's code. The TUI asks `internal/tui/keymap` for an action by name, and draws the key hints and the `?` list from it.
 
 ## Logging
 

@@ -9,7 +9,7 @@ import (
 
 	"github.com/babarot/gh-triage/internal/model"
 	"github.com/babarot/gh-triage/internal/runner"
-	"github.com/babarot/gh-triage/internal/statusline"
+	"github.com/babarot/gh-triage/internal/tui/statusline"
 )
 
 // batchWords names what a batch does while it runs.

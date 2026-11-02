@@ -5,8 +5,8 @@ import (
 	"testing"
 
 	"github.com/babarot/gh-triage/internal/claude"
-	"github.com/babarot/gh-triage/internal/keymap"
 	"github.com/babarot/gh-triage/internal/runner"
+	"github.com/babarot/gh-triage/internal/tui/keymap"
 )
 
 // startTriage starts the TUI with Claude answering plan, and asks it on

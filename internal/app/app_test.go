@@ -11,10 +11,10 @@ import (
 
 	"github.com/babarot/gh-triage/internal/claude"
 	"github.com/babarot/gh-triage/internal/config"
-	"github.com/babarot/gh-triage/internal/keymap"
 	"github.com/babarot/gh-triage/internal/logging"
 	"github.com/babarot/gh-triage/internal/model"
 	"github.com/babarot/gh-triage/internal/state"
+	"github.com/babarot/gh-triage/internal/tui/keymap"
 )
 
 func TestKeysTemplateLoadsUncommented(t *testing.T) {

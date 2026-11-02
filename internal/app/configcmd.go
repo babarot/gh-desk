@@ -13,7 +13,7 @@ import (
 	"strings"
 
 	"github.com/babarot/gh-triage/internal/config"
-	"github.com/babarot/gh-triage/internal/keymap"
+	"github.com/babarot/gh-triage/internal/tui/keymap"
 )
 
 const configUsage = `Usage: gh triage config <command>

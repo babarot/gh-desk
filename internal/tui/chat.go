@@ -14,10 +14,10 @@ import (
 	"github.com/charmbracelet/x/ansi"
 
 	"github.com/babarot/gh-triage/internal/claude"
-	"github.com/babarot/gh-triage/internal/keymap"
 	"github.com/babarot/gh-triage/internal/model"
 	"github.com/babarot/gh-triage/internal/runner"
 	"github.com/babarot/gh-triage/internal/tui/chat"
+	"github.com/babarot/gh-triage/internal/tui/keymap"
 )
 
 // Claude asks Claude Code about pull requests. The app package passes the

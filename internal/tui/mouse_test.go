@@ -6,7 +6,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/babarot/gh-triage/internal/keymap"
+	"github.com/babarot/gh-triage/internal/tui/keymap"
 )
 
 func mouseAt(m *Model, msg tea.Msg) {

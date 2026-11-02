@@ -7,9 +7,9 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
 
-	"github.com/babarot/gh-triage/internal/keymap"
 	"github.com/babarot/gh-triage/internal/model"
 	"github.com/babarot/gh-triage/internal/tui/chat"
+	"github.com/babarot/gh-triage/internal/tui/keymap"
 )
 
 func TestMarkdownLines(t *testing.T) {

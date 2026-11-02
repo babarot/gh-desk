@@ -18,13 +18,13 @@ import (
 
 	"github.com/babarot/gh-triage/internal/claude"
 	"github.com/babarot/gh-triage/internal/diff"
-	"github.com/babarot/gh-triage/internal/keymap"
 	"github.com/babarot/gh-triage/internal/logging"
 	"github.com/babarot/gh-triage/internal/model"
 	"github.com/babarot/gh-triage/internal/plan"
 	"github.com/babarot/gh-triage/internal/runner"
-	"github.com/babarot/gh-triage/internal/statusline"
 	"github.com/babarot/gh-triage/internal/tui/chat"
+	"github.com/babarot/gh-triage/internal/tui/keymap"
+	"github.com/babarot/gh-triage/internal/tui/statusline"
 )
 
 var update = flag.Bool("update", false, "rewrite the golden files")

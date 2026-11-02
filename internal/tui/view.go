@@ -9,8 +9,8 @@ import (
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
 
-	"github.com/babarot/gh-triage/internal/keymap"
 	"github.com/babarot/gh-triage/internal/plan"
+	"github.com/babarot/gh-triage/internal/tui/keymap"
 )
 
 // View draws the screen.
