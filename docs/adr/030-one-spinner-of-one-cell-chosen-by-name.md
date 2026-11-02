@@ -1,4 +1,4 @@
-# ADR-029: One spinner, of one cell, chosen by name
+# ADR-030: One spinner, of one cell, chosen by name
 
 ## Status
 
