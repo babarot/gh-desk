@@ -54,10 +54,13 @@ func (m *Model) render() string {
 		st = m.st.red
 	}
 	// A comment on its way, then Claude answering elsewhere, takes the
-	// line until it is done, unless the line tells of a failure.
+	// line until it is done, unless the line tells of a failure. A
+	// refresh shows only on a line nothing else uses.
 	if s := m.postingStatus(); s != "" && !m.statusErr {
 		b.WriteString(fit(s, m.width) + "\n")
 	} else if s := m.claudeStatus(); s != "" && !m.statusErr {
+		b.WriteString(fit(s, m.width) + "\n")
+	} else if s := m.refreshStatus(); s != "" && m.status == "" {
 		b.WriteString(fit(s, m.width) + "\n")
 	} else {
 		b.WriteString(fit(st.Render(m.status), m.width) + "\n")

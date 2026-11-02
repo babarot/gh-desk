@@ -29,18 +29,57 @@ func (m *Model) autoRefresh() tea.Cmd {
 	return tea.Batch(m.reload(), m.tick())
 }
 
+// refreshRun is a reading r started: the tabs it reads, and how many
+// results it put away.
+type refreshRun struct {
+	tabs    []int
+	cleared int
+}
+
 // refresh is r: read the shown tab and the notifications again, and put
 // away the results on the rows.
 func (m *Model) refresh() tea.Cmd {
 	// Checks read for ◌ and the preview's merge line may have moved on.
 	clear(m.cache.info)
 	n := m.clearResults()
-	if n > 0 {
-		m.setStatus(fmt.Sprintf("refreshing · %d results cleared", n), false)
-	} else {
-		m.setStatus("refreshing", false)
+	// The status line says so while the reading lasts, unless something
+	// else is said meanwhile; see refreshStatus.
+	m.setStatus("", false)
+	tabs := []int{m.cur}
+	if m.cur != m.inbox {
+		tabs = append(tabs, m.inbox)
 	}
+	m.refreshing = &refreshRun{tabs: tabs, cleared: n}
 	return m.reload()
+}
+
+// endRefresh forgets the reading r started once each tab it reads is
+// done, heavy fields included, as the tabs' spinners are.
+func (m *Model) endRefresh() {
+	if m.refreshing == nil {
+		return
+	}
+	for _, i := range m.refreshing.tabs {
+		if !m.tabDone(m.tabs[i]) {
+			return
+		}
+	}
+	m.refreshing = nil
+}
+
+// refreshStatus is the status line while a reading r started lasts. It is
+// built from the state rather than set, so it neither holds the line nor
+// clears what else is said there: the view shows it only when nothing
+// else is.
+func (m *Model) refreshStatus() string {
+	if m.refreshing == nil {
+		return ""
+	}
+	text := "refreshing…"
+	if n := m.refreshing.cleared; n > 0 {
+		text += fmt.Sprintf(" · %d results cleared", n)
+	}
+	return m.st.mauve.Render(m.spinner()) + " " + m.st.muted.Render(text)
 }
 
 // reload reads the shown tab again, keeping the cursor on the pull

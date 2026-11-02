@@ -1535,3 +1535,27 @@ func TestEnterConfirms(t *testing.T) {
 		t.Errorf("enter did not confirm the approve: batches = %+v", r.items)
 	}
 }
+
+// r says it is refreshing while the reading lasts, and no longer; what is
+// said meanwhile goes first, and the clock's reading says nothing.
+func TestRefreshStatus(t *testing.T) {
+	m, _ := startWith(t, fixture(), keymap.Default())
+	_, cmd := m.Update(keyMsg("r"))
+	if s := screen(m); !strings.Contains(s, "refreshing…") {
+		t.Fatalf("no refreshing line while reading:\n%s", s)
+	}
+	m.setStatus("opened in the browser", false)
+	if s := screen(m); strings.Contains(s, "refreshing…") || !strings.Contains(s, "opened in the browser") {
+		t.Errorf("the refreshing line hid another message:\n%s", s)
+	}
+	m.setStatus("", false)
+	run(m, cmd)
+	if m.refreshing != nil || strings.Contains(screen(m), "refreshing") {
+		t.Errorf("the refreshing line stayed after the reading:\n%s", screen(m))
+	}
+	_, cmd = m.Update(tickMsg{})
+	if strings.Contains(screen(m), "refreshing") {
+		t.Errorf("the clock's reading said refreshing:\n%s", screen(m))
+	}
+	run(m, cmd)
+}

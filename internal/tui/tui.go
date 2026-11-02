@@ -230,11 +230,12 @@ type Model struct {
 	notesAt  *notesView
 	toast    *note
 	merged   map[model.PRKey]bool
-	// refreshing is the reading started by a refresh or the clock, and refreshed
-	// when each tab was last read.
+	// refreshed is when each tab was last read.
 	refreshed map[int]time.Time
-	compose   *compose
-	confirm   *confirm
+	// refreshing is the reading r started, while it lasts.
+	refreshing *refreshRun
+	compose    *compose
+	confirm    *confirm
 	// chats are the conversations with Claude, by pull request; chatKey is
 	// the one on screen.
 	chats   map[model.PRKey]*chat
@@ -317,9 +318,11 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		before, _, had := m.currentPR()
 		_, cmd := m.update(msg)
 		m.followCursor(before.Key, had)
+		m.endRefresh()
 		return m, tea.Batch(cmd, m.spin())
 	}
 	_, cmd := m.update(msg)
+	m.endRefresh()
 	return m, tea.Batch(cmd, m.spin())
 }
 
