@@ -648,9 +648,9 @@ func TestActionMenuSelection(t *testing.T) {
 	// space on #12, then on the team group under it, which selects #7.
 	press(m, "space", "space", "k", "enter")
 	golden(t, "action-menu-selection", screen(m))
-	press(m, "c")
-	if m.menu == nil || m.view != viewList || !m.statusErr {
-		t.Fatalf("comment on a selection ran: menu %v, view %v", m.menu, m.view)
+	press(m, "R")
+	if m.menu == nil || m.compose != nil || !m.statusErr {
+		t.Fatalf("review on a selection ran: menu %v, compose %v", m.menu, m.compose)
 	}
 	press(m, "A")
 	if m.menu != nil || m.bulk == nil || m.bulk.kind != runner.Approve {
@@ -723,6 +723,48 @@ func TestCommentWithBody(t *testing.T) {
 	if p, _ := m.knownPR(key("acme", "api", 12)); len(p.Reviews) != 0 {
 		t.Errorf("a comment shows as a review: %+v", p.Reviews)
 	}
+}
+
+// c with a selection sends the same comment to each selected pull
+// request, and keeps in the popup only those it failed on.
+func TestCommentOnSelection(t *testing.T) {
+	f := fixture()
+	m := start(t, f, keymap.Default())
+	m.src = &failingComment{fakeSource: f, on: key("acme", "web", 7)}
+	// space on #12, then on the team group under it, which selects #7.
+	press(m, "space", "space", "k", "c")
+	run(m, m.paste(tea.PasteMsg{Content: "@dependabot rebase"}))
+	press(m, "ctrl+s")
+	if s := screen(m); !strings.Contains(s, "comment on 2 pull requests") || !strings.Contains(s, "acme/api#12  acme/web#7") {
+		t.Fatalf("the confirm popup does not name both:\n%s", s)
+	}
+	press(m, "y")
+	if len(f.posted) != 1 || f.posted[0] != "acme/api#12 @dependabot rebase" {
+		t.Errorf("posted = %q", f.posted)
+	}
+	if m.compose == nil || len(m.compose.prs) != 1 || m.compose.pr.Key != key("acme", "web", 7) || !strings.Contains(m.status, "failed on 1") {
+		t.Fatalf("the popup does not keep the one it failed on: %+v, %q", m.compose, m.status)
+	}
+	press(m, "R")
+	if m.compose == nil || !m.compose.single {
+		t.Error("R inside the comment popup did not stay text")
+	}
+	press(m, "esc", "R")
+	if m.compose != nil || !strings.Contains(m.status, "one pull request at a time") {
+		t.Errorf("R on a selection opened: %q", m.status)
+	}
+}
+
+type failingComment struct {
+	*fakeSource
+	on model.PRKey
+}
+
+func (f *failingComment) PostComment(ctx context.Context, p model.PR, body string) error {
+	if p.Key == f.on {
+		return fmt.Errorf("locked")
+	}
+	return f.fakeSource.PostComment(ctx, p, body)
 }
 
 // R writes a review: a comment in it is a review of the head seen.

@@ -196,9 +196,9 @@ type Model struct {
 
 	pane  pane
 	cache cache
-	// sending is the review on its way to GitHub; no other is sent until
-	// it is back.
-	sending *model.PRKey
+	// sending names the pull requests a comment or a review is on its way
+	// to; none other is sent until it is back. Empty when none is.
+	sending string
 
 	selected map[model.PRKey]selection
 	bulk     *bulk

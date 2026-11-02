@@ -30,8 +30,10 @@ var kindWords = map[model.ReviewEvent]string{
 type compose struct {
 	pr model.PR
 	// single is a comment on the conversation, not a review: it has no
-	// kind, and leaves a review request from the viewer as it is.
+	// kind, and leaves a review request from the viewer as it is. It goes
+	// to every one of prs, which starts with pr.
 	single bool
+	prs    []model.PR
 	kind   int
 	// own is the viewer's own pull request, which can only be commented
 	// on.
@@ -61,8 +63,11 @@ func (c *compose) update(msg tea.Msg) tea.Cmd {
 type confirm struct {
 	pr     model.PR
 	single bool
-	event  model.ReviewEvent
-	body   string
+	// prs and from are a comment's pull requests and its popup.
+	prs   []model.PR
+	from  *compose
+	event model.ReviewEvent
+	body  string
 }
 
 // sentWord names what is sent: a comment, or a review of its kind.
@@ -81,10 +86,10 @@ func (m *Model) own(p model.PR) bool { return m.viewer != "" && p.Author == m.vi
 // busy refuses a review while one is on its way, so a second key press
 // does not send it twice.
 func (m *Model) busy() bool {
-	if m.sending == nil {
+	if m.sending == "" {
 		return false
 	}
-	m.setStatus(fmt.Sprintf("a comment or review of %s is being sent; wait for it", *m.sending), true)
+	m.setStatus(fmt.Sprintf("a comment or review of %s is being sent; wait for it", m.sending), true)
 	return true
 }
 
@@ -94,9 +99,14 @@ func (m *Model) askApprove(model.PR) tea.Cmd {
 	return m.startBulk(runner.Approve)
 }
 
-// startComment opens the popup for a comment on p's conversation.
-func (m *Model) startComment(p model.PR) tea.Cmd {
-	c := &compose{pr: p, single: true, own: m.own(p), ta: textarea.New()}
+// startComment opens the popup for a comment on the conversation of each
+// selected pull request, or of the one under the cursor.
+func (m *Model) startComment() tea.Cmd {
+	prs := m.menuTargets()
+	if len(prs) == 0 {
+		return nil
+	}
+	c := &compose{pr: prs[0], prs: prs, single: true, ta: textarea.New()}
 	c.ta.Placeholder = "Write the comment (markdown)"
 	return m.openCompose(c)
 }
@@ -147,7 +157,7 @@ func (m *Model) composeKey(msg tea.KeyPressMsg) tea.Cmd {
 			m.setStatus("write the "+sentWord(c.single, ev)+" first", true)
 			return nil
 		}
-		m.confirm = &confirm{pr: c.pr, single: c.single, event: ev, body: body}
+		m.confirm = &confirm{pr: c.pr, single: c.single, prs: c.prs, from: c, event: ev, body: body}
 		return nil
 	case m.keys.Matches("editor", k):
 		return m.openEditor()
@@ -207,13 +217,14 @@ func (m *Model) confirmKey(k string) tea.Cmd {
 	switch {
 	case m.keys.Matches("confirm", k):
 		m.confirm = nil
-		key := c.pr.Key
-		m.sending = &key
-		m.setStatus(fmt.Sprintf("sending %s to %s…", sentWord(c.single, c.event), c.pr.Key), false)
 		if c.single {
-			return func() tea.Msg { return reviewMsg{c.pr, true, "", m.src.PostComment(m.ctx, c.pr, c.body)} }
+			m.sending = prsWord(c.prs)
+			m.setStatus(fmt.Sprintf("sending the comment to %s…", m.sending), false)
+			return m.postComments(c)
 		}
-		return func() tea.Msg { return reviewMsg{c.pr, false, c.event, m.src.Review(m.ctx, c.pr, c.event, c.body)} }
+		m.sending = c.pr.Key.String()
+		m.setStatus(fmt.Sprintf("sending %s to %s…", sentWord(false, c.event), c.pr.Key), false)
+		return func() tea.Msg { return reviewMsg{c.pr, c.event, m.src.Review(m.ctx, c.pr, c.event, c.body)} }
 	case k == keymap.Back:
 		m.confirm = nil
 		m.setStatus("canceled", false)
@@ -221,22 +232,74 @@ func (m *Model) confirmKey(k string) tea.Cmd {
 	return nil
 }
 
-// reviewed takes in a sent comment or review: the popup closes; a review
-// shows on the row, and marks the notification done when the settings say
-// so.
+// prsWord names one pull request by its key, and more by their count.
+func prsWord(prs []model.PR) string {
+	if len(prs) == 1 {
+		return prs[0].Key.String()
+	}
+	return fmt.Sprintf("%d pull requests", len(prs))
+}
+
+// commentsMsg is a comment sent to each of its popup's pull requests, one
+// after another: those it reached, and those it failed on with why.
+type commentsMsg struct {
+	from   *compose
+	sent   []model.PR
+	failed []model.PR
+	errs   []error
+}
+
+// postComments sends a comment to its pull requests one at a time, as
+// GitHub asks of writes, and goes on past one that fails.
+func (m *Model) postComments(c *confirm) tea.Cmd {
+	return func() tea.Msg {
+		msg := commentsMsg{from: c.from}
+		for _, p := range c.prs {
+			if err := m.src.PostComment(m.ctx, p, c.body); err != nil {
+				msg.failed, msg.errs = append(msg.failed, p), append(msg.errs, err)
+				continue
+			}
+			msg.sent = append(msg.sent, p)
+		}
+		return msg
+	}
+}
+
+// commented takes in a comment sent: the popup closes once it reached
+// every pull request; otherwise it stays, with only those it failed on, to
+// send again.
+func (m *Model) commented(msg commentsMsg) tea.Cmd {
+	m.sending = ""
+	if len(msg.failed) == 0 {
+		if m.compose == msg.from {
+			m.compose = nil
+		}
+		m.setStatus(fmt.Sprintf("✓ comment sent to %s", prsWord(msg.sent)), false)
+		return nil
+	}
+	if m.compose == msg.from {
+		m.compose.prs, m.compose.pr = msg.failed, msg.failed[0]
+	}
+	text := fmt.Sprintf("comment on %s failed: %v", msg.failed[0].Key, msg.errs[0])
+	if len(msg.sent) > 0 || len(msg.failed) > 1 {
+		text = fmt.Sprintf("comment sent to %d, failed on %d (%s: %v); the popup keeps those it failed on",
+			len(msg.sent), len(msg.failed), msg.failed[0].Key, msg.errs[0])
+	}
+	m.setStatus(text, true)
+	return nil
+}
+
+// reviewed takes in a sent review: the popup closes, the row shows it, and
+// the notification is marked done when the settings say so.
 func (m *Model) reviewed(msg reviewMsg) tea.Cmd {
-	m.sending = nil
-	what := sentWord(msg.single, msg.event)
+	m.sending = ""
+	what := sentWord(false, msg.event)
 	if msg.err != nil {
 		m.setStatus(fmt.Sprintf("%s on %s failed: %v", what, msg.pr.Key, msg.err), true)
 		return nil
 	}
-	if m.compose != nil && m.compose.pr.Key == msg.pr.Key {
+	if m.compose != nil && !m.compose.single && m.compose.pr.Key == msg.pr.Key {
 		m.compose = nil
-	}
-	if msg.single {
-		m.setStatus(fmt.Sprintf("✓ comment sent to %s", msg.pr.Key), false)
-		return nil
 	}
 	state := map[model.ReviewEvent]model.ReviewState{
 		model.EventApprove: model.ReviewApproved, model.EventComment: model.ReviewCommented, model.EventRequestChanges: model.ReviewChangesRequested,
@@ -268,7 +331,10 @@ func (m *Model) renderCompose() []string {
 	title := c.pr.Key.String() + " · review"
 	keys := st.key.Render(m.firstKey("post")) + " " + st.muted.Render("post")
 	if c.single {
-		title = c.pr.Key.String() + " · comment"
+		title = prsWord(c.prs) + " · comment"
+		if len(c.prs) > 1 {
+			lines = []string{st.sub0.Render(keysOf(c.prs))}
+		}
 		lines = append(lines, "")
 	} else {
 		var ks []string
@@ -298,6 +364,10 @@ func (m *Model) renderConfirm() []string {
 		st.sub1.Render(c.pr.Key.String()) + " " + st.muted.Render(c.pr.Author),
 		st.muted.Render(c.pr.Title),
 	}
+	if len(c.prs) > 1 {
+		title = fmt.Sprintf("comment on %d pull requests", len(c.prs))
+		lines = []string{st.sub0.Render(keysOf(c.prs))}
+	}
 	if c.body != "" {
 		lines = append(lines, "")
 		for i, l := range strings.Split(c.body, "\n") {
@@ -309,7 +379,7 @@ func (m *Model) renderConfirm() []string {
 		}
 	}
 	if c.single {
-		lines = append(lines, "", st.dim.Render("Adds a comment to its conversation; a review asked of you stays asked."))
+		lines = append(lines, "", st.dim.Render("Adds the comment to each conversation; a review asked of you stays asked."))
 	} else {
 		lines = append(lines, "", st.dim.Render(fmt.Sprintf("Reviews the head you saw (%s). GitHub cannot take a review back.", short(c.pr.HeadOID))))
 	}
@@ -319,6 +389,15 @@ func (m *Model) renderConfirm() []string {
 	lines = append(lines, "", st.sub0.Render("send "+title+"? ")+st.key.Render(m.firstKey("confirm"))+" "+st.muted.Render("yes")+
 		st.dim.Render(" · ")+st.key.Render(keymap.Back)+" "+st.muted.Render("no"))
 	return box(st, title, lines, w)
+}
+
+// keysOf names pull requests by their keys, on one line.
+func keysOf(prs []model.PR) string {
+	var ks []string
+	for _, p := range prs {
+		ks = append(ks, p.Key.String())
+	}
+	return strings.Join(ks, "  ")
 }
 
 func short(oid string) string {

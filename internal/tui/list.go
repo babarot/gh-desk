@@ -96,6 +96,11 @@ func (m *Model) listKey(k string) tea.Cmd {
 		return m.startBulk(runner.Merge)
 	case is("ready_for_review"):
 		return m.startBulk(runner.Ready)
+	case is("comment"):
+		return m.startComment()
+	case is("review") && len(m.selected) > 0:
+		m.setStatus("review: one pull request at a time", true)
+		return nil
 	case is("toggle_bots"):
 		if t.grouped {
 			t.folded[plan.GroupBots] = !t.folded[plan.GroupBots]
@@ -173,8 +178,6 @@ func (m *Model) listKey(k string) tea.Cmd {
 		return move(t.sel + 1)
 	case is("approve"):
 		return m.askApprove(p)
-	case is("comment"):
-		return m.startComment(p)
 	case is("review"):
 		return m.startCompose(p, model.EventComment)
 	case is("pr_claude"):

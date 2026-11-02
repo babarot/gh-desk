@@ -321,12 +321,9 @@ type (
 		err error
 	}
 	reviewMsg struct {
-		pr model.PR
-		// single is a comment on the conversation; event is the kind of a
-		// review.
-		single bool
-		event  model.ReviewEvent
-		err    error
+		pr    model.PR
+		event model.ReviewEvent
+		err   error
 	}
 	doneMsg struct {
 		n   model.Notification
@@ -445,6 +442,8 @@ func (m *Model) handleData(msg tea.Msg) tea.Cmd {
 		e.loading, e.err, e.val = false, msg.err, safeComment(msg.c)
 	case reviewMsg:
 		return m.reviewed(msg)
+	case commentsMsg:
+		return m.commented(msg)
 	case doneMsg:
 		if msg.err != nil {
 			m.setStatus(fmt.Sprintf("could not mark %s done: %v", msg.n.Key, msg.err), true)

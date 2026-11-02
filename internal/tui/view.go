@@ -329,7 +329,7 @@ func (m *Model) hints() string {
 			as = []keymap.Action{"triage_more"}
 		}
 	case m.view == viewList && len(m.selected) > 0:
-		as = []keymap.Action{"select", "select_shown", "clear_selection", "approve", "merge", "pane_tab", "filter", "help"}
+		as = []keymap.Action{"select", "select_shown", "clear_selection", "approve", "merge", "comment", "pane_tab", "filter", "help"}
 	case m.filtering:
 		as = []keymap.Action{"accept"}
 	case m.view == viewChat && m.chat() != nil && m.chat().typing:

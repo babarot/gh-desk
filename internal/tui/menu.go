@@ -164,6 +164,8 @@ func (m *Model) aboutMany(a keymap.Action, prs []model.PR) (string, bool) {
 			return "none of them is a draft", true
 		}
 		return of("mark ready", n), false
+	case "comment":
+		return fmt.Sprintf("the same comment on each of %d", len(prs)), false
 	}
 	return "one pull request at a time", true
 }
@@ -255,14 +257,14 @@ func (m *Model) runMenu(it menuItem) tea.Cmd {
 		return m.startBulk(runner.Merge)
 	case "ready_for_review":
 		return m.startBulk(runner.Ready)
+	case "comment":
+		return m.startComment()
 	}
 	p, n, ok := m.currentPR()
 	if !ok {
 		return nil
 	}
 	switch it.action {
-	case "comment":
-		return m.startComment(p)
 	case "review":
 		return m.startCompose(p, model.EventComment)
 	case "pr_claude":
