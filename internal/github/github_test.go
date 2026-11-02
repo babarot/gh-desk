@@ -16,7 +16,8 @@ import (
 )
 
 // fake answers requests with canned bodies, by the first rule whose match
-// returns true, and keeps what was sent.
+// returns true, and keeps what was sent. An empty body is answered 204 No
+// Content, as GitHub answers a write it has nothing to say about.
 type fake struct {
 	mu    sync.Mutex
 	rules []rule
@@ -44,7 +45,11 @@ func (f *fake) RoundTrip(r *http.Request) (*http.Response, error) {
 	for _, ru := range f.rules {
 		if ru.match(r, body) {
 			h := http.Header{"Content-Type": {"application/json"}, "X-Github-Request-Id": {"REQ-1"}}
-			return &http.Response{StatusCode: 200, Header: h, Body: io.NopCloser(strings.NewReader(ru.body)), Request: r}, nil
+			status := http.StatusOK
+			if ru.body == "" {
+				status = http.StatusNoContent
+			}
+			return &http.Response{StatusCode: status, Header: h, Body: io.NopCloser(strings.NewReader(ru.body)), Request: r}, nil
 		}
 	}
 	return &http.Response{StatusCode: 404, Header: http.Header{}, Body: io.NopCloser(strings.NewReader(`{"message":"Not Found"}`)), Request: r}, nil
