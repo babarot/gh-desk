@@ -107,7 +107,7 @@ func (m *Model) busy() bool {
 	if m.sending == "" {
 		return false
 	}
-	m.setStatus(fmt.Sprintf("a comment or review of %s is being sent; wait for it", m.sending), true)
+	m.refuse(fmt.Sprintf("a comment or review of %s is being sent; wait for it", m.sending))
 	return true
 }
 
@@ -135,7 +135,7 @@ func (m *Model) startComment() tea.Cmd {
 // startCompose opens the popup for a review of p, of the kind event.
 func (m *Model) startCompose(p model.PR, event model.ReviewEvent) tea.Cmd {
 	if m.own(p) && event != model.EventComment {
-		m.setStatus("you cannot request changes on your own pull request", true)
+		m.refuse("you cannot request changes on your own pull request")
 		return nil
 	}
 	c := &compose{pr: p, own: m.own(p), ta: textarea.New()}
@@ -161,7 +161,7 @@ func (m *Model) composeKey(msg tea.KeyPressMsg) tea.Cmd {
 	switch {
 	case k == keymap.Back:
 		m.compose = nil
-		m.setStatus(sentWord(c.single, kinds[c.kind])+" discarded", false)
+		m.say(sentWord(c.single, kinds[c.kind]) + " discarded")
 		return nil
 	case m.keys.Matches("next_kind", k):
 		if !c.own && !c.single {
@@ -175,7 +175,7 @@ func (m *Model) composeKey(msg tea.KeyPressMsg) tea.Cmd {
 		ev := kinds[c.kind]
 		body := strings.TrimSpace(c.ta.Value())
 		if body == "" && (c.single || ev != model.EventApprove) {
-			m.setStatus("write the "+sentWord(c.single, ev)+" first", true)
+			m.refuse("write the " + sentWord(c.single, ev) + " first")
 			return nil
 		}
 		m.confirm = &confirm{pr: c.pr, single: c.single, prs: c.prs, event: ev, body: body}
@@ -196,12 +196,12 @@ type editedMsg struct {
 func (m *Model) openEditor() tea.Cmd {
 	args := strings.Fields(m.set.Editor)
 	if len(args) == 0 {
-		m.setStatus("set review.editor or $EDITOR to write the review in an editor", true)
+		m.refuse("set review.editor or $EDITOR to write the review in an editor")
 		return nil
 	}
 	f, err := os.CreateTemp("", "gh-triage-review-*.md")
 	if err != nil {
-		m.setStatus("could not make a file for the editor: "+err.Error(), true)
+		m.fail("could not make a file for the editor: " + err.Error())
 		return nil
 	}
 	path := f.Name()
@@ -209,7 +209,7 @@ func (m *Model) openEditor() tea.Cmd {
 	f.Close()
 	if err != nil {
 		os.Remove(path)
-		m.setStatus("could not write the review for the editor: "+err.Error(), true)
+		m.fail("could not write the review for the editor: " + err.Error())
 		return nil
 	}
 	cmd := exec.Command(args[0], append(args[1:], path)...)
@@ -219,12 +219,12 @@ func (m *Model) openEditor() tea.Cmd {
 func (m *Model) edited(msg editedMsg) tea.Cmd {
 	defer os.Remove(msg.path)
 	if msg.err != nil {
-		m.setStatus("the editor failed: "+msg.err.Error(), true)
+		m.fail("the editor failed: " + msg.err.Error())
 		return nil
 	}
 	b, err := os.ReadFile(msg.path)
 	if err != nil {
-		m.setStatus("could not read the review back: "+err.Error(), true)
+		m.fail("could not read the review back: " + err.Error())
 		return nil
 	}
 	if m.compose != nil {
@@ -244,15 +244,13 @@ func (m *Model) confirmKey(k string) tea.Cmd {
 			m.compose = nil
 			m.sending = prsWord(c.prs)
 			m.posting = &posting{body: c.body, prs: c.prs}
-			m.setStatus("", false)
 			return m.postNext(m.posting)
 		}
-		m.sending = c.pr.Key.String()
-		m.setStatus(fmt.Sprintf("sending %s to %s…", sentWord(false, c.event), c.pr.Key), false)
+		m.sending, m.sendingWhat = c.pr.Key.String(), sentWord(false, c.event)
 		return func() tea.Msg { return reviewMsg{c.pr, c.event, m.src.Review(m.ctx, c.pr, c.event, c.body)} }
 	case k == keymap.Back:
 		m.confirm = nil
-		m.setStatus("canceled", false)
+		m.say("canceled")
 	case m.keys.Matches("down", k):
 		// Kept within the body when it is drawn.
 		c.top++
@@ -313,7 +311,7 @@ func (m *Model) posted(msg postedMsg) tea.Cmd {
 	}
 	m.posting, m.sending = nil, ""
 	if len(p.failed) == 0 {
-		m.setStatus(fmt.Sprintf("✓ comment sent to %s", prsWord(p.prs)), false)
+		m.say(fmt.Sprintf("✓ comment sent to %s", prsWord(p.prs)))
 		return nil
 	}
 	clear(m.selected)
@@ -321,13 +319,12 @@ func (m *Model) posted(msg postedMsg) tea.Cmd {
 		m.selected[f.Key] = byHand
 	}
 	m.unsent = p.body
-	m.setStatus(fmt.Sprintf("comment failed on %d of %d (%s: %v) · they are selected; %s to send it again",
-		len(p.failed), len(p.prs), p.failed[0].Key, p.err, m.firstKey("comment")), true)
-	return nil
+	return m.failNoted(fmt.Sprintf("comment failed on %d of %d (%s: %v) · they are selected; %s to send it again",
+		len(p.failed), len(p.prs), p.failed[0].Key, p.err, m.firstKey("comment")), p.failed[0].Key)
 }
 
-// postingStatus is the status line while a comment is on its way.
-func (m *Model) postingStatus() string {
+// postingActivity is a comment on its way.
+func (m *Model) postingActivity() string {
 	p := m.posting
 	if p == nil {
 		return ""
@@ -336,17 +333,16 @@ func (m *Model) postingStatus() string {
 	if len(p.prs) > 1 {
 		text = fmt.Sprintf("sending the comment… %d/%d", p.next+1, len(p.prs))
 	}
-	return m.st.mauve.Render(m.spinner()) + " " + m.st.muted.Render(text)
+	return text
 }
 
 // reviewed takes in a sent review: the popup closes, the row shows it, and
 // the notification is marked done when the settings say so.
 func (m *Model) reviewed(msg reviewMsg) tea.Cmd {
-	m.sending = ""
+	m.sending, m.sendingWhat = "", ""
 	what := sentWord(false, msg.event)
 	if msg.err != nil {
-		m.setStatus(fmt.Sprintf("%s on %s failed: %v", what, msg.pr.Key, msg.err), true)
-		return nil
+		return m.failNoted(fmt.Sprintf("%s on %s failed: %v", what, msg.pr.Key, msg.err), msg.pr.Key)
 	}
 	if m.compose != nil && !m.compose.single && m.compose.pr.Key == msg.pr.Key {
 		m.compose = nil
@@ -364,7 +360,7 @@ func (m *Model) reviewed(msg reviewMsg) tea.Cmd {
 		p.Reviews = append(rs, model.Review{Author: m.viewer, State: state})
 		m.updatePR(p)
 	}
-	m.setStatus(fmt.Sprintf("✓ %s sent to %s", what, msg.pr.Key), false)
+	m.say(fmt.Sprintf("✓ %s sent to %s", what, msg.pr.Key))
 	n, ok := m.unread[msg.pr.Key]
 	if !ok || !m.set.MarkDone {
 		return nil

@@ -66,7 +66,7 @@ type triageMsg struct {
 // openTriage opens the popup, ready for a request.
 func (m *Model) openTriage() tea.Cmd {
 	if m.claude == nil {
-		m.setStatus("Claude is not available", true)
+		m.refuse("Claude is not available")
 		return nil
 	}
 	if m.triage == nil {
@@ -416,7 +416,7 @@ func (m *Model) applyTriage() tea.Cmd {
 		}
 	}
 	if last.reply != "" {
-		m.setStatus("claude: "+safeLine(firstLine(last.reply)), false)
+		m.say("claude: " + safeLine(firstLine(last.reply)))
 	}
 	m.log.Debug("triage applied", logging.KeyOp, "triage", logging.KeyClaude, tr.session, "actions", applied, "left_out", len(steps)-applied)
 	return tea.Batch(cmds...)

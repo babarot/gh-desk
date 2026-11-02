@@ -154,6 +154,8 @@ type Settings struct {
 	Refresh time.Duration
 	// Now is the clock, for tests; nil is time.Now.
 	Now func() time.Time
+	// Tick asks for msg after d, for tests; nil is tea.Tick.
+	Tick func(d time.Duration, msg tea.Msg) tea.Cmd
 }
 
 type view int
@@ -189,11 +191,8 @@ type Model struct {
 	helpTop       int             // the first line of the ? popup shown
 	helpFolded    map[string]bool // the ? popup's sections folded, by title
 	helpBox       helpBox
-	status        string
-	statusErr     bool
-	// statusOfRow is set while the status line shows the result of the
-	// row under the cursor, which moving off it clears.
-	statusOfRow bool
+	// line is what the status line says (ADR-025).
+	line statusLine
 	// holder is the gh-triage holding the record of pending merges, while
 	// this one runs without it.
 	holder holder
@@ -213,6 +212,9 @@ type Model struct {
 	// sending names the pull requests a comment or a review is on its way
 	// to; none other is sent until it is back. Empty when none is.
 	sending string
+	// sendingWhat is the review a single pull request is sent, while one
+	// is on its way.
+	sendingWhat string
 	// posting is the comment on its way, and unsent the text of one that
 	// failed on some, which the next comment starts with.
 	posting *posting
@@ -226,10 +228,12 @@ type Model struct {
 	// its row until a refresh.
 	progress map[model.PRKey]progress
 	batches  map[string]*batchState
-	notes    []*note
-	notesAt  *notesView
-	toast    *note
-	merged   map[model.PRKey]bool
+	// batchOrder is the batches as they started.
+	batchOrder []string
+	notes      []*note
+	notesAt    *notesView
+	toast      *note
+	merged     map[model.PRKey]bool
 	// refreshed is when each tab was last read.
 	refreshed map[int]time.Time
 	// refreshing is the reading r started, while it lasts.
@@ -316,14 +320,17 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.KeyPressMsg, tea.MouseMsg:
 		// Only the user moves the cursor onto a row.
 		before, _, had := m.currentPR()
+		if _, ok := msg.(tea.KeyPressMsg); ok {
+			m.keyPressed()
+		}
 		_, cmd := m.update(msg)
 		m.followCursor(before.Key, had)
 		m.endRefresh()
-		return m, tea.Batch(cmd, m.spin())
+		return m, tea.Batch(cmd, m.spin(), m.statusTick())
 	}
 	_, cmd := m.update(msg)
 	m.endRefresh()
-	return m, tea.Batch(cmd, m.spin())
+	return m, tea.Batch(cmd, m.spin(), m.statusTick())
 }
 
 func (m *Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -357,6 +364,9 @@ func (m *Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case spinMsg:
 		m.spinning = false
+		return m, nil
+	case statusTickMsg:
+		m.line.tickAt = time.Time{}
 		return m, nil
 	case freshMsg:
 		if msg.gen == m.freshGen {
@@ -436,12 +446,6 @@ func (m *Model) paste(msg tea.PasteMsg) tea.Cmd {
 		return cmd
 	}
 	return nil
-}
-
-// setStatus shows a line under the list until the next one.
-func (m *Model) setStatus(s string, isErr bool) {
-	m.status, m.statusErr = s, isErr
-	m.statusOfRow = false
 }
 
 // tab is the tab shown.

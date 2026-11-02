@@ -108,11 +108,17 @@ func (m *Model) heavyRead(msg heavyMsg) tea.Cmd {
 // tabDone reports whether a tab's reading is over, heavy fields included.
 func (m *Model) tabDone(t *tab) bool { return !t.loading && t.heavyLeft == 0 }
 
-// reading reports whether anything is being read that a spinner shows:
-// the lists, the pull requests of a confirm popup, or Claude's answers.
+// reading reports whether anything is going on that a spinner shows: the
+// lists, the pull requests of a confirm popup, Claude's answers, a comment
+// or a review on its way, or a batch.
 func (m *Model) reading() bool {
-	if m.bulk != nil && m.bulk.loading || m.triage != nil && m.triage.asking || m.posting != nil {
+	if m.bulk != nil && m.bulk.loading || m.triage != nil && m.triage.asking || m.sending != "" {
 		return true
+	}
+	for _, bs := range m.batches {
+		if !bs.noted {
+			return true
+		}
 	}
 	for _, c := range m.chats {
 		if c.running {

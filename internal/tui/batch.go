@@ -33,7 +33,9 @@ type progress struct {
 // batchState follows a batch until every pull request it acts on has a
 // result, then writes one notification for it.
 type batchState struct {
-	kind    runner.Kind
+	kind runner.Kind
+	// resumed is set on the merges the last run was waiting for.
+	resumed bool
 	goes    map[model.PRKey]bool
 	order   []model.PRKey
 	done    map[model.PRKey]progress
@@ -57,13 +59,14 @@ func listen(batch string, ch <-chan runner.Event) tea.Cmd {
 
 // resume goes on with the merges the last run was waiting for.
 func (m *Model) resume() tea.Cmd {
+	var note tea.Cmd
 	if m.set.StoreProblem != "" {
-		m.setStatus("merges that wait are off: "+m.set.StoreProblem, true)
+		note = m.failNoted("merges that wait are off: "+m.set.StoreProblem, model.PRKey{})
 	}
 	if len(m.set.Resume) == 0 {
-		return nil
+		return note
 	}
-	bs := &batchState{kind: runner.Merge, goes: map[model.PRKey]bool{}, done: map[model.PRKey]progress{}}
+	bs := &batchState{kind: runner.Merge, resumed: true, goes: map[model.PRKey]bool{}, done: map[model.PRKey]progress{}}
 	for _, p := range m.set.Resume {
 		bs.goes[p.Key] = true
 		bs.order = append(bs.order, p.Key)
@@ -71,8 +74,8 @@ func (m *Model) resume() tea.Cmd {
 	}
 	id, ch := m.run.Resume(m.ctx, m.set.Resume)
 	m.batches[id] = bs
-	m.setStatus(fmt.Sprintf("going on with %d merges from the last run", len(m.set.Resume)), false)
-	return listen(id, ch)
+	m.batchOrder = append(m.batchOrder, id)
+	return tea.Batch(note, listen(id, ch))
 }
 
 // event takes in a step of a batch.
@@ -234,11 +237,14 @@ type notesView struct {
 
 type toastMsg struct{ n *note }
 
+// toastFor is how long a toast shows.
+const toastFor = 4 * time.Second
+
 func (m *Model) pushNote(icon, title string, items []noteItem) tea.Cmd {
 	n := &note{at: m.set.Now(), icon: icon, title: title, items: items}
 	m.notes = append([]*note{n}, m.notes...)
 	m.toast = n
-	return tea.Tick(4*time.Second, func(time.Time) tea.Msg { return toastMsg{n} })
+	return m.after(toastFor, toastMsg{n})
 }
 
 // configNote tells of the config file's warnings, which did not stop
@@ -344,7 +350,7 @@ func (m *Model) jumpTo(k model.PRKey) tea.Cmd {
 			}
 		}
 	}
-	m.setStatus(fmt.Sprintf("%s is no longer in any tab", k), false)
+	m.say(fmt.Sprintf("%s is no longer in any tab", k))
 	return nil
 }
 

@@ -51,6 +51,9 @@ type tab struct {
 	// not what GitHub has now: from the cache until read again, or after a
 	// reading again failed. Zero asOf is live.
 	readAt, asOf time.Time
+	// failing is set while reading the tab again fails, so the failure is
+	// kept in the notifications once.
+	failing bool
 	// pend gathers a reading again of a tab that has rows, page by page,
 	// to put in place at once when every page is in; nil otherwise.
 	pend *pending
@@ -391,9 +394,8 @@ func (m *Model) handleData(msg tea.Msg) tea.Cmd {
 	switch msg := msg.(type) {
 	case viewerMsg:
 		if msg.err != nil {
-			m.setStatus("could not read who you are on GitHub: "+msg.err.Error(), true)
 			m.log.Error("viewer", "err", msg.err.Error())
-			return nil
+			return m.failNoted("could not read who you are on GitHub: "+msg.err.Error(), model.PRKey{})
 		}
 		m.viewer = msg.login
 		return tea.Batch(m.loadAll())
@@ -446,15 +448,15 @@ func (m *Model) handleData(msg tea.Msg) tea.Cmd {
 		return m.posted(msg)
 	case doneMsg:
 		if msg.err != nil {
-			m.setStatus(fmt.Sprintf("could not mark %s done: %v", msg.n.Key, msg.err), true)
 			delete(m.inboxTab().hidden, msg.n.Key)
 			if msg.n.Unread {
 				m.unread[msg.n.Key] = msg.n
 			}
+			return m.failNoted(fmt.Sprintf("could not mark %s done: %v", msg.n.Key, msg.err), msg.n.Key)
 		}
 	case browseMsg:
 		if msg.err != nil {
-			m.setStatus("could not open the browser: "+msg.err.Error(), true)
+			m.fail("could not open the browser: " + msg.err.Error())
 		}
 	case notesMsg:
 		return m.notesRead(msg)
@@ -620,10 +622,16 @@ func (m *Model) tabRead(msg tabMsg) tea.Cmd {
 			t.pend = nil
 			t.asOf = t.readAt
 			if t == m.tab() {
-				m.setStatus(fmt.Sprintf("could not update: %s · showing the list as of %s · %s to try again",
-					short80(msg.err), t.readAt.Local().Format("15:04"), m.firstKey("refresh")), true)
+				m.fail(fmt.Sprintf("could not update: %s · showing the list as of %s · %s to try again",
+					short80(msg.err), t.readAt.Local().Format("15:04"), m.firstKey("refresh")))
 			}
-			return nil
+			// Kept once, not at every reading the clock starts while the
+			// network stays down.
+			if t.failing {
+				return nil
+			}
+			t.failing = true
+			return m.pushNote("✗", fmt.Sprintf("could not update %s: %s", t.name, short80(msg.err)), nil)
 		}
 		t.loaded, t.err = true, msg.err
 		return nil
@@ -645,7 +653,7 @@ func (m *Model) tabRead(msg tabMsg) tea.Cmd {
 		}
 		return m.swap(msg.tab)
 	}
-	t.loaded, t.err, t.total, t.asOf = true, nil, msg.total, time.Time{}
+	t.loaded, t.err, t.total, t.asOf, t.failing = true, nil, msg.total, time.Time{}, false
 	if msg.more {
 		t.prs = append(t.prs, prs...)
 		t.warnings = append(t.warnings, msg.warnings...)
@@ -711,7 +719,7 @@ func (m *Model) swap(i int) tea.Cmd {
 		}
 	}
 	t.prs, t.total, t.warnings = rows, p.total, p.warnings
-	t.loading, t.loaded, t.err, t.asOf, t.readAt = false, true, nil, time.Time{}, now
+	t.loading, t.loaded, t.err, t.asOf, t.readAt, t.failing = false, true, nil, time.Time{}, now, false
 	m.refreshed[i] = now
 	m.restoreCursor(t)
 	cmds := []tea.Cmd{m.ensure(), m.queueHeavy(i, t.gen, p.prs), m.dropGone(t)}

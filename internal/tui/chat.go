@@ -110,7 +110,7 @@ func listenChat(ch <-chan tea.Msg) tea.Cmd {
 // it is new.
 func (m *Model) openChat(p model.PR) tea.Cmd {
 	if m.claude == nil {
-		m.setStatus("Claude is not available", true)
+		m.refuse("Claude is not available")
 		return nil
 	}
 	back := m.view
@@ -143,7 +143,7 @@ func (m *Model) chat() *chat { return m.chats[m.chatKey] }
 // its worktree first.
 func (m *Model) ask(c *chat, shown, prompt string, draft bool) tea.Cmd {
 	if c.running {
-		m.setStatus("Claude is still answering", true)
+		m.refuse("Claude is still answering")
 		return nil
 	}
 	c.turns = append(c.turns, turn{you: true, text: shown})
@@ -245,7 +245,7 @@ func (m *Model) chatAnswer(msg chatAnswerMsg) tea.Cmd {
 		c.steps = nil
 		if m.view != viewChat || m.chatKey != msg.key {
 			c.draft = &d
-			m.setStatus(fmt.Sprintf("the review of %s is drafted; open Claude to see it", msg.key), false)
+			m.say(fmt.Sprintf("the review of %s is drafted; open Claude to see it", msg.key))
 			return nil
 		}
 		return m.draftCompose(c, d)
@@ -253,7 +253,7 @@ func (m *Model) chatAnswer(msg chatAnswerMsg) tea.Cmd {
 	c.turns = append(c.turns, turn{text: msg.answer.Text, steps: c.steps})
 	c.steps = nil
 	if m.view != viewChat || m.chatKey != msg.key {
-		m.setStatus(fmt.Sprintf("Claude answered on %s", msg.key), false)
+		m.say(fmt.Sprintf("Claude answered on %s", msg.key))
 	}
 	return nil
 }
@@ -290,7 +290,7 @@ func (m *Model) chatKeyPress(msg tea.KeyPressMsg) tea.Cmd {
 				return nil
 			}
 			if c.running {
-				m.setStatus("Claude is still answering", true)
+				m.refuse("Claude is still answering")
 				return nil
 			}
 			c.input.Reset()
@@ -329,7 +329,7 @@ func (m *Model) chatKeyPress(msg tea.KeyPressMsg) tea.Cmd {
 		return m.ask(c, "Draft the review.", claude.DraftPrompt, true)
 	case is("chat_approve"):
 		if m.own(c.pr) {
-			m.setStatus("you cannot approve your own pull request", true)
+			m.refuse("you cannot approve your own pull request")
 			return nil
 		}
 		if m.busy() {
@@ -339,9 +339,9 @@ func (m *Model) chatKeyPress(msg tea.KeyPressMsg) tea.Cmd {
 	case is("open_claude"):
 		switch {
 		case c.running:
-			m.setStatus("wait for Claude to answer first", true)
+			m.refuse("wait for Claude to answer first")
 		case !c.started:
-			m.setStatus("the conversation has not started", true)
+			m.refuse("the conversation has not started")
 		default:
 			return tea.ExecProcess(m.claude.Interactive(c.dir, c.session), func(err error) tea.Msg { return claudeExitMsg{err} })
 		}
@@ -354,10 +354,10 @@ type claudeExitMsg struct{ err error }
 
 func (m *Model) claudeExited(msg claudeExitMsg) tea.Cmd {
 	if msg.err != nil {
-		m.setStatus("Claude Code: "+msg.err.Error(), true)
+		m.fail("Claude Code: " + msg.err.Error())
 		return nil
 	}
-	m.setStatus("back from Claude Code; what was said there is not shown here", false)
+	m.say("back from Claude Code; what was said there is not shown here")
 	return nil
 }
 
@@ -418,9 +418,9 @@ func elapsed(d time.Duration) string {
 	return fmt.Sprintf("%dm%02ds", s/60, s%60)
 }
 
-// claudeStatus is the line under the list while Claude answers about a pull
-// request whose conversation is not shown.
-func (m *Model) claudeStatus() string {
+// claudeActivity is Claude answering about a pull request whose
+// conversation is not shown.
+func (m *Model) claudeActivity() string {
 	var away []model.PRKey
 	for k, c := range m.chats {
 		if c.running && (m.view != viewChat || m.chatKey != k) {
@@ -435,7 +435,7 @@ func (m *Model) claudeStatus() string {
 	if n := len(away) - 1; n > 0 {
 		what += fmt.Sprintf(" and %d more", n)
 	}
-	return m.st.mauve.Render(m.spinner()) + " " + m.st.muted.Render(what+"…")
+	return what + "…"
 }
 
 func firstLine(s string) string {

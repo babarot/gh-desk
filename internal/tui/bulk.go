@@ -141,7 +141,7 @@ func (m *Model) startBulkOf(kind runner.Kind) tea.Cmd {
 		}
 	} else if p, _, ok := m.currentPR(); ok {
 		if kind == runner.Approve && m.own(p) {
-			m.setStatus("you cannot approve your own pull request", true)
+			m.refuse("you cannot approve your own pull request")
 			return nil
 		}
 		prs = []model.PR{p}
@@ -361,7 +361,7 @@ func (m *Model) bulkKey(k string) tea.Cmd {
 	switch {
 	case k == keymap.Back:
 		m.bulk = nil
-		m.setStatus("canceled", false)
+		m.say("canceled")
 	case is("down"):
 		// Kept within the body when it is drawn.
 		b.offset++
@@ -402,8 +402,10 @@ func (m *Model) runBulk() tea.Cmd {
 	}
 	m.bulk = nil
 	if len(items) == 0 {
-		if !m.rowStatus() {
-			m.setStatus("nothing to do", false)
+		if m.rowResult() != "" {
+			m.movedOnto()
+		} else {
+			m.say("nothing to do")
 		}
 		return nil
 	}
@@ -415,8 +417,7 @@ func (m *Model) runBulk() tea.Cmd {
 	}
 	id, ch := m.run.Start(m.ctx, b.kind, items)
 	m.batches[id] = bs
-	verb := map[runner.Kind]string{runner.Approve: "approving", runner.Merge: "approving and merging", runner.Ready: "marking ready"}[b.kind]
-	m.setStatus(fmt.Sprintf("%s %d pull requests · progress shows on their rows", verb, len(items)), false)
+	m.batchOrder = append(m.batchOrder, id)
 	return listen(id, ch)
 }
 

@@ -99,7 +99,7 @@ func (m *Model) listKey(k string) tea.Cmd {
 	case is("comment"):
 		return m.startComment()
 	case is("review") && len(m.selected) > 0:
-		m.setStatus("review: one pull request at a time", true)
+		m.refuse("review: one pull request at a time")
 		return nil
 	case is("fold_bots"):
 		if t.grouped {
@@ -268,12 +268,12 @@ func (m *Model) hide(p model.PR, n *model.Notification) tea.Cmd {
 	t := m.tab()
 	t.hidden[p.Key] = true
 	if !t.inbox || n == nil {
-		m.setStatus(fmt.Sprintf("hidden here: %s (the request on GitHub stays)", p.Key), false)
+		m.say(fmt.Sprintf("hidden here: %s (the request on GitHub stays)", p.Key))
 		return m.ensure()
 	}
 	delete(m.unread, p.Key)
 	note := *n
-	m.setStatus(fmt.Sprintf("marked done: %s", p.Key), false)
+	m.say(fmt.Sprintf("marked done: %s", p.Key))
 	return tea.Batch(m.ensure(), func() tea.Msg { return doneMsg{note, m.src.MarkDone(m.ctx, note)} })
 }
 

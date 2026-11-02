@@ -77,7 +77,7 @@ func (m *Model) bodies(msg bodiesMsg) {
 		m.picker.loading = false
 	}
 	if msg.err != nil {
-		m.setStatus("could not read every description: "+msg.err.Error(), true)
+		m.fail("could not read every description: " + msg.err.Error())
 	}
 }
 
@@ -149,7 +149,7 @@ func (m *Model) applyRule(r plan.Rule) tea.Cmd {
 		}
 	}
 	if len(hits) == 0 {
-		m.setStatus(r.Name+": nothing matches in this tab", false)
+		m.say(r.Name + ": nothing matches in this tab")
 		return nil
 	}
 	for i, row := range m.rows(t) {
@@ -158,7 +158,7 @@ func (m *Model) applyRule(r plan.Rule) tea.Cmd {
 			break
 		}
 	}
-	m.setStatus(fmt.Sprintf("%s: selected %d · %s to merge, %s to approve", r.Name, len(hits), m.firstKey("merge"), m.firstKey("approve")), false)
+	m.say(fmt.Sprintf("%s: selected %d · %s to merge, %s to approve", r.Name, len(hits), m.firstKey("merge"), m.firstKey("approve")))
 	return m.ensure()
 }
 

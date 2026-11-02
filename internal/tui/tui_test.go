@@ -293,8 +293,13 @@ func testSettings() Settings {
 			AttentionPaths: []string{".github/workflows/*"}},
 		Rules:   []plan.Rule{{Name: "octo bumps", Author: "renovate", Packages: []string{"octo/app"}}},
 		CanWait: true, Language: "English",
+		// Ticks only redraw; tests read the screen when they like.
+		Tick: func(time.Duration, tea.Msg) tea.Cmd { return nil },
 	}
 }
+
+// status is the status line as shown, without colors.
+func status(m *Model) string { return ansi.Strip(m.statusText()) }
 
 // run carries out cmd and every command its messages lead to, at once.
 func run(m *Model, cmd tea.Cmd) {
@@ -650,7 +655,7 @@ func TestActionMenuSelection(t *testing.T) {
 	press(m, "space", "space", "k", "enter")
 	golden(t, "action-menu-selection", screen(m))
 	press(m, "R")
-	if m.menu == nil || m.compose != nil || !m.statusErr {
+	if m.menu == nil || m.compose != nil || m.line.last.kind != eventRefusal {
 		t.Fatalf("review on a selection ran: menu %v, compose %v", m.menu, m.compose)
 	}
 	press(m, "A")
@@ -703,8 +708,8 @@ func TestCommentWithBody(t *testing.T) {
 	f := fixture()
 	m := start(t, f, keymap.Default())
 	press(m, "c", "tab", "ctrl+s")
-	if !strings.Contains(m.status, "write the comment first") {
-		t.Errorf("empty comment was not refused: %q", m.status)
+	if !strings.Contains(status(m), "write the comment first") {
+		t.Errorf("empty comment was not refused: %q", status(m))
 	}
 	run(m, m.paste(tea.PasteMsg{Content: "Does this retry on a 429?"}))
 	press(m, "ctrl+s")
@@ -749,24 +754,24 @@ func TestCommentOnSelection(t *testing.T) {
 	press(m, "c")
 	run(m, m.paste(tea.PasteMsg{Content: "again"}))
 	press(m, "ctrl+s")
-	if m.confirm != nil || !strings.Contains(m.status, "being sent") {
-		t.Errorf("a second comment was let through while one was on its way: %q", m.status)
+	if m.confirm != nil || !strings.Contains(status(m), "being sent") {
+		t.Errorf("a second comment was let through while one was on its way: %q", status(m))
 	}
 	press(m, "esc")
 	run(m, cmd)
 	if len(f.posted) != 1 || f.posted[0] != "acme/api#12 @dependabot rebase" {
 		t.Errorf("posted = %q", f.posted)
 	}
-	if !strings.Contains(m.status, "failed on 1 of 2") || len(m.selected) != 1 || !m.isSelected(key("acme", "web", 7)) {
-		t.Fatalf("the one it failed on is not selected again: %v, %q", m.selected, m.status)
+	if !strings.Contains(status(m), "failed on 1 of 2") || len(m.selected) != 1 || !m.isSelected(key("acme", "web", 7)) {
+		t.Fatalf("the one it failed on is not selected again: %v, %q", m.selected, status(m))
 	}
 	press(m, "c")
 	if m.compose == nil || len(m.compose.prs) != 1 || m.compose.ta.Value() != "@dependabot rebase" {
 		t.Fatalf("c does not write the comment again for the one it failed on: %+v", m.compose)
 	}
 	press(m, "esc", "R")
-	if m.compose != nil || !strings.Contains(m.status, "one pull request at a time") {
-		t.Errorf("R on a selection opened: %q", m.status)
+	if m.compose != nil || !strings.Contains(status(m), "one pull request at a time") {
+		t.Errorf("R on a selection opened: %q", status(m))
 	}
 }
 
@@ -787,8 +792,8 @@ func TestReviewWithBody(t *testing.T) {
 	f := fixture()
 	m := start(t, f, keymap.Default())
 	press(m, "R", "ctrl+s")
-	if !strings.Contains(m.status, "write the review comment first") {
-		t.Errorf("empty review was not refused: %q", m.status)
+	if !strings.Contains(status(m), "write the review comment first") {
+		t.Errorf("empty review was not refused: %q", status(m))
 	}
 	run(m, m.paste(tea.PasteMsg{Content: "Looks good, one question."}))
 	press(m, "ctrl+s", "y")
@@ -804,8 +809,8 @@ func TestOwnPullRequest(t *testing.T) {
 	f := fixture()
 	m := start(t, f, keymap.Default())
 	press(m, "2", "A")
-	if m.bulk != nil || !strings.Contains(m.status, "cannot approve your own") {
-		t.Errorf("approve of own PR not refused: %q", m.status)
+	if m.bulk != nil || !strings.Contains(status(m), "cannot approve your own") {
+		t.Errorf("approve of own PR not refused: %q", status(m))
 	}
 }
 
@@ -868,8 +873,8 @@ func TestOneReviewAtATime(t *testing.T) {
 	press(m, "ctrl+s")
 	_, cmd := m.Update(keyMsg("y"))
 	press(m, "ctrl+s")
-	if m.confirm != nil || !strings.Contains(m.status, "being sent") {
-		t.Errorf("a second review was asked for while one was on its way: %q", m.status)
+	if m.confirm != nil || !strings.Contains(status(m), "being sent") {
+		t.Errorf("a second review was asked for while one was on its way: %q", status(m))
 	}
 	run(m, cmd)
 	if len(f.reviews) != 1 {
@@ -1175,22 +1180,22 @@ func TestLockedRowAndCursor(t *testing.T) {
 		t.Fatalf("row = %+v", pg)
 	}
 	// The cursor is on it: the status line has the whole of it.
-	if !strings.Contains(m.status, "acme/api#12 skipped: it would wait for checks") || !strings.Contains(m.status, "press M again") {
-		t.Fatalf("status = %q", m.status)
+	if !strings.Contains(status(m), "acme/api#12 skipped: it would wait for checks") || !strings.Contains(status(m), "press M again") {
+		t.Fatalf("status = %q", status(m))
 	}
 	press(m, "j")
-	if m.status != "" {
-		t.Errorf("status kept after leaving the row: %q", m.status)
+	if status(m) != "" {
+		t.Errorf("status kept after leaving the row: %q", status(m))
 	}
 	press(m, "k")
-	if !strings.Contains(m.status, "acme/api#12 skipped") {
-		t.Errorf("status on coming back = %q", m.status)
+	if !strings.Contains(status(m), "acme/api#12 skipped") {
+		t.Errorf("status on coming back = %q", status(m))
 	}
 	// Another message is not cleared by moving.
-	m.setStatus("refreshing", false)
+	m.say("opened in the browser")
 	press(m, "j")
-	if m.status != "refreshing" {
-		t.Errorf("moving cleared another message: %q", m.status)
+	if status(m) != "opened in the browser" {
+		t.Errorf("moving cleared another message: %q", status(m))
 	}
 }
 
@@ -1544,11 +1549,12 @@ func TestRefreshStatus(t *testing.T) {
 	if s := screen(m); !strings.Contains(s, "refreshing…") {
 		t.Fatalf("no refreshing line while reading:\n%s", s)
 	}
-	m.setStatus("opened in the browser", false)
+	m.say("opened in the browser")
 	if s := screen(m); strings.Contains(s, "refreshing…") || !strings.Contains(s, "opened in the browser") {
 		t.Errorf("the refreshing line hid another message:\n%s", s)
 	}
-	m.setStatus("", false)
+	clock := now.Add(infoFor)
+	m.set.Now = func() time.Time { return clock }
 	run(m, cmd)
 	if m.refreshing != nil || strings.Contains(screen(m), "refreshing") {
 		t.Errorf("the refreshing line stayed after the reading:\n%s", screen(m))

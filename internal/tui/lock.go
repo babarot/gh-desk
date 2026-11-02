@@ -87,8 +87,9 @@ func (m *Model) tookLock(msg lockMsg) tea.Cmd {
 		cmd = m.resume()
 		text += fmt.Sprintf(" · going on with %d", len(msg.pending))
 	}
-	m.setStatus(text, false)
-	return cmd
+	// Kept in the notifications: it happens at a moment the user did
+	// nothing for.
+	return tea.Batch(cmd, m.pushNote("✓", text, nil))
 }
 
 // lockedBy names the gh-triage holding the lock, for a row.
@@ -127,39 +128,12 @@ func waitWord(s plan.Step) string {
 	return "would wait"
 }
 
-// rowStatus shows the full result of the row under the cursor on the
-// status line, where the row has room for a few words only. It reports
-// whether the row has one.
-func (m *Model) rowStatus() bool {
-	p, _, ok := m.currentPR()
-	if !ok {
-		return false
-	}
-	pg, ok := m.progress[p.Key]
-	if !ok {
-		return false
-	}
-	text := pg.detail
-	if text == "" {
-		text = p.Key.String() + ": " + pg.text
-	}
-	m.setStatus(text, false)
-	m.statusOfRow = true
-	return true
-}
-
-// followCursor changes the status line when the cursor moved to another
-// pull request: its result if it has one, or nothing if the line showed
-// the result of the row it left.
+// followCursor shows the result of the row the cursor moved onto, when it
+// has one, before the work in progress for a moment (ADR-025).
 func (m *Model) followCursor(before model.PRKey, had bool) {
 	p, _, ok := m.currentPR()
 	if ok == had && (!ok || p.Key == before) {
 		return
 	}
-	if m.rowStatus() {
-		return
-	}
-	if m.statusOfRow {
-		m.setStatus("", false)
-	}
+	m.movedOnto()
 }

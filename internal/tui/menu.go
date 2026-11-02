@@ -270,7 +270,7 @@ func (m *Model) menuKey(k string) tea.Cmd {
 // leaves the menu open and says why.
 func (m *Model) runMenu(it menuItem) tea.Cmd {
 	if it.off {
-		m.setStatus(m.keys.Help(it.action)+": "+it.about, true)
+		m.refuse(m.keys.Help(it.action) + ": " + it.about)
 		return nil
 	}
 	m.menu = nil
