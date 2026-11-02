@@ -181,3 +181,23 @@ func TestCommentIsDrawn(t *testing.T) {
 		t.Errorf("the comment was not shown as written:\n%s", s)
 	}
 }
+
+func TestChatAnswerIsDrawnFromMarkdown(t *testing.T) {
+	m := start(t, fixture(), keymap.Default())
+	c := &chat{turns: []turn{{text: "## Verdict\n\n**Safe** to merge, see [the docs](https://example.com).\n\n- `go test` passes"}}}
+	var got []string
+	for _, l := range m.chatLines(c, 40) {
+		got = append(got, ansi.Strip(l))
+	}
+	want := []string{
+		"claude",
+		"  Verdict",
+		"  Safe to merge, see the docs.",
+		"",
+		"  • go test passes",
+		"",
+	}
+	if strings.Join(got, "\n") != strings.Join(want, "\n") {
+		t.Errorf("lines:\n%s\nwant:\n%s", strings.Join(got, "\n"), strings.Join(want, "\n"))
+	}
+}

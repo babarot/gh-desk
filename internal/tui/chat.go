@@ -361,7 +361,8 @@ func (m *Model) claudeExited(msg claudeExitMsg) tea.Cmd {
 	return nil
 }
 
-// chatLines are the conversation, wrapped to width.
+// chatLines are the conversation, wrapped to width, with Claude's answers
+// drawn from their Markdown.
 func (m *Model) chatLines(c *chat, width int) []string {
 	st := m.st
 	wrap := func(s string) []string {
@@ -392,8 +393,14 @@ func (m *Model) chatLines(c *chat, width int) []string {
 		default:
 			L = append(L, steps(t.steps)...)
 			L = append(L, st.mauve.Render("claude"))
-			for _, l := range wrap(t.text) {
-				L = append(L, st.sub1.Render(l))
+			// An answer is Markdown, drawn as a description is.
+			text := zeroWidth.Replace(mdLinkRe.ReplaceAllString(safe(t.text), "$1"))
+			for _, l := range m.markdownLines(strings.TrimRight(text, " \t\n"), max(width-2, 10)) {
+				if l.text == "" {
+					L = append(L, "")
+					continue
+				}
+				L = append(L, "  "+l.text)
 			}
 		}
 		L = append(L, "")
