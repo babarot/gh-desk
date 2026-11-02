@@ -400,6 +400,10 @@ name = "approved"
 approved_by_me = true
 
 [[select]]
+name = "recent"
+updated_within_days = 90
+
+[[select]]
 name = "lock files"
 authors = ["renovate"]
 title = "(?i)lock file maintenance"

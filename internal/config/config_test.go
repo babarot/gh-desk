@@ -59,7 +59,7 @@ func TestTemplateLoadsAsDefault(t *testing.T) {
 	for _, s := range cfg.Select {
 		names = append(names, s.Name)
 	}
-	if want := []string{"small", "dependency bots", "approved", "lock files"}; !reflect.DeepEqual(names, want) {
+	if want := []string{"small", "dependency bots", "approved", "recent", "lock files"}; !reflect.DeepEqual(names, want) {
 		t.Errorf("rules = %v, want %v", names, want)
 	}
 	if len(Default().Select) != 0 {
