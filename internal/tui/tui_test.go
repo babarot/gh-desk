@@ -355,7 +355,7 @@ func press(m *Model, keys ...string) {
 	}
 }
 
-func screen(m *Model) string { return ansi.Strip(m.render()) }
+func screen(m *Model) string { s, _ := m.render(); return ansi.Strip(s) }
 
 func golden(t *testing.T, name, got string) {
 	t.Helper()
@@ -637,7 +637,7 @@ func TestActionMenu(t *testing.T) {
 // only the popup keeps its colors.
 func TestPopupDimsTheScreen(t *testing.T) {
 	m := start(t, fixture(), keymap.Default())
-	header := func() string { return strings.Split(m.render(), "\n")[0] }
+	header := func() string { s, _ := m.render(); return strings.Split(s, "\n")[0] }
 	before := header()
 	if before == m.st.dim.Render(ansi.Strip(before)) {
 		t.Fatalf("the header is faint before any popup: %q", before)
@@ -851,7 +851,7 @@ func TestTitleEscapesNeverReachTheScreen(t *testing.T) {
 	f := fixture()
 	f.searches["review"][0].Title = "evil \x1b]0;pwned\x07title"
 	m := start(t, f, keymap.Default())
-	if s := m.render(); strings.Contains(s, "pwned\x07") || strings.Contains(s, "\x1b]0;") {
+	if s, _ := m.render(); strings.Contains(s, "pwned\x07") || strings.Contains(s, "\x1b]0;") {
 		t.Error("an escape sequence from a title reached the screen")
 	}
 }
@@ -923,7 +923,8 @@ func TestCursorRowBackground(t *testing.T) {
 	m := start(t, fixture(), keymap.Default())
 	probe := m.st.sel.Render("\x00")
 	set := probe[:strings.IndexByte(probe, 0)]
-	for l := range strings.SplitSeq(m.render(), "\n") {
+	s, _ := m.render()
+	for l := range strings.SplitSeq(s, "\n") {
 		if !strings.Contains(ansi.Strip(l), "▎ ● api#12") {
 			continue
 		}

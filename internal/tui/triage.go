@@ -70,7 +70,7 @@ func (m *Model) openTriage() tea.Cmd {
 		return nil
 	}
 	if m.triage == nil {
-		ta := textarea.New()
+		ta := newInput()
 		ta.Placeholder = "Ask Claude to find or select pull requests"
 		ta.ShowLineNumbers = false
 		ta.SetHeight(3)
@@ -436,7 +436,9 @@ func (m *Model) cursorTo(p model.PR) tea.Cmd {
 	return nil
 }
 
-func (m *Model) renderTriage() []string {
+// renderTriage draws the popup and says on which of its rows the text box
+// starts, -1 when it is not shown.
+func (m *Model) renderTriage() ([]string, int) {
 	tr, st := m.triage, m.st
 	w := m.triageWidth()
 	inner := w - 4
@@ -495,7 +497,12 @@ func (m *Model) renderTriage() []string {
 	}
 	out, top := scrollBox(st, "claude · "+m.tab().name, body, foot, w, m.popupHeight(), top, keepLines{}, keys)
 	tr.top = top
-	return out
+	at := -1
+	if tr.typing {
+		// The text box opens the foot, above the bottom edge.
+		at = len(out) - 1 - len(foot)
+	}
+	return out, at
 }
 
 // footKeys are the keys of a popup's last line; accept, when given, is

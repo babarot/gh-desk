@@ -126,7 +126,7 @@ func (m *Model) openChat(p model.PR) tea.Cmd {
 		}
 		return nil
 	}
-	ta := textarea.New()
+	ta := newInput()
 	ta.Placeholder = "Ask Claude"
 	ta.ShowLineNumbers = false
 	ta.SetHeight(3)
@@ -443,10 +443,12 @@ func firstLine(s string) string {
 	return l
 }
 
-func (m *Model) renderChat(b *strings.Builder, height int) {
+// renderChat draws the conversation and returns where the cursor of the
+// text box is on the screen, nil when the box is not shown.
+func (m *Model) renderChat(b *strings.Builder, height int) *tea.Cursor {
 	c, st := m.chat(), m.st
 	if c == nil {
-		return
+		return nil
 	}
 	info := []string{"at " + short(c.pr.HeadOID), "read-only"}
 	if c.model != "" {
@@ -473,8 +475,13 @@ func (m *Model) renderChat(b *strings.Builder, height int) {
 		b.WriteString("\n")
 	}
 	if c.typing {
+		cur := c.input.Cursor()
+		if cur != nil {
+			cur.Y += strings.Count(b.String(), "\n")
+		}
 		b.WriteString(c.input.View() + "\n")
-		return
+		return cur
 	}
 	b.WriteString(fit(st.dim.Render(fmt.Sprintf("› %s to ask more · %s to draft a review", m.firstKey("chat_more"), m.firstKey("draft_review"))), m.width) + "\n")
+	return nil
 }

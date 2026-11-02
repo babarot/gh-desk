@@ -124,7 +124,7 @@ func (m *Model) startComment() tea.Cmd {
 	if len(prs) == 0 {
 		return nil
 	}
-	c := &compose{pr: prs[0], prs: prs, single: true, ta: textarea.New()}
+	c := &compose{pr: prs[0], prs: prs, single: true, ta: newInput()}
 	c.ta.Placeholder = "Write the comment (markdown)"
 	// A comment that failed comes back to be sent again.
 	c.ta.SetValue(m.unsent)
@@ -138,7 +138,7 @@ func (m *Model) startCompose(p model.PR, event model.ReviewEvent) tea.Cmd {
 		m.refuse("you cannot request changes on your own pull request")
 		return nil
 	}
-	c := &compose{pr: p, own: m.own(p), ta: textarea.New()}
+	c := &compose{pr: p, own: m.own(p), ta: newInput()}
 	for i, k := range kinds {
 		if k == event {
 			c.kind = i
@@ -371,7 +371,9 @@ func (m *Model) reviewed(msg reviewMsg) tea.Cmd {
 }
 
 // renderCompose draws the popup a comment or a review is written in.
-func (m *Model) renderCompose() []string {
+// renderCompose draws the popup and says on which of its rows the text
+// box starts.
+func (m *Model) renderCompose() ([]string, int) {
 	c, st := m.compose, m.st
 	lines := []string{st.muted.Render(c.pr.Title)}
 	title := c.pr.Key.String() + " · review"
@@ -394,11 +396,13 @@ func (m *Model) renderCompose() []string {
 		lines = append(lines, strings.Join(ks, tabGap), "")
 		keys += st.dim.Render(" · ") + st.key.Render(m.firstKey("next_kind")) + " " + st.muted.Render("kind")
 	}
+	// Below the box's top edge.
+	at := 1 + len(lines)
 	lines = append(lines, strings.Split(c.ta.View(), "\n")...)
 	lines = append(lines, "", keys+
 		st.dim.Render(" · ")+st.key.Render(m.firstKey("editor"))+" "+st.muted.Render("$EDITOR")+
 		st.dim.Render(" · ")+st.key.Render(keymap.Back)+" "+st.muted.Render("discard"))
-	return box(st, title, lines, composeWidth(m.width))
+	return box(st, title, lines, composeWidth(m.width)), at
 }
 
 // renderConfirm draws the popup over the screen's lines.
@@ -465,6 +469,14 @@ func short(oid string) string {
 }
 
 // box draws lines in a rounded frame w wide, with title on its top edge.
+// newInput is a text box that leaves the cursor to the terminal, so an
+// input method shows the text being composed where it goes.
+func newInput() textarea.Model {
+	ta := textarea.New()
+	ta.SetVirtualCursor(false)
+	return ta
+}
+
 func box(st styles, title string, lines []string, w int) []string {
 	inner := w - 4
 	top := st.border.Render("╭ ") + st.title.Render(title) + " "

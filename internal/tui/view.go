@@ -15,16 +15,22 @@ import (
 
 // View draws the screen.
 func (m *Model) View() tea.View {
-	v := tea.NewView(m.render())
+	s, cur := m.render()
+	v := tea.NewView(s)
+	// The terminal's own cursor, not one drawn: an input method shows the
+	// text being composed where it is.
+	v.Cursor = cur
 	v.AltScreen = true
 	// Clicks, the wheel, and dragging the pane's edge; see mouse.go.
 	v.MouseMode = tea.MouseModeCellMotion
 	return v
 }
 
-func (m *Model) render() string {
+// render draws the screen and says where the cursor of the input being
+// typed in is, nil when nothing is.
+func (m *Model) render() (string, *tea.Cursor) {
 	if m.width == 0 || m.height == 0 {
-		return ""
+		return "", nil
 	}
 	var b strings.Builder
 	b.WriteString(m.renderHeader() + "\n")
@@ -39,9 +45,10 @@ func (m *Model) render() string {
 	if m.filtering || m.filter != "" {
 		body--
 	}
+	var cur *tea.Cursor
 	switch m.view {
 	case viewChat:
-		m.renderChat(&b, body)
+		cur = m.renderChat(&b, body)
 	default:
 		l := m.layout()
 		m.renderList(&b, l.list)
@@ -54,22 +61,35 @@ func (m *Model) render() string {
 	lines := strings.Split(b.String(), "\n")
 	if m.compose != nil {
 		// Under the confirm popup when a review is posted.
-		lines = m.overlay(lines, m.renderCompose(), 2, m.width)
+		popup, at := m.renderCompose()
+		lines = m.overlay(lines, popup, 2, m.width)
+		cur = inPopup(m.compose.ta.Cursor(), popup, 2+at, m.width)
 	}
 	switch {
 	case m.bulk != nil:
+		cur = nil
 		lines = m.overlay(lines, m.renderBulk(), 2, m.width)
 	case m.notesAt != nil:
+		cur = nil
 		lines = m.overlay(lines, m.renderNotes(), 2, m.width)
 	case m.picker != nil:
+		cur = nil
 		lines = m.overlay(lines, m.renderPick(), 2, m.width)
 	case m.menu != nil:
+		cur = nil
 		lines = m.overlay(lines, m.renderMenu(), 2, m.width)
 	case m.confirm != nil:
+		cur = nil
 		lines = m.overlay(lines, m.renderConfirm(), 2, m.width)
 	case m.triage != nil && m.triage.open:
-		lines = m.overlay(lines, m.renderTriage(), 2, m.width)
+		popup, at := m.renderTriage()
+		lines = m.overlay(lines, popup, 2, m.width)
+		cur = nil
+		if at >= 0 {
+			cur = inPopup(m.triage.input.Cursor(), popup, 2+at, m.width)
+		}
 	case m.help:
+		cur = nil
 		lines = m.renderHelp(lines)
 	case m.toast != nil && len(lines) > 3:
 		toast := m.st.border.Render("╭ ") + m.noteIcon(m.toast.icon) + " " + m.st.sub1.Render(m.toast.title) + " " +
@@ -80,7 +100,21 @@ func (m *Model) render() string {
 	if len(lines) > m.height {
 		lines = lines[:m.height]
 	}
-	return strings.Join(lines, "\n")
+	if cur != nil && cur.Y >= len(lines) {
+		cur = nil
+	}
+	return strings.Join(lines, "\n"), cur
+}
+
+// inPopup moves the cursor of an input drawn in a box from row at of the
+// screen, inside the box's left edge, to where it is on the screen.
+func inPopup(c *tea.Cursor, popup []string, at, width int) *tea.Cursor {
+	if c == nil || len(popup) == 0 {
+		return nil
+	}
+	c.X += max((width-lipgloss.Width(popup[0]))/2, 0) + lipgloss.Width("│ ")
+	c.Y += at
+	return c
 }
 
 // overlay puts a popup over the screen's lines, the screen dimmed under

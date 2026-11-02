@@ -43,6 +43,11 @@ func startSmall(t *testing.T, f *fakeSource) *Model {
 // readPopup reads all of a popup: what it shows, then again after down
 // while its bottom edge tells of lines below. Every time, the popup must
 // fit the screen and show its foot. It returns the text, spaces collapsed.
+// linesOnly drops where a popup's text box starts.
+func linesOnly(render func() ([]string, int)) func() []string {
+	return func() []string { l, _ := render(); return l }
+}
+
 func readPopup(t *testing.T, m *Model, render func() []string, foot string, down string) string {
 	t.Helper()
 	var text []string
@@ -106,7 +111,7 @@ func TestPopupsOnASmallScreen(t *testing.T) {
 		m := startSmall(t, f)
 		selectAll(m, keys)
 		press(m, "c")
-		readPopup(t, m, m.renderCompose, "discard", "j")
+		readPopup(t, m, linesOnly(m.renderCompose), "discard", "j")
 		body := "First line of a comment that is long enough to be wrapped in the popup, then more.\nsecond line"
 		run(m, m.paste(tea.PasteMsg{Content: body}))
 		press(m, "ctrl+s")
@@ -146,7 +151,7 @@ func TestPopupsOnASmallScreen(t *testing.T) {
 		long := "show the bot pull requests whose checks pass and which change nothing but the lock files of the repository"
 		m.triage.turns = append([]triageTurn{{request: long, reply: strings.Repeat("A reply of many lines. ", 30)}}, m.triage.turns...)
 		m.triage.top, m.triage.follow = 0, false
-		has(t, readPopup(t, m, m.renderTriage, "close", "j"), long)
+		has(t, readPopup(t, m, linesOnly(m.renderTriage), "close", "j"), long)
 	})
 	t.Run("help", func(t *testing.T) {
 		m := startSmall(t, fixture())
