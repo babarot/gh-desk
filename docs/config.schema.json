@@ -288,6 +288,10 @@
       "items": {
         "additionalProperties": false,
         "properties": {
+          "approved_by_me": {
+            "description": "Your latest review must approve it; a person's pull request matches too, unlike the built-in \"approved by me\".",
+            "type": "boolean"
+          },
           "author": {
             "description": "A login; bots without app/.",
             "type": "string"

@@ -310,6 +310,7 @@ var elems = map[string][]elem{
 		{Key: "max_lines", Kind: intKind{Min: 1}, Doc: "The most lines it may add and delete together: the sum of the two numbers SIZE shows."},
 		{Key: "bot", Kind: boolKind{}, Doc: "The author must be a bot."},
 		{Key: "checks", Kind: enumKind{[]string{"passing"}}, Doc: `"passing": passed, or only checks.approval pending.`},
+		{Key: "approved_by_me", Kind: boolKind{}, Doc: "Your latest review must approve it; a person's pull request matches too, unlike the built-in \"approved by me\"."},
 	},
 }
 
@@ -364,8 +365,14 @@ const selectExamples = `# Rules S offers to select pull requests, besides "appro
 # dependencies a renovate or dependabot pull request updates, read from its
 # body; every one it updates must be listed), title (a regular expression),
 # max_files (1 or more), max_lines (1 or more; the lines added and deleted
-# together, the sum of the two numbers SIZE shows), bot = true, and checks =
-# "passing" (passed, or only checks.approval pending).
+# together, the sum of the two numbers SIZE shows), bot = true, checks =
+# "passing" (passed, or only checks.approval pending), and approved_by_me =
+# true (your latest review approves it; a person's pull request matches too).
+#
+# [[select]]
+# name = "approved, small"
+# approved_by_me = true
+# max_lines = 300
 #
 # [[select]]
 # name = "safe renovate"
@@ -547,6 +554,9 @@ func Show(f File, onlyDiff bool) string {
 		}
 		if s.Checks != "" {
 			fmt.Fprintf(&b, "checks = %q\n", s.Checks)
+		}
+		if s.ApprovedByMe {
+			b.WriteString("approved_by_me = true\n")
 		}
 		b.WriteString("\n")
 	}

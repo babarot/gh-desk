@@ -206,6 +206,9 @@ type Select struct {
 	Bot      bool
 	// Checks is "passing" to require passing checks, or "".
 	Checks string
+	// ApprovedByMe requires the viewer's latest review to approve it, a
+	// person's pull request or a bot's.
+	ApprovedByMe bool
 }
 
 // Claude configures asking Claude Code.
@@ -420,14 +423,15 @@ type (
 		AttentionPaths *[]Glob `toml:"attention_paths"`
 	}
 	selectDoc struct {
-		Name     string   `toml:"name"`
-		Author   string   `toml:"author"`
-		Packages []string `toml:"packages"`
-		Title    *Regexp  `toml:"title"`
-		MaxFiles *int     `toml:"max_files"`
-		MaxLines *int     `toml:"max_lines"`
-		Bot      bool     `toml:"bot"`
-		Checks   *string  `toml:"checks"`
+		Name         string   `toml:"name"`
+		Author       string   `toml:"author"`
+		Packages     []string `toml:"packages"`
+		Title        *Regexp  `toml:"title"`
+		MaxFiles     *int     `toml:"max_files"`
+		MaxLines     *int     `toml:"max_lines"`
+		Bot          bool     `toml:"bot"`
+		Checks       *string  `toml:"checks"`
+		ApprovedByMe bool     `toml:"approved_by_me"`
 	}
 )
 
@@ -668,7 +672,7 @@ func selectFrom(ds []selectDoc) ([]Select, Problems) {
 	var out []Select
 	seen := map[string]bool{"approved by me": true}
 	for i, d := range ds {
-		s := Select{Name: d.Name, Author: d.Author, Packages: d.Packages, Bot: d.Bot}
+		s := Select{Name: d.Name, Author: d.Author, Packages: d.Packages, Bot: d.Bot, ApprovedByMe: d.ApprovedByMe}
 		switch {
 		case strings.TrimSpace(s.Name) == "":
 			at(i, "name", "must not be empty")
@@ -700,7 +704,7 @@ func selectFrom(ds []selectDoc) ([]Select, Problems) {
 			}
 			s.Checks = *d.Checks
 		}
-		if s.Author == "" && len(s.Packages) == 0 && d.Title == nil && d.MaxFiles == nil && d.MaxLines == nil && !s.Bot && d.Checks == nil {
+		if s.Author == "" && len(s.Packages) == 0 && d.Title == nil && d.MaxFiles == nil && d.MaxLines == nil && !s.Bot && d.Checks == nil && !s.ApprovedByMe {
 			at(i, "", "%q matches every pull request; give it at least one condition", s.Name)
 		}
 		out = append(out, s)

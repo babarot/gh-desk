@@ -255,8 +255,9 @@ packages = ["actions/checkout"]
 title = "(?i)bump"
 checks = "passing"
 max_lines = 500
+approved_by_me = true
 `))
-	if err != nil || len(cfg.Select) != 1 || cfg.Select[0].Packages[0] != "actions/checkout" || !cfg.Select[0].Title.MatchString("Bump x") || cfg.Select[0].MaxLines != 500 {
+	if err != nil || len(cfg.Select) != 1 || cfg.Select[0].Packages[0] != "actions/checkout" || !cfg.Select[0].Title.MatchString("Bump x") || cfg.Select[0].MaxLines != 500 || !cfg.Select[0].ApprovedByMe {
 		t.Fatalf("cfg.Select = %+v, %v", cfg.Select, err)
 	}
 	wantErrs(t, `
@@ -273,6 +274,10 @@ name = "all"
 [[select]]
 name = "small"
 max_lines = 500
+
+[[select]]
+name = "mine"
+approved_by_me = true
 `,
 		`config.toml:3:8: select[0].name "approved by me" is used twice`,
 		`config.toml:4:9: select[0].title is not a regular expression`,

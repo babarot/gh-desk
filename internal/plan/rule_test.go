@@ -41,6 +41,8 @@ func TestRuleMatch(t *testing.T) {
 		{"approved by me", ApprovedByMe, approved, Facts{}, true},
 		{"not approved", ApprovedByMe, bot, Facts{}, false},
 		{"a person's", ApprovedByMe, person, Facts{}, false},
+		{"a person's, by a key", Rule{ApprovedByMe: true}, person, Facts{}, true},
+		{"not approved, by a key", Rule{ApprovedByMe: true}, bot, Facts{}, false},
 		{"draft", Rule{}, model.PR{Draft: true}, Facts{}, false},
 	}
 	for _, tt := range tests {
