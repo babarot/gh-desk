@@ -12,11 +12,14 @@ import (
 )
 
 // pick is the popup of S: the rules, how many pull requests of the tab each
-// matches, and those the rule under the cursor matches. Choosing one
-// replaces the selection with them; approving and merging stay with A and M.
+// matches, and those the rules chosen match together: the rules checked,
+// or with none checked the one under the cursor. Choosing replaces the
+// selection with them; approving and merging stay with A and M.
 type pick struct {
 	sel     int
 	loading bool
+	// checked are the rules checked, by their index in rules().
+	checked map[int]bool
 	// top is the first line shown, kept by renderPick so sel is in sight.
 	top int
 }
@@ -38,7 +41,7 @@ func (m *Model) rules() []plan.Rule {
 
 // openPick opens the popup, reading the bodies a rule needs first.
 func (m *Model) openPick() tea.Cmd {
-	m.picker = &pick{}
+	m.picker = &pick{checked: map[int]bool{}}
 	needs := false
 	for _, r := range m.rules() {
 		needs = needs || r.NeedsBody()
@@ -92,8 +95,8 @@ func (m *Model) body(k model.PRKey) (string, bool) {
 	return "", false
 }
 
-// matches are the pull requests of the tab a rule picks.
-func (m *Model) ruleMatches(r plan.Rule) []model.PR {
+// ruleMatches are the pull requests of the tab every one of rs picks.
+func (m *Model) ruleMatches(rs ...plan.Rule) []model.PR {
 	t := m.tab()
 	var out []model.PR
 	for _, p := range m.allOf(t) {
@@ -105,17 +108,50 @@ func (m *Model) ruleMatches(r plan.Rule) []model.PR {
 		if mi, ok := m.cache.info[p.Key]; ok {
 			f.AwaitingApproval = plan.AwaitingApproval(mi.Checks, m.set.Plan.ApprovalChecks)
 		}
-		// A rule on the size or the checks does not pick a pull request
-		// whose heavy fields are not read for its head: unread, they look
-		// like an empty pull request with no checks, which would pass.
-		if r.NeedsHeavy() && !p.HeavyRead() {
-			continue
-		}
-		if r.Match(p, m.viewer, f) {
+		if matchesAll(rs, p, m.viewer, f) {
 			out = append(out, p)
 		}
 	}
 	return out
+}
+
+// matchesAll reports whether every rule picks p. A rule on the size or the
+// checks does not pick a pull request whose heavy fields are not read for
+// its head: unread, they look like an empty pull request with no checks,
+// which would pass.
+func matchesAll(rs []plan.Rule, p model.PR, viewer string, f plan.Facts) bool {
+	for _, r := range rs {
+		if r.NeedsHeavy() && !p.HeavyRead() || !r.Match(p, viewer, f) {
+			return false
+		}
+	}
+	return true
+}
+
+// chosen are the rules choosing acts on: those checked, in the order shown,
+// or with none checked the one under the cursor.
+func (m *Model) chosen() []plan.Rule {
+	rs, v := m.rules(), m.picker
+	var out []plan.Rule
+	for i, r := range rs {
+		if v.checked[i] {
+			out = append(out, r)
+		}
+	}
+	if len(out) == 0 {
+		out = []plan.Rule{rs[v.sel]}
+	}
+	return out
+}
+
+// ruleNames names rules put together, as the popup and the status line
+// say them.
+func ruleNames(rs []plan.Rule) string {
+	names := make([]string, len(rs))
+	for i, r := range rs {
+		names[i] = r.Name
+	}
+	return strings.Join(names, " + ")
 }
 
 func (m *Model) pickKey(k string) tea.Cmd {
@@ -129,17 +165,28 @@ func (m *Model) pickKey(k string) tea.Cmd {
 		v.sel = min(v.sel+1, len(rs)-1)
 	case is("up"):
 		v.sel = max(v.sel-1, 0)
+	case is("toggle_rule"):
+		if v.checked == nil {
+			v.checked = map[int]bool{}
+		}
+		if v.checked[v.sel] {
+			delete(v.checked, v.sel)
+		} else {
+			v.checked[v.sel] = true
+		}
 	case is("choose") && m.pickReady():
+		chosen := m.chosen()
 		m.picker = nil
-		return m.applyRule(rs[v.sel])
+		return m.applyRules(chosen)
 	}
 	return nil
 }
 
-// applyRule replaces the selection with what the rule matches, unfolds
-// their groups, and puts the cursor on the first.
-func (m *Model) applyRule(r plan.Rule) tea.Cmd {
-	hits := m.ruleMatches(r)
+// applyRules replaces the selection with what the rules match together,
+// unfolds their groups, and puts the cursor on the first.
+func (m *Model) applyRules(rs []plan.Rule) tea.Cmd {
+	hits := m.ruleMatches(rs...)
+	name := ruleNames(rs)
 	clear(m.selected)
 	t := m.tab()
 	for _, p := range hits {
@@ -149,7 +196,7 @@ func (m *Model) applyRule(r plan.Rule) tea.Cmd {
 		}
 	}
 	if len(hits) == 0 {
-		m.say(r.Name + ": nothing matches in this tab")
+		m.say(name + ": nothing matches in this tab")
 		return nil
 	}
 	for i, row := range m.rows(t) {
@@ -158,7 +205,7 @@ func (m *Model) applyRule(r plan.Rule) tea.Cmd {
 			break
 		}
 	}
-	m.say(fmt.Sprintf("%s: selected %d · %s to merge, %s to approve", r.Name, len(hits), m.firstKey("merge"), m.firstKey("approve")))
+	m.say(fmt.Sprintf("%s: selected %d · %s to merge, %s to approve", name, len(hits), m.firstKey("merge"), m.firstKey("approve")))
 	return m.ensure()
 }
 
@@ -174,12 +221,16 @@ func (m *Model) renderPick() []string {
 		if i == v.sel {
 			cursor = st.blue.Render("▎")
 		}
+		mark := " "
+		if v.checked[i] {
+			mark = st.mauve.Render("✓")
+		}
 		n := len(m.ruleMatches(r))
 		count := st.dim.Render(fmt.Sprintf("%d", n))
 		if n > 0 {
 			count = st.mauve.Render(fmt.Sprintf("%d", n))
 		}
-		rule := hang(cursor+" "+fit(st.sub1.Render(r.Name), 22)+fit(count+st.dim.Render(" PRs"), 9), st.muted.Render(ruleWords(r)), inner)
+		rule := hang(cursor+" "+mark+" "+fit(st.sub1.Render(r.Name), 20)+fit(count+st.dim.Render(" PRs"), 9), st.muted.Render(ruleWords(r)), inner)
 		if i == v.sel {
 			for j := range rule {
 				rule[j] = onBackground(rule[j], st.sel, inner)
@@ -188,7 +239,12 @@ func (m *Model) renderPick() []string {
 		}
 		lines = append(lines, rule...)
 	}
-	lines = append(lines, "", st.group.Render("matches"))
+	chosen := m.chosen()
+	head := st.group.Render("matches")
+	if len(v.checked) > 0 && m.pickReady() {
+		head += st.dim.Render(" · ") + st.sub1.Render(ruleNames(chosen)) + st.dim.Render(fmt.Sprintf(" · %d PRs", len(m.ruleMatches(chosen...))))
+	}
+	lines = append(lines, "", head)
 	if !m.pickReady() {
 		what := "descriptions"
 		if !m.tabDone(m.tab()) {
@@ -196,7 +252,7 @@ func (m *Model) renderPick() []string {
 		}
 		lines = append(lines, "  "+st.mauve.Render(m.spinner())+" "+st.dim.Render("reading "+what+"…"))
 	} else {
-		hits := m.ruleMatches(rs[v.sel])
+		hits := m.ruleMatches(chosen...)
 		if len(hits) == 0 {
 			lines = append(lines, st.dim.Render("  nothing in this tab"))
 		}
@@ -210,7 +266,8 @@ func (m *Model) renderPick() []string {
 			lines = append(lines, "  "+fit(name, 30)+" "+st.sub0.Render(p.Title))
 		}
 	}
-	foot := []string{"", st.key.Render(m.firstKey("choose")) + " " + st.muted.Render("select these") +
+	foot := []string{"", st.key.Render(m.firstKey("toggle_rule")) + " " + st.muted.Render("check") + st.dim.Render(" · ") +
+		st.key.Render(m.firstKey("choose")) + " " + st.muted.Render("select these") +
 		st.dim.Render(" · ") + st.key.Render(keymap.Back) + " " + st.muted.Render("cancel")}
 	out, top := scrollBox(st, "select by rule", lines, foot, w, m.popupHeight(), v.top, keep, "")
 	v.top = top

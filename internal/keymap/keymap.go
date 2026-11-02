@@ -99,6 +99,7 @@ var Defaults = []Def{
 	{"preview_shrink", ScopeList, []string{"-"}, "shorter pane"},
 
 	{"choose", ScopePopup, []string{"enter"}, "choose"},
+	{"toggle_rule", ScopePopup, []string{"space"}, "check a rule"},
 
 	// A confirm popup reads no choose, so enter answers it too.
 	{"confirm", ScopeConfirm, []string{"y", "enter"}, "yes"},

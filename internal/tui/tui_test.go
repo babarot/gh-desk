@@ -1107,6 +1107,38 @@ func TestSelectByRule(t *testing.T) {
 	}
 }
 
+// Rules checked in the popup of S select what they all match; with none
+// checked, the rule under the cursor does.
+func TestSelectByRulesTogether(t *testing.T) {
+	set := testSettings()
+	set.Rules = []plan.Rule{{Name: "small", MaxLines: 100}, {Name: "bots", Bot: true}}
+	m := startSet(t, set, 130)
+	press(m, "S", "j", "space", "j", "space")
+	if !strings.Contains(screen(m), "matches · small + bots · 1 PRs") {
+		t.Errorf("the matches do not name the rules put together:\n%s", screen(m))
+	}
+	// The cursor on another rule does not change what is chosen.
+	press(m, "k", "k", "enter")
+	if len(m.selected) != 1 || !m.isSelected(key("acme", "api", 30)) {
+		t.Fatalf("selected = %v, want only the small bot pull request", m.selected)
+	}
+	if got := status(m); !strings.Contains(got, "small + bots: selected 1") {
+		t.Errorf("status = %q", got)
+	}
+	// A check taken off again leaves the rule under the cursor.
+	press(m, "S", "j", "space", "space", "enter")
+	if len(m.selected) != 2 || !m.isSelected(key("acme", "api", 12)) {
+		t.Errorf("selected = %v, want both small pull requests", m.selected)
+	}
+	// Rules that share nothing select nothing, and say so.
+	set.Rules = append(set.Rules, plan.Rule{Name: "alice", Author: "alice"})
+	m = startSet(t, set, 130)
+	press(m, "S", "j", "j", "space", "j", "space", "enter")
+	if len(m.selected) != 0 || !strings.Contains(status(m), "bots + alice: nothing matches in this tab") {
+		t.Errorf("selected = %v, status = %q", m.selected, status(m))
+	}
+}
+
 func TestResumeAtStart(t *testing.T) {
 	f := fixture()
 	set := Settings{Tabs: []Tab{{Name: "review", Query: "review", Groups: plan.Groups, Limit: 100}, {Name: "inbox", Inbox: true, Limit: 100}},
