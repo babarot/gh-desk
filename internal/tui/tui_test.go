@@ -1264,7 +1264,7 @@ func TestFilterByRuleReadsNewBodiesInTheInbox(t *testing.T) {
 	in.notifs = append(in.notifs, model.Notification{ThreadID: "n9", Key: p.Key, Title: p.Title, Reason: "review_requested", Updated: now})
 	prs := map[model.PRKey]model.PR{p.Key: p}
 	maps.Copy(prs, in.inboxPRs)
-	_, cmd := m.Update(inboxPRsMsg{prs: prs})
+	_, cmd := m.Update(inboxPRsMsg{gen: in.gen, prs: prs})
 	run(m, cmd)
 	if _, ok := m.cache.bodies[p.Key]; !ok {
 		t.Error("the body of the inbox's new bot pull request was not read")
