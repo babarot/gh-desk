@@ -338,11 +338,15 @@ type (
 		warnings []string
 		err      error
 	}
+	// The inbox's messages carry the reading gen they are for; one of an
+	// older reading is dropped.
 	notifsMsg struct {
+		gen    int
 		notifs []model.Notification
 		err    error
 	}
 	inboxPRsMsg struct {
+		gen int
 		prs map[model.PRKey]model.PR
 		err error
 	}
@@ -397,14 +401,14 @@ func (m *Model) loadAll() tea.Cmd {
 func (m *Model) loadTab(i int) tea.Cmd {
 	t := m.tabs[i]
 	t.loading = true
+	t.gen++
 	if t.inbox {
-		limit := t.limit
+		limit, gen := t.limit, t.gen
 		return func() tea.Msg {
 			ns, err := m.src.Notifications(m.ctx, limit)
-			return notifsMsg{ns, err}
+			return notifsMsg{gen, ns, err}
 		}
 	}
-	t.gen++
 	t.heavyLeft = 0
 	t.pend = nil
 	if len(t.prs) > 0 {
@@ -446,6 +450,9 @@ func (m *Model) handleData(msg tea.Msg) tea.Cmd {
 		return m.tabRead(msg)
 	case notifsMsg:
 		t := m.inboxTab()
+		if msg.gen != t.gen {
+			return nil
+		}
 		if msg.err != nil {
 			t.loading = false
 			m.log.Error("notifications", "err", msg.err.Error())
@@ -456,14 +463,21 @@ func (m *Model) handleData(msg tea.Msg) tea.Cmd {
 			t.loaded, t.err = true, msg.err
 			return nil
 		}
+		first := firstInbox(t, msg.notifs)
 		keys := m.setNotifs(t, msg.notifs)
-		return func() tea.Msg {
+		gen := msg.gen
+		return tea.Batch(m.readInboxFirst(gen, first), func() tea.Msg {
 			prs, err := m.src.PullRequests(m.ctx, keys)
-			return inboxPRsMsg{prs, err}
-		}
+			return inboxPRsMsg{gen, prs, err}
+		})
+	case inboxFirstMsg:
+		return m.inboxFirstRead(msg)
 	case inboxPRsMsg:
 		// The inbox is read once its pull requests are.
 		t := m.inboxTab()
+		if msg.gen != t.gen {
+			return nil
+		}
 		t.loading, t.loaded, t.err = false, true, msg.err
 		if msg.prs != nil {
 			t.inboxPRs = map[model.PRKey]model.PR{}
