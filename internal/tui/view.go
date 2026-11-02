@@ -309,9 +309,15 @@ var ready = map[keymap.Action]bool{
 	"triage": true, "triage_apply": true, "triage_more": true, "ask_claude": true, "chat_more": true, "draft_review": true, "open_claude": true, "chat_approve": true,
 }
 
-// hints is the key line of what has the focus.
+// hints is the key line of what has the focus. It holds the ways in (the
+// menu of enter, and ? for every key) and the keys nothing else on the
+// screen tells: the menu shows what can be done to a pull request, the
+// preview pane its own keys, and the header the key of the events.
 func (m *Model) hints() string {
 	var as []keymap.Action
+	// esc is told where it steps back; on the list it clears a selection or
+	// a filter, and is not told when it would quit.
+	back := "back"
 	switch {
 	case m.bulk != nil:
 		as = []keymap.Action{"confirm", "include_failing"}
@@ -332,23 +338,23 @@ func (m *Model) hints() string {
 			as = []keymap.Action{"triage_more"}
 		}
 	case m.view == viewList && len(m.selected) > 0:
-		as = []keymap.Action{"select", "select_shown", "clear_selection", "approve", "merge", "comment", "preview_tab", "filter", "help"}
+		as = []keymap.Action{"menu", "select", "select_shown", "clear_selection", "help"}
+		back = "clear"
 	case m.filtering:
 		as = []keymap.Action{"accept"}
 	case m.view == viewChat && m.chat() != nil && m.chat().typing:
 		as = []keymap.Action{"accept"}
 	case m.view == viewChat:
-		as = []keymap.Action{"chat_more", "draft_review", "chat_approve", "open_claude", "down", "help"}
+		as = []keymap.Action{"chat_more", "draft_review", "chat_approve", "open_claude", "help"}
 	default:
-		// What the menu does not offer comes first; the rest can be reached
-		// through it when the line is short.
 		as = []keymap.Action{"menu", "select", "select_rule", "triage"}
 		if m.tab().inbox {
 			as = append(as, "hide", "show_settled")
 		}
-		as = append(as, "approve", "merge", "comment", "review", "browse", "preview_tab", "help")
-		if p, _, ok := m.currentPR(); ok && m.own(p) {
-			as = []keymap.Action{"menu", "select", "merge", "comment", "browse", "preview_tab", "filter", "help"}
+		as = append(as, "filter", "help")
+		back = ""
+		if m.filter != "" {
+			back = "clear"
 		}
 	}
 	// The keys of ? and esc are kept: the hints that do not fit go from
@@ -366,7 +372,9 @@ func (m *Model) hints() string {
 			head = append(head, part)
 		}
 	}
-	tail = append(tail, m.st.key.Render(keymap.Back)+" "+m.st.muted.Render("back"))
+	if back != "" {
+		tail = append(tail, m.st.key.Render(keymap.Back)+" "+m.st.muted.Render(back))
+	}
 	sep := m.st.dim.Render(" · ")
 	join := func() string { return strings.Join(append(slices.Clone(head), tail...), sep) }
 	for len(head) > 0 && ansi.StringWidth(join()) > m.width {

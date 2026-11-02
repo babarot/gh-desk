@@ -91,18 +91,26 @@ func TestHelpScrolls(t *testing.T) {
 	}
 }
 
-// The key line keeps ? and esc at any width: the hints that do not fit go
-// from before them.
+// The key line keeps ? at any width, and esc where it steps back: the
+// hints that do not fit go from before them. On the list esc would quit,
+// and is not told until there is a selection or a filter to clear.
 func TestHintsKeepHelpAndBack(t *testing.T) {
+	last := func(m *Model) string {
+		lines := strings.Split(screen(m), "\n")
+		l := lines[len(lines)-1]
+		if w := ansi.StringWidth(l); w > m.width {
+			t.Errorf("width %d: key line is %d wide: %q", m.width, w, l)
+		}
+		return strings.TrimSpace(l)
+	}
 	for _, w := range []int{130, 80, 50} {
 		m := startSet(t, testSettings(), w)
-		lines := strings.Split(screen(m), "\n")
-		last := strings.TrimSpace(lines[len(lines)-1])
-		if !strings.HasSuffix(last, "? keys · esc back") {
-			t.Errorf("width %d: key line = %q, want it to end with ? and esc", w, last)
+		if got := last(m); !strings.HasSuffix(got, "? keys") {
+			t.Errorf("width %d: key line = %q, want it to end with ?", w, got)
 		}
-		if ansi.StringWidth(lines[len(lines)-1]) > w {
-			t.Errorf("width %d: key line is wider than the screen: %q", w, last)
+		press(m, "space")
+		if got := last(m); !strings.HasSuffix(got, "? keys · esc clear") {
+			t.Errorf("width %d, a selection: key line = %q, want it to end with ? and esc", w, got)
 		}
 	}
 }
