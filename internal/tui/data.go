@@ -313,13 +313,18 @@ type (
 		files []diff.File
 		err   error
 	}
+	// A detail or a comment carries the cache entry its read was started
+	// for: a refresh may have cleared that entry, or put another in its
+	// place, and then the read is dropped.
 	detailMsg struct {
 		key model.PRKey
+		e   *entry[model.Detail]
 		d   model.Detail
 		err error
 	}
 	commentMsg struct {
 		url string
+		e   *entry[model.Comment]
 		c   model.Comment
 		err error
 	}
@@ -437,11 +442,15 @@ func (m *Model) handleData(msg tea.Msg) tea.Cmd {
 		e := m.cache.diffs[msg.id]
 		e.loading, e.err, e.val = false, msg.err, safeFiles(msg.files)
 	case detailMsg:
-		e := m.cache.details[msg.key]
-		e.loading, e.err, e.val = false, msg.err, safeDetail(msg.d)
+		if m.cache.details[msg.key] != msg.e {
+			return nil
+		}
+		msg.e.loading, msg.e.err, msg.e.val = false, msg.err, safeDetail(msg.d)
 	case commentMsg:
-		e := m.cache.comments[msg.url]
-		e.loading, e.err, e.val = false, msg.err, safeComment(msg.c)
+		if m.cache.comments[msg.url] != msg.e {
+			return nil
+		}
+		msg.e.loading, msg.e.err, msg.e.val = false, msg.err, safeComment(msg.c)
 	case reviewMsg:
 		return m.reviewed(msg)
 	case postedMsg:
@@ -538,10 +547,11 @@ func (m *Model) ensureDetail(k model.PRKey) tea.Cmd {
 	if _, ok := m.cache.details[k]; ok {
 		return nil
 	}
-	m.cache.details[k] = &entry[model.Detail]{loading: true}
+	e := &entry[model.Detail]{loading: true}
+	m.cache.details[k] = e
 	return func() tea.Msg {
 		d, err := m.src.Detail(m.ctx, k)
-		return detailMsg{k, d, err}
+		return detailMsg{key: k, e: e, d: d, err: err}
 	}
 }
 
@@ -549,10 +559,11 @@ func (m *Model) ensureComment(url string) tea.Cmd {
 	if _, ok := m.cache.comments[url]; ok {
 		return nil
 	}
-	m.cache.comments[url] = &entry[model.Comment]{loading: true}
+	e := &entry[model.Comment]{loading: true}
+	m.cache.comments[url] = e
 	return func() tea.Msg {
 		c, err := m.src.Comment(m.ctx, url)
-		return commentMsg{url, c, err}
+		return commentMsg{url: url, e: e, c: c, err: err}
 	}
 }
 

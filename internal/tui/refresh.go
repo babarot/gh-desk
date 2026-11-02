@@ -39,8 +39,12 @@ type refreshRun struct {
 // refresh is r: read the shown tab and the notifications again, and put
 // away the results on the rows.
 func (m *Model) refresh() tea.Cmd {
-	// Checks read for ◌ and the preview's merge line may have moved on.
+	// Checks read for ◌ and the preview's merge line may have moved on, and
+	// so may the pane's description, checks and comments, read once a pull
+	// request.
 	clear(m.cache.info)
+	clear(m.cache.details)
+	clear(m.cache.comments)
 	n := m.clearResults()
 	tabs := []int{m.cur}
 	if m.cur != m.inbox {
