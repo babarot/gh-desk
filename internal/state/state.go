@@ -88,7 +88,7 @@ func writeHolder(f *os.File) {
 		return
 	}
 	if f.Truncate(0) == nil {
-		f.WriteAt(b, 0)
+		_, _ = f.WriteAt(b, 0)
 	}
 }
 
