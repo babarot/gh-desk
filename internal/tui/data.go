@@ -131,8 +131,9 @@ func (m *Model) rowsOf(t *tab, filter string, rules []plan.Rule, folded map[plan
 		return rs
 	}
 	var prs []model.PR
+	now := m.set.Now()
 	for _, p := range t.prs {
-		if !t.hidden[p.Key] && m.passes(p, filter, rules) {
+		if !t.hidden[p.Key] && m.passes(p, filter, rules, now) {
 			prs = append(prs, p)
 		}
 	}
@@ -177,6 +178,7 @@ func (m *Model) rowsOf(t *tab, filter string, rules []plan.Rule, folded map[plan
 // inboxRows are the inbox's lines under filter and rules, and how many
 // notifications on merged or closed pull requests they leave out.
 func (m *Model) inboxRows(t *tab, filter string, rules []plan.Rule) ([]row, int) {
+	now := m.set.Now()
 	var out []row
 	closed := 0
 	for i := range t.notifs {
@@ -194,7 +196,7 @@ func (m *Model) inboxRows(t *tab, filter string, rules []plan.Rule) ([]row, int)
 				continue
 			}
 		}
-		if !m.passes(p, filter, rules) {
+		if !m.passes(p, filter, rules, now) {
 			continue
 		}
 		p.Updated = n.Updated
@@ -257,10 +259,10 @@ func (m *Model) updatePR(p model.PR) {
 }
 
 // passes reports whether p is shown under the filter typed and the rules
-// the rows are narrowed to. Every place that asks whether a row is shown
-// asks this, so nothing hidden by a filter is acted on.
-func (m *Model) passes(p model.PR, filter string, rules []plan.Rule) bool {
-	return matches(p, filter) && (len(rules) == 0 || matchesAll(rules, p, m.viewer, m.ruleFacts(p)))
+// the rows are narrowed to, as of now. Every place that asks whether a row
+// is shown asks this, so nothing hidden by a filter is acted on.
+func (m *Model) passes(p model.PR, filter string, rules []plan.Rule, now time.Time) bool {
+	return matches(p, filter) && (len(rules) == 0 || matchesAll(rules, p, m.viewer, m.ruleFacts(p, now)))
 }
 
 // matches reports whether p's key, title or author contains filter,

@@ -1271,6 +1271,26 @@ func TestFilterByRuleReadsNewBodiesInTheInbox(t *testing.T) {
 	}
 }
 
+// A rule on the days since an update is matched again as time passes: a
+// row narrowed to it leaves when it grows too old, and a selection made
+// with it stays.
+func TestFilterByRuleOnDays(t *testing.T) {
+	m := start(t, fixture(), keymap.Default())
+	m.set.Rules = []plan.Rule{{Name: "recent", UpdatedWithinDays: 1}}
+	press(m, "S", "j", "enter", "S", "j", "f")
+	if got := shownKeys(m); len(got) != 2 {
+		t.Fatalf("shown = %v, want the two updated within a day", got)
+	}
+	selected := len(m.selected)
+	m.set.Now = func() time.Time { return now.Add(22 * time.Hour) }
+	if got := shownKeys(m); len(got) != 1 || got[0] != key("acme", "api", 30) {
+		t.Errorf("shown = %v, want only the one updated 20 minutes before", got)
+	}
+	if len(m.selected) != selected {
+		t.Errorf("selected = %v; time passing changed the selection", m.selected)
+	}
+}
+
 func TestResumeAtStart(t *testing.T) {
 	f := fixture()
 	set := Settings{Tabs: []Tab{{Name: "review", Query: "review", Groups: plan.Groups, Limit: 100}, {Name: "inbox", Inbox: true, Limit: 100}},

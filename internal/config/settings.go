@@ -72,7 +72,8 @@ func as[T any](v any) T {
 type (
 	boolKind struct{}
 	// intKind is a whole number from Min.
-	intKind struct{ Min int }
+	// intKind is an int of Min or more, and of Max or less when Max is not 0.
+	intKind struct{ Min, Max int }
 	// stringKind is any string, or one with something in it.
 	stringKind struct{ NonEmpty bool }
 	// enumKind is one of Values.
@@ -94,14 +95,21 @@ func (boolKind) toml(v any) string          { return fmt.Sprint(v) }
 func (boolKind) schema() map[string]any     { return map[string]any{"type": "boolean"} }
 
 func (k intKind) check(key string, v any) Problems {
-	if n := as[int](v); n < k.Min {
+	if n := as[int](v); n < k.Min || k.Max != 0 && n > k.Max {
+		if k.Max != 0 {
+			return Problems{problem(key, "%s must be between %d and %d, got %d", key, k.Min, k.Max, n)}
+		}
 		return Problems{problem(key, "%s must be %d or more, got %d", key, k.Min, n)}
 	}
 	return nil
 }
 func (intKind) toml(v any) string { return fmt.Sprint(v) }
 func (k intKind) schema() map[string]any {
-	return map[string]any{"type": "integer", "minimum": k.Min}
+	s := map[string]any{"type": "integer", "minimum": k.Min}
+	if k.Max != 0 {
+		s["maximum"] = k.Max
+	}
+	return s
 }
 
 func (k stringKind) check(key string, v any) Problems {
@@ -308,6 +316,8 @@ var elems = map[string][]elem{
 		{Key: "title", Kind: stringKind{}, Doc: "A regular expression the title must match."},
 		{Key: "max_files", Kind: intKind{Min: 1}, Doc: "The most files it may change."},
 		{Key: "max_lines", Kind: intKind{Min: 1}, Doc: "The most lines it may add and delete together: the sum of the two numbers SIZE shows."},
+		{Key: "updated_within_days", Kind: intKind{Min: 1, Max: MaxWithinDays}, Doc: "The most days, of 24 hours, since it was last updated: a label or a bot's comment updates it too. An old pull request updated lately matches."},
+		{Key: "created_within_days", Kind: intKind{Min: 1, Max: MaxWithinDays}, Doc: "The most days, of 24 hours, since it was created."},
 		{Key: "bot", Kind: boolKind{}, Doc: "The author must be a bot."},
 		{Key: "checks", Kind: enumKind{[]string{"passing"}}, Doc: `"passing": passed, or only checks.approval pending.`},
 		{Key: "approved_by_me", Kind: boolKind{}, Doc: "Your latest review must approve it; a person's pull request matches too, unlike the built-in \"approved by me\"."},
@@ -365,8 +375,11 @@ const selectExamples = `# Rules S offers to select pull requests, besides "appro
 # app/), packages (the dependencies a renovate or dependabot pull request
 # updates, read from its body; every one it updates must be listed), title
 # (a regular expression), max_files (1 or more), max_lines (1 or more; the
-# lines added and deleted together, the sum of the two numbers SIZE shows), a
-# bot as the author with bot = true, checks = "passing" (passed, or only
+# lines added and deleted together, the sum of the two numbers SIZE shows),
+# updated_within_days and created_within_days (the most days, of 24 hours,
+# since it was last updated or created; a label or a bot's comment updates
+# it too, and the inbox's AGE is its notification's time, not this), a bot as
+# the author with bot = true, checks = "passing" (passed, or only
 # checks.approval pending), and approved_by_me = true (your latest review
 # approves it; a person's pull request matches too).
 #
@@ -563,6 +576,12 @@ func Show(f File, onlyDiff bool) string {
 		}
 		if s.MaxLines > 0 {
 			fmt.Fprintf(&b, "max_lines = %d\n", s.MaxLines)
+		}
+		if s.UpdatedWithinDays > 0 {
+			fmt.Fprintf(&b, "updated_within_days = %d\n", s.UpdatedWithinDays)
+		}
+		if s.CreatedWithinDays > 0 {
+			fmt.Fprintf(&b, "created_within_days = %d\n", s.CreatedWithinDays)
 		}
 		if s.Bot {
 			b.WriteString("bot = true\n")

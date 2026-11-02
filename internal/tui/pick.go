@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"slices"
 	"strings"
+	"time"
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
@@ -125,19 +126,21 @@ func (m *Model) body(k model.PRKey) (string, bool) {
 func (m *Model) ruleMatches(rs ...plan.Rule) []model.PR {
 	t := m.tab()
 	var out []model.PR
+	now := m.set.Now()
 	for _, p := range m.allOf(t) {
-		if !t.hidden[p.Key] && matchesAll(rs, p, m.viewer, m.ruleFacts(p)) {
+		if !t.hidden[p.Key] && matchesAll(rs, p, m.viewer, m.ruleFacts(p, now)) {
 			out = append(out, p)
 		}
 	}
 	return out
 }
 
-// ruleFacts are what a rule may need beyond p: its body, if read, and whether
-// only approval checks are pending.
-func (m *Model) ruleFacts(p model.PR) plan.Facts {
+// ruleFacts are what a rule may need beyond p: its body, if read, whether
+// only approval checks are pending, and now, the time its days count back
+// from, taken once for every pull request matched at once.
+func (m *Model) ruleFacts(p model.PR, now time.Time) plan.Facts {
 	body, known := m.body(p.Key)
-	f := plan.Facts{Body: body, BodyKnown: known}
+	f := plan.Facts{Body: body, BodyKnown: known, Now: now}
 	if mi, ok := m.cache.info[p.Key]; ok {
 		f.AwaitingApproval = plan.AwaitingApproval(mi.Checks, m.set.Plan.ApprovalChecks)
 	}
@@ -365,6 +368,12 @@ func ruleWords(r plan.Rule) string {
 	}
 	if r.MaxLines > 0 {
 		parts = append(parts, fmt.Sprintf("≤%d lines", r.MaxLines))
+	}
+	if r.UpdatedWithinDays > 0 {
+		parts = append(parts, fmt.Sprintf("updated ≤%dd ago", r.UpdatedWithinDays))
+	}
+	if r.CreatedWithinDays > 0 {
+		parts = append(parts, fmt.Sprintf("created ≤%dd ago", r.CreatedWithinDays))
 	}
 	if r.ChecksPassing {
 		parts = append(parts, "checks passing")

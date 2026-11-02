@@ -188,6 +188,11 @@ type Bulk struct {
 	AttentionPaths []Glob
 }
 
+// MaxWithinDays is the most days updated_within_days and
+// created_within_days take: a hundred years, past any pull request, and
+// short of what a time.Duration holds.
+const MaxWithinDays = 36500
+
 // Select is a rule S offers: a pull request matches when it meets every
 // key given.
 type Select struct {
@@ -204,7 +209,11 @@ type Select struct {
 	// MaxLines is the most lines it may add and delete together; 0 for no
 	// limit.
 	MaxLines int
-	Bot      bool
+	// UpdatedWithinDays and CreatedWithinDays are the most days since it
+	// was last updated, or created; 0 for no limit.
+	UpdatedWithinDays int
+	CreatedWithinDays int
+	Bot               bool
 	// Checks is "passing" to require passing checks, or "".
 	Checks string
 	// ApprovedByMe requires the viewer's latest review to approve it, a
@@ -430,6 +439,8 @@ type (
 		Title        *Regexp  `toml:"title"`
 		MaxFiles     *int     `toml:"max_files"`
 		MaxLines     *int     `toml:"max_lines"`
+		UpdatedIn    *int     `toml:"updated_within_days"`
+		CreatedIn    *int     `toml:"created_within_days"`
 		Bot          bool     `toml:"bot"`
 		Checks       *string  `toml:"checks"`
 		ApprovedByMe bool     `toml:"approved_by_me"`
@@ -704,13 +715,26 @@ func selectFrom(ds []selectDoc) ([]Select, Problems) {
 			}
 			s.MaxLines = *d.MaxLines
 		}
+		for _, w := range []struct {
+			key string
+			n   *int
+			dst *int
+		}{{"updated_within_days", d.UpdatedIn, &s.UpdatedWithinDays}, {"created_within_days", d.CreatedIn, &s.CreatedWithinDays}} {
+			if w.n == nil {
+				continue
+			}
+			if *w.n < 1 || *w.n > MaxWithinDays {
+				at(i, w.key, "must be between 1 and %d, got %d", MaxWithinDays, *w.n)
+			}
+			*w.dst = *w.n
+		}
 		if d.Checks != nil {
 			if *d.Checks != "passing" {
 				at(i, "checks", `must be "passing", got %q`, *d.Checks)
 			}
 			s.Checks = *d.Checks
 		}
-		if d.Authors == nil && len(s.Packages) == 0 && d.Title == nil && d.MaxFiles == nil && d.MaxLines == nil && !s.Bot && d.Checks == nil && !s.ApprovedByMe {
+		if d.Authors == nil && len(s.Packages) == 0 && d.Title == nil && d.MaxFiles == nil && d.MaxLines == nil && d.UpdatedIn == nil && d.CreatedIn == nil && !s.Bot && d.Checks == nil && !s.ApprovedByMe {
 			at(i, "", "%q matches every pull request; give it at least one condition", s.Name)
 		}
 		out = append(out, s)

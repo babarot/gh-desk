@@ -269,8 +269,11 @@ title = "(?i)bump"
 checks = "passing"
 max_lines = 500
 approved_by_me = true
+updated_within_days = 90
+created_within_days = 30
 `))
-	if err != nil || len(cfg.Select) != 1 || cfg.Select[0].Packages[0] != "actions/checkout" || !cfg.Select[0].Title.MatchString("Bump x") || cfg.Select[0].MaxLines != 500 || !cfg.Select[0].ApprovedByMe || len(cfg.Select[0].Authors) != 2 {
+	if err != nil || len(cfg.Select) != 1 || cfg.Select[0].Packages[0] != "actions/checkout" || !cfg.Select[0].Title.MatchString("Bump x") || cfg.Select[0].MaxLines != 500 || !cfg.Select[0].ApprovedByMe || len(cfg.Select[0].Authors) != 2 ||
+		cfg.Select[0].UpdatedWithinDays != 90 || cfg.Select[0].CreatedWithinDays != 30 {
 		t.Fatalf("cfg.Select = %+v, %v", cfg.Select, err)
 	}
 	wantErrs(t, `
@@ -295,6 +298,11 @@ approved_by_me = true
 [[select]]
 name = "nobody"
 authors = []
+
+[[select]]
+name = "ages"
+updated_within_days = 0
+created_within_days = 36501
 `,
 		`config.toml:3:8: select[0].name "approved by me" is used twice`,
 		`config.toml:4:9: select[0].title is not a regular expression`,
@@ -303,6 +311,8 @@ authors = []
 		`config.toml:7:13: select[0].max_lines must be 1 or more, got 0`,
 		`config.toml:9:3: select[1]: "all" matches every pull request`,
 		`config.toml:22:1: select[4].authors must name at least one login`,
+		`select[5].updated_within_days must be between 1 and 36500, got 0`,
+		`select[5].created_within_days must be between 1 and 36500, got 36501`,
 	)
 }
 

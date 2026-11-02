@@ -147,8 +147,9 @@ func (m *Model) listKey(k string) tea.Cmd {
 			// A group's header selects every pull request in it, or clears
 			// them when all are selected.
 			var in []model.PRKey
+			now := m.set.Now()
 			for _, p := range t.prs {
-				if !t.hidden[p.Key] && m.passes(p, m.filter, t.ruleFilter) && plan.GroupOf(p, m.viewer) == r.group {
+				if !t.hidden[p.Key] && m.passes(p, m.filter, t.ruleFilter, now) && plan.GroupOf(p, m.viewer) == r.group {
 					in = append(in, p.Key)
 				}
 			}

@@ -311,6 +311,12 @@
             ],
             "type": "string"
           },
+          "created_within_days": {
+            "description": "The most days, of 24 hours, since it was created.",
+            "maximum": 36500,
+            "minimum": 1,
+            "type": "integer"
+          },
           "max_files": {
             "description": "The most files it may change.",
             "minimum": 1,
@@ -336,6 +342,12 @@
           "title": {
             "description": "A regular expression the title must match.",
             "type": "string"
+          },
+          "updated_within_days": {
+            "description": "The most days, of 24 hours, since it was last updated: a label or a bot's comment updates it too. An old pull request updated lately matches.",
+            "maximum": 36500,
+            "minimum": 1,
+            "type": "integer"
           }
         },
         "type": "object"

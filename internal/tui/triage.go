@@ -228,8 +228,14 @@ func (m *Model) snapshot() (claude.Snapshot, map[model.PRKey]model.PR) {
 	seen := map[model.PRKey]model.PR{}
 	for _, r := range m.listed(t) {
 		p := m.fullPR(r.pr)
+		// The rules match the pull request's own times, not the
+		// notification's time an inbox row shows.
+		own, ok := m.knownPR(r.pr.Key)
+		if !ok {
+			own = r.pr
+		}
 		row := claude.SnapshotRow{PR: p, Why: m.why(r), Selected: m.isSelected(p.Key),
-			Narrowed: t.ruleFilter != nil && !m.passes(r.pr, "", t.ruleFilter)}
+			Narrowed: t.ruleFilter != nil && !m.passes(own, "", t.ruleFilter, s.Now)}
 		if t.grouped {
 			row.Group = string(plan.GroupOf(p, m.viewer))
 		}

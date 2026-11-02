@@ -306,6 +306,7 @@ func settings(cfg config.File) tui.Settings {
 	}
 	for _, s := range cfg.Select {
 		set.Rules = append(set.Rules, plan.Rule{Name: s.Name, Authors: s.Authors, Packages: s.Packages, Title: s.Title, MaxFiles: s.MaxFiles, MaxLines: s.MaxLines,
+			UpdatedWithinDays: s.UpdatedWithinDays, CreatedWithinDays: s.CreatedWithinDays,
 			Bot: s.Bot, ChecksPassing: s.Checks == "passing", ApprovedByMe: s.ApprovedByMe})
 	}
 	for _, m := range cfg.Merge.Methods {

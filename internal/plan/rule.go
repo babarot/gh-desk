@@ -4,6 +4,7 @@ import (
 	"regexp"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/babarot/gh-triage/internal/model"
 )
@@ -23,6 +24,11 @@ type Rule struct {
 	MaxFiles int
 	// MaxLines caps the lines added and deleted together; 0 does not.
 	MaxLines int
+	// UpdatedWithinDays and CreatedWithinDays ask for a pull request last
+	// updated, or created, at most so many days (of 24 hours) before
+	// Facts.Now; 0 does not.
+	UpdatedWithinDays int
+	CreatedWithinDays int
 	// Bot requires a bot's pull request.
 	Bot bool
 	// ChecksPassing requires its checks to pass, an approval check
@@ -43,6 +49,9 @@ type Facts struct {
 	Body             string
 	BodyKnown        bool
 	AwaitingApproval bool
+	// Now is the time the days of UpdatedWithinDays and CreatedWithinDays
+	// count back from, the same for every pull request matched at once.
+	Now time.Time
 }
 
 // NeedsBody reports whether matching the rule reads pull requests' bodies.
@@ -71,6 +80,10 @@ func (r Rule) Match(pr model.PR, viewer string, f Facts) bool {
 		return false
 	case r.MaxLines > 0 && pr.Additions+pr.Deletions > r.MaxLines:
 		return false
+	case r.UpdatedWithinDays > 0 && !within(pr.Updated, f.Now, r.UpdatedWithinDays):
+		return false
+	case r.CreatedWithinDays > 0 && !within(pr.Created, f.Now, r.CreatedWithinDays):
+		return false
 	case r.ChecksPassing && !ChecksPass(pr, f.AwaitingApproval):
 		return false
 	}
@@ -95,4 +108,13 @@ func (r Rule) Match(pr model.PR, viewer string, f Facts) bool {
 		}
 	}
 	return true
+}
+
+// within reports whether t is at most days days of 24 hours before now. A
+// time not read is not within; one after now, from a clock ahead, is.
+func within(t, now time.Time, days int) bool {
+	if t.IsZero() {
+		return false
+	}
+	return now.Sub(t) <= time.Duration(days)*24*time.Hour
 }
