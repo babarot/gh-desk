@@ -121,8 +121,10 @@ func TestUnreadHeavyFields(t *testing.T) {
 	if !strings.Contains(screen(m), "alice           "+m.spinner()) {
 		t.Errorf("no spinner in the heavy columns:\n%s", screen(m))
 	}
-	if got := m.ruleMatches(plan.Rule{Name: "small", MaxFiles: 2}); len(got) != 0 {
-		t.Errorf("a size rule picked unread pull requests: %v", got)
+	for _, r := range []plan.Rule{{Name: "few files", MaxFiles: 2}, {Name: "few lines", MaxLines: 500}} {
+		if got := m.ruleMatches(r); len(got) != 0 {
+			t.Errorf("%s picked unread pull requests: %v", r.Name, got)
+		}
 	}
 	// While heavy reads are on their way, the tab spins and S waits.
 	m.tabs[0].heavyLeft = 1

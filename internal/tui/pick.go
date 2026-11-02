@@ -107,8 +107,8 @@ func (m *Model) ruleMatches(r plan.Rule) []model.PR {
 		}
 		// A rule on the size or the checks does not pick a pull request
 		// whose heavy fields are not read for its head: unread, they look
-		// like 0 files and no checks, which would pass.
-		if (r.MaxFiles > 0 || r.ChecksPassing) && !p.HeavyRead() {
+		// like an empty pull request with no checks, which would pass.
+		if r.NeedsHeavy() && !p.HeavyRead() {
 			continue
 		}
 		if r.Match(p, m.viewer, f) {
@@ -241,6 +241,9 @@ func ruleWords(r plan.Rule) string {
 	}
 	if r.MaxFiles > 0 {
 		parts = append(parts, fmt.Sprintf("≤%d files", r.MaxFiles))
+	}
+	if r.MaxLines > 0 {
+		parts = append(parts, fmt.Sprintf("≤%d lines", r.MaxLines))
 	}
 	if r.ChecksPassing {
 		parts = append(parts, "checks passing")

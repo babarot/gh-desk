@@ -308,6 +308,11 @@
             "minimum": 1,
             "type": "integer"
           },
+          "max_lines": {
+            "description": "The most lines it may add and delete together: the sum of the two numbers SIZE shows.",
+            "minimum": 1,
+            "type": "integer"
+          },
           "name": {
             "description": "The rule's name, as S lists it.",
             "pattern": "\\S",

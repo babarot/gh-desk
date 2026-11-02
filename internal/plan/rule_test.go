@@ -30,6 +30,8 @@ func TestRuleMatch(t *testing.T) {
 		{"title", Rule{Title: regexp.MustCompile(`^Update actions/`)}, bot, Facts{}, true},
 		{"max files", Rule{MaxFiles: 0}, bot, Facts{}, true},
 		{"too many files", Rule{MaxFiles: 1}, model.PR{AuthorIsBot: true, ChangedFiles: 3}, Facts{}, false},
+		{"lines at the cap", Rule{MaxLines: 500}, model.PR{Additions: 300, Deletions: 200}, Facts{}, true},
+		{"too many lines", Rule{MaxLines: 500}, model.PR{Additions: 300, Deletions: 201}, Facts{}, false},
 		{"package listed", Rule{Packages: []string{"actions/checkout"}}, bot, Facts{Body: body, BodyKnown: true}, true},
 		{"package not listed", Rule{Packages: []string{"songmu/tagpr"}}, bot, Facts{Body: body, BodyKnown: true}, false},
 		{"body not read", Rule{Packages: []string{"actions/checkout"}}, bot, Facts{}, false},

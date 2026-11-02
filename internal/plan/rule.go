@@ -20,6 +20,8 @@ type Rule struct {
 	Title    *regexp.Regexp
 	// MaxFiles caps the files changed; 0 does not.
 	MaxFiles int
+	// MaxLines caps the lines added and deleted together; 0 does not.
+	MaxLines int
 	// Bot requires a bot's pull request.
 	Bot bool
 	// ChecksPassing requires its checks to pass, an approval check
@@ -45,6 +47,12 @@ type Facts struct {
 // NeedsBody reports whether matching the rule reads pull requests' bodies.
 func (r Rule) NeedsBody() bool { return len(r.Packages) > 0 }
 
+// NeedsHeavy reports whether matching the rule reads the heavy fields (the
+// size and the checks). Unread, they look like an empty pull request with no
+// checks, which would pass, so a pull request whose heavy fields are not
+// read for its head must not be matched.
+func (r Rule) NeedsHeavy() bool { return r.MaxFiles > 0 || r.MaxLines > 0 || r.ChecksPassing }
+
 // Match reports whether pr matches the rule for viewer.
 func (r Rule) Match(pr model.PR, viewer string, f Facts) bool {
 	switch {
@@ -57,6 +65,8 @@ func (r Rule) Match(pr model.PR, viewer string, f Facts) bool {
 	case r.Title != nil && !r.Title.MatchString(pr.Title):
 		return false
 	case r.MaxFiles > 0 && pr.ChangedFiles > r.MaxFiles:
+		return false
+	case r.MaxLines > 0 && pr.Additions+pr.Deletions > r.MaxLines:
 		return false
 	case r.ChecksPassing && !ChecksPass(pr, f.AwaitingApproval):
 		return false

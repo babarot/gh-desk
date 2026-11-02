@@ -305,7 +305,7 @@ func settings(cfg config.File) tui.Settings {
 		set.StaleDays = cfg.List.StaleDays.N
 	}
 	for _, s := range cfg.Select {
-		set.Rules = append(set.Rules, plan.Rule{Name: s.Name, Author: s.Author, Packages: s.Packages, Title: s.Title, MaxFiles: s.MaxFiles,
+		set.Rules = append(set.Rules, plan.Rule{Name: s.Name, Author: s.Author, Packages: s.Packages, Title: s.Title, MaxFiles: s.MaxFiles, MaxLines: s.MaxLines,
 			Bot: s.Bot, ChecksPassing: s.Checks == "passing"})
 	}
 	for _, m := range cfg.Merge.Methods {

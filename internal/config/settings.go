@@ -307,6 +307,7 @@ var elems = map[string][]elem{
 		{Key: "packages", Kind: listKind{}, Doc: "The dependencies a renovate or dependabot pull request updates, read from its body; every one it updates must be listed."},
 		{Key: "title", Kind: stringKind{}, Doc: "A regular expression the title must match."},
 		{Key: "max_files", Kind: intKind{Min: 1}, Doc: "The most files it may change."},
+		{Key: "max_lines", Kind: intKind{Min: 1}, Doc: "The most lines it may add and delete together: the sum of the two numbers SIZE shows."},
 		{Key: "bot", Kind: boolKind{}, Doc: "The author must be a bot."},
 		{Key: "checks", Kind: enumKind{[]string{"passing"}}, Doc: `"passing": passed, or only checks.approval pending.`},
 	},
@@ -362,8 +363,9 @@ const selectExamples = `# Rules S offers to select pull requests, besides "appro
 # meets every key given: author (a login; bots without app/), packages (the
 # dependencies a renovate or dependabot pull request updates, read from its
 # body; every one it updates must be listed), title (a regular expression),
-# max_files (1 or more), bot = true, and checks = "passing" (passed, or only
-# checks.approval pending).
+# max_files (1 or more), max_lines (1 or more; the lines added and deleted
+# together, the sum of the two numbers SIZE shows), bot = true, and checks =
+# "passing" (passed, or only checks.approval pending).
 #
 # [[select]]
 # name = "safe renovate"
@@ -536,6 +538,9 @@ func Show(f File, onlyDiff bool) string {
 		}
 		if s.MaxFiles > 0 {
 			fmt.Fprintf(&b, "max_files = %d\n", s.MaxFiles)
+		}
+		if s.MaxLines > 0 {
+			fmt.Fprintf(&b, "max_lines = %d\n", s.MaxLines)
 		}
 		if s.Bot {
 			b.WriteString("bot = true\n")

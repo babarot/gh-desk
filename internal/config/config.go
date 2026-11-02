@@ -200,6 +200,9 @@ type Select struct {
 	Title *regexp.Regexp
 	// MaxFiles is the most files it may change; 0 for no limit.
 	MaxFiles int
+	// MaxLines is the most lines it may add and delete together; 0 for no
+	// limit.
+	MaxLines int
 	Bot      bool
 	// Checks is "passing" to require passing checks, or "".
 	Checks string
@@ -422,6 +425,7 @@ type (
 		Packages []string `toml:"packages"`
 		Title    *Regexp  `toml:"title"`
 		MaxFiles *int     `toml:"max_files"`
+		MaxLines *int     `toml:"max_lines"`
 		Bot      bool     `toml:"bot"`
 		Checks   *string  `toml:"checks"`
 	}
@@ -684,13 +688,19 @@ func selectFrom(ds []selectDoc) ([]Select, Problems) {
 			}
 			s.MaxFiles = *d.MaxFiles
 		}
+		if d.MaxLines != nil {
+			if *d.MaxLines < 1 {
+				at(i, "max_lines", "must be 1 or more, got %d", *d.MaxLines)
+			}
+			s.MaxLines = *d.MaxLines
+		}
 		if d.Checks != nil {
 			if *d.Checks != "passing" {
 				at(i, "checks", `must be "passing", got %q`, *d.Checks)
 			}
 			s.Checks = *d.Checks
 		}
-		if s.Author == "" && len(s.Packages) == 0 && d.Title == nil && d.MaxFiles == nil && !s.Bot && d.Checks == nil {
+		if s.Author == "" && len(s.Packages) == 0 && d.Title == nil && d.MaxFiles == nil && d.MaxLines == nil && !s.Bot && d.Checks == nil {
 			at(i, "", "%q matches every pull request; give it at least one condition", s.Name)
 		}
 		out = append(out, s)

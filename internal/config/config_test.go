@@ -254,8 +254,9 @@ author = "renovate"
 packages = ["actions/checkout"]
 title = "(?i)bump"
 checks = "passing"
+max_lines = 500
 `))
-	if err != nil || len(cfg.Select) != 1 || cfg.Select[0].Packages[0] != "actions/checkout" || !cfg.Select[0].Title.MatchString("Bump x") {
+	if err != nil || len(cfg.Select) != 1 || cfg.Select[0].Packages[0] != "actions/checkout" || !cfg.Select[0].Title.MatchString("Bump x") || cfg.Select[0].MaxLines != 500 {
 		t.Fatalf("cfg.Select = %+v, %v", cfg.Select, err)
 	}
 	wantErrs(t, `
@@ -264,15 +265,21 @@ name = "approved by me"
 title = "("
 checks = "green"
 max_files = 0
+max_lines = 0
 
 [[select]]
 name = "all"
+
+[[select]]
+name = "small"
+max_lines = 500
 `,
 		`config.toml:3:8: select[0].name "approved by me" is used twice`,
 		`config.toml:4:9: select[0].title is not a regular expression`,
 		`config.toml:5:10: select[0].checks must be "passing"`,
 		`config.toml:6:13: select[0].max_files must be 1 or more, got 0`,
-		`config.toml:8:3: select[1]: "all" matches every pull request`,
+		`config.toml:7:13: select[0].max_lines must be 1 or more, got 0`,
+		`config.toml:9:3: select[1]: "all" matches every pull request`,
 	)
 }
 
