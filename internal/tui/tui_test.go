@@ -418,6 +418,22 @@ func TestGroupsOnlyWithRows(t *testing.T) {
 	}
 }
 
+func TestFilterEraseWord(t *testing.T) {
+	m := start(t, fixture(), keymap.Default())
+	press(m, "/", "a", " ", "b", "c", " ", " ", "ctrl+w")
+	if m.filter != "a " {
+		t.Fatalf("filter = %q, want %q", m.filter, "a ")
+	}
+	press(m, "ctrl+w")
+	if m.filter != "" {
+		t.Fatalf("filter = %q, want empty", m.filter)
+	}
+	press(m, "ctrl+w")
+	if m.filter != "" || !m.filtering {
+		t.Fatalf("filter = %q, filtering = %v; want empty and still filtering", m.filter, m.filtering)
+	}
+}
+
 func TestGroupedTabWithoutRequests(t *testing.T) {
 	// A grouped tab of one's own pull requests has no requests to the
 	// viewer or a team: its rows are all under other.

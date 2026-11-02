@@ -300,7 +300,7 @@ var ready = map[keymap.Action]bool{
 	"include_failing": true, "choose": true, "select_rule": true,
 	"toggle_bots": true, "show_settled": true, "filter": true,
 	"pane_down": true, "pane_up": true, "pane_grow": true, "pane_shrink": true, "next_file": true, "prev_file": true, "pane_tab": true, "unfold": true, "toggle_pane": true,
-	"confirm": true, "next_kind": true, "post": true, "editor": true, "accept": true, "erase": true,
+	"confirm": true, "next_kind": true, "post": true, "editor": true, "accept": true, "erase": true, "erase_word": true,
 	"claude": true, "triage_apply": true, "triage_more": true, "pr_claude": true, "ask_more": true, "draft_review": true, "open_claude": true, "chat_approve": true,
 }
 

@@ -115,6 +115,7 @@ var Defaults = []Def{
 
 	{"accept", ScopeInput, []string{"enter"}, "accept"},
 	{"erase", ScopeInput, []string{"backspace"}, "erase"},
+	{"erase_word", ScopeInput, []string{"ctrl+w"}, "erase word"},
 }
 
 // The fixed keys are read before any action and cannot be bound.

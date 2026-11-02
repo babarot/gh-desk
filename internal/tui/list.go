@@ -5,6 +5,7 @@ import (
 	"slices"
 	"strings"
 	"time"
+	"unicode"
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
@@ -242,11 +243,20 @@ func (m *Model) filterKey(msg tea.KeyPressMsg) tea.Cmd {
 		if r := []rune(m.filter); len(r) > 0 {
 			m.filter = string(r[:len(r)-1])
 		}
+	case m.keys.Matches("erase_word", k):
+		m.filter = eraseWord(m.filter)
 	case msg.Text != "":
 		m.filter += msg.Text
 	}
 	m.tab().sel, m.tab().offset = 0, 0
 	return m.ensure()
+}
+
+// eraseWord drops the last word of s and the spaces after it, as ctrl+w
+// does in a shell.
+func eraseWord(s string) string {
+	s = strings.TrimRightFunc(s, unicode.IsSpace)
+	return s[:strings.LastIndexFunc(s, unicode.IsSpace)+1]
 }
 
 // hide puts a pull request away: in a section it is hidden here only; in
