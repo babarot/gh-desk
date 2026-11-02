@@ -22,6 +22,12 @@ type progress struct {
 	text   string
 	result runner.Result
 	watch  bool
+	// detail is the whole of what text says in a few words, for the
+	// status line; empty when text is all there is.
+	detail string
+	// locked is set on a merge skipped because another gh-triage holds
+	// the record of pending merges; its row starts with the word.
+	locked bool
 }
 
 // batchState follows a batch until every pull request it acts on has a
@@ -76,7 +82,11 @@ func (m *Model) event(msg eventMsg) tea.Cmd {
 	}
 	ev := msg.ev
 	cmds := []tea.Cmd{listen(msg.batch, msg.ch)}
-	m.progress[ev.Key] = progress{text: ev.Text, result: ev.Result, watch: ev.Watch}
+	pg := progress{text: ev.Text, result: ev.Result, watch: ev.Watch}
+	if ev.Locked {
+		pg.text, pg.detail, pg.locked = m.lockedBy(), m.lockedDetail(ev.Key, ""), true
+	}
+	m.progress[ev.Key] = pg
 	if ev.Approved {
 		m.markApproved(ev.Key)
 	}
@@ -409,6 +419,11 @@ func (m *Model) progressText(p progress) string {
 	text := p.text
 	if after, ok := strings.CutPrefix(text, "– "); ok {
 		text = after
+	}
+	if rest, ok := strings.CutPrefix(text, "locked"); ok && p.locked {
+		// The word first, in its own color: the row is cut short, and the
+		// word is why.
+		return m.resultStyle(p.result).Render(icon+" ") + m.st.peach.Render("locked") + m.resultStyle(p.result).Render(rest)
 	}
 	return m.resultStyle(p.result).Render(icon + " " + text)
 }

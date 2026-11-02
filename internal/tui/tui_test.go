@@ -1125,6 +1125,128 @@ func TestNoWaitingWithoutTheLock(t *testing.T) {
 	}
 }
 
+// fakeLock is the lock another gh-triage holds until free is set.
+type fakeLock struct {
+	free    bool
+	pending []model.Pending
+	takes   int
+}
+
+func (l *fakeLock) Take() ([]model.Pending, bool, error) {
+	l.takes++
+	if !l.free {
+		return nil, false, nil
+	}
+	return l.pending, true, nil
+}
+
+func (l *fakeLock) Holder() (int, string, bool) { return 4242, "~/src/acme/gh-triage", true }
+
+// moveTo moves the cursor down to k.
+func moveTo(t *testing.T, m *Model, k model.PRKey) {
+	t.Helper()
+	for range 50 {
+		if r, ok := m.current(); ok && r.kind == rowPR && r.pr.Key == k {
+			return
+		}
+		press(m, "j")
+	}
+	t.Fatalf("no row of %s", k)
+}
+
+func TestLockedRowAndCursor(t *testing.T) {
+	f := fixture()
+	f.info = map[model.PRKey]func(*model.MergeInfo){
+		key("acme", "api", 12): func(mi *model.MergeInfo) { mi.MergeState = model.MergeBlocked },
+	}
+	m, _ := startWith(t, f, keymap.Default())
+	m.set.CanWait = false
+	m.set.Lock = &fakeLock{}
+	run(m, m.takeLock())
+	k := key("acme", "api", 12)
+	moveTo(t, m, k)
+	press(m, "M")
+	if s := screen(m); !strings.Contains(s, "skip · locked by pid 4242 · would wait") || !strings.Contains(s, "~/src/acme/gh-triage") {
+		t.Fatalf("popup does not say what holds it:\n%s", s)
+	}
+	press(m, "y")
+	if pg := m.progress[k]; pg.text != "– locked by pid 4242" || !pg.locked {
+		t.Fatalf("row = %+v", pg)
+	}
+	// The cursor is on it: the status line has the whole of it.
+	if !strings.Contains(m.status, "acme/api#12 skipped: it would wait for checks") || !strings.Contains(m.status, "press M again") {
+		t.Fatalf("status = %q", m.status)
+	}
+	press(m, "j")
+	if m.status != "" {
+		t.Errorf("status kept after leaving the row: %q", m.status)
+	}
+	press(m, "k")
+	if !strings.Contains(m.status, "acme/api#12 skipped") {
+		t.Errorf("status on coming back = %q", m.status)
+	}
+	// Another message is not cleared by moving.
+	m.setStatus("refreshing", false)
+	press(m, "j")
+	if m.status != "refreshing" {
+		t.Errorf("moving cleared another message: %q", m.status)
+	}
+}
+
+// Tries that would overlap are one: a second try while one is on its way
+// could take the lock without the merges to go on with.
+func TestTakeLockOnce(t *testing.T) {
+	m, _ := startWith(t, fixture(), keymap.Default())
+	m.set.CanWait = false
+	l := &fakeLock{}
+	m.set.Lock = l
+	first := m.takeLock()
+	if first == nil || m.takeLock() != nil {
+		t.Fatal("a second try started while the first was on its way")
+	}
+	run(m, first)
+	if m.takeLock() == nil {
+		t.Error("no try after the first came back")
+	}
+}
+
+func TestTakeLockOver(t *testing.T) {
+	f := fixture()
+	f.info = map[model.PRKey]func(*model.MergeInfo){
+		key("acme", "api", 12): func(mi *model.MergeInfo) { mi.MergeState = model.MergeBlocked },
+	}
+	m, r := startWith(t, f, keymap.Default())
+	m.set.CanWait = false
+	waited := model.Pending{Key: key("acme", "web", 7), ID: "9", Head: "h9", Author: "alice"}
+	l := &fakeLock{pending: []model.Pending{waited}}
+	m.set.Lock = l
+	moveTo(t, m, key("acme", "api", 12))
+	press(m, "M")
+	if !strings.Contains(screen(m), "skip · locked") {
+		t.Fatalf("popup with the lock held:\n%s", screen(m))
+	}
+	press(m, "esc")
+	// The other gh-triage quits.
+	l.free = true
+	press(m, "M")
+	if s := screen(m); strings.Contains(s, "skip · locked") || !strings.Contains(s, "The other gh-triage quit") {
+		t.Fatalf("popup after it quit:\n%s", s)
+	}
+	if len(r.resumed) != 1 || r.resumed[0].Key != waited.Key {
+		t.Errorf("resumed %+v", r.resumed)
+	}
+	press(m, "y")
+	if n := len(r.items); n == 0 || len(r.items[n-1]) != 1 || r.items[n-1][0].PR.Key != key("acme", "api", 12) {
+		t.Errorf("the merge did not start: %+v", r.items)
+	}
+	takes := l.takes
+	press(m, "M")
+	press(m, "esc")
+	if l.takes != takes {
+		t.Error("tried the lock again after taking it")
+	}
+}
+
 // fakeClaude answers every question at once and keeps what it was asked.
 type fakeClaude struct {
 	asked    []claude.Request

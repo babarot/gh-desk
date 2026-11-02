@@ -158,6 +158,9 @@ type Event struct {
 	// Watch is set on events of a pull request put on auto-merge, after
 	// its batch has ended.
 	Watch bool
+	// Locked is set on a skip because the merge would wait while another
+	// gh-triage holds the record of pending merges.
+	Locked bool
 }
 
 // Runner runs batches.
@@ -172,6 +175,28 @@ type Runner struct {
 	// the same record.
 	mu   sync.Mutex
 	busy map[model.PRKey]bool
+	// wmu guards store and canWait, which Adopt sets after the start.
+	wmu     sync.Mutex
+	store   Store
+	canWait bool
+}
+
+// Adopt gives the runner the record of pending merges after it started
+// without it, once this gh-triage took the lock from one that quit.
+// Merges confirmed from then on may wait; jobs already running go on
+// without it, so none waits unrecorded.
+func (r *Runner) Adopt(s Store) {
+	r.wmu.Lock()
+	defer r.wmu.Unlock()
+	r.store, r.canWait = s, true
+}
+
+// waiting is the record and whether merges may wait, taken together so a
+// job never waits without the record to keep it in.
+func (r *Runner) waiting() (Store, bool) {
+	r.wmu.Lock()
+	defer r.wmu.Unlock()
+	return r.store, r.canWait
 }
 
 func (r *Runner) claim(k model.PRKey) bool {
@@ -196,7 +221,7 @@ func (r *Runner) Wait() { r.active.Wait() }
 
 // New returns a Runner.
 func New(gh GitHub, log *slog.Logger, opt Options) *Runner {
-	return &Runner{gh: gh, opt: opt.withDefaults(), log: log, busy: map[model.PRKey]bool{}}
+	return &Runner{gh: gh, opt: opt.withDefaults(), log: log, busy: map[model.PRKey]bool{}, store: opt.Store, canWait: opt.CanWait}
 }
 
 // Start runs a batch and returns its ID and its events. The channel is
@@ -257,8 +282,9 @@ func (r *Runner) run(ctx context.Context, kind Kind, items []Item, resume map[mo
 				if ctx.Err() != nil {
 					return
 				}
+				store, canWait := r.waiting()
 				j := &job{r: r, ctx: ctx, log: log.With(logging.KeyPR, it.PR.Key.String()), it: it, head: it.Head, emit: emit, wg: &wg,
-					record: kind == Merge && r.opt.Store != nil}
+					store: store, canWait: canWait, record: kind == Merge && store != nil}
 				if !r.claim(it.PR.Key) {
 					// Its record belongs to the job already on it.
 					j.record = false
@@ -305,6 +331,10 @@ type job struct {
 	// watching is set once the pull request is handed to watch, which
 	// releases it.
 	watching bool
+	// store and canWait are the runner's when the job was made, kept for
+	// its whole run.
+	store   Store
+	canWait bool
 	// record keeps pend in the store while the job waits.
 	record bool
 	pend   model.Pending
@@ -328,6 +358,13 @@ func (j *job) say(res Result, text string) {
 	}
 }
 
+// locked skips a merge that would wait without the record of pending
+// merges, which another gh-triage holds.
+func (j *job) locked(text string) {
+	j.emit(Event{Key: j.it.PR.Key, Result: Skipped, Text: text, Approved: j.approved, Locked: true})
+	j.log.Info("pr end", logging.KeyStep, resultWord[Skipped], "why", text)
+}
+
 // unsure ends the job keeping its record: something failed midway.
 func (j *job) unsure(text string) {
 	j.keep = true
@@ -347,7 +384,7 @@ func (j *job) save() bool {
 	j.pend.Author, j.pend.AuthorIsBot = j.it.PR.Author, j.it.PR.AuthorIsBot
 	j.pend.AutoMerge = j.it.AutoMerge
 	j.pend.Approved = j.pend.Approved || j.approved
-	if err := j.r.opt.Store.Put(j.pend); err != nil {
+	if err := j.store.Put(j.pend); err != nil {
 		j.log.Warn("could not record the pending merge", "err", err.Error())
 		return false
 	}
@@ -364,7 +401,7 @@ func (j *job) forget() {
 	if !j.record {
 		return
 	}
-	if err := j.r.opt.Store.Remove(j.it.PR.Key); err != nil {
+	if err := j.store.Remove(j.it.PR.Key); err != nil {
 		j.log.Warn("could not forget the pending merge", "err", err.Error())
 	}
 }
@@ -541,8 +578,8 @@ func (j *job) merge() {
 		// here, on the confirmed head, is what the user agreed to.
 		d.Step = plan.StepWait
 	}
-	if waits(d.Step) && !j.r.opt.CanWait {
-		j.say(Skipped, "would wait, and another gh-triage keeps the waiting merges")
+	if waits(d.Step) && !j.canWait {
+		j.locked("locked by another gh-triage")
 		return
 	}
 	// The user's approval the merge starts with is recorded too, so the
@@ -569,8 +606,8 @@ func (j *job) merge() {
 		if d.Step == plan.StepAutoMerge && !j.it.AutoMerge {
 			d.Step = plan.StepWait
 		}
-		if waits(d.Step) && !j.r.opt.CanWait {
-			j.say(Skipped, "approved; would wait, and another gh-triage keeps the waiting merges")
+		if waits(d.Step) && !j.canWait {
+			j.locked("approved; locked by another gh-triage")
 			return
 		}
 	}

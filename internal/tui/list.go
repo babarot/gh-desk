@@ -72,7 +72,7 @@ func (m *Model) listKey(k string) tea.Cmd {
 	case is("filter"):
 		m.filtering = true
 	case is("refresh"):
-		return m.refresh()
+		return tea.Batch(m.refresh(), m.takeLock())
 	case is("notifications"):
 		m.openNotes()
 		return nil

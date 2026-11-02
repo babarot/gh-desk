@@ -157,6 +157,12 @@ func Run(args []string, stdout, stderr io.Writer) int {
 	}
 	rn := runner.New(runnerGitHub{gh}, log, runner.Options{Settings: set.Plan, Viewer: viewer, Store: rstore, CanWait: rstore != nil,
 		ChecksTimeout: cfg.Merge.ChecksTimeout.D, BlockedTimeout: cfg.Merge.BlockedTimeout.D})
+	var lock *pendingLock
+	if store == nil && err == nil {
+		// Taken over once the other gh-triage quits.
+		lock = &pendingLock{dir: state.DefaultDir(), rn: rn}
+		set.Lock = lock
+	}
 	cl := asker{
 		Claude: claude.New(claude.Options{Bin: cfg.ClaudeCommand(), Model: cfg.Claude.Model, Tools: cfg.Claude.AllowedTools, Language: cfg.Claude.Language, Instructions: cfg.Claude.Instructions, Log: log}),
 		ws:     &claude.Workspace{Dir: cfg.CacheDir(), Borrow: claude.GhqRoots(ctx), Log: log},
@@ -169,6 +175,9 @@ func Run(args []string, stdout, stderr io.Writer) int {
 	rn.Wait()
 	if store != nil {
 		store.Close()
+	}
+	if lock != nil {
+		lock.close()
 	}
 	log.Info("exit", logging.KeyDurationMS, time.Since(start).Milliseconds(), "err", errString(err))
 	if err != nil {

@@ -1,6 +1,8 @@
 package state
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -17,6 +19,9 @@ func TestStore(t *testing.T) {
 	// process contends as another process would.
 	if other, err := Open(dir); err != nil || other != nil {
 		t.Fatalf("second Open = %v, %v; want nil, nil while held", other, err)
+	}
+	if pid, wd, ok := Holder(dir); !ok || pid != os.Getpid() || wd == "" {
+		t.Fatalf("Holder = %d, %q, %v; want this process", pid, wd, ok)
 	}
 	k := model.PRKey{Owner: "acme", Repo: "api", Number: 1}
 	p := model.Pending{Key: k, ID: "PR_1", Head: "h1", Author: "renovate", AuthorIsBot: true, ChecksWaited: 3 * time.Minute}
@@ -41,6 +46,26 @@ func TestStore(t *testing.T) {
 		t.Fatalf("remove: %v %+v", err, s2.Pending())
 	}
 	s2.Close()
+}
+
+func TestHolderUnknown(t *testing.T) {
+	dir := t.TempDir()
+	if _, _, ok := Holder(dir); ok {
+		t.Fatal("Holder with no lock file reported one")
+	}
+	// An older gh-triage leaves the lock file empty.
+	if err := os.WriteFile(filepath.Join(dir, "pending.lock"), nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, ok := Holder(dir); ok {
+		t.Fatal("Holder of an empty lock file reported one")
+	}
+	if err := os.WriteFile(filepath.Join(dir, "pending.lock"), []byte("{"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, ok := Holder(dir); ok {
+		t.Fatal("Holder of a broken lock file reported one")
+	}
 }
 
 func TestLayout(t *testing.T) {

@@ -136,6 +136,9 @@ type Settings struct {
 	// StoreProblem says why the record could not be opened, when it was
 	// not another gh-triage holding it.
 	StoreProblem string
+	// Lock is tried again while CanWait is false, to take the record
+	// over from a gh-triage that quit; nil never tries.
+	Lock Lock
 	// Host is the GitHub host the profiles and pull requests are on, for
 	// their web pages; empty is github.com.
 	Host string
@@ -185,6 +188,14 @@ type Model struct {
 	helpBox       helpBox
 	status        string
 	statusErr     bool
+	// statusOfRow is set while the status line shows the result of the
+	// row under the cursor, which moving off it clears.
+	statusOfRow bool
+	// holder is the gh-triage holding the record of pending merges, while
+	// this one runs without it.
+	holder holder
+	// taking is set while a try to take the lock is on its way.
+	taking bool
 
 	filtering bool
 	filter    string
@@ -282,7 +293,7 @@ func Run(ctx context.Context, src Source, run Runner, cl Claude, km keymap.Map, 
 
 // Init asks for the terminal's background, the viewer, and every tab.
 func (m *Model) Init() tea.Cmd {
-	cmds := []tea.Cmd{m.tick(), m.resume(), m.configNote()}
+	cmds := []tea.Cmd{m.tick(), m.resume(), m.configNote(), m.takeLock()}
 	if m.viewer == "" {
 		cmds = append(cmds, m.loadViewer())
 	} else {
@@ -297,6 +308,14 @@ func (m *Model) Init() tea.Cmd {
 // Update handles a message, and keeps the spinner turning while anything
 // is read.
 func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	switch msg.(type) {
+	case tea.KeyPressMsg, tea.MouseMsg:
+		// Only the user moves the cursor onto a row.
+		before, _, had := m.currentPR()
+		_, cmd := m.update(msg)
+		m.followCursor(before.Key, had)
+		return m, tea.Batch(cmd, m.spin())
+	}
 	_, cmd := m.update(msg)
 	return m, tea.Batch(cmd, m.spin())
 }
@@ -323,6 +342,8 @@ func (m *Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, m.autoRefresh()
 	case eventMsg:
 		return m, m.event(msg)
+	case lockMsg:
+		return m, m.tookLock(msg)
 	case toastMsg:
 		if m.toast == msg.n {
 			m.toast = nil
@@ -414,6 +435,7 @@ func (m *Model) paste(msg tea.PasteMsg) tea.Cmd {
 // setStatus shows a line under the list until the next one.
 func (m *Model) setStatus(s string, isErr bool) {
 	m.status, m.statusErr = s, isErr
+	m.statusOfRow = false
 }
 
 // tab is the tab shown.

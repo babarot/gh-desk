@@ -55,6 +55,7 @@ func Open(dir string) (*Store, error) {
 		f.Close()
 		return nil, err
 	}
+	writeHolder(f)
 	s := &Store{path: filepath.Join(dir, "pending.json"), lock: f}
 	b, err := os.ReadFile(s.path)
 	switch {
@@ -69,6 +70,41 @@ func Open(dir string) (*Store, error) {
 		}
 	}
 	return s, nil
+}
+
+// holder is who holds the lock, written in the lock file so another
+// gh-triage can say which one keeps the merges that wait.
+type holder struct {
+	PID int    `json:"pid"`
+	Dir string `json:"dir"`
+}
+
+// writeHolder writes this process into the lock file it holds. A failure
+// leaves the others saying "another gh-triage" without naming it.
+func writeHolder(f *os.File) {
+	dir, _ := os.Getwd()
+	b, err := json.Marshal(holder{PID: os.Getpid(), Dir: dir})
+	if err != nil {
+		return
+	}
+	if f.Truncate(0) == nil {
+		f.WriteAt(b, 0)
+	}
+}
+
+// Holder reads who holds the lock in dir: its process ID and the directory
+// it was started in. It reports false when the lock file names no one, as
+// one written by an older gh-triage does.
+func Holder(dir string) (pid int, wd string, ok bool) {
+	b, err := os.ReadFile(filepath.Join(dir, "pending.lock"))
+	if err != nil {
+		return 0, "", false
+	}
+	var h holder
+	if json.Unmarshal(b, &h) != nil || h.PID <= 0 {
+		return 0, "", false
+	}
+	return h.PID, h.Dir, true
 }
 
 // Pending is the record as it was read or last written.

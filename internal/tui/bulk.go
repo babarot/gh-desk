@@ -37,6 +37,9 @@ type bulk struct {
 	// by is the request Claude picked the pull requests for, empty when
 	// the user picked them.
 	by string
+	// tookOver is set when this gh-triage took the record of pending
+	// merges over while the popup was open.
+	tookOver bool
 }
 
 type notesState int
@@ -76,8 +79,15 @@ func (it bulkItem) goes(kind runner.Kind) bool {
 	return it.d.Step != plan.StepSkip
 }
 
-// why is why it is skipped; refresh names the key that reads it again.
-func (it bulkItem) why(refresh string) string {
+// lockedOut reports whether it is skipped only because the merge would
+// wait while another gh-triage holds the record of pending merges.
+func (it bulkItem) lockedOut() bool {
+	return it.ok && !it.moved && !it.running && it.noWait
+}
+
+// why is why it is skipped; refresh names the key that reads it again,
+// and locked the gh-triage holding the record of pending merges.
+func (it bulkItem) why(refresh, locked string) string {
 	switch {
 	case !it.ok:
 		return "could not read it"
@@ -86,7 +96,7 @@ func (it bulkItem) why(refresh string) string {
 	case it.running:
 		return "already running"
 	case it.noWait:
-		return "would wait, and another gh-triage keeps the waiting merges"
+		return locked + " · " + waitWord(it.d.Step)
 	}
 	return it.d.Reason
 }
@@ -111,6 +121,15 @@ func (m *Model) startBulk(kind runner.Kind) tea.Cmd {
 	if m.busy() {
 		return nil
 	}
+	if kind == runner.Merge {
+		// The gh-triage holding the record may have quit since.
+		return tea.Batch(m.takeLock(), m.startBulkOf(kind))
+	}
+	return m.startBulkOf(kind)
+}
+
+// startBulkOf opens the popup of kind for what startBulk chose.
+func (m *Model) startBulkOf(kind runner.Kind) tea.Cmd {
 	var prs []model.PR
 	if len(m.selected) > 0 {
 		for _, t := range m.tabs {
@@ -317,6 +336,7 @@ func (m *Model) decideBulk() {
 	b := m.bulk
 	for i := range b.items {
 		it := &b.items[i]
+		it.noWait = false
 		if !it.ok {
 			continue
 		}
@@ -370,13 +390,21 @@ func (m *Model) runBulk() tea.Cmd {
 			continue
 		}
 		delete(m.selected, it.pr.Key)
-		why := it.why(m.firstKey("refresh"))
-		m.progress[it.pr.Key] = progress{text: "– " + why, result: runner.Skipped}
+		why := it.why(m.firstKey("refresh"), m.lockedBy())
+		pg := progress{text: "– " + why, result: runner.Skipped}
+		if it.lockedOut() {
+			// The row has room for the reason only; the rest is on the
+			// status line when the cursor is on it.
+			pg.text, pg.detail, pg.locked = "– "+m.lockedBy(), m.lockedDetail(it.pr.Key, it.d.Step), true
+		}
+		m.progress[it.pr.Key] = pg
 		bs.skipped = append(bs.skipped, noteItem{key: it.pr.Key, text: "skipped: " + why, result: runner.Skipped})
 	}
 	m.bulk = nil
 	if len(items) == 0 {
-		m.setStatus("nothing to do", false)
+		if !m.rowStatus() {
+			m.setStatus("nothing to do", false)
+		}
 		return nil
 	}
 	for _, it := range items {
@@ -407,6 +435,10 @@ func (m *Model) renderBulk() []string {
 	}
 	inner := w - 4
 	var lines []string
+	if b.tookOver {
+		lines = append(lines, wrapped(st.teal, "↻ The other gh-triage quit; this one runs the merges that wait now.", inner)...)
+		lines = append(lines, "")
+	}
 	if b.by != "" {
 		lines = append(lines, hang(st.teal.Render("✧ picked by Claude")+st.muted.Render(": "), st.muted.Render("“"+safeLine(firstLine(b.by))+"”"), inner)...)
 		lines = append(lines, "")
@@ -448,7 +480,11 @@ func (m *Model) renderBulk() []string {
 				what += m.stepStyle(it.d.Step).Render(it.d.Reason) + " " + st.dim.Render("("+methodWord(it.d.Method)+")")
 			}
 		default:
-			what = st.dim.Render("skip · ") + st.red.Render(it.why(m.firstKey("refresh")))
+			why := it.why(m.firstKey("refresh"), m.lockedBy())
+			what = st.dim.Render("skip · ") + st.red.Render(why)
+			if rest, ok := strings.CutPrefix(why, "locked"); ok && it.lockedOut() {
+				what = st.dim.Render("skip · ") + st.peach.Render("locked") + st.red.Render(rest)
+			}
 		}
 		r := bulkRow{pr: it.pr, mark: mark, title: title, what: what}
 		if it.goes(b.kind) {
@@ -468,6 +504,10 @@ func (m *Model) renderBulk() []string {
 	lines = append(lines, "")
 	prose := func(s styleFn, text string) {
 		lines = append(lines, wrapped(s, text, inner)...)
+	}
+	if slices.ContainsFunc(b.items, bulkItem.lockedOut) {
+		prose(st.peach, "Merges that wait are locked by "+m.lockedHolder()+". Quit it and press "+m.firstKey("merge")+
+			" again to wait here, or merge once the checks pass.")
 	}
 	switch b.notes {
 	case notesReading:

@@ -453,6 +453,41 @@ func TestRecordedWhileWaitingForgottenAfter(t *testing.T) {
 	}
 }
 
+// A job made before the runner adopts the record keeps going without it:
+// it skips the wait rather than wait unrecorded. One made after waits and
+// records.
+func TestAdoptReachesOnlyLaterJobs(t *testing.T) {
+	mi, it := pr("1", "api", 1, "alice")
+	mi.MergeState = model.MergeBlocked
+	mi.Checks = []model.Check{{Name: "build", State: model.CheckPending, Required: true}}
+	f := newFake(mi)
+	r := newRunner(f, nil)
+	r.canWait = false
+	st := newStore()
+	f.onRead = func(_ string, mi *model.MergeInfo, n int) {
+		if n == 1 {
+			// The other gh-triage quits while the job reads.
+			r.Adopt(st)
+		}
+		if n > 5 {
+			mi.Checks[0].State, mi.MergeState = model.CheckSuccess, model.MergeClean
+		}
+	}
+	_, ch := r.Start(context.Background(), Merge, []Item{it})
+	es := drain(t, ch)
+	if e := last(es); e.Result != Skipped || !e.Locked || st.ever[it.PR.Key] {
+		t.Fatalf("before adopting: events %+v, recorded %v", es, st.ever)
+	}
+	if len(f.calls) != 0 {
+		t.Fatalf("wrote to GitHub: %v", f.calls)
+	}
+	_, ch = r.Start(context.Background(), Merge, []Item{it})
+	es = drain(t, ch)
+	if last(es).Result != Merged || !st.ever[it.PR.Key] || len(st.now) != 0 {
+		t.Errorf("after adopting: events %+v, recorded %v, left %v", es, st.ever, st.now)
+	}
+}
+
 func TestResumeWatching(t *testing.T) {
 	mi, _ := pr("1", "api", 1, "renovate")
 	mi.MergeState, mi.AutoMerge = model.MergeBlocked, true
