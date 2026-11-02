@@ -76,7 +76,7 @@ func TestConversationGoesOnInAnotherLaunch(t *testing.T) {
 	if len(fc1.asked) != 2 {
 		t.Fatalf("asked %d", len(fc1.asked))
 	}
-	k := m1.chatKey
+	k := m1.chats.key
 	if r := chats.recs[k]; len(r.Turns) != 4 || !r.Started || r.Session != fc1.asked[0].Session || r.Rev == 0 {
 		t.Fatalf("kept %+v", r)
 	}
@@ -190,7 +190,7 @@ func TestConversationStartedOver(t *testing.T) {
 	chats := newFakeChats()
 	m, fc := startKept(t, chats)
 	press(m, "i")
-	k := m.chatKey
+	k := m.chats.key
 	before := chats.recs[k].Rev
 	press(m, "N")
 	if len(fc.asked) != 1 {
@@ -224,7 +224,7 @@ func TestConversationRemovedByGC(t *testing.T) {
 	chats := newFakeChats()
 	m, fc := startKept(t, chats)
 	press(m, "i")
-	k := m.chatKey
+	k := m.chats.key
 	press(m, "esc")
 	delete(chats.recs, k)
 	press(m, "i")
@@ -257,7 +257,7 @@ func TestConversationAskedAfterAnotherAdded(t *testing.T) {
 		t.Fatalf("asked %d", len(fc1.asked))
 	}
 	var asked []string
-	for _, tr := range chats.recs[m1.chatKey].Turns {
+	for _, tr := range chats.recs[m1.chats.key].Turns {
 		if tr.You {
 			asked = append(asked, tr.Text)
 		}

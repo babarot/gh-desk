@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"os/exec"
-	"slices"
 	"strings"
 	"time"
 
@@ -15,7 +14,6 @@ import (
 
 	"github.com/babarot/gh-triage/internal/claude"
 	"github.com/babarot/gh-triage/internal/keymap"
-	"github.com/babarot/gh-triage/internal/logging"
 	"github.com/babarot/gh-triage/internal/model"
 	"github.com/babarot/gh-triage/internal/runner"
 )
@@ -148,23 +146,23 @@ func (m *Model) openChat(p model.PR) tea.Cmd {
 	if back == viewChat {
 		back = viewList
 	}
-	c, ok := m.chats[p.Key]
+	c, ok := m.chats.all[p.Key]
 	if !ok {
 		ta := newInput()
 		ta.Placeholder = "Ask Claude"
 		ta.ShowLineNumbers = false
 		ta.SetHeight(3)
 		ta.SetWidth(chatInputWidth(m.width))
-		c = &chat{input: ta, persist: m.set.Chats != nil}
-		m.chats[p.Key] = c
+		c = &chat{input: ta, persist: m.chats.store != nil}
+		m.chats.all[p.Key] = c
 	}
 	// The pull request as the list has it now, whose head may have moved.
 	c.pr, c.back, c.unseen = p, back, false
-	m.chatKey, m.view = p.Key, viewChat
+	m.chats.key, m.view = p.Key, viewChat
 	// Probed before reading: a lock found free means what is read is
 	// what the other gh-triage left.
-	m.probeChat(c)
-	m.syncChat(c)
+	m.chats.probe(c)
+	m.chats.sync(c)
 	if len(c.turns) == 0 && !c.running && c.elsewhere == "" {
 		return m.ask(c, "Review this pull request.", "", false)
 	}
@@ -175,35 +173,36 @@ func (m *Model) openChat(p model.PR) tea.Cmd {
 	return nil
 }
 
-func (m *Model) chat() *chat { return m.chats[m.chatKey] }
+func (m *Model) chat() *chat { return m.chats.current() }
+
+// watchEvery is how often a conversation on screen is read again while
+// another gh-triage works on it. A constant: reading is a stat and a small
+// file.
+const watchEvery = time.Second
+
+// watchChat reads the conversation on screen again while another
+// gh-triage works on it, as the spinner turns, so its answer shows when
+// it comes. It only reads; nothing is written on a timer.
+func (m *Model) watchChat() {
+	c := m.chat()
+	if m.view != viewChat || c == nil || c.elsewhere == "" || m.set.Now().Sub(c.probed) < watchEvery {
+		return
+	}
+	// Probed first: found free, the reading after it has the answer.
+	m.chats.probe(c)
+	m.chats.sync(c)
+}
 
 // ask sends a question under the conversation's lock; the first one
 // carries the pull request, and one asked after the head moved says so.
 // The worktree is moved to the head shown before each question, as
 // another gh-triage or gh triage gc may have moved or removed it.
 func (m *Model) ask(c *chat, shown, prompt string, draft bool) tea.Cmd {
-	if c.running {
-		m.refuse("Claude is still answering")
+	moved, ok := m.chats.begin(c, shown)
+	if !ok {
 		return nil
-	}
-	if !m.lockChat(c) {
-		return nil
-	}
-	m.reloadChat(c)
-	if !c.started {
-		c.session = claude.NewSession()
 	}
 	first, dir, key, pr, session := !c.started, c.dir, c.pr.Key, c.pr, c.session
-	moved := ""
-	if c.started && c.head != "" && c.head != pr.HeadOID {
-		moved = c.head
-	}
-	c.turns = append(c.turns, turn{you: true, text: shown, head: pr.HeadOID, at: m.set.Now()})
-	c.head = pr.HeadOID
-	c.running, c.steps, c.scroll, c.since = true, nil, 0, m.set.Now()
-	// Kept before it is answered, so a question cut short by quitting is
-	// still there.
-	m.saveChat(c)
 	ctx, cancel := context.WithCancel(m.ctx)
 	c.cancel = cancel
 	ch := make(chan tea.Msg, 16)
@@ -211,9 +210,9 @@ func (m *Model) ask(c *chat, shown, prompt string, draft bool) tea.Cmd {
 	if draft {
 		schema = claude.DraftSchema
 	}
-	m.asking.Add(1)
+	m.chats.asking.Add(1)
 	go func() {
-		defer m.asking.Done()
+		defer m.chats.asking.Done()
 		defer close(ch)
 		defer cancel()
 		send := func(msg tea.Msg) {
@@ -275,44 +274,32 @@ func (m *Model) ask(c *chat, shown, prompt string, draft bool) tea.Cmd {
 }
 
 func (m *Model) chatStep(msg chatStepMsg) tea.Cmd {
-	if c, ok := m.chats[msg.key]; ok {
-		c.steps = append(c.steps, msg.step)
-	}
+	m.chats.step(msg.key, msg.step)
 	return listenChat(msg.ch)
 }
 
 func (m *Model) chatPrepared(msg chatPreparedMsg) tea.Cmd {
-	if c, ok := m.chats[msg.key]; ok {
-		c.dir = msg.dir
-		if msg.session != "" {
-			c.session, c.started = msg.session, false
-			m.say("the session kept was started in another cache; this question starts a new one")
-		}
+	if m.chats.prepared(msg.key, msg.dir, msg.session) {
+		m.say("the session kept was started in another cache; this question starts a new one")
 	}
 	return listenChat(msg.ch)
 }
 
 func (m *Model) chatAnswer(msg chatAnswerMsg) tea.Cmd {
-	c, ok := m.chats[msg.key]
+	c, ok := m.chats.all[msg.key]
 	if !ok {
 		return nil
 	}
 	c.running, c.cancel = false, nil
-	c.unseen = m.view != viewChat || m.chatKey != msg.key
+	c.unseen = m.view != viewChat || m.chats.key != msg.key
 	add := func(text string, err bool) {
-		t := turn{text: text, steps: c.steps, err: err, at: m.set.Now()}
+		cost := 0.0
 		if !err {
-			t.cost = msg.answer.Cost
+			cost = msg.answer.Cost
 		}
-		c.turns = append(c.turns, t)
-		c.steps = nil
+		c.reply(text, err, cost, m.set.Now())
 	}
-	// Kept with the answer, then the session is free for another
-	// gh-triage.
-	defer func() {
-		m.saveChat(c)
-		c.unlockChat()
-	}()
+	defer m.chats.end(c)
 	if msg.err != nil {
 		// A session not started is made anew at the next question, as
 		// Claude Code may have taken its ID before failing.
@@ -322,12 +309,7 @@ func (m *Model) chatAnswer(msg chatAnswerMsg) tea.Cmd {
 		c.steps = nil
 		return nil
 	}
-	// Claude Code keeps the session from the first answer on.
-	c.started = true
-	c.cost += msg.answer.Cost
-	if msg.answer.Model != "" {
-		c.model = msg.answer.Model
-	}
+	c.answered(msg.answer)
 	if msg.draft {
 		d, err := claude.ParseDraft(msg.answer)
 		if err != nil {
@@ -335,7 +317,7 @@ func (m *Model) chatAnswer(msg chatAnswerMsg) tea.Cmd {
 			return nil
 		}
 		add("Drafted a review ("+kindWords[d.Event]+").", false)
-		if m.view != viewChat || m.chatKey != msg.key {
+		if m.view != viewChat || m.chats.key != msg.key {
 			c.draft = &d
 			m.say(fmt.Sprintf("the review of %s is drafted; open Claude to see it", msg.key))
 			return nil
@@ -343,7 +325,7 @@ func (m *Model) chatAnswer(msg chatAnswerMsg) tea.Cmd {
 		return m.draftCompose(c, d)
 	}
 	add(msg.answer.Text, false)
-	if m.view != viewChat || m.chatKey != msg.key {
+	if m.view != viewChat || m.chats.key != msg.key {
 		m.say(fmt.Sprintf("Claude answered on %s", msg.key))
 	}
 	return nil
@@ -443,9 +425,9 @@ func (m *Model) chatKeyPress(msg tea.KeyPressMsg) tea.Cmd {
 		switch {
 		case c.running:
 			m.refuse("wait for Claude to answer first")
-		case !m.lockChat(c):
+		case !m.chats.lock(c):
 		default:
-			m.reloadChat(c)
+			m.chats.reload(c)
 			if !c.started {
 				c.unlockChat()
 				m.refuse("the conversation has not started")
@@ -467,9 +449,7 @@ type claudeExitMsg struct {
 }
 
 func (m *Model) claudeExited(msg claudeExitMsg) tea.Cmd {
-	if c, ok := m.chats[msg.key]; ok {
-		c.unlockChat()
-	}
+	m.chats.unlock(msg.key)
 	if msg.err != nil {
 		m.fail("Claude Code: " + msg.err.Error())
 		return nil
@@ -478,20 +458,11 @@ func (m *Model) claudeExited(msg claudeExitMsg) tea.Cmd {
 	return nil
 }
 
-// restartChat starts the conversation over, under its lock, which the
-// first question takes on. What is kept is replaced rather than removed,
-// so its rev goes on rising and another gh-triage sees its own as older;
-// Claude Code keeps the old session.
+// restartChat starts the conversation over and asks for a review again.
 func (m *Model) restartChat(c *chat) tea.Cmd {
-	if !m.lockChat(c) {
+	if !m.chats.restart(c) {
 		return nil
 	}
-	m.reloadChat(c)
-	rev := c.rev
-	c.load(ChatRecord{Key: c.pr.Key, Rev: rev})
-	c.draft, c.scroll = nil, 0
-	m.saveChat(c)
-	m.log.Info("conversation started over", logging.KeyPR, c.pr.Key.String())
 	return m.ask(c, "Review this pull request.", "", false)
 }
 
@@ -722,16 +693,14 @@ func elapsed(d time.Duration) string {
 // claudeActivity is Claude answering about a pull request whose
 // conversation is not shown.
 func (m *Model) claudeActivity() string {
-	var away []model.PRKey
-	for k, c := range m.chats {
-		if c.running && (m.view != viewChat || m.chatKey != k) {
-			away = append(away, k)
-		}
+	var shown *model.PRKey
+	if m.view == viewChat {
+		shown = &m.chats.key
 	}
+	away := m.chats.answering(shown)
 	if len(away) == 0 {
 		return ""
 	}
-	slices.SortFunc(away, func(a, b model.PRKey) int { return strings.Compare(a.String(), b.String()) })
 	what := "Claude is answering on " + away[0].String()
 	if n := len(away) - 1; n > 0 {
 		what += fmt.Sprintf(" and %d more", n)

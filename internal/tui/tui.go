@@ -7,7 +7,6 @@ import (
 	"cmp"
 	"context"
 	"log/slog"
-	"sync"
 	"time"
 
 	tea "charm.land/bubbletea/v2"
@@ -252,18 +251,8 @@ type Model struct {
 	refreshing *refreshRun
 	compose    *compose
 	confirm    *confirm
-	// chats are the conversations with Claude, by pull request; chatKey is
-	// the one on screen.
-	chats   map[model.PRKey]*chat
-	chatKey model.PRKey
-	// chatInfo is what the pane says of each conversation kept, its
-	// questions -1 until it is read; chatProblem the conversations kept
-	// that could not be read, said once.
-	chatInfo    map[model.PRKey]chatInfo
-	chatProblem map[model.PRKey]bool
-	// asking counts the questions to Claude on their way, which quitting
-	// waits for a moment, so Claude Code closes the sessions it keeps.
-	asking *sync.WaitGroup
+	// chats are the conversations with Claude.
+	chats *chatState
 	// triage is the conversation with Claude about the lists, once begun.
 	triage *triage
 	// cautions are what Claude said of release notes, by notesID; empty
@@ -293,9 +282,10 @@ func New(src Source, run Runner, cl Claude, km keymap.Map, log *slog.Logger, set
 	if log == nil {
 		log = logging.Discard()
 	}
-	m := &Model{src: src, run: run, claude: cl, chats: map[model.PRKey]*chat{}, chatInfo: map[model.PRKey]chatInfo{}, chatProblem: map[model.PRKey]bool{}, asking: &sync.WaitGroup{}, cautions: map[string]string{}, fresh: map[model.PRKey]time.Time{}, keys: km, log: log, set: set, ctx: context.Background(), unread: map[model.PRKey]model.Notification{},
+	m := &Model{src: src, run: run, claude: cl, cautions: map[string]string{}, fresh: map[model.PRKey]time.Time{}, keys: km, log: log, set: set, ctx: context.Background(), unread: map[model.PRKey]model.Notification{},
 		selected: map[model.PRKey]selection{}, progress: map[model.PRKey]progress{}, batches: map[string]*batchState{},
 		merged: map[model.PRKey]bool{}, refreshed: map[int]time.Time{}}
+	m.chats = newChatState(set.Chats, log, set.Now, m)
 	m.st = newStyles(theme(set.ThemeDark))
 	m.spinStyle = spinner(set.Spinner)
 	for i, t := range set.Tabs {
@@ -311,7 +301,7 @@ func New(src Source, run Runner, cl Claude, km keymap.Map, log *slog.Logger, set
 	m.cache = newCache()
 	m.viewer = set.Viewer
 	m.loadCached()
-	m.loadChatKeys()
+	m.chats.loadKeys()
 	return m
 }
 
@@ -329,7 +319,7 @@ func Run(ctx context.Context, src Source, run Runner, cl Claude, km keymap.Map, 
 	cancel()
 	done := make(chan struct{})
 	go func() {
-		m.asking.Wait()
+		m.chats.asking.Wait()
 		close(done)
 	}()
 	select {
@@ -380,7 +370,7 @@ func (m *Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.compose != nil {
 			m.compose.resize(m.width, m.height)
 		}
-		for _, c := range m.chats {
+		for _, c := range m.chats.all {
 			c.input.SetWidth(chatInputWidth(m.width))
 		}
 		return m, nil

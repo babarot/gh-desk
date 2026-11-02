@@ -120,7 +120,7 @@ func (m *Model) reading() bool {
 			return true
 		}
 	}
-	for _, c := range m.chats {
+	for _, c := range m.chats.all {
 		if c.running {
 			return true
 		}

@@ -1532,7 +1532,7 @@ func TestClaudeConversation(t *testing.T) {
 func TestClaudeAnsweringElsewhere(t *testing.T) {
 	m, _ := startWith(t, fixture(), keymap.Default())
 	press(m, "i")
-	k := m.chatKey
+	k := m.chats.key
 	c := m.chat()
 	c.running, c.since = true, now.Add(-75*time.Second)
 	if s := screen(m); !strings.Contains(s, "thinking… 1m15s") {
