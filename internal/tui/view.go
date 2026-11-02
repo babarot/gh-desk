@@ -33,22 +33,24 @@ func (m *Model) render() (string, *tea.Cursor) {
 		return "", nil
 	}
 	var b strings.Builder
+	var cur *tea.Cursor
 	b.WriteString(m.renderHeader() + "\n")
 	if m.filtering || m.filter != "" {
-		cursor := ""
+		line := "/ " + m.filter
 		if m.filtering {
-			cursor = "▏"
+			cur = tea.NewCursor(min(lipgloss.Width(line), max(m.width-1, 0)), 1)
 		}
-		b.WriteString(m.st.yellow.Render("/ "+m.filter+cursor) + "\n")
+		b.WriteString(m.st.yellow.Render(line) + "\n")
 	}
 	body := m.height - 3
 	if m.filtering || m.filter != "" {
 		body--
 	}
-	var cur *tea.Cursor
 	switch m.view {
 	case viewChat:
-		cur = m.renderChat(&b, body)
+		if c := m.renderChat(&b, body); c != nil {
+			cur = c
+		}
 	default:
 		l := m.layout()
 		m.renderList(&b, l.list)
