@@ -175,7 +175,7 @@ func gitPaths(s string) (oldPath, newPath string) {
 			return strings.TrimPrefix(a, "a/"), strings.TrimPrefix(unquote(strings.TrimSpace(rest)), "b/")
 		}
 	}
-	if n := len(s); n%2 == 1 && s[:n/2] == "a/"+s[n/2+3:] && s[n/2:n/2+3] == " b/" {
+	if n := len(s); n%2 == 1 && n >= len("a/x b/x") && s[:n/2] == "a/"+s[n/2+3:] && s[n/2:n/2+3] == " b/" {
 		p := s[2 : n/2]
 		return p, p
 	}

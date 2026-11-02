@@ -111,6 +111,10 @@ func TestGitPaths(t *testing.T) {
 		"a/x.txt b/x.txt":                   {"x.txt", "x.txt"},
 		"a/sp ace b/x b/sp ace b/x":         {"sp ace b/x", "sp ace b/x"},
 		`"a/\346\227\245" "b/\346\227\245"`: {"日", "日"},
+		// Too short to be two paths; read as one, without panicking
+		"0":     {"0", ""},
+		"a/x":   {"x", ""},
+		"a/x b": {"x b", ""},
 	} {
 		a, b := gitPaths(in)
 		if a != want[0] || b != want[1] {
