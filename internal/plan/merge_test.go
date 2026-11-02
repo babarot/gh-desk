@@ -128,6 +128,29 @@ func TestForApprove(t *testing.T) {
 	}
 }
 
+func TestForReady(t *testing.T) {
+	draft := info(model.MergeDraft)
+	draft.Draft = true
+	merged := draft
+	merged.State = model.StateMerged
+	tests := []struct {
+		name   string
+		mi     model.MergeInfo
+		skip   bool
+		reason string
+	}{
+		{"draft", draft, false, "mark ready for review"},
+		{"not a draft", info(model.MergeClean), true, "not a draft"},
+		{"merged", merged, true, "merged"},
+	}
+	for _, tt := range tests {
+		d := ForReady(tt.mi)
+		if (d.Step == StepSkip) != tt.skip || d.Reason != tt.reason || d.Approve {
+			t.Errorf("%s: ForReady = %+v", tt.name, d)
+		}
+	}
+}
+
 func TestChecksRunningAndAwaitingApproval(t *testing.T) {
 	mi := model.MergeInfo{Checks: []model.Check{
 		{Name: "test", State: model.CheckSuccess, Required: true},

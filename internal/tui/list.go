@@ -93,6 +93,8 @@ func (m *Model) listKey(k string) tea.Cmd {
 		return m.startBulk(runner.Approve)
 	case is("merge"):
 		return m.startBulk(runner.Merge)
+	case is("ready_for_review"):
+		return m.startBulk(runner.Ready)
 	case is("toggle_bots"):
 		if t.grouped {
 			t.folded[plan.GroupBots] = !t.folded[plan.GroupBots]

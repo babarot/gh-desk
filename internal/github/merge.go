@@ -227,6 +227,16 @@ func (c *Client) EnableAutoMerge(ctx context.Context, key model.PRKey, id, head 
 }`, map[string]any{"id": id, "head": head, "method": string(method)})
 }
 
+// MarkReady marks a draft pull request ready for review. GitHub takes no
+// expected head for it; head is logged only, the runner having checked it
+// just before.
+func (c *Client) MarkReady(ctx context.Context, key model.PRKey, id, head string) error {
+	return c.write(ctx, "ready-for-review", key, head,
+		`mutation($id: ID!) {
+  markPullRequestReadyForReview(input: {pullRequestId: $id}) { clientMutationId }
+}`, map[string]any{"id": id})
+}
+
 // UpdateBranch merges the base branch into the pull request's branch, only
 // if its head is still head.
 func (c *Client) UpdateBranch(ctx context.Context, key model.PRKey, id, head string) error {

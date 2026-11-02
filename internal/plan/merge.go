@@ -173,6 +173,19 @@ func ForApprove(mi model.MergeInfo, pr model.PR, viewer string, includeFailing b
 	return d
 }
 
+// ForReady decides marking a draft pull request ready for review. Whether
+// the viewer may (the author, or one who can write to the repository) is
+// GitHub's to say.
+func ForReady(mi model.MergeInfo) Decision {
+	switch {
+	case mi.State != model.StateOpen:
+		return Decision{Step: StepSkip, Reason: stateWord(mi.State)}
+	case !mi.Draft:
+		return Decision{Step: StepSkip, Reason: "not a draft"}
+	}
+	return Decision{Reason: "mark ready for review"}
+}
+
 // ForMerge decides merging a pull request, approving it first when the
 // viewer has to. It is called again with fresh information before each
 // write, so what it decided when the user said yes is checked against what

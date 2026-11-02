@@ -58,7 +58,7 @@ type tab struct {
 	// not back.
 	heavyLeft int
 	// kept are the rows a reading again no longer had, kept to show their
-	// results until R.
+	// results until a refresh.
 	kept map[model.PRKey]bool
 }
 
@@ -668,7 +668,7 @@ func (m *Model) tabRead(msg tabMsg) tea.Cmd {
 // swap puts a reading again in place of the rows. A row of the same pull
 // request at the same head keeps its heavy fields until they are read
 // again; rows added or changed are marked for a moment; rows that still
-// show a result stay until R.
+// show a result stay until a refresh.
 func (m *Model) swap(i int) tea.Cmd {
 	t := m.tabs[i]
 	p := t.pend

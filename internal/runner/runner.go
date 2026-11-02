@@ -1,4 +1,5 @@
-// Package runner approves and merges pull requests, many at once, and
+// Package runner approves, merges and marks ready pull requests, many at
+// once, and
 // follows them until each is merged, skipped or stopped. It decides each
 // step with internal/plan from information read just before the step, and
 // acts only on the head the user confirmed.
@@ -31,6 +32,7 @@ type GitHub interface {
 	Merge(ctx context.Context, key model.PRKey, id, head string, method model.MergeMethod) error
 	EnableAutoMerge(ctx context.Context, key model.PRKey, id, head string, method model.MergeMethod) error
 	UpdateBranch(ctx context.Context, key model.PRKey, id, head string) error
+	MarkReady(ctx context.Context, key model.PRKey, id, head string) error
 	CommitInfo(ctx context.Context, key model.PRKey, oid string) (Commit, error)
 }
 
@@ -109,6 +111,8 @@ type Kind int
 const (
 	Approve Kind = iota
 	Merge
+	// Ready marks drafts ready for review.
+	Ready
 )
 
 // Item is a pull request the user confirmed, with the head they saw.
@@ -129,6 +133,8 @@ const (
 	Approved
 	Merged
 	AutoMergeOn
+	// Readied is a draft marked ready for review.
+	Readied
 	Skipped
 	Stopped
 	Failed
@@ -227,7 +233,7 @@ func (r *Runner) run(ctx context.Context, kind Kind, items []Item, resume map[mo
 		}
 		byRepo[repo] = append(byRepo[repo], it)
 	}
-	verb := map[Kind]string{Approve: "approve", Merge: "merge"}[kind]
+	verb := map[Kind]string{Approve: "approve", Merge: "merge", Ready: "ready"}[kind]
 	if resume != nil {
 		verb = "resume"
 	}
@@ -265,6 +271,8 @@ func (r *Runner) run(ctx context.Context, kind Kind, items []Item, resume map[mo
 					j.resume()
 				case kind == Approve:
 					j.approveOnly()
+				case kind == Ready:
+					j.markReady()
 				default:
 					j.merge()
 				}
@@ -408,7 +416,7 @@ func approvedBy(mi model.MergeInfo, login string) bool {
 	return false
 }
 
-var resultWord = map[Result]string{Running: "running", Approved: "approved", Merged: "merged", AutoMergeOn: "auto-merge-on",
+var resultWord = map[Result]string{Running: "running", Approved: "approved", Merged: "merged", AutoMergeOn: "auto-merge-on", Readied: "readied",
 	Skipped: "skipped", Stopped: "stopped", Failed: "failed"}
 
 // read reads the pull request and checks its head is the one confirmed.
@@ -445,6 +453,24 @@ func (j *job) approveOnly() {
 	if j.sendApproval() {
 		j.say(Approved, "approved")
 	}
+}
+
+// markReady marks a draft ready for review, on the head the user saw.
+func (j *job) markReady() {
+	mi, ok := j.read(false)
+	if !ok {
+		return
+	}
+	if d := plan.ForReady(mi); d.Step == plan.StepSkip {
+		j.say(Skipped, d.Reason)
+		return
+	}
+	j.say(Running, "marking ready")
+	if err := j.r.gh.MarkReady(j.ctx, j.it.PR.Key, j.it.PR.ID, j.head); err != nil {
+		j.say(Failed, "ready for review failed: "+short(err))
+		return
+	}
+	j.say(Readied, "ready for review")
 }
 
 func (j *job) sendApproval() bool {

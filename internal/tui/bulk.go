@@ -13,7 +13,8 @@ import (
 	"github.com/babarot/gh-triage/internal/runner"
 )
 
-// bulk is the confirm popup of an approve or a merge, of one pull request
+// bulk is the confirm popup of an approve, a merge or a ready for review,
+// of one pull request
 // or of every one selected. It reads each pull request again, decides what
 // to do with it, and lists that, with the reason for every one it skips.
 type bulk struct {
@@ -71,12 +72,13 @@ func (it bulkItem) goes(kind runner.Kind) bool {
 	return it.d.Step != plan.StepSkip
 }
 
-func (it bulkItem) why() string {
+// why is why it is skipped; refresh names the key that reads it again.
+func (it bulkItem) why(refresh string) string {
 	switch {
 	case !it.ok:
 		return "could not read it"
 	case it.moved:
-		return "changed since it was read · R to read again"
+		return "changed since it was read · " + refresh + " to read again"
 	case it.running:
 		return "already running"
 	case it.noWait:
@@ -314,9 +316,12 @@ func (m *Model) decideBulk() {
 		if !it.ok {
 			continue
 		}
-		if b.kind == runner.Approve {
+		switch b.kind {
+		case runner.Approve:
 			it.d = plan.ForApprove(it.mi, it.pr, m.viewer, b.includeFailing, m.set.Plan)
-		} else {
+		case runner.Ready:
+			it.d = plan.ForReady(it.mi)
+		default:
 			it.d = plan.ForMerge(it.mi, it.pr, m.viewer, m.set.Plan)
 			switch it.d.Step {
 			case plan.StepWait, plan.StepUpdate, plan.StepAutoMerge:
@@ -362,9 +367,9 @@ func (m *Model) runBulk() tea.Cmd {
 			continue
 		}
 		delete(m.selected, it.pr.Key)
-		p := progress{text: "– " + it.why(), result: runner.Skipped}
-		m.progress[it.pr.Key] = p
-		bs.skipped = append(bs.skipped, noteItem{key: it.pr.Key, text: "skipped: " + it.why(), result: runner.Skipped})
+		why := it.why(m.firstKey("refresh"))
+		m.progress[it.pr.Key] = progress{text: "– " + why, result: runner.Skipped}
+		bs.skipped = append(bs.skipped, noteItem{key: it.pr.Key, text: "skipped: " + why, result: runner.Skipped})
 	}
 	m.bulk = nil
 	if len(items) == 0 {
@@ -373,13 +378,13 @@ func (m *Model) runBulk() tea.Cmd {
 	}
 	for _, it := range items {
 		m.progress[it.PR.Key] = progress{text: "queued"}
-		if b.kind == runner.Merge {
+		if b.kind != runner.Approve {
 			delete(m.selected, it.PR.Key)
 		}
 	}
 	id, ch := m.run.Start(m.ctx, b.kind, items)
 	m.batches[id] = bs
-	verb := map[runner.Kind]string{runner.Approve: "approving", runner.Merge: "approving and merging"}[b.kind]
+	verb := map[runner.Kind]string{runner.Approve: "approving", runner.Merge: "approving and merging", runner.Ready: "marking ready"}[b.kind]
 	m.setStatus(fmt.Sprintf("%s %d pull requests · progress shows on their rows", verb, len(items)), false)
 	return listen(id, ch)
 }
@@ -388,7 +393,7 @@ func (m *Model) runBulk() tea.Cmd {
 func (m *Model) renderBulk() []string {
 	b, st := m.bulk, m.st
 	w := min(max(m.width-6, 40), 130)
-	verb := map[runner.Kind]string{runner.Approve: "approve", runner.Merge: "merge"}[b.kind]
+	verb := bulkVerbs[b.kind]
 	if b.kind == runner.Merge {
 		for _, it := range b.items {
 			if it.ok && it.d.Approve && it.goes(b.kind) {
@@ -429,6 +434,8 @@ func (m *Model) renderBulk() []string {
 			switch b.kind {
 			case runner.Approve:
 				what = st.green.Render("approve")
+			case runner.Ready:
+				what = st.green.Render(it.d.Reason)
 			default:
 				if it.d.Approve {
 					what = st.green.Render("approve") + st.dim.Render(" → ")
@@ -436,7 +443,7 @@ func (m *Model) renderBulk() []string {
 				what += m.stepStyle(it.d.Step).Render(it.d.Reason) + " " + st.dim.Render("("+methodWord(it.d.Method)+")")
 			}
 		default:
-			what = st.dim.Render("skip · ") + st.red.Render(it.why())
+			what = st.dim.Render("skip · ") + st.red.Render(it.why(m.firstKey("refresh")))
 		}
 		if len(it.d.Notes) > 0 && it.goes(b.kind) {
 			what += " " + st.yellow.Render("⚠ "+it.d.Notes[0])
@@ -477,7 +484,11 @@ func (m *Model) renderBulk() []string {
 		}
 		lines = append(lines, st.dim.Render(fmt.Sprintf("%d with failing checks are %s · %s to change", failing, state, m.firstKey("include_failing"))))
 	}
-	if !b.loading {
+	switch {
+	case b.loading:
+	case b.kind == runner.Ready:
+		lines = append(lines, st.dim.Render("Its reviewers are asked for a review once it is ready. Each acts only on the head shown when it was read."))
+	default:
 		lines = append(lines, st.dim.Render("GitHub cannot take an approval or a merge back. Each acts only on the head shown when it was read."))
 	}
 	hint := fmt.Sprintf("%s %d of %d? ", verb, goes, len(b.items))
@@ -519,6 +530,9 @@ func (m *Model) renderBulk() []string {
 	}
 	return box(st, title, lines, w)
 }
+
+// bulkVerbs name what a popup of each kind does, in its title and question.
+var bulkVerbs = map[runner.Kind]string{runner.Approve: "approve", runner.Merge: "merge", runner.Ready: "mark ready"}
 
 func (m *Model) stepStyle(s plan.Step) styleFn {
 	switch s {

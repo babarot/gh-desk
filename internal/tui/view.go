@@ -296,7 +296,7 @@ var ready = map[keymap.Action]bool{
 	"up": true, "down": true, "top": true, "bottom": true, "page_up": true, "page_down": true,
 	"next_tab": true, "prev_tab": true, "tab_1": true, "tab_2": true, "tab_3": true, "tab_4": true, "tab_5": true, "tab_6": true, "tab_7": true, "tab_8": true, "tab_9": true,
 	"open": true, "expand": true, "collapse": true, "approve": true, "comment": true, "request_changes": true, "browse": true, "hide": true,
-	"notifications": true, "select": true, "select_shown": true, "clear_selection": true, "merge": true,
+	"notifications": true, "select": true, "select_shown": true, "clear_selection": true, "merge": true, "ready_for_review": true,
 	"include_failing": true, "choose": true, "select_rule": true,
 	"toggle_bots": true, "show_settled": true, "filter": true,
 	"pane_down": true, "pane_up": true, "pane_grow": true, "pane_shrink": true, "next_file": true, "prev_file": true, "pane_tab": true, "unfold": true, "toggle_pane": true,

@@ -176,8 +176,11 @@ func (r *fakeRunner) Start(_ context.Context, kind runner.Kind, items []runner.I
 		ev, ok := r.results[it.PR.Key]
 		if !ok {
 			ev = runner.Event{Result: runner.Merged, Text: "merged", Method: model.MethodMerge}
-			if kind == runner.Approve {
+			switch kind {
+			case runner.Approve:
 				ev = runner.Event{Result: runner.Approved, Text: "approved", Approved: true}
+			case runner.Ready:
+				ev = runner.Event{Result: runner.Readied, Text: "ready for review"}
 			}
 		}
 		ev.Key = it.PR.Key
@@ -809,9 +812,9 @@ func TestBulkMerge(t *testing.T) {
 	if got := m.notes[0].items[0].text; got != "merged (merge commit)" {
 		t.Errorf("the note says %q", got)
 	}
-	press(m, "R")
+	press(m, "r")
 	if len(m.progress) != 0 || len(m.rows(m.tab())) == 0 {
-		t.Errorf("R did not clear the results: %v", m.progress)
+		t.Errorf("r did not clear the results: %v", m.progress)
 	}
 	for _, p := range m.tab().prs {
 		if p.Key == key("acme", "api", 12) && m.merged[p.Key] {
@@ -833,6 +836,46 @@ func TestHeadMovedIsNotSent(t *testing.T) {
 	press(m, "y")
 	if len(r.items) != 0 {
 		t.Errorf("a moved head was sent: %+v", r.items)
+	}
+}
+
+func TestMarkReady(t *testing.T) {
+	f := fixture()
+	draft := key("acme", "web", 7)
+	f.info = map[model.PRKey]func(*model.MergeInfo){draft: func(mi *model.MergeInfo) { mi.Draft = true }}
+	m, r := startWith(t, f, keymap.Default())
+	m.tab().folded[plan.GroupTeam] = false
+	for range 10 {
+		if row, ok := m.current(); ok && row.pr.Key == draft {
+			break
+		}
+		press(m, "j")
+	}
+	press(m, "R")
+	if !strings.Contains(screen(m), "mark ready this pull request?") {
+		t.Fatalf("no popup:\n%s", screen(m))
+	}
+	press(m, "y")
+	if len(r.kinds) != 1 || r.kinds[0] != runner.Ready || r.items[0][0].PR.Key != draft {
+		t.Fatalf("batches = %v %+v", r.kinds, r.items)
+	}
+	if p, _ := m.knownPR(draft); p.Draft {
+		t.Error("the row still says draft")
+	}
+	if !strings.Contains(m.notes[0].title, "marked ready 1") {
+		t.Errorf("notes = %+v", m.notes)
+	}
+}
+
+func TestMarkReadySkipsNonDraft(t *testing.T) {
+	m, r := startWith(t, fixture(), keymap.Default())
+	press(m, "R")
+	if !strings.Contains(screen(m), "not a draft") {
+		t.Errorf("popup does not say why:\n%s", screen(m))
+	}
+	press(m, "y")
+	if len(r.items) != 0 {
+		t.Errorf("sent: %+v", r.items)
 	}
 }
 

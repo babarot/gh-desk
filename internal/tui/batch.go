@@ -17,7 +17,7 @@ import (
 type styleFn = lipgloss.Style
 
 // progress is a pull request's step or result in a batch, written on its
-// row over WHY and SIZE until R clears it.
+// row over WHY and SIZE until a refresh clears it.
 type progress struct {
 	text   string
 	result runner.Result
@@ -83,6 +83,9 @@ func (m *Model) event(msg eventMsg) tea.Cmd {
 	if ev.Result == runner.Merged {
 		m.merged[ev.Key] = true
 	}
+	if ev.Result == runner.Readied {
+		m.markReady(ev.Key)
+	}
 	switch ev.Result {
 	case runner.Approved, runner.Merged, runner.AutoMergeOn:
 		cmds = append(cmds, m.doneAfterReview(ev.Key))
@@ -129,6 +132,15 @@ func (m *Model) markApproved(k model.PRKey) {
 	m.updatePR(p)
 }
 
+// markReady shows a pull request marked ready for review as no longer a
+// draft.
+func (m *Model) markReady(k model.PRKey) {
+	if p, ok := m.knownPR(k); ok {
+		p.Draft = false
+		m.updatePR(p)
+	}
+}
+
 // doneAfterReview marks the pull request's notification done when the
 // settings say so.
 func (m *Model) doneAfterReview(k model.PRKey) tea.Cmd {
@@ -151,9 +163,12 @@ func (m *Model) noteBatch(bs *batchState) tea.Cmd {
 	}
 	items = append(items, bs.skipped...)
 	var parts []string
-	if bs.kind == runner.Approve {
+	switch bs.kind {
+	case runner.Approve:
 		parts = append(parts, fmt.Sprintf("approved %d", count[runner.Approved]))
-	} else {
+	case runner.Ready:
+		parts = append(parts, fmt.Sprintf("marked ready %d", count[runner.Readied]))
+	default:
 		parts = append(parts, fmt.Sprintf("merged %d", count[runner.Merged]))
 		if n := count[runner.AutoMergeOn]; n > 0 {
 			parts = append(parts, fmt.Sprintf("%d on auto-merge", n))
@@ -169,8 +184,7 @@ func (m *Model) noteBatch(bs *batchState) tea.Cmd {
 	if count[runner.Stopped]+count[runner.Failed] > 0 {
 		icon = "✗"
 	}
-	verb := map[runner.Kind]string{runner.Approve: "approve", runner.Merge: "merge"}[bs.kind]
-	return m.pushNote(icon, verb+" done: "+strings.Join(parts, ", "), items)
+	return m.pushNote(icon, bulkVerbs[bs.kind]+" done: "+strings.Join(parts, ", "), items)
 }
 
 // methodWord names a merge method as people say it.
@@ -369,7 +383,7 @@ func (m *Model) noteIcon(icon string) string {
 
 func (m *Model) resultStyle(r runner.Result) lipgloss.Style {
 	switch r {
-	case runner.Merged, runner.Approved:
+	case runner.Merged, runner.Approved, runner.Readied:
 		return m.st.green
 	case runner.AutoMergeOn:
 		return m.st.teal
@@ -381,7 +395,7 @@ func (m *Model) resultStyle(r runner.Result) lipgloss.Style {
 
 // progressText is a row's progress, short enough for the cells it takes.
 func (m *Model) progressText(p progress) string {
-	icon := map[runner.Result]string{runner.Running: "◌", runner.Approved: "✓", runner.Merged: "✓", runner.AutoMergeOn: "⧗",
+	icon := map[runner.Result]string{runner.Running: "◌", runner.Approved: "✓", runner.Merged: "✓", runner.Readied: "✓", runner.AutoMergeOn: "⧗",
 		runner.Skipped: "–", runner.Stopped: "✗", runner.Failed: "✗"}[p.result]
 	text := p.text
 	if after, ok := strings.CutPrefix(text, "– "); ok {
@@ -425,7 +439,7 @@ func (m *Model) tally() string {
 		count[p.result]++
 	}
 	var parts []string
-	for _, r := range []runner.Result{runner.Merged, runner.Approved, runner.AutoMergeOn, runner.Running, runner.Skipped, runner.Stopped, runner.Failed} {
+	for _, r := range []runner.Result{runner.Merged, runner.Approved, runner.Readied, runner.AutoMergeOn, runner.Running, runner.Skipped, runner.Stopped, runner.Failed} {
 		if count[r] == 0 {
 			continue
 		}
@@ -435,7 +449,7 @@ func (m *Model) tally() string {
 }
 
 func (m *Model) progressTextIcon(r runner.Result, n int) string {
-	icon := map[runner.Result]string{runner.Running: "◌", runner.Approved: "✓", runner.Merged: "✓", runner.AutoMergeOn: "⧗",
+	icon := map[runner.Result]string{runner.Running: "◌", runner.Approved: "✓", runner.Merged: "✓", runner.Readied: "✓", runner.AutoMergeOn: "⧗",
 		runner.Skipped: "–", runner.Stopped: "✗", runner.Failed: "✗"}[r]
 	return m.resultStyle(r).Render(fmt.Sprintf("%s%d", icon, n))
 }

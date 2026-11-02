@@ -29,7 +29,7 @@ func (m *Model) autoRefresh() tea.Cmd {
 	return tea.Batch(m.reload(), m.tick())
 }
 
-// refresh is R: read the shown tab and the notifications again, and put
+// refresh is r: read the shown tab and the notifications again, and put
 // away the results on the rows.
 func (m *Model) refresh() tea.Cmd {
 	// Checks read for ◌ and the preview's merge line may have moved on.

@@ -158,7 +158,7 @@
               "const": "off"
             }
           ],
-          "description": "Refresh the shown tab this often, as a Go duration such as \"3m\" or \"90s\"; \"off\" refreshes only when R is pressed."
+          "description": "Refresh the shown tab this often, as a Go duration such as \"3m\" or \"90s\"; \"off\" refreshes only when r is pressed."
         },
         "stale_days": {
           "anyOf": [

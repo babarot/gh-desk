@@ -47,7 +47,7 @@ type Def struct {
 var Defaults = []Def{
 	{"quit", ScopeGlobal, []string{"q"}, "quit"},
 	{"help", ScopeGlobal, []string{"?"}, "keys"},
-	{"refresh", ScopeGlobal, []string{"R"}, "refresh"},
+	{"refresh", ScopeGlobal, []string{"r"}, "refresh"},
 	{"notifications", ScopeGlobal, []string{"n"}, "notifications"},
 
 	{"up", ScopeNav, []string{"up", "k"}, "up"},
@@ -77,6 +77,7 @@ var Defaults = []Def{
 	{"clear_selection", ScopeList, []string{"u"}, "clear selection"},
 	{"approve", ScopeList, []string{"A"}, "approve"},
 	{"merge", ScopeList, []string{"M"}, "merge"},
+	{"ready_for_review", ScopeList, []string{"R"}, "ready for review"},
 	{"comment", ScopeList, []string{"c"}, "comment"},
 	{"request_changes", ScopeList, []string{"X"}, "request changes"},
 	{"claude", ScopeList, []string{"C"}, "ask claude"},

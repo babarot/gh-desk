@@ -37,7 +37,7 @@ func TestHelpUnfoldsTheScreenItWasOpenedFrom(t *testing.T) {
 	}
 
 	press(m, "esc", "i", "?")
-	if s := helpText(m); !strings.HasPrefix(s, "▾ claude on a pull request · works here") || !strings.Contains(s, "▸ the list and its preview (30) ─") {
+	if s := helpText(m); !strings.HasPrefix(s, "▾ claude on a pull request · works here") || !strings.Contains(s, "▸ the list and its preview (31) ─") {
 		t.Errorf("the Claude screen's section is not first and unfolded:\n%s", s)
 	}
 }
@@ -48,7 +48,7 @@ func TestHelpFolds(t *testing.T) {
 	m := newModel(fixture(), cachedReview())
 	run(m, m.Init())
 	press(m, "?", "z")
-	if s := helpText(m); !strings.HasPrefix(s, "▸ the list and its preview (30) · works here") {
+	if s := helpText(m); !strings.HasPrefix(s, "▸ the list and its preview (31) · works here") {
 		t.Errorf("z did not fold the list's section:\n%s", s)
 	}
 	x, y := lineOf(t, m, "▸ moving")

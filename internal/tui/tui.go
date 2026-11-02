@@ -205,14 +205,14 @@ type Model struct {
 	picker   *pick
 	menu     *actionMenu
 	// progress is each pull request's step or result in a batch, shown on
-	// its row until R.
+	// its row until a refresh.
 	progress map[model.PRKey]progress
 	batches  map[string]*batchState
 	notes    []*note
 	notesAt  *notesView
 	toast    *note
 	merged   map[model.PRKey]bool
-	// refreshing is the reading started by R or the clock, and refreshed
+	// refreshing is the reading started by a refresh or the clock, and refreshed
 	// when each tab was last read.
 	refreshed map[int]time.Time
 	compose   *compose

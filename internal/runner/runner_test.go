@@ -87,6 +87,14 @@ func (f *fakeGH) UpdateBranch(_ context.Context, k model.PRKey, id, head string)
 	return nil
 }
 
+func (f *fakeGH) MarkReady(_ context.Context, k model.PRKey, id, head string) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.log(fmt.Sprintf("ready %s %s", k, head))
+	f.prs[id].Draft = false
+	return nil
+}
+
 func (f *fakeGH) CommitInfo(_ context.Context, _ model.PRKey, oid string) (Commit, error) {
 	return f.commits[oid], nil
 }
@@ -752,5 +760,27 @@ func TestDismissedWhileWaiting(t *testing.T) {
 	es := drain(t, ch)
 	if e := last(es); e.Result != Stopped || !strings.Contains(e.Text, "dismissed") || len(f.calls) != 0 {
 		t.Errorf("last %+v, calls %v", e, f.calls)
+	}
+}
+
+func TestReadyOnly(t *testing.T) {
+	draft, it := pr("1", "api", 1, "me")
+	draft.Draft, draft.MergeState = true, model.MergeDraft
+	ready, it2 := pr("2", "web", 2, "me")
+	moved, it3 := pr("3", "cli", 3, "me")
+	moved.Draft, moved.HeadOID = true, "pushed-later"
+	f := newFake(draft, ready, moved)
+	evs := runBatch(t, f, Ready, it, it2, it3)
+	if e := last(evs[it.PR.Key]); e.Result != Readied {
+		t.Errorf("draft: last event = %+v", e)
+	}
+	if e := last(evs[it2.PR.Key]); e.Result != Skipped || e.Text != "not a draft" {
+		t.Errorf("not a draft: last event = %+v", e)
+	}
+	if e := last(evs[it3.PR.Key]); e.Result != Stopped || !strings.Contains(e.Text, "head changed") {
+		t.Errorf("moved: last event = %+v", e)
+	}
+	if want := "ready acme/api#1 h-1"; strings.Join(f.calls, ",") != want {
+		t.Errorf("calls = %v", f.calls)
 	}
 }

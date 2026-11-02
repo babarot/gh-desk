@@ -20,7 +20,7 @@ type actionMenu struct {
 }
 
 // menuActions are the actions the menu offers, in its order.
-var menuActions = []keymap.Action{"approve", "merge", "comment", "request_changes", "pr_claude", "browse", "hide"}
+var menuActions = []keymap.Action{"approve", "merge", "ready_for_review", "comment", "request_changes", "pr_claude", "browse", "hide"}
 
 // menuItem is one line of the menu: what the action would do, or why it
 // cannot run.
@@ -101,6 +101,8 @@ func (m *Model) aboutOne(a keymap.Action, p model.PR) (string, bool) {
 			how = "approve, then " + how
 		}
 		return how, false
+	case "ready_for_review":
+		return m.aboutReady(p)
 	case "comment":
 		return "write a comment", false
 	case "request_changes":
@@ -156,6 +158,12 @@ func (m *Model) aboutMany(a keymap.Action, prs []model.PR) (string, bool) {
 			return "none of them can be merged", true
 		}
 		return of("merge", n), false
+	case "ready_for_review":
+		n := count(func(p model.PR) bool { _, off := m.aboutReady(p); return !off })
+		if n == 0 {
+			return "none of them is a draft", true
+		}
+		return of("mark ready", n), false
 	}
 	return "one pull request at a time", true
 }
@@ -175,6 +183,18 @@ func (m *Model) cannotApprove(p model.PR) (string, bool) {
 		}
 	}
 	return "", false
+}
+
+// aboutReady says what marking p ready for review would do, or why it
+// cannot, as the list tells; the popup reads it again before it acts.
+func (m *Model) aboutReady(p model.PR) (string, bool) {
+	switch {
+	case p.State != model.StateOpen:
+		return stateWords(p.State), true
+	case !p.Draft:
+		return "not a draft", true
+	}
+	return "ask its reviewers to review it", false
 }
 
 func stateWords(s model.PRState) string {
@@ -233,6 +253,8 @@ func (m *Model) runMenu(it menuItem) tea.Cmd {
 		return m.startBulk(runner.Approve)
 	case "merge":
 		return m.startBulk(runner.Merge)
+	case "ready_for_review":
+		return m.startBulk(runner.Ready)
 	}
 	p, n, ok := m.currentPR()
 	if !ok {
