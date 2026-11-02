@@ -21,6 +21,7 @@ import (
 	"github.com/babarot/gh-triage/internal/model"
 	"github.com/babarot/gh-triage/internal/plan"
 	"github.com/babarot/gh-triage/internal/runner"
+	"github.com/babarot/gh-triage/internal/statusline"
 )
 
 var update = flag.Bool("update", false, "rewrite the golden files")
@@ -655,7 +656,7 @@ func TestActionMenuSelection(t *testing.T) {
 	press(m, "space", "space", "k", "enter")
 	golden(t, "action-menu-selection", screen(m))
 	press(m, "R")
-	if m.menu == nil || m.compose != nil || m.line.last.kind != eventRefusal {
+	if m.menu == nil || m.compose != nil || func() bool { k, _ := m.shownStatus(); return k != statusline.Refusal }() {
 		t.Fatalf("review on a selection ran: menu %v, compose %v", m.menu, m.compose)
 	}
 	press(m, "A")
@@ -1553,7 +1554,7 @@ func TestRefreshStatus(t *testing.T) {
 	if s := screen(m); strings.Contains(s, "refreshing…") || !strings.Contains(s, "opened in the browser") {
 		t.Errorf("the refreshing line hid another message:\n%s", s)
 	}
-	clock := now.Add(infoFor)
+	clock := now.Add(statusline.InfoFor)
 	m.set.Now = func() time.Time { return clock }
 	run(m, cmd)
 	if m.refreshing != nil || strings.Contains(screen(m), "refreshing") {

@@ -7,6 +7,7 @@ import (
 
 	"github.com/babarot/gh-triage/internal/keymap"
 	"github.com/babarot/gh-triage/internal/model"
+	"github.com/babarot/gh-triage/internal/statusline"
 )
 
 // clockAt sets the model's clock d after the tests' now.
@@ -15,44 +16,16 @@ func clockAt(m *Model, d time.Duration) {
 	m.set.Now = func() time.Time { return t }
 }
 
-// An event lasts its time; a refusal also goes at the next key.
-func TestStatusEventsLast(t *testing.T) {
+// A refusal goes at the next key the TUI takes in.
+func TestStatusRefusalGoesAtNextKey(t *testing.T) {
 	m := start(t, fixture(), keymap.Default())
-	m.say("marked done")
-	if got := status(m); got != "marked done" {
-		t.Fatalf("status = %q", got)
-	}
-	clockAt(m, infoFor)
-	if got := status(m); got != "" {
-		t.Errorf("information outlived its time: %q", got)
-	}
 	m.refuse("you cannot approve your own pull request")
+	if kind, _ := m.shownStatus(); kind != statusline.Refusal {
+		t.Fatalf("status = %q", status(m))
+	}
 	press(m, "j")
 	if got := status(m); strings.Contains(got, "cannot approve") {
 		t.Errorf("a refusal stayed after the next key: %q", got)
-	}
-}
-
-// Information does not hide a failure still in its time; a refusal, which
-// answers the key just pressed, does until the next key.
-func TestStatusFailureFirst(t *testing.T) {
-	m := start(t, fixture(), keymap.Default())
-	m.fail("could not mark acme/api#12 done")
-	m.say("✓ comment sent to acme/web#7")
-	if got := status(m); !strings.Contains(got, "could not mark") {
-		t.Fatalf("information hid the failure: %q", got)
-	}
-	m.refuse("review: one pull request at a time")
-	if got := status(m); !strings.Contains(got, "one pull request") {
-		t.Fatalf("the failure hid a refusal: %q", got)
-	}
-	press(m, "j")
-	if got := status(m); !strings.Contains(got, "could not mark") {
-		t.Errorf("the failure did not come back after the refusal: %q", got)
-	}
-	clockAt(m, failureFor)
-	if got := status(m); got != "" {
-		t.Errorf("the failure outlived its time: %q", got)
 	}
 }
 
@@ -73,7 +46,7 @@ func TestStatusActivities(t *testing.T) {
 	if got := status(m); got != "canceled" {
 		t.Errorf("an event did not go first: %q", got)
 	}
-	clockAt(m, infoFor)
+	clockAt(m, statusline.InfoFor)
 	if got := status(m); !strings.HasSuffix(got, want) {
 		t.Errorf("the work in progress did not come back: %q", got)
 	}
@@ -92,7 +65,7 @@ func TestStatusRowResult(t *testing.T) {
 	if got := status(m); got != row {
 		t.Fatalf("status = %q, want the row's result", got)
 	}
-	clockAt(m, rowFor)
+	clockAt(m, statusline.RowFor)
 	if got := status(m); !strings.Contains(got, "refreshing…") {
 		t.Errorf("the row's result hid the work in progress after its moment: %q", got)
 	}

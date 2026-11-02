@@ -9,87 +9,28 @@ import (
 
 	"github.com/babarot/gh-triage/internal/model"
 	"github.com/babarot/gh-triage/internal/runner"
+	"github.com/babarot/gh-triage/internal/statusline"
 )
 
 // batchWords names what a batch does while it runs.
 var batchWords = map[runner.Kind]string{runner.Approve: "approving", runner.Merge: "approving and merging", runner.Ready: "marking ready"}
 
-// The status line (ADR-025) shows, in order: the newest event still in
-// its time, information giving way to a failure still in its time, the result of the row the
-// cursor has just moved onto, the work in progress, and the result of the
-// row under the cursor. Events are said with say, refuse and fail, and
+// The status line (ADR-025) is decided by internal/statusline, whose state
+// only its methods change. Events are said with say, refuse and fail, and
 // only for what already happened; work in progress is listed in
 // activities and built from the state, never written into the line.
 
-type eventKind int
-
-const (
-	eventInfo eventKind = iota
-	eventRefusal
-	eventFailure
-)
-
-// How long each kind of event stays on the line. Information lasts as long
-// as a toast, which says the same kind of thing; a failure longer, as it
-// may need reading twice.
-const (
-	infoFor    = toastFor
-	refusalFor = 4 * time.Second
-	failureFor = 10 * time.Second
-	// rowFor is how long the result of the row the cursor moved onto goes
-	// before the work in progress.
-	rowFor = toastFor
-)
-
-type statusEvent struct {
-	kind eventKind
-	text string
-	at   time.Time
-}
-
-func (e statusEvent) life() time.Duration {
-	switch e.kind {
-	case eventRefusal:
-		return refusalFor
-	case eventFailure:
-		return failureFor
-	}
-	return infoFor
-}
-
-func (e statusEvent) live(now time.Time) bool {
-	return e.text != "" && now.Sub(e.at) < e.life()
-}
-
-// statusLine is what the status line holds: the newest event, the newest
-// failure, and when the cursor moved onto the row it is on.
-type statusLine struct {
-	last   statusEvent
-	failed statusEvent
-	rowAt  time.Time
-	// tickAt is when the redraw asked for is due, zero when none is.
-	tickAt time.Time
-}
-
 // say tells of something that happened, such as a write that went through.
-func (m *Model) say(text string) { m.tell(eventInfo, text) }
+func (m *Model) say(text string) { m.line.Say(m.set.Now(), text) }
 
 // refuse tells why the key pressed cannot act here. It goes at the next
 // key.
-func (m *Model) refuse(text string) { m.tell(eventRefusal, text) }
+func (m *Model) refuse(text string) { m.line.Refuse(m.set.Now(), text) }
 
 // fail tells of something that went wrong. A failure that may arrive
 // while the user is not looking goes into the notifications as well; see
 // failNoted.
-func (m *Model) fail(text string) { m.tell(eventFailure, text) }
-
-func (m *Model) tell(kind eventKind, text string) {
-	e := statusEvent{kind: kind, text: text, at: m.set.Now()}
-	m.line.last = e
-	if kind == eventFailure {
-		m.line.failed = e
-	}
-}
+func (m *Model) fail(text string) { m.line.Fail(m.set.Now(), text) }
 
 // failNoted says a failure and keeps it in the notifications, with the
 // pull request it is about when there is one.
@@ -98,59 +39,27 @@ func (m *Model) failNoted(text string, k model.PRKey) tea.Cmd {
 	return m.pushNote("✗", text, []noteItem{{key: k, text: text}})
 }
 
-// keyPressed puts away a refusal, which answers the key before.
-func (m *Model) keyPressed() {
-	if m.line.last.kind == eventRefusal {
-		m.line.last = statusEvent{}
-	}
-}
-
 // movedOnto marks the row the cursor has just moved onto, so its result
 // goes before the work in progress for a moment.
-func (m *Model) movedOnto() {
-	m.line.rowAt = time.Time{}
-	if m.rowResult() != "" {
-		m.line.rowAt = m.set.Now()
-	}
-}
+func (m *Model) movedOnto() { m.line.MovedOnto(m.set.Now(), m.rowResult() != "") }
 
-// shownEvent is the event the line shows now, if any: the newest, except
-// that information does not hide a failure still in its time. A refusal
-// does, as it answers the key just pressed and goes at the next.
-func (m *Model) shownEvent() (statusEvent, bool) {
-	now := m.set.Now()
-	if m.line.last.live(now) && m.line.last.kind != eventInfo {
-		return m.line.last, true
-	}
-	if m.line.failed.live(now) {
-		return m.line.failed, true
-	}
-	if m.line.last.live(now) {
-		return m.line.last, true
-	}
-	return statusEvent{}, false
+// shownStatus is what the status line shows now.
+func (m *Model) shownStatus() (statusline.Kind, string) {
+	return m.line.Shown(m.set.Now(), m.activities(), m.rowResult())
 }
 
 // statusText is the status line as drawn.
 func (m *Model) statusText() string {
-	if e, ok := m.shownEvent(); ok {
-		switch e.kind {
-		case eventFailure:
-			return m.st.red.Render(e.text)
-		case eventRefusal:
-			return m.st.peach.Render(e.text)
-		}
-		return m.st.muted.Render(e.text)
+	kind, text := m.shownStatus()
+	switch kind {
+	case statusline.Failure:
+		return m.st.red.Render(text)
+	case statusline.Refusal:
+		return m.st.peach.Render(text)
+	case statusline.Activity:
+		return m.st.mauve.Render(m.spinner()) + " " + m.st.muted.Render(text)
 	}
-	row := m.rowResult()
-	fresh := row != "" && m.set.Now().Sub(m.line.rowAt) < rowFor
-	if fresh {
-		return m.st.muted.Render(row)
-	}
-	if acts := m.activities(); len(acts) > 0 {
-		return m.st.mauve.Render(m.spinner()) + " " + m.st.muted.Render(strings.Join(acts, " · "))
-	}
-	return m.st.muted.Render(row)
+	return m.st.muted.Render(text)
 }
 
 // activities is the work in progress, writes to GitHub first.
@@ -181,22 +90,15 @@ func (m *Model) rowResult() string {
 	return p.Key.String() + ": " + pg.text
 }
 
-// statusTick asks for a redraw when what the line shows next is due: an
-// event or the moment of a row's result ends.
+// statusTick asks for a redraw when what the line shows may change by
+// time alone.
 func (m *Model) statusTick() tea.Cmd {
 	now := m.set.Now()
-	var due time.Time
-	for _, t := range []time.Time{
-		m.line.last.at.Add(m.line.last.life()), m.line.failed.at.Add(m.line.failed.life()), m.line.rowAt.Add(rowFor),
-	} {
-		if t.After(now) && (due.IsZero() || t.Before(due)) {
-			due = t
-		}
-	}
-	if due.IsZero() || (!m.line.tickAt.IsZero() && !m.line.tickAt.After(due) && m.line.tickAt.After(now)) {
+	due := m.line.Due(now)
+	if due.IsZero() || (m.statusTickAt.After(now) && !m.statusTickAt.After(due)) {
 		return nil
 	}
-	m.line.tickAt = due
+	m.statusTickAt = due
 	return m.after(due.Sub(now), statusTickMsg{})
 }
 

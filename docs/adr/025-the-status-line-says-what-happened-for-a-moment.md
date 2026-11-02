@@ -21,6 +21,7 @@ This adds to ADR-007; it replaces none of it.
 - The line is taken by, in order: the newest event still in its time, except that information gives way to a failure still in its time so that a success arriving after it does not hide it; the result of the row the cursor has just moved onto, for as long as an event lasts, since moving the cursor is the user's doing; work in progress, every piece of it at once; then the row's result for as long as the cursor stays on it.
 - When work in progress ends, the status line says so only when nothing else on the screen does. A failure that may arrive while the user is not looking is also kept in the notifications. A failure to read a list again is kept only when the reading before it went through, so a network that stays down does not fill the notifications as the clock reads the lists again.
 - Work the clock starts, such as reading the lists again, is not shown as work in progress.
+- What the line shows is decided in a package of its own, `internal/statusline`, whose state only its methods change. The compiler, not review, keeps anything else from writing to the line; an AST check in a test, tied to a field's name, was rejected as easy to slip past.
 
 ## Consequences
 

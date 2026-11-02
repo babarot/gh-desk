@@ -16,6 +16,7 @@ import (
 	"github.com/babarot/gh-triage/internal/model"
 	"github.com/babarot/gh-triage/internal/plan"
 	"github.com/babarot/gh-triage/internal/runner"
+	"github.com/babarot/gh-triage/internal/statusline"
 )
 
 // Source is what the TUI needs from GitHub. The app package passes the
@@ -191,8 +192,10 @@ type Model struct {
 	helpTop       int             // the first line of the ? popup shown
 	helpFolded    map[string]bool // the ? popup's sections folded, by title
 	helpBox       helpBox
-	// line is what the status line says (ADR-025).
-	line statusLine
+	// line is what the status line says (ADR-025), and statusTickAt when
+	// the redraw asked for it is due.
+	line         statusline.Line
+	statusTickAt time.Time
 	// holder is the gh-triage holding the record of pending merges, while
 	// this one runs without it.
 	holder holder
@@ -321,7 +324,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Only the user moves the cursor onto a row.
 		before, _, had := m.currentPR()
 		if _, ok := msg.(tea.KeyPressMsg); ok {
-			m.keyPressed()
+			m.line.KeyPressed()
 		}
 		_, cmd := m.update(msg)
 		m.followCursor(before.Key, had)
@@ -366,7 +369,7 @@ func (m *Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.spinning = false
 		return m, nil
 	case statusTickMsg:
-		m.line.tickAt = time.Time{}
+		m.statusTickAt = time.Time{}
 		return m, nil
 	case freshMsg:
 		if msg.gen == m.freshGen {

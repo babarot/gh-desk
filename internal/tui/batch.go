@@ -12,6 +12,7 @@ import (
 	"github.com/babarot/gh-triage/internal/model"
 	"github.com/babarot/gh-triage/internal/plan"
 	"github.com/babarot/gh-triage/internal/runner"
+	"github.com/babarot/gh-triage/internal/statusline"
 )
 
 type styleFn = lipgloss.Style
@@ -237,8 +238,9 @@ type notesView struct {
 
 type toastMsg struct{ n *note }
 
-// toastFor is how long a toast shows.
-const toastFor = 4 * time.Second
+// toastFor is how long a toast shows, as long as information on the
+// status line.
+const toastFor = statusline.InfoFor
 
 func (m *Model) pushNote(icon, title string, items []noteItem) tea.Cmd {
 	n := &note{at: m.set.Now(), icon: icon, title: title, items: items}

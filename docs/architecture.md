@@ -8,6 +8,7 @@ gh-triage is split into packages by layer. A package imports only packages of lo
 | 0 | `internal/model` | Shared types: pull requests and their names | - | - |
 | 0 | `internal/logging` | The slog logger and the log file | - | - |
 | 0 | `internal/near` | The closest of a few names to one mistyped, for a did-you-mean | - | - |
+| 0 | `internal/statusline` | What the status line shows: events for a moment, work in progress, the row's result | - | - |
 | 1 | `internal/config` | Reading the config file and reporting its mistakes | `model`, `near` | `github.com/pelletier/go-toml/v2` |
 | 1 | `internal/keymap` | Keys bound to actions by name | `near` | - |
 | 1 | `internal/plan` | Deciding how to merge each pull request; selection rules | `model` | - |
@@ -17,7 +18,7 @@ gh-triage is split into packages by layer. A package imports only packages of lo
 | 2 | `internal/claude` | Running claude -p and the pull request worktrees | `model`, `logging` | - |
 | 2 | `internal/listcache` | The lists last read, kept on disk for the next launch | `model` | - |
 | 3 | `internal/runner` | Bulk approve and merge, auto-merge watching, resuming | `model`, `logging`, `plan` | - |
-| 4 | `internal/tui` | The terminal UI | `model`, `logging`, `plan`, `diff`, `keymap`, `runner`, `claude`, `listcache` | `charm.land/bubbletea/v2`, `charm.land/bubbles/v2`, `charm.land/lipgloss/v2`, `github.com/charmbracelet/x/ansi`, `github.com/alecthomas/chroma/v2`, `golang.org/x/net/html` |
+| 4 | `internal/tui` | The terminal UI | `model`, `logging`, `plan`, `diff`, `keymap`, `runner`, `claude`, `listcache`, `statusline` | `charm.land/bubbletea/v2`, `charm.land/bubbles/v2`, `charm.land/lipgloss/v2`, `github.com/charmbracelet/x/ansi`, `github.com/alecthomas/chroma/v2`, `golang.org/x/net/html` |
 | 5 | `internal/app` | Putting it together: flags, config, log, and starting the TUI | `model`, `logging`, `config`, `keymap`, `plan`, `diff`, `github`, `state`, `claude`, `listcache`, `runner`, `tui` | - |
 | 6 | `main` | Calls app.Run | `app` | - |
 
