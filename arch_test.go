@@ -27,18 +27,18 @@ var layers = []layer{
 	{"internal/logging", 0, nil, nil, "The slog logger and the log file"},
 	{"internal/near", 0, nil, nil, "The closest of a few names to one mistyped, for a did-you-mean"},
 	{"internal/statusline", 0, nil, nil, "What the status line shows: events for a moment, work in progress, the row's result"},
-	{"internal/config", 1, []string{"model", "near"}, []string{"github.com/pelletier/go-toml/v2"}, "Reading the config file and reporting its mistakes"},
+	{"internal/config", 1, []string{"near"}, []string{"github.com/pelletier/go-toml/v2"}, "Reading the config file and reporting its mistakes"},
 	{"internal/keymap", 1, []string{"near"}, nil, "Keys bound to actions by name"},
 	{"internal/plan", 1, []string{"model"}, nil, "Deciding how to merge each pull request; selection rules"},
 	{"internal/diff", 1, nil, nil, "Reading patches and the words that changed"},
 	{"internal/github", 2, []string{"model", "logging"}, []string{"github.com/cli/go-gh/v2"}, "GitHub's GraphQL and REST APIs"},
-	{"internal/state", 2, []string{"model", "logging"}, nil, "The pending-merge record and its lock; the conversations with Claude and their locks; the screen layout kept between launches"},
+	{"internal/state", 2, []string{"model"}, nil, "The pending-merge record and its lock; the conversations with Claude and their locks; the screen layout kept between launches"},
 	{"internal/claude", 2, []string{"model", "logging"}, nil, "Running claude -p and the pull request worktrees"},
 	{"internal/listcache", 2, []string{"model"}, nil, "The lists last read, kept on disk for the next launch"},
 	{"internal/runner", 3, []string{"model", "logging", "plan"}, nil, "Bulk approve and merge, auto-merge watching, resuming"},
 	{"internal/tui", 4, []string{"model", "logging", "plan", "diff", "keymap", "runner", "claude", "listcache", "statusline"},
-		[]string{"charm.land/bubbletea/v2", "charm.land/bubbles/v2", "charm.land/lipgloss/v2", "github.com/charmbracelet/x/ansi", "github.com/alecthomas/chroma/v2", "golang.org/x/net/html"}, "The terminal UI"},
-	{"internal/app", 5, []string{"model", "logging", "config", "keymap", "plan", "diff", "github", "state", "claude", "listcache", "runner", "tui"}, nil, "Putting it together: flags, config, log, and starting the TUI"},
+		[]string{"charm.land/bubbletea/v2", "charm.land/bubbles/v2", "charm.land/lipgloss/v2", "github.com/charmbracelet/x/ansi", "golang.org/x/net/html"}, "The terminal UI"},
+	{"internal/app", 5, []string{"model", "logging", "config", "keymap", "plan", "github", "state", "claude", "listcache", "runner", "tui"}, nil, "Putting it together: flags, config, log, and starting the TUI"},
 	{"", 6, []string{"app"}, nil, "Calls app.Run"},
 }
 
@@ -132,6 +132,45 @@ func TestLayersGoDownward(t *testing.T) {
 			}
 		}
 	}
+}
+
+// TestNoUnusedImportAllowed checks that every package of the table exists
+// and every import it allows is made, so the table tells what each
+// package depends on. An outside
+// module is used when the module or a package in it is imported. reach is
+// not checked: it limits who may use a package, and a package no one uses
+// is still limited.
+func TestNoUnusedImportAllowed(t *testing.T) {
+	imports := map[string][]string{}
+	for _, p := range listPackages(t) {
+		rel := strings.TrimPrefix(strings.TrimPrefix(p.ImportPath, module), "/")
+		imports[rel] = p.Imports
+	}
+	for _, l := range layers {
+		imps, ok := imports[l.pkg]
+		if !ok {
+			t.Errorf("%s is in the table but is not a package", pkgName(l.pkg))
+			continue
+		}
+		for _, dep := range l.internal {
+			if !slices.Contains(imps, module+"/internal/"+dep) {
+				t.Errorf("%s may import %s but does not; remove it from the table", pkgName(l.pkg), dep)
+			}
+		}
+		for _, m := range l.external {
+			if !slices.ContainsFunc(imps, func(imp string) bool { return imp == m || strings.HasPrefix(imp, m+"/") }) {
+				t.Errorf("%s may import %s but does not; remove it from the table", pkgName(l.pkg), m)
+			}
+		}
+	}
+}
+
+// pkgName is a package of the table as people call it.
+func pkgName(pkg string) string {
+	if pkg == "" {
+		return "main"
+	}
+	return pkg
 }
 
 var update = flag.Bool("update", false, "rewrite the layer table in docs/architecture.md")
