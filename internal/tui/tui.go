@@ -153,7 +153,6 @@ type view int
 
 const (
 	viewList view = iota
-	viewCompose
 	viewChat
 )
 
@@ -370,7 +369,7 @@ func (m *Model) key(msg tea.KeyPressMsg) tea.Cmd {
 		return nil
 	case m.filtering:
 		return m.filterKey(msg)
-	case m.view == viewCompose:
+	case m.compose != nil:
 		return m.composeKey(msg)
 	case m.view == viewChat && m.chat() != nil && m.chat().typing:
 		return m.chatKeyPress(msg)
@@ -396,7 +395,7 @@ func (m *Model) paste(msg tea.PasteMsg) tea.Cmd {
 		var cmd tea.Cmd
 		m.triage.input, cmd = m.triage.input.Update(msg)
 		return cmd
-	case m.view == viewCompose && m.compose != nil:
+	case m.compose != nil:
 		return m.compose.update(msg)
 	case m.view == viewChat && m.chat() != nil && m.chat().typing:
 		c := m.chat()

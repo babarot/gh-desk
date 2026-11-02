@@ -15,7 +15,7 @@ import (
 	"github.com/babarot/gh-triage/internal/runner"
 )
 
-// kinds are the kinds of review, in the order the writing screen cycles
+// kinds are the kinds of review, in the order the review popup cycles
 // through them.
 var kinds = []model.ReviewEvent{model.EventComment, model.EventApprove, model.EventRequestChanges}
 
@@ -25,20 +25,26 @@ var kindWords = map[model.ReviewEvent]string{
 	model.EventRequestChanges: "request changes",
 }
 
-// compose is a review being written.
+// compose is a review being written, in a popup over the screen it was
+// opened from.
 type compose struct {
 	pr   model.PR
 	kind int
 	// own is the viewer's own pull request, which can only be commented
 	// on.
-	own  bool
-	ta   textarea.Model
-	back view
+	own bool
+	ta  textarea.Model
 }
 
+// composeWidth is the width of the popup on a screen w wide.
+func composeWidth(w int) int { return min(max(w-8, 40), 100) }
+
+// resize fits the text area in the popup on a screen w by h: the popup
+// takes seven lines besides it, and leaves the status and key lines under
+// it in sight. A longer review is written in $EDITOR.
 func (c *compose) resize(w, h int) {
-	c.ta.SetWidth(max(w-4, 20))
-	c.ta.SetHeight(max(h-8, 3))
+	c.ta.SetWidth(composeWidth(w) - 4)
+	c.ta.SetHeight(min(max(h-12, 3), 10))
 }
 
 func (c *compose) update(msg tea.Msg) tea.Cmd {
@@ -77,7 +83,7 @@ func (m *Model) startCompose(p model.PR, event model.ReviewEvent) tea.Cmd {
 		m.setStatus("you cannot request changes on your own pull request", true)
 		return nil
 	}
-	c := &compose{pr: p, own: m.own(p), ta: textarea.New(), back: m.view}
+	c := &compose{pr: p, own: m.own(p), ta: textarea.New()}
 	for i, k := range kinds {
 		if k == event {
 			c.kind = i
@@ -87,7 +93,6 @@ func (m *Model) startCompose(p model.PR, event model.ReviewEvent) tea.Cmd {
 	c.ta.ShowLineNumbers = false
 	c.resize(m.width, m.height)
 	m.compose = c
-	m.view = viewCompose
 	return c.ta.Focus()
 }
 
@@ -96,7 +101,7 @@ func (m *Model) composeKey(msg tea.KeyPressMsg) tea.Cmd {
 	k := msg.String()
 	switch {
 	case k == keymap.Back:
-		m.view, m.compose = c.back, nil
+		m.compose = nil
 		m.setStatus("review discarded", false)
 		return nil
 	case m.keys.Matches("next_kind", k):
@@ -185,7 +190,7 @@ func (m *Model) confirmKey(k string) tea.Cmd {
 	return nil
 }
 
-// reviewed takes in a sent review: the row shows it, the writing screen
+// reviewed takes in a sent review: the row shows it, the review popup
 // closes, and the notification is marked done when the settings say so.
 func (m *Model) reviewed(msg reviewMsg) tea.Cmd {
 	m.sending = nil
@@ -193,8 +198,8 @@ func (m *Model) reviewed(msg reviewMsg) tea.Cmd {
 		m.setStatus(fmt.Sprintf("%s on %s failed: %v", kindWords[msg.event], msg.pr.Key, msg.err), true)
 		return nil
 	}
-	if m.view == viewCompose && m.compose != nil && m.compose.pr.Key == msg.pr.Key {
-		m.view, m.compose = m.compose.back, nil
+	if m.compose != nil && m.compose.pr.Key == msg.pr.Key {
+		m.compose = nil
 	}
 	state := map[model.ReviewEvent]model.ReviewState{
 		model.EventApprove: model.ReviewApproved, model.EventComment: model.ReviewCommented, model.EventRequestChanges: model.ReviewChangesRequested,
@@ -219,9 +224,10 @@ func (m *Model) reviewed(msg reviewMsg) tea.Cmd {
 	return func() tea.Msg { return doneMsg{n, m.src.MarkDone(m.ctx, n)} }
 }
 
-func (m *Model) renderCompose(b *strings.Builder, height int) {
+// renderCompose draws the popup a review is written in.
+func (m *Model) renderCompose() []string {
 	c, st := m.compose, m.st
-	b.WriteString(fit(st.sub1.Render(c.pr.Key.String())+"  "+st.muted.Render(c.pr.Title), m.width) + "\n")
+	lines := []string{st.muted.Render(c.pr.Title)}
 	var ks []string
 	for i, k := range kinds {
 		off := st.subOff
@@ -230,12 +236,13 @@ func (m *Model) renderCompose(b *strings.Builder, height int) {
 		}
 		ks = append(ks, pill(st.subOn, off, kindWords[k], i == c.kind))
 	}
-	b.WriteString(strings.Join(ks, tabGap) + "\n\n")
-	view := c.ta.View()
-	b.WriteString(view + "\n")
-	for i := lipgloss.Height(view) + 3; i < height; i++ {
-		b.WriteString("\n")
-	}
+	lines = append(lines, strings.Join(ks, tabGap), "")
+	lines = append(lines, strings.Split(c.ta.View(), "\n")...)
+	lines = append(lines, "", st.key.Render(m.firstKey("post"))+" "+st.muted.Render("post")+
+		st.dim.Render(" · ")+st.key.Render(m.firstKey("next_kind"))+" "+st.muted.Render("kind")+
+		st.dim.Render(" · ")+st.key.Render(m.firstKey("editor"))+" "+st.muted.Render("$EDITOR")+
+		st.dim.Render(" · ")+st.key.Render(keymap.Back)+" "+st.muted.Render("discard"))
+	return box(st, c.pr.Key.String(), lines, composeWidth(m.width))
 }
 
 // renderConfirm draws the popup over the screen's lines.

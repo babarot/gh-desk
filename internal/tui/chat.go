@@ -258,7 +258,7 @@ func (m *Model) chatAnswer(msg chatAnswerMsg) tea.Cmd {
 	return nil
 }
 
-// draftCompose opens the review screen with Claude's draft.
+// draftCompose opens the review popup with Claude's draft.
 func (m *Model) draftCompose(c *chat, d claude.Draft) tea.Cmd {
 	ev := d.Event
 	if m.own(c.pr) || c.pr.State != model.StateOpen {

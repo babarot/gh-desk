@@ -39,8 +39,6 @@ func (m *Model) render() string {
 		body--
 	}
 	switch m.view {
-	case viewCompose:
-		m.renderCompose(&b, body)
 	case viewChat:
 		m.renderChat(&b, body)
 	default:
@@ -63,6 +61,10 @@ func (m *Model) render() string {
 	}
 	b.WriteString(fit(m.hints(), m.width))
 	lines := strings.Split(b.String(), "\n")
+	if m.compose != nil {
+		// Under the confirm popup when a review is posted.
+		lines = m.overlay(lines, m.renderCompose(), 2, m.width)
+	}
 	switch {
 	case m.bulk != nil:
 		lines = m.overlay(lines, m.renderBulk(), 2, m.width)
@@ -314,6 +316,8 @@ func (m *Model) hints() string {
 		as = []keymap.Action{"choose"}
 	case m.confirm != nil:
 		as = []keymap.Action{"confirm"}
+	case m.compose != nil:
+		as = []keymap.Action{"next_kind", "post", "editor"}
 	case m.triage != nil && m.triage.open:
 		switch {
 		case m.triage.typing:
@@ -328,8 +332,6 @@ func (m *Model) hints() string {
 		as = []keymap.Action{"select", "select_shown", "clear_selection", "approve", "merge", "pane_tab", "filter", "help"}
 	case m.filtering:
 		as = []keymap.Action{"accept"}
-	case m.view == viewCompose:
-		as = []keymap.Action{"next_kind", "post", "editor"}
 	case m.view == viewChat && m.chat() != nil && m.chat().typing:
 		as = []keymap.Action{"accept"}
 	case m.view == viewChat:

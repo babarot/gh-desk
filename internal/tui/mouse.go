@@ -50,7 +50,7 @@ func (m *Model) mouse(msg tea.MouseMsg) tea.Cmd {
 		}
 		return nil
 	}
-	if m.bulk != nil || m.notesAt != nil || m.picker != nil || m.menu != nil || m.confirm != nil || m.triage != nil && m.triage.open || m.filtering || m.view == viewCompose {
+	if m.bulk != nil || m.notesAt != nil || m.picker != nil || m.menu != nil || m.confirm != nil || m.triage != nil && m.triage.open || m.filtering || m.compose != nil {
 		return nil
 	}
 	if m.help {

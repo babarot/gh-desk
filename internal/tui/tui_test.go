@@ -603,7 +603,7 @@ func TestActionMenu(t *testing.T) {
 	press(m, "esc")
 
 	press(m, "enter", "c")
-	if m.view != viewCompose || m.menu != nil {
+	if m.compose == nil || m.menu != nil {
 		t.Fatalf("c in the menu did not start a comment: view %v", m.view)
 	}
 }
@@ -737,6 +737,19 @@ func TestTitleEscapesNeverReachTheScreen(t *testing.T) {
 	}
 }
 
+// c writes a review in a popup over the list, which stays in sight
+// dimmed; esc puts it away and leaves the list as it was.
+func TestComposePopup(t *testing.T) {
+	m := start(t, fixture(), keymap.Default())
+	press(m, "c")
+	run(m, m.paste(tea.PasteMsg{Content: "Does this retry on a 429?"}))
+	golden(t, "compose", screen(m))
+	press(m, "esc")
+	if m.compose != nil || m.view != viewList {
+		t.Errorf("esc left compose %v, view %v", m.compose, m.view)
+	}
+}
+
 func TestOneReviewAtATime(t *testing.T) {
 	f := fixture()
 	m := start(t, f, keymap.Default())
@@ -759,7 +772,7 @@ func TestReviewOfAnotherPRKeepsTheDraft(t *testing.T) {
 	m := start(t, fixture(), keymap.Default())
 	press(m, "c")
 	m.handleData(reviewMsg{pr: model.PR{Key: key("acme", "web", 7)}, event: model.EventApprove})
-	if m.view != viewCompose || m.compose == nil {
+	if m.compose == nil {
 		t.Error("a review of another pull request closed the draft")
 	}
 }
@@ -1115,7 +1128,7 @@ func TestClaudeAnsweringElsewhere(t *testing.T) {
 func TestClaudeDraft(t *testing.T) {
 	m, _ := startWith(t, fixture(), keymap.Default())
 	press(m, "i", "D")
-	if m.view != viewCompose || m.compose == nil {
+	if m.compose == nil {
 		t.Fatalf("view %v", m.view)
 	}
 	if kinds[m.compose.kind] != model.EventApprove || m.compose.ta.Value() != "Looks good: the retry is bounded." {
