@@ -634,11 +634,7 @@ func (m *Model) layoutBulk(rows []bulkRow, inner int, single bool) []string {
 			subs = append(subs, n.icon)
 		}
 		for i := range subs {
-			first, rest := "  ├ ", "  │ "
-			if i == len(subs)-1 {
-				first, rest = "  └ ", "    "
-			}
-			first, rest = st.border.Render(first), st.border.Render(rest)
+			first, rest := treeLines(st, "  ", i == len(subs)-1)
 			if under && i == 0 {
 				lines = append(lines, first+r.what)
 				continue

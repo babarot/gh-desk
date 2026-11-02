@@ -462,7 +462,14 @@ func (m *Model) renderTriage() []string {
 		foot = append(foot, m.footKeys([]keymap.Action{"accept"}, "send", "back"))
 	default:
 		for i, s := range m.checkPlan() {
-			body = append(body, hang(st.dim.Render(fmt.Sprintf("%d ", i+1)), m.stepLine(s), inner)...)
+			num := fmt.Sprintf("%d ", i+1)
+			words, left := m.stepLine(s)
+			body = append(body, hang(st.dim.Render(num), words, inner)...)
+			// What is left out of the step hangs from it, one to a line.
+			for j, l := range left {
+				first, rest := treeLines(st, spaces(len(num)), j == len(left)-1)
+				body = append(body, hangWith(first, rest+"  ", l, inner)...)
+			}
 		}
 		if len(tr.actions) > 0 {
 			body = append(body, "")
@@ -506,24 +513,23 @@ func (m *Model) footKeys(as []keymap.Action, accept, back string) string {
 	return strings.Join(parts, m.st.dim.Render(" · "))
 }
 
-// stepLine is a step of the plan with what is left out of it; the caller
-// numbers it.
-func (m *Model) stepLine(s step) string {
+// stepLine is a step of the plan, and what is left out of it, a line each;
+// the caller numbers the step.
+func (m *Model) stepLine(s step) (string, []string) {
 	st := m.st
 	words := st.teal.Render(m.stepWords(s))
 	if s.skip != "" {
 		words = st.dim.Render(m.stepWords(s))
 	}
-	var line strings.Builder
-	line.WriteString(words)
+	var left []string
 	for _, g := range s.gone {
-		line.WriteString("  " + st.red.Render("✗ "+safeLine(g.key)) + " " + st.muted.Render(g.why))
+		left = append(left, st.red.Render("✗ "+safeLine(g.key))+" "+st.muted.Render(g.why))
 	}
 	// With nothing left, the keys left out already say why.
 	if s.skip != "" && (s.skip != noneLeft || len(s.gone) == 0) {
-		line.WriteString("  " + st.red.Render("✗ "+s.skip))
+		left = append(left, st.red.Render("✗ "+s.skip))
 	}
-	return line.String()
+	return words, left
 }
 
 // stepWords says what a step does.

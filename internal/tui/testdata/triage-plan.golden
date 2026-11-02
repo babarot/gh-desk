@@ -5,13 +5,13 @@ triage // @me    1 review (3)   2 mine (1)   3 involved (0)   4 inbox (2)       
   ▸ reques│ Picked the bot update; api#99 is not in this tab.                                                          │
   ▸ bots 1│                                                                                                            │
           │ 1 unfold bots                                                                                              │
-          │ 2 select api#30  ✗ acme/api#99 not in this tab                                                             │
+          │ 2 select api#30                                                                                            │
+          │   └ ✗ acme/api#99 not in this tab                                                                          │
           │ 3 cursor api#30                                                                                            │
           │ 4 approve api#30 → confirm                                                                                 │
           │                                                                                                            │
           │ enter apply · i ask more · esc close                                                                       │
           ╰────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
-
 
 
 

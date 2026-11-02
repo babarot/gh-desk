@@ -27,17 +27,31 @@ func (m *Model) popupHeight() int { return max(m.height-popupTop-2, 5) }
 // prefix leads the first line and the others are indented as far, so the
 // text reads as one column.
 func hang(prefix, text string, width int) []string {
-	pw := lipgloss.Width(prefix)
-	ls := strings.Split(lipgloss.Wrap(text, max(width-pw, 10), " "), "\n")
-	out := make([]string, len(ls))
-	for i, l := range ls {
+	return hangWith(prefix, spaces(lipgloss.Width(prefix)), text, width)
+}
+
+// hangWith is hang with rest leading the lines after the first, as wide as
+// first: the line of a tree that goes on down, say.
+func hangWith(first, rest, text string, width int) []string {
+	ls := strings.Split(lipgloss.Wrap(text, max(width-lipgloss.Width(first), 10), " "), "\n")
+	for i := range ls {
 		if i == 0 {
-			out[i] = prefix + l
+			ls[i] = first + ls[i]
 		} else {
-			out[i] = spaces(pw) + l
+			ls[i] = rest + ls[i]
 		}
 	}
-	return out
+	return ls
+}
+
+// treeLines are the prefixes of a line hung from the one above, at indent:
+// its first line, and those it wraps to. The last of the lines hung from
+// one closes the tree.
+func treeLines(st styles, indent string, last bool) (first, rest string) {
+	if last {
+		return indent + st.border.Render("└ "), indent + "  "
+	}
+	return indent + st.border.Render("├ "), indent + st.border.Render("│ ")
 }
 
 // wrapped is text made safe and wrapped to width, every line in s.

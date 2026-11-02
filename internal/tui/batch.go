@@ -365,15 +365,18 @@ func (m *Model) renderNotes() []string {
 			cursor = st.blue.Render("▎")
 		}
 		var item []string
-		switch {
-		case l.item == nil:
+		if l.item == nil {
 			item = hang(cursor+" "+m.noteIcon(l.n.icon)+" ", st.sub1.Render(safeLine(l.n.title))+"  "+st.dim.Render(shortAge(m.set.Now().Sub(l.n.at))+" ago"), inner)
-		case l.item.key == (model.PRKey{}):
-			// An item about no pull request, as a warning of the config file.
-			item = hang(cursor+"     ", st.yellow.Render(safeLine(l.item.text)), inner)
-		default:
-			name := st.sub1.Render(l.item.key.Repository()) + st.muted.Render(fmt.Sprintf("#%d", l.item.key.Number))
-			item = hang(cursor+"     "+fit(name, 30)+" ", m.resultStyle(l.item.result).Render(safeLine(l.item.text)), inner)
+		} else {
+			// Hung from its note, under the icon.
+			first, rest := treeLines(st, cursor+" ", l.item == &l.n.items[len(l.n.items)-1])
+			if l.item.key == (model.PRKey{}) {
+				// An item about no pull request, as a warning of the config file.
+				item = hangWith(first, rest, st.yellow.Render(safeLine(l.item.text)), inner)
+			} else {
+				name := fit(st.sub1.Render(l.item.key.Repository())+st.muted.Render(fmt.Sprintf("#%d", l.item.key.Number)), 30) + " "
+				item = hangWith(first+name, rest+spaces(31), m.resultStyle(l.item.result).Render(safeLine(l.item.text)), inner)
+			}
 		}
 		if i == v.sel {
 			for j := range item {

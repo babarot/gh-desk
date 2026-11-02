@@ -162,3 +162,28 @@ func TestPopupsOnASmallScreen(t *testing.T) {
 		}
 	})
 }
+
+// A note's results hang from it, the last closing the tree, and one that
+// wraps goes on under its text.
+func TestNoteResultsHang(t *testing.T) {
+	m := startSmall(t, fixture())
+	m.pushNote("✓", "merged 1, 1 failed", []noteItem{
+		{key: key("acme", "api", 12), text: "merged (merge commit)", result: runner.Merged},
+		{key: key("acme", "api", 30), text: "GraphQL: Pull request is not mergeable: the base branch policy prohibits the merge.", result: runner.Failed},
+	})
+	m.openNotes()
+	var got []string
+	for _, l := range m.renderNotes()[1:6] {
+		got = append(got, strings.TrimRight(strings.TrimSuffix(strings.TrimPrefix(ansi.Strip(l), "│ "), "│"), " "))
+	}
+	want := []string{
+		"▎ ✓ merged 1, 1 failed  1m ago",
+		"  ├ acme/api#12                    merged (merge commit)",
+		"  └ acme/api#30                    GraphQL: Pull request is not",
+		"                                   mergeable: the base branch policy",
+		"                                   prohibits the merge.",
+	}
+	if strings.Join(got, "\n") != strings.Join(want, "\n") {
+		t.Errorf("got\n%s\nwant\n%s", strings.Join(got, "\n"), strings.Join(want, "\n"))
+	}
+}
