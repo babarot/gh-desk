@@ -2,19 +2,34 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Inter:wght@400;600;800&display=swap">
 <script>
-// An embedded screen of the playground starts when it is asked for, in
-// the theme the docs are shown in.
-document.addEventListener('click', e => {
-  const b = e.target.closest('.desk-pg-run');
-  if (!b) return;
-  const f = document.createElement('iframe');
-  const theme = document.documentElement.classList.contains('dark') ? 'dark' : 'light';
-  f.src = b.dataset.src + '&theme=' + theme;
-  f.title = b.dataset.title;
-  f.allow = 'clipboard-write';
-  b.closest(".desk-pg").replaceChildren(f);
-  f.focus();
-});
+// An embedded screen of the playground loads when it is scrolled to, and
+// plays its scenario at once, as a muted video starts; until then it is a
+// card, so a page with several does not run them all. The button loads it
+// too, where scrolling does not tell.
+(() => {
+  const load = b => {
+    if (!b.isConnected) return;
+    const f = document.createElement('iframe');
+    const theme = document.documentElement.classList.contains('dark') ? 'dark' : 'light';
+    f.src = b.dataset.src + '&theme=' + theme;
+    f.title = b.dataset.title;
+    f.allow = 'clipboard-write';
+    b.closest('.desk-pg').replaceChildren(f);
+  };
+  document.addEventListener('click', e => {
+    const b = e.target.closest('.desk-pg-run');
+    if (b) load(b);
+  });
+  document.addEventListener('DOMContentLoaded', () => {
+    if (!('IntersectionObserver' in window)) return;
+    const seen = new IntersectionObserver(entries => entries.forEach(en => {
+      if (!en.isIntersecting) return;
+      seen.unobserve(en.target);
+      load(en.target);
+    }), { threshold: 0.3 });
+    document.querySelectorAll('.desk-pg-run').forEach(b => seen.observe(b));
+  });
+})();
 </script>
 <script>
 // The version the docs are of, where Hextra puts the language switch on a

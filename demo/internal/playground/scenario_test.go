@@ -181,6 +181,7 @@ func (d *desk) screen() string { return ansi.Strip(d.m.View().Content) }
 // and checks the screen it ends on.
 func TestScenariosReachTheirScreen(t *testing.T) {
 	want := map[string][]string{
+		"tour":   {"acme/api#479", "Drop support for Go 1.22"},
 		"diff":   {"acme/api#482", "PRIMARY KEY (subscription_id, event_id, attempt)"},
 		"rules":  {"select by rule", "dependency bots"},
 		"merge":  {"approve and merge 5 of 5", "dependency bots: selected 5"},

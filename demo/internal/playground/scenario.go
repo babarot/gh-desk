@@ -67,6 +67,21 @@ func Scenarios() []Scenario {
 			{Action: "prev_file", Hold: time.Second},
 			{Action: "next_file"},
 		}},
+		// A walk round the screen as it starts: the tabs, then a pull
+		// request read from the list, its diff and back. The docs show it
+		// where they show gh-desk as a whole.
+		{Name: "tour", Title: "A walk round gh-desk as it starts", Steps: []Step{
+			{Action: "tab_2", Hold: time.Second},
+			{Action: "tab_3"},
+			{Action: "tab_4"},
+			{Action: "tab_1", Hold: time.Second},
+			{Action: "down"},
+			{Action: "down", Wait: -scroll},
+			{Action: "preview_tab", Hold: time.Second},
+			{Action: "next_file", Hold: time.Second},
+			{Action: "preview_down"},
+			{Action: "preview_tab", Hold: time.Second},
+		}},
 		{Name: "rules", Title: "The rules that select pull requests", Steps: []Step{
 			{Action: "select_rule"},
 		}},

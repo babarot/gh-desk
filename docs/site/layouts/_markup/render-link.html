@@ -27,6 +27,10 @@ leads on the site:
   {{- end -}}
   {{- with $u.Fragment }}{{ $href = printf "%s#%s" $href . }}{{ end -}}
   {{- $embed = eq .Title "playground" -}}
+  {{- if and $embed (not (strings.Contains $u.RawQuery "scenario=")) -}}
+    {{- /* An embedded playground is watched, so it has to play something. */ -}}
+    {{- errorf "%s: the playground embedded by %q plays no scenario; add ?scenario=" .Page.File.Path $dest -}}
+  {{- end -}}
 {{- else if and (not $u.IsAbs) (not (strings.HasPrefix $dest "#")) -}}
   {{- $dir := path.Dir .Page.File.Path -}}
   {{- $target := path.Clean (path.Join $dir $u.Path) -}}
@@ -57,7 +61,7 @@ leads on the site:
 {{- if $embed -}}
 {{- /* Embedded, the playground plays the screen like a video; the
        visitor drives it on its own page. */ -}}
-<span class="desk-pg"><span class="desk-pg-bar"><i></i><i></i><i></i> {{ .Text | plainify }} <a href="{{ $href | safeURL }}">try it yourself ↗</a></span><button class="desk-pg-run" type="button" data-src="{{ $src | safeURL }}" data-title="{{ .Text | plainify }}"><span>▶</span> Play</button><span class="desk-pg-skel"><span>▶</span><i></i></span></span>
+<span class="desk-pg"><span class="desk-pg-bar"><i></i><i></i><i></i> {{ .Text | plainify }} <a href="{{ $href | safeURL }}">try it yourself ↗</a></span><button class="desk-pg-run" type="button" data-src="{{ $src | safeURL }}" data-title="{{ .Text | plainify }}"><span>▶</span> Loading gh-desk…</button><span class="desk-pg-skel"><span>▶</span><i></i></span></span>
 {{- else -}}
 <a href="{{ $href | safeURL }}"{{ with .Title }} title="{{ . }}"{{ end }}>{{ .Text | safeHTML }}</a>
 {{- end -}}

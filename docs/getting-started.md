@@ -43,7 +43,7 @@ Across the top are the tabs. By default they are four:
 
 Under the list is the pane: the pull request under the cursor, its description beside its checks and reviews, or its diff. The line at the bottom shows the keys that matter where you are, and `?` lists them all.
 
-[The screen as gh-desk starts](https://babarot.me/gh-desk/ "playground")
+[A walk round the screen](https://babarot.me/gh-desk/?scenario=tour "playground")
 
 A few keys to start with:
 
