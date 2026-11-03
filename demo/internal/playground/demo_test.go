@@ -13,6 +13,15 @@ import (
 	"github.com/babarot/gh-desk/internal/model"
 	"github.com/babarot/gh-desk/internal/plan"
 	"github.com/babarot/gh-desk/internal/runner"
+	"github.com/babarot/gh-desk/internal/tui"
+)
+
+// The site hands the world to the TUI and the runner, so a method added to
+// one of their interfaces fails this build, not only the site's.
+var (
+	_ tui.Source    = Source{}
+	_ tui.Claude    = Claude{}
+	_ runner.GitHub = Runner{}
 )
 
 // clock is a time that moves only when told.

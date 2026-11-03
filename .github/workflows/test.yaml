@@ -91,7 +91,7 @@ jobs:
           go-version-file: go.mod
           cache-dependency-path: |
             go.sum
-            site/go.sum
+            demo/site/go.sum
       - uses: jdx/mise-action@6be3c7ed4c21d4f76b208d351d95aac273ebb76d # v5.2.4
         with:
           version: 2026.9.18

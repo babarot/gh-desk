@@ -1,7 +1,7 @@
-// Package demo runs the TUI against a made-up GitHub and a made-up Claude,
-// for the recordings in the README. It is built only into hack/demo, never
-// into gh-desk.
-package demo
+// Package recording runs the TUI against a made-up GitHub and a made-up
+// Claude, for the recordings in the README. It is built only into
+// demo/recording, never into gh-desk (ADR-049).
+package recording
 
 import (
 	"context"

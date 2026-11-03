@@ -10,22 +10,22 @@ gh-desk is split into packages by layer. A package imports only packages of lowe
 | 0 | `internal/version` | The release version, which tagpr updates | - | - |
 | 0 | `internal/near` | The closest of a few names to one mistyped, for a did-you-mean | - | - |
 | 0 | `internal/tui/statusline` | What the status line shows: events for a moment, work in progress, the row's result | - | - |
-| 1 | `internal/config` | Reading the config file and reporting its mistakes | `near` | `github.com/pelletier/go-toml/v2` |
-| 1 | `internal/tui/keymap` | Keys bound to actions by name | `near` | - |
-| 1 | `internal/plan` | Deciding how to merge each pull request; selection rules | `model` | - |
+| 1 | `internal/config` | Reading the config file and reporting its mistakes | `internal/near` | `github.com/pelletier/go-toml/v2` |
+| 1 | `internal/tui/keymap` | Keys bound to actions by name | `internal/near` | - |
+| 1 | `internal/plan` | Deciding how to merge each pull request; selection rules | `internal/model` | - |
 | 1 | `internal/diff` | Reading patches and the words that changed | - | - |
-| 2 | `internal/github` | GitHub's GraphQL and REST APIs | `model`, `logging` | `github.com/cli/go-gh/v2` |
-| 2 | `internal/state` | The pending-merge record and its lock; the conversations with Claude and their locks; the directories of the running gh-desk; the screen layout kept between launches | `model` | - |
-| 2 | `internal/claude` | Running claude -p and the pull request worktrees, and the skills of the plugins given to it | `model`, `logging` | `gopkg.in/yaml.v3` |
-| 2 | `internal/listcache` | The lists last read, kept on disk for the next launch | `model` | - |
-| 3 | `internal/runner` | Bulk approve and merge, auto-merge watching, resuming | `model`, `logging`, `plan` | - |
-| 3 | `internal/tui/chat` | The conversations with Claude about pull requests: what each holds, keeping them and their locks | `model`, `logging`, `claude` | - |
-| 4 | `internal/tui` | The terminal UI | `model`, `logging`, `plan`, `diff`, `tui/keymap`, `runner`, `claude`, `listcache`, `tui/statusline`, `tui/chat` | `charm.land/bubbletea/v2`, `charm.land/bubbles/v2`, `charm.land/lipgloss/v2`, `github.com/charmbracelet/x/ansi`, `golang.org/x/net/html` |
-| 4 | `internal/demo/playground` | A made-up GitHub and Claude that the playground on the site runs against; never built into gh-desk | `model`, `claude`, `runner` | - |
-| 5 | `internal/app` | Putting it together: flags, config, log, and starting the TUI | `model`, `logging`, `config`, `tui/keymap`, `plan`, `github`, `state`, `claude`, `listcache`, `runner`, `tui`, `tui/chat`, `version` | - |
-| 6 | `main` | Calls app.Run | `app` | - |
-| 6 | `internal/demo` | A made-up GitHub and Claude that the TUI runs against for the recordings in the README | `model`, `logging`, `config`, `tui/keymap`, `runner`, `claude`, `tui`, `app`, `version` | - |
-| 7 | `hack/demo` | Runs the demo; never built into gh-desk | `demo` | - |
+| 2 | `internal/github` | GitHub's GraphQL and REST APIs | `internal/model`, `internal/logging` | `github.com/cli/go-gh/v2` |
+| 2 | `internal/state` | The pending-merge record and its lock; the conversations with Claude and their locks; the directories of the running gh-desk; the screen layout kept between launches | `internal/model` | - |
+| 2 | `internal/claude` | Running claude -p and the pull request worktrees, and the skills of the plugins given to it | `internal/model`, `internal/logging` | `gopkg.in/yaml.v3` |
+| 2 | `internal/listcache` | The lists last read, kept on disk for the next launch | `internal/model` | - |
+| 3 | `internal/runner` | Bulk approve and merge, auto-merge watching, resuming | `internal/model`, `internal/logging`, `internal/plan` | - |
+| 3 | `internal/tui/chat` | The conversations with Claude about pull requests: what each holds, keeping them and their locks | `internal/model`, `internal/logging`, `internal/claude` | - |
+| 4 | `internal/tui` | The terminal UI | `internal/model`, `internal/logging`, `internal/plan`, `internal/diff`, `internal/tui/keymap`, `internal/runner`, `internal/claude`, `internal/listcache`, `internal/tui/statusline`, `internal/tui/chat` | `charm.land/bubbletea/v2`, `charm.land/bubbles/v2`, `charm.land/lipgloss/v2`, `github.com/charmbracelet/x/ansi`, `golang.org/x/net/html` |
+| 4 | `demo/internal/playground` | A made-up GitHub and Claude that the playground on the site runs against; never built into gh-desk | `internal/model`, `internal/claude`, `internal/runner` | - |
+| 5 | `internal/app` | Putting it together: flags, config, log, and starting the TUI | `internal/model`, `internal/logging`, `internal/config`, `internal/tui/keymap`, `internal/plan`, `internal/github`, `internal/state`, `internal/claude`, `internal/listcache`, `internal/runner`, `internal/tui`, `internal/tui/chat`, `internal/version` | - |
+| 6 | `main` | Calls app.Run | `internal/app` | - |
+| 6 | `demo/internal/recording` | A made-up GitHub and Claude that the TUI runs against for the recordings in the README | `internal/model`, `internal/logging`, `internal/config`, `internal/tui/keymap`, `internal/runner`, `internal/claude`, `internal/tui`, `internal/app`, `internal/version` | - |
+| 7 | `demo/recording` | Runs the recordings' made-up world for VHS to record; never built into gh-desk | `demo/internal/recording` | - |
 
 Standard library packages that reach outside the process:
 
@@ -33,7 +33,7 @@ Standard library packages that reach outside the process:
 |---|---|
 | `net` | `internal/github` |
 | `net/http` | `internal/github` |
-| `os/exec` | `internal/app`, `internal/claude`, `internal/demo`, `internal/demo/playground`, `internal/github`, `internal/tui` |
+| `os/exec` | `demo/internal/playground`, `demo/internal/recording`, `internal/app`, `internal/claude`, `internal/github`, `internal/tui` |
 | `syscall` | `internal/state` |
 <!-- layers:end -->
 

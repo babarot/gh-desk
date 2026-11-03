@@ -1,8 +1,8 @@
 //go:build js && wasm
 
 // The demo on the site: gh-desk compiled to WebAssembly, run against the
-// made-up GitHub of internal/demo/playground, in a terminal the page draws with
-// xterm.js.
+// made-up GitHub of demo/internal/playground, in a terminal the page draws
+// with xterm.js.
 //
 // The page calls ghDesk.start(cols, rows, write) once the wasm is loaded:
 // write gets what gh-desk writes to the terminal. ghDesk.input(data) gives
@@ -20,9 +20,9 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/colorprofile"
 
+	"github.com/babarot/gh-desk/demo/internal/playground"
 	"github.com/babarot/gh-desk/internal/app"
 	"github.com/babarot/gh-desk/internal/config"
-	"github.com/babarot/gh-desk/internal/demo/playground"
 	"github.com/babarot/gh-desk/internal/logging"
 	"github.com/babarot/gh-desk/internal/runner"
 	"github.com/babarot/gh-desk/internal/tui"

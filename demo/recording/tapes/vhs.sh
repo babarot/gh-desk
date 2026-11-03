@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Record the tapes in docs/tapes with VHS in Docker, then make each MP4 a
+# Record the tapes in this directory with VHS in Docker, then make each MP4 a
 # GIF with ffmpeg. The GIF is made apart because VHS's own GIF output is
 # unreliable when several containers run at once on macOS.
 #

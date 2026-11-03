@@ -1,4 +1,4 @@
-module github.com/babarot/gh-desk/site
+module github.com/babarot/gh-desk/demo/site
 
 go 1.26.10
 
@@ -45,4 +45,4 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
 
-replace github.com/babarot/gh-desk => ../
+replace github.com/babarot/gh-desk => ../../
