@@ -113,11 +113,17 @@ func Scenarios() []Scenario {
 			{Action: "confirm", Wait: 2 * time.Second, Hold: time.Second},
 			{Action: "refresh", Wait: 3 * time.Second},
 		}},
-		// i opens the conversation suggesting a review, which tab fills in.
-		{Name: "claude", Title: "Claude's review of a pull request", Steps: []Step{
-			{Action: "ask_claude"},
+		// A conversation about acme/api#482: i opens it suggesting a
+		// review, which tab fills in; Claude reads the files and answers, is
+		// asked one more thing, and drafts the review, which opens in the
+		// review popup for the visitor to read; nothing is sent.
+		{Name: "claude", Title: "Claude's review of a pull request, a question, and the review it drafts", Steps: []Step{
+			{Action: "ask_claude", Hold: time.Second},
 			{Action: "fill_suggestion", Wait: time.Second},
+			{Action: "accept", Hold: time.Second},
+			{Text: "What happens when the retries run out?", Wait: 5 * time.Second, Hold: 2 * time.Second},
 			{Action: "accept"},
+			{Action: "draft_review", Wait: 4 * time.Second, Hold: 2 * time.Second},
 		}},
 		{Name: "triage", Title: "A plan from Claude for what to merge", Steps: []Step{
 			{Action: "triage"},
