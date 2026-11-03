@@ -1,5 +1,11 @@
 # Changelog
 
+## [v0.2.0](https://github.com/babarot/gh-desk/compare/v0.1.1...v0.2.0) - 2026-11-03
+### New Features
+- Write the reference pages of the docs from the code by @babarot in https://github.com/babarot/gh-desk/pull/22
+- Play scenarios in the playground, and seek by replaying them by @babarot in https://github.com/babarot/gh-desk/pull/23
+- Let popups take the mouse by @babarot in https://github.com/babarot/gh-desk/pull/26
+
 ## [v0.1.1](https://github.com/babarot/gh-desk/compare/v0.1.0...v0.1.1) - 2026-11-03
 ### Improvements
 - Print the version with --version, not a version command by @babarot in https://github.com/babarot/gh-desk/pull/20
