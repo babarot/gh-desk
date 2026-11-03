@@ -58,7 +58,12 @@ func TestEveryKeyEncodes(t *testing.T) {
 			t.Errorf("%s: %q is read as %d keys", k, b, len(msgs))
 			continue
 		}
-		if got := msgs[0].(tea.KeyPressMsg).String(); got != k {
+		key, ok := msgs[0].(tea.KeyPressMsg)
+		if !ok {
+			t.Errorf("%s: %q is read as %T, not a key press", k, b, msgs[0])
+			continue
+		}
+		if got := key.String(); got != k {
 			t.Errorf("%s: %q is read as %s", k, b, got)
 		}
 	}
@@ -157,7 +162,10 @@ func (d *desk) run(cmd tea.Cmd) {
 			// of its own.
 			if v := reflect.ValueOf(msg); v.Kind() == reflect.Slice && v.Type().Elem() == reflect.TypeFor[tea.Cmd]() {
 				for i := range v.Len() {
-					queue = append(queue, v.Index(i).Interface().(tea.Cmd))
+					// The element type was checked above, so this holds.
+					if cmd, ok := reflect.TypeAssert[tea.Cmd](v.Index(i)); ok {
+						queue = append(queue, cmd)
+					}
 				}
 				continue
 			}
