@@ -1480,7 +1480,9 @@ func (c *fakeClaude) Ask(_ context.Context, r claude.Request, progress func(clau
 	return claude.Answer{Text: fmt.Sprintf("Answer %d: the retry loop has no limit.", len(c.asked)), Cost: 0.4, Model: "claude-opus-5-5"}, nil
 }
 
-func (c *fakeClaude) Interactive(dir, session string) *exec.Cmd { return exec.Command("true") }
+func (c *fakeClaude) Interactive(_ model.PRKey, dir, session string) *exec.Cmd {
+	return exec.Command("true")
+}
 
 func (c *fakeClaude) Triage(_ context.Context, r claude.Request) (claude.Answer, error) {
 	c.triaged = append(c.triaged, r)

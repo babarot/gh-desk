@@ -197,7 +197,7 @@ func TestGCRemovesClosedOnly(t *testing.T) {
 	prs := fakePRs{open: {Key: open, State: model.StateOpen}, merged: {Key: merged, State: model.StateMerged},
 		closed: {Key: closed, State: model.StateClosed}, talking: {Key: talking, State: model.StateClosed}}
 	var out bytes.Buffer
-	if err := gc(context.Background(), ws, chats, prs, &out); err != nil {
+	if err := gc(context.Background(), ws, chats, state.Runs{Dir: filepath.Join(t.TempDir(), "runs")}, prs, &out); err != nil {
 		t.Fatal(err)
 	}
 	for k, want := range map[model.PRKey]bool{open: true, merged: false, gone: true} {

@@ -23,10 +23,13 @@ import (
 	"log/slog"
 	"os"
 	"os/exec"
+	"slices"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/babarot/gh-triage/internal/logging"
+	"github.com/babarot/gh-triage/internal/model"
 )
 
 // Tools are the tools Claude may be given; each only reads.
@@ -45,7 +48,12 @@ type Options struct {
 	// Instructions are appended to the system prompt of every review and
 	// triage.
 	Instructions string
-	Log          *slog.Logger
+	// MCPConfig is the file of the MCP servers of a conversation, as
+	// WriteMCPConfig wrote it, and MCPTools their tools that may run
+	// without a prompt; empty when there are none (ADR-033).
+	MCPConfig string
+	MCPTools  []string
+	Log       *slog.Logger
 }
 
 // Claude runs Claude Code.
@@ -86,6 +94,12 @@ func NewSession() string {
 	return fmt.Sprintf("%x-%x-%x-%x-%x", b[0:4], b[4:6], b[6:8], b[8:10], b[10:])
 }
 
+// guard is what the runs that may take the user's MCP servers and skills
+// (the conversation, and Claude Code in the terminal) take whether or not
+// any are configured: no hooks, of a plugin or of a skill, none of Claude
+// Code's own skills, and no shell commands in a skill (ADR-033).
+const guard = `{"disableAllHooks":true,"disableBundledSkills":true,"disableSkillShellExecution":true}`
+
 // restricted are the flags every run takes, interactive or not.
 func (c *Claude) restricted(tools []string) []string {
 	return []string{
@@ -102,6 +116,9 @@ func (c *Claude) restricted(tools []string) []string {
 
 // Request is one question in a session.
 type Request struct {
+	// PR is the pull request a conversation is about, told to its MCP
+	// servers; zero for a triage.
+	PR model.PRKey
 	// Dir is where Claude runs: the worktree of a review, or a directory
 	// away from any repository for a triage. A session is resumed only from
 	// the directory it started in.
@@ -118,9 +135,34 @@ type Request struct {
 // so it can be resumed, here or in Claude Code. progress hears of each
 // tool Claude uses.
 func (c *Claude) Ask(ctx context.Context, r Request, progress func(Step)) (Answer, error) {
-	args := c.session(r, reviewInstructions+"\n\nAnswer in "+c.opt.Language+".", c.opt.Tools)
-	args = append(args, "--allowedTools", strings.Join(c.opt.Tools, ","))
-	return c.run(ctx, c.opt.Log.With(logging.KeyClaude, r.Session), r.Dir, args, r.Prompt, progress)
+	args := c.conversation(c.session(r, reviewInstructions+"\n\nAnswer in "+c.opt.Language+".", c.opt.Tools))
+	args = append(args, "--allowedTools", strings.Join(append(slices.Clone(c.opt.Tools), c.opt.MCPTools...), ","))
+	return c.run(ctx, c.opt.Log.With(logging.KeyClaude, r.Session), r.Dir, prEnv(r.PR), args, r.Prompt, progress)
+}
+
+// conversation adds to args, the flags of a conversation or of Claude Code
+// in the terminal, the guard and the user's MCP servers.
+func (c *Claude) conversation(args []string) []string {
+	args = append(args, "--settings", guard)
+	if c.opt.MCPConfig != "" {
+		i := slices.Index(args, "--mcp-config")
+		args[i+1] = c.opt.MCPConfig
+	}
+	return args
+}
+
+// prEnv is the environment a conversation about k runs in: the pull
+// request, for the MCP servers' ${VAR}.
+func prEnv(k model.PRKey) []string {
+	if k.Owner == "" {
+		return nil
+	}
+	return append(os.Environ(),
+		"GH_TRIAGE_OWNER="+k.Owner,
+		"GH_TRIAGE_REPO="+k.Repo,
+		"GH_TRIAGE_NUMBER="+strconv.Itoa(k.Number),
+		"GH_TRIAGE_URL=https://github.com/"+k.Owner+"/"+k.Repo,
+	)
 }
 
 // Triage asks Claude for a plan of what to show and select in the tab
@@ -130,7 +172,7 @@ func (c *Claude) Ask(ctx context.Context, r Request, progress func(Step)) (Answe
 func (c *Claude) Triage(ctx context.Context, r Request) (Answer, error) {
 	r.Schema = TriageSchema
 	args := c.session(r, triageInstructions, nil)
-	return c.run(ctx, c.opt.Log.With(logging.KeyClaude, r.Session), r.Dir, args, r.Prompt, func(Step) {})
+	return c.run(ctx, c.opt.Log.With(logging.KeyClaude, r.Session), r.Dir, nil, args, r.Prompt, func(Step) {})
 }
 
 // session are the arguments of a question in a session, with tools and
@@ -166,19 +208,22 @@ func (c *Claude) Once(ctx context.Context, dir, prompt, schema string) (Answer, 
 	if schema != "" {
 		args = append(args, "--json-schema", schema)
 	}
-	return c.run(ctx, c.opt.Log, dir, args, prompt, func(Step) {})
+	return c.run(ctx, c.opt.Log, dir, nil, args, prompt, func(Step) {})
 }
 
-// Interactive is Claude Code resuming the session in dir, restricted as
-// the runs are; it asks before each tool, as Claude Code does.
-func (c *Claude) Interactive(dir, session string) *exec.Cmd {
-	args := append([]string{"--resume", session, "--model", c.opt.Model}, c.restricted(c.opt.Tools)...)
+// Interactive is Claude Code resuming the session about pr in dir,
+// restricted as the conversation is; it asks before each tool, as Claude
+// Code does.
+func (c *Claude) Interactive(pr model.PRKey, dir, session string) *exec.Cmd {
+	args := c.conversation(append([]string{"--resume", session, "--model", c.opt.Model}, c.restricted(c.opt.Tools)...))
 	cmd := exec.Command(c.opt.Bin, args...)
 	cmd.Dir = dir
+	cmd.Env = prEnv(pr)
 	return cmd
 }
 
-func (c *Claude) run(ctx context.Context, log *slog.Logger, dir string, args []string, prompt string, progress func(Step)) (Answer, error) {
+// run runs claude in dir; env, when not nil, is its whole environment.
+func (c *Claude) run(ctx context.Context, log *slog.Logger, dir string, env, args []string, prompt string, progress func(Step)) (Answer, error) {
 	bin, err := exec.LookPath(c.opt.Bin)
 	if err != nil {
 		return Answer{}, fmt.Errorf("%s (Claude Code) is not found; claude.command sets where it is", c.opt.Bin)
@@ -186,6 +231,7 @@ func (c *Claude) run(ctx context.Context, log *slog.Logger, dir string, args []s
 	start := time.Now()
 	cmd := exec.CommandContext(ctx, bin, args...)
 	cmd.Dir = dir
+	cmd.Env = env
 	// Stopped, Claude Code is interrupted rather than killed, so it closes
 	// the session it keeps, which may be resumed later.
 	cmd.Cancel = func() error { return cmd.Process.Signal(os.Interrupt) }

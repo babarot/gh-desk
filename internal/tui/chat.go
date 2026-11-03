@@ -28,7 +28,7 @@ type Claude interface {
 	Ask(ctx context.Context, r claude.Request, progress func(claude.Step)) (claude.Answer, error)
 	// Interactive is Claude Code resuming a session, to run in the
 	// terminal.
-	Interactive(dir, session string) *exec.Cmd
+	Interactive(pr model.PRKey, dir, session string) *exec.Cmd
 	// Once asks with no tools and no session kept, in dir, or where the
 	// implementation picks when dir is empty.
 	Once(ctx context.Context, dir, prompt, schema string) (claude.Answer, error)
@@ -228,7 +228,7 @@ func (m *Model) ask(c *chatScreen, shown, prompt string, draft bool) tea.Cmd {
 			}
 			prompt = claude.HeadMovedPrompt(moved, pr.HeadOID, diff) + prompt
 		}
-		a, err := m.claude.Ask(ctx, claude.Request{Dir: dir, Session: session, First: first, Prompt: prompt, Schema: schema},
+		a, err := m.claude.Ask(ctx, claude.Request{PR: key, Dir: dir, Session: session, First: first, Prompt: prompt, Schema: schema},
 			func(s claude.Step) { send(chatStepMsg{key: key, step: s, ch: ch}) })
 		send(chatAnswerMsg{key: key, answer: a, err: err, draft: draft})
 	})
@@ -402,7 +402,7 @@ func (m *Model) chatKeyPress(msg tea.KeyPressMsg) tea.Cmd {
 			// Held while Claude Code has the session, so no other
 			// gh-triage resumes it meanwhile.
 			key := c.PR().Key
-			return tea.ExecProcess(m.claude.Interactive(c.Dir(), c.Session()), func(err error) tea.Msg { return claudeExitMsg{key: key, err: err} })
+			return tea.ExecProcess(m.claude.Interactive(key, c.Dir(), c.Session()), func(err error) tea.Msg { return claudeExitMsg{key: key, err: err} })
 		}
 	}
 	return nil

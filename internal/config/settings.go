@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"maps"
+	"regexp"
 	"slices"
 	"strings"
 )
@@ -88,6 +90,10 @@ type (
 	durationKind struct{ Off bool }
 	daysKind     struct{}
 	globsKind    struct{}
+	// mcpServersKind is a table of MCP servers by name, each as Claude
+	// Code configures a server, with the tools that may run without a
+	// prompt in tools.
+	mcpServersKind struct{}
 )
 
 func (boolKind) check(string, any) Problems { return nil }
@@ -199,6 +205,124 @@ func (globsKind) schema() map[string]any {
 	return map[string]any{"type": "array", "items": map[string]any{"type": "string"}}
 }
 
+// mcpName is what a server's name and its tools are made of: nothing that
+// a permission rule of Claude Code reads as a pattern.
+var mcpName = regexp.MustCompile(`^[A-Za-z0-9_-]+$`)
+
+func (mcpServersKind) check(key string, v any) Problems {
+	servers := as[map[string]map[string]any](v)
+	var ps Problems
+	at := func(name string, sub ...string) []string {
+		return append(append(strings.Split(key, "."), name), sub...)
+	}
+	for _, name := range slices.Sorted(maps.Keys(servers)) {
+		srv := servers[name]
+		if !mcpName.MatchString(name) {
+			ps = append(ps, Problem{Key: at(name), Index: -1, AtKey: true,
+				Message: fmt.Sprintf("%s.%s: a server's name is made of letters, digits, _ and -", key, name)})
+		}
+		ts, ok := srv["tools"].([]any)
+		if !ok || len(ts) == 0 {
+			ps = append(ps, Problem{Key: at(name), Index: -1, AtKey: true,
+				Message: fmt.Sprintf("%s.%s needs tools: the tools of the server that may run without a prompt", key, name)})
+		}
+		for i, t := range ts {
+			if s, ok := t.(string); !ok || !mcpName.MatchString(s) {
+				ps = append(ps, Problem{Key: at(name, "tools"), Index: i,
+					Message: fmt.Sprintf("%s.%s.tools[%d] must name one tool, made of letters, digits, _ and -, got %v", key, name, i, t)})
+			}
+		}
+		if c, ok := srv["command"]; ok {
+			if s, ok := c.(string); !ok || strings.TrimSpace(s) == "" {
+				ps = append(ps, problemAt(at(name, "command"), "%s.%s.command must be a command", key, name))
+			}
+		}
+		if a, ok := srv["args"]; ok {
+			as, ok := a.([]any)
+			for _, x := range as {
+				if _, s := x.(string); !s {
+					ok = false
+				}
+			}
+			if !ok {
+				ps = append(ps, problemAt(at(name, "args"), "%s.%s.args must be a list of strings", key, name))
+			}
+		}
+	}
+	return ps
+}
+
+func problemAt(key []string, format string, args ...any) Problem {
+	return Problem{Key: key, Index: -1, Message: fmt.Sprintf(format, args...)}
+}
+
+// toml writes the servers as an inline table, the values of env and
+// headers hidden, since they may hold secrets.
+func (mcpServersKind) toml(v any) string {
+	servers := as[map[string]map[string]any](v)
+	m := make(map[string]any, len(servers))
+	for name, srv := range servers {
+		c := make(map[string]any, len(srv))
+		for k, x := range srv {
+			if h, ok := x.(map[string]any); ok && (k == "env" || k == "headers") {
+				hidden := make(map[string]any, len(h))
+				for hk := range h {
+					hidden[hk] = "(hidden)"
+				}
+				x = hidden
+			}
+			c[k] = x
+		}
+		m[name] = c
+	}
+	return tomlValue(m)
+}
+
+func (mcpServersKind) schema() map[string]any {
+	strs := map[string]any{"type": "array", "items": map[string]any{"type": "string"}}
+	return map[string]any{"type": "object", "additionalProperties": map[string]any{
+		"type":     "object",
+		"required": []string{"tools"},
+		"properties": map[string]any{
+			"tools":   map[string]any{"type": "array", "minItems": 1, "items": map[string]any{"type": "string", "pattern": mcpName.String()}},
+			"command": map[string]any{"type": "string"},
+			"args":    strs,
+		},
+	}}
+}
+
+// tomlValue is v, as decoded from TOML, written as an inline TOML value.
+func tomlValue(v any) string {
+	switch x := v.(type) {
+	case string:
+		return fmt.Sprintf("%q", x)
+	case []any:
+		q := make([]string, len(x))
+		for i, e := range x {
+			q[i] = tomlValue(e)
+		}
+		return "[" + strings.Join(q, ", ") + "]"
+	case map[string]any:
+		if len(x) == 0 {
+			return "{}"
+		}
+		var q []string
+		for _, k := range slices.Sorted(maps.Keys(x)) {
+			q = append(q, tomlKey(k)+" = "+tomlValue(x[k]))
+		}
+		return "{ " + strings.Join(q, ", ") + " }"
+	default:
+		return fmt.Sprint(x)
+	}
+}
+
+func tomlKey(k string) string {
+	if mcpName.MatchString(k) {
+		return k
+	}
+	return fmt.Sprintf("%q", k)
+}
+
 func tomlList(ss []string) string {
 	q := make([]string, len(ss))
 	for i, s := range ss {
@@ -219,7 +343,7 @@ var tables = []table{
 	{Name: "review"},
 	{Name: "merge"},
 	{Name: "bulk", Before: selectExamples},
-	{Name: "claude", Doc: "C and i ask Claude Code (claude -p, with the account you are signed in with). i, or ask claude about it in the menu of enter, reviews the pull request under the cursor in a worktree of its head. C plans what to show and select in the tab shown, with no tools, and answers in the language you ask in; enter applies the plan, and an approve or a merge in it opens the confirm popup. Claude only reads: no settings files or MCP servers are loaded, its file tools see only the worktree, and it has none that run commands."},
+	{Name: "claude", Doc: "C and i ask Claude Code (claude -p, with the account you are signed in with). i, or ask claude about it in the menu of enter, reviews the pull request under the cursor in a worktree of its head. C plans what to show and select in the tab shown, with no tools, and answers in the language you ask in; enter applies the plan, and an approve or a merge in it opens the confirm popup. Claude only reads: no settings files are loaded, no MCP servers but those in mcp_servers, its file tools see only the worktree, and it has none that run commands."},
 	{Name: "theme"},
 	{Name: "log"},
 	{Name: "cache"},
@@ -284,6 +408,9 @@ var settings = []setting{
 		Doc: `Appended to the instructions of every review and triage, such as "Point out changes that have no tests."`},
 	{Key: "claude.release_notes_check", Kind: boolKind{}, Value: func(f File) any { return f.Claude.ReleaseNotesCheck },
 		Doc: "Let Claude read the release notes of the bot pull requests in the merge popup, and mark those that need care."},
+	{Key: "claude.mcp_servers", Kind: mcpServersKind{}, Value: func(f File) any { return f.Claude.MCPServers },
+		Example: `{ recall = { command = "recall", args = ["mcp", "--repo", "${GH_TRIAGE_URL}"], tools = ["recall_search", "recall_list", "recall_export"] } }`,
+		Doc:     "MCP servers for the conversation about a pull request, by name, written as Claude Code configures a server (command, args, env; or type, url, headers), with tools: the server's tools that may run without a prompt. A server started with a command runs in the cache, not in the worktree. ${GH_TRIAGE_OWNER}, ${GH_TRIAGE_REPO}, ${GH_TRIAGE_NUMBER} and ${GH_TRIAGE_URL} (the repository's URL) are the pull request; pass secrets as ${VAR} from your environment. What the pull request says may call these tools: a server that reads private data, together with WebFetch, lets it send the data out."},
 
 	{Key: "theme.dark", Kind: enumKind{Themes}, Value: func(f File) any { return f.Theme.Dark },
 		Doc: `The color scheme on a dark terminal, and on one that does not tell its background.`},

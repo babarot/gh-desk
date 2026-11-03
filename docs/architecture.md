@@ -14,7 +14,7 @@ gh-triage is split into packages by layer. A package imports only packages of lo
 | 1 | `internal/plan` | Deciding how to merge each pull request; selection rules | `model` | - |
 | 1 | `internal/diff` | Reading patches and the words that changed | - | - |
 | 2 | `internal/github` | GitHub's GraphQL and REST APIs | `model`, `logging` | `github.com/cli/go-gh/v2` |
-| 2 | `internal/state` | The pending-merge record and its lock; the conversations with Claude and their locks; the screen layout kept between launches | `model` | - |
+| 2 | `internal/state` | The pending-merge record and its lock; the conversations with Claude and their locks; the directories of the running gh-triage; the screen layout kept between launches | `model` | - |
 | 2 | `internal/claude` | Running claude -p and the pull request worktrees | `model`, `logging` | - |
 | 2 | `internal/listcache` | The lists last read, kept on disk for the next launch | `model` | - |
 | 3 | `internal/runner` | Bulk approve and merge, auto-merge watching, resuming | `model`, `logging`, `plan` | - |

@@ -58,6 +58,7 @@ func fakeClaude(t *testing.T) (bin, dir string) {
 printf '%s\0' "$@" > "` + dir + `/args"
 cat > "` + dir + `/stdin"
 pwd > "` + dir + `/pwd"
+env | grep -E "^GH_TRIAGE_(OWNER|REPO|NUMBER|URL)=" > "` + dir + `/env"
 echo '{"type":"result","is_error":false,"result":"ok","total_cost_usd":0.1}'
 `
 	if err := os.WriteFile(bin, []byte(script), 0o755); err != nil {
@@ -120,7 +121,7 @@ func TestAskIsRestricted(t *testing.T) {
 		t.Errorf("resume got = %q", got)
 	}
 
-	cmd := c.Interactive(wt, "s-1")
+	cmd := c.Interactive(model.PRKey{}, wt, "s-1")
 	if !slices.Contains(cmd.Args, "--restricted") || slices.Contains(cmd.Args, "--allowedTools") || cmd.Dir != wt {
 		t.Errorf("interactive = %q in %s", cmd.Args, cmd.Dir)
 	}

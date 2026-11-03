@@ -241,6 +241,24 @@ type Claude struct {
 	// ReleaseNotesCheck lets Claude read the release notes of the bot pull
 	// requests in a merge popup.
 	ReleaseNotesCheck bool `toml:"release_notes_check"`
+	// MCPServers are the MCP servers of the conversation about a pull
+	// request, by name, as Claude Code configures a server, with Tools
+	// (`tools`) added (ADR-033).
+	MCPServers map[string]map[string]any `toml:"mcp_servers"`
+}
+
+// MCPTools are the tools of server that may run without a prompt, as its
+// `tools` names them. Load has checked them.
+func MCPTools(server map[string]any) []string {
+	var out []string
+	if ts, ok := server["tools"].([]any); ok {
+		for _, t := range ts {
+			if s, ok := t.(string); ok {
+				out = append(out, s)
+			}
+		}
+	}
+	return out
 }
 
 // Theme configures the colors.

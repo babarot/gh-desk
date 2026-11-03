@@ -13,6 +13,7 @@ import (
 	"io"
 	"io/fs"
 	"log/slog"
+	"maps"
 	"os"
 	"path/filepath"
 	"slices"
@@ -112,7 +113,7 @@ func Run(args []string, stdout, stderr io.Writer) int {
 	if flags.Arg(0) == "gc" {
 		ws := &claude.Workspace{Dir: cfg.CacheDir(), Log: log}
 		chats := state.OpenChats(state.DefaultDir(), github.DefaultHost())
-		if err := gc(context.Background(), ws, chats, gh, stdout); err != nil {
+		if err := gc(context.Background(), ws, chats, runs(cfg), gh, stdout); err != nil {
 			log.Error("gc", "err", err.Error())
 			fmt.Fprintf(stderr, "gh-triage: gc: %v\n", err)
 			return 1
@@ -141,6 +142,7 @@ func Run(args []string, stdout, stderr io.Writer) int {
 	if p.lock != nil {
 		p.lock.close()
 	}
+	p.release()
 	log.Info("exit", logging.KeyDurationMS, time.Since(start).Milliseconds(), "err", errString(err))
 	if err != nil {
 		fmt.Fprintf(stderr, "gh-triage: %v (run %s)\n", err, run)
@@ -170,6 +172,8 @@ type parts struct {
 	cl    asker
 	store *state.Store
 	lock  *pendingLock
+	// release removes the files of this run given to Claude.
+	release func()
 }
 
 // assemble puts together what the TUI runs with from the config and e. It
@@ -215,11 +219,43 @@ func assemble(cfg config.File, warns []string, e env, log *slog.Logger) parts {
 		lock = &pendingLock{dir: e.stateDir, rn: rn}
 		set.Lock = lock
 	}
+	opt := claude.Options{Bin: cfg.ClaudeCommand(), Model: cfg.Claude.Model, Tools: cfg.Claude.AllowedTools, Language: cfg.Claude.Language, Instructions: cfg.Claude.Instructions, Log: log}
+	release := func() {}
+	if len(cfg.Claude.MCPServers) > 0 {
+		var err error
+		release, err = conversationFiles(cfg, &opt)
+		if err != nil {
+			log.Warn("could not write the MCP servers for Claude", "err", err.Error())
+			set.ConfigWarnings = append(set.ConfigWarnings, "claude.mcp_servers are left out: "+err.Error())
+			release = func() {}
+		} else {
+			log.Debug("mcp servers", "servers", slices.Sorted(maps.Keys(cfg.Claude.MCPServers)), "tools", opt.MCPTools)
+		}
+	}
 	cl := asker{
-		Claude: claude.New(claude.Options{Bin: cfg.ClaudeCommand(), Model: cfg.Claude.Model, Tools: cfg.Claude.AllowedTools, Language: cfg.Claude.Language, Instructions: cfg.Claude.Instructions, Log: log}),
+		Claude: claude.New(opt),
 		ws:     &claude.Workspace{Dir: cfg.CacheDir(), Borrow: e.borrow, Log: log},
 	}
-	return parts{set: set, rn: rn, cl: cl, store: store, lock: lock}
+	return parts{set: set, rn: rn, cl: cl, store: store, lock: lock, release: release}
+}
+
+// runs are the directories of the running gh-triage, in the cache.
+func runs(cfg config.File) state.Runs { return state.Runs{Dir: filepath.Join(cfg.CacheDir(), "runs")} }
+
+// conversationFiles writes what the conversation with Claude is given
+// beside its flags, in a directory of this run, and sets them in opt.
+// release removes them.
+func conversationFiles(cfg config.File, opt *claude.Options) (release func(), err error) {
+	dir, release, err := runs(cfg).New()
+	if err != nil {
+		return nil, err
+	}
+	opt.MCPConfig, opt.MCPTools, err = claude.WriteMCPConfig(dir, cfg.CacheDir(), cfg.Claude.MCPServers)
+	if err != nil {
+		release()
+		return nil, err
+	}
+	return release, nil
 }
 
 // openLists opens the lists last read by this account on this host. The
@@ -243,7 +279,13 @@ type prReader interface {
 // that are no longer open. A pull request GitHub does not return (deleted,
 // or out of reach) is kept, and so is one whose conversation a gh-triage
 // is working on: its lock is taken first, without waiting.
-func gc(ctx context.Context, ws *claude.Workspace, chats *state.Chats, gh prReader, out io.Writer) error {
+func gc(ctx context.Context, ws *claude.Workspace, chats *state.Chats, rs state.Runs, gh prReader, out io.Writer) error {
+	// The files of a gh-triage that did not exit cleanly.
+	if n, err := rs.Sweep(); err != nil {
+		return err
+	} else if n > 0 {
+		fmt.Fprintf(out, "removed the files of %d gh-triage no longer running\n", n)
+	}
 	wts, err := ws.Worktrees()
 	if err != nil {
 		return err
