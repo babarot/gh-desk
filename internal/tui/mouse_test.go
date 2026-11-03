@@ -216,7 +216,7 @@ func TestClickOnALinkWaitsForASecond(t *testing.T) {
 	}
 	// It keeps the background of the row it is on, the cursor's here.
 	raw, _ := m.render()
-	if want := m.st.peach.Bold(true).Background(m.st.sel.GetBackground()).Render("open "); !strings.Contains(strings.Split(raw, "\n")[y], want) {
+	if want := m.st.peach.Bold(true).Background(m.st.sel.GetBackground()).Underline(true).Render("open"); !strings.Contains(strings.Split(raw, "\n")[y], want) {
 		t.Fatalf("%q is not drawn on the row's background:\n%q", "open", strings.Split(raw, "\n")[y])
 	}
 

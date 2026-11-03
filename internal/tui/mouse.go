@@ -7,6 +7,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
+	"github.com/charmbracelet/x/ansi"
 
 	"github.com/babarot/gh-triage/internal/model"
 )
@@ -257,10 +258,6 @@ func (m *Model) drawArmed(lines []string) []string {
 	if s, ok := m.linkUnder(a.x, a.y); !ok || s != a.spot {
 		return lines
 	}
-	label := "open"
-	if lipgloss.Width("▸ "+label) <= a.w {
-		label = "▸ " + label
-	}
 	// On the background of what it is drawn over, as place leaves none.
 	style := m.st.peach.Bold(true)
 	switch {
@@ -272,7 +269,9 @@ func (m *Model) drawArmed(lines []string) []string {
 			style = style.Background(bg.GetBackground())
 		}
 	}
-	lines[a.y] = place(lines[a.y], style.Render(fit(label, a.w)), a.x)
+	// Only the word is underlined, not the rest of the link's cells.
+	label := ansi.Truncate("open", a.w, "")
+	lines[a.y] = place(lines[a.y], style.Underline(true).Render(label)+style.Render(spaces(a.w-lipgloss.Width(label))), a.x)
 	return lines
 }
 
