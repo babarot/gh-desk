@@ -1,6 +1,6 @@
 # gh-desk
 
-Review and merge the pull requests that reach you, from the terminal.
+A desk in your terminal for the pull requests waiting on you.
 
 ```sh
 gh desk
