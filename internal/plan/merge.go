@@ -173,6 +173,25 @@ func ForApprove(mi model.MergeInfo, pr model.PR, viewer string, includeFailing b
 	return d
 }
 
+// ForReview decides sending a review of the kind event: an approval as
+// ForApprove does, a request for changes to another's open pull request,
+// and a comment to any.
+func ForReview(mi model.MergeInfo, pr model.PR, viewer string, event model.ReviewEvent, includeFailing bool, set Settings) Decision {
+	switch event {
+	case model.EventApprove:
+		return ForApprove(mi, pr, viewer, includeFailing, set)
+	case model.EventRequestChanges:
+		switch {
+		case mi.State != model.StateOpen:
+			return Decision{Step: StepSkip, Reason: stateWord(mi.State)}
+		case pr.Author == viewer:
+			return Decision{Step: StepSkip, Reason: "your own pull request"}
+		}
+		return Decision{Reason: "request changes"}
+	}
+	return Decision{Reason: "comment"}
+}
+
 // ForReady decides marking a draft pull request ready for review. Whether
 // the viewer may (the author, or one who can write to the repository) is
 // GitHub's to say.

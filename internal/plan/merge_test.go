@@ -175,3 +175,33 @@ func TestCancelledRequiredCheckFails(t *testing.T) {
 		t.Error("a canceled required check is not failing")
 	}
 }
+
+func TestForReview(t *testing.T) {
+	open := info(model.MergeClean)
+	merged := open
+	merged.State = model.StateMerged
+	other, mine := model.PR{Author: "alice"}, model.PR{Author: "me"}
+	tests := []struct {
+		name   string
+		mi     model.MergeInfo
+		pr     model.PR
+		event  model.ReviewEvent
+		skip   bool
+		reason string
+	}{
+		{"approve", open, other, model.EventApprove, false, "approve"},
+		{"approve own", open, mine, model.EventApprove, true, "your own pull request"},
+		{"approve merged", merged, other, model.EventApprove, true, "merged"},
+		{"request changes", open, other, model.EventRequestChanges, false, "request changes"},
+		{"request changes own", open, mine, model.EventRequestChanges, true, "your own pull request"},
+		{"request changes merged", merged, other, model.EventRequestChanges, true, "merged"},
+		{"comment own", open, mine, model.EventComment, false, "comment"},
+		{"comment merged", merged, other, model.EventComment, false, "comment"},
+	}
+	for _, tt := range tests {
+		d := ForReview(tt.mi, tt.pr, "me", tt.event, false, set)
+		if (d.Step == StepSkip) != tt.skip || d.Reason != tt.reason {
+			t.Errorf("%s: ForReview = %+v", tt.name, d)
+		}
+	}
+}
