@@ -33,6 +33,13 @@
 - Record a decision that sets the direction of the code as an ADR in `docs/adr/`, following `.claude/rules/adr.md`. It comes from babarot/github-config, and the Regomark workflow checks `docs/adr` against it
 - The lists an ADR names instead of copying are the package table (`arch_test.go`), the settings (`internal/config`), the default keys (`internal/tui/keymap`) and the log attribute names (`internal/logging`). A value left out of an ADR is a constant, as ADR-014 decides
 
+## Docs
+
+- The pages of the docs site are the Markdown files in `docs/`, outside `docs/adr` and `docs/site`, written to read on GitHub as they are: a `# title` first, no front matter, links to other pages by their `.md` file. See [ADR-053](docs/adr/053-the-docs-are-markdown-in-docs-built-by-hugo.md)
+- Never edit the pages in `docs/reference` by hand; the tests write them from the code (ADR-051)
+- Never name a page `claude.md`: on a filesystem that ignores case, Claude Code reads it as its instructions
+- `mise run docs:serve` shows the docs with the playground as they are published; `mise run docs:test` is what CI checks
+
 ## Test data
 
 - Tests and fixtures must not contain data from any private repository or organization. Use this repository, other public repositories, or made-up data

@@ -1,0 +1,18 @@
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Inter:wght@400;600;800&display=swap">
+<script>
+// An embedded screen of the playground starts when it is asked for, in
+// the theme the docs are shown in.
+document.addEventListener('click', e => {
+  const b = e.target.closest('.desk-pg-run');
+  if (!b) return;
+  const f = document.createElement('iframe');
+  const theme = document.documentElement.classList.contains('dark') ? 'dark' : 'light';
+  f.src = b.dataset.src + '&theme=' + theme;
+  f.title = b.dataset.title;
+  f.allow = 'clipboard-write';
+  b.closest(".desk-pg").replaceChildren(f);
+  f.focus();
+});
+</script>
