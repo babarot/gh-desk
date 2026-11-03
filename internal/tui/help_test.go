@@ -29,7 +29,7 @@ func TestHelpUnfoldsTheScreenItWasOpenedFrom(t *testing.T) {
 	if !strings.HasPrefix(s, "▾ the list and its preview · works here") || !strings.Contains(s, "select by rule") {
 		t.Errorf("the list's section is not first and unfolded:\n%s", s)
 	}
-	for _, want := range []string{"▸ anywhere (6) · works here", "▸ moving (6) · works here", "▸ writing a review (3) ─", "▸ mouse (5) · works here"} {
+	for _, want := range []string{"▸ anywhere (6) · works here", "▸ moving (6) · works here", "▸ writing a review (3) ─", "▸ mouse (6) · works here"} {
 		if !strings.Contains(s, want) {
 			t.Errorf("the ? popup has no %q:\n%s", want, s)
 		}
@@ -81,7 +81,7 @@ func TestHelpScrolls(t *testing.T) {
 	}
 	press(m, "G")
 	s := screen(m)
-	if !strings.Contains(s, "▸ mouse (5) · works here") || strings.Contains(s, "↓ ") {
+	if !strings.Contains(s, "▸ mouse (6) · works here") || strings.Contains(s, "↓ ") {
 		t.Errorf("G did not scroll to the end:\n%s", s)
 	}
 	end := m.helpTop

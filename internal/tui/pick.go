@@ -27,6 +27,7 @@ type pick struct {
 	checked map[int]bool
 	// top is the first line shown, kept by renderPick so sel is in sight.
 	top int
+	pointer
 }
 
 // ready reports whether the rules can be matched: the bodies they read are
@@ -206,16 +207,25 @@ func (m *Model) pickKey(k string) tea.Cmd {
 		} else {
 			v.checked[v.sel] = true
 		}
-	case (is("choose") || is("add_to_selection")) && m.pickReady():
-		chosen := m.chosen()
-		m.picker = nil
-		return m.applyRules(chosen, is("add_to_selection"))
+	case is("choose") || is("add_to_selection"):
+		return m.chooseRules(is("add_to_selection"))
 	case is("filter_by_rule") && m.pickReady():
 		chosen := m.chosen()
 		m.picker = nil
 		return m.filterByRules(chosen)
 	}
 	return nil
+}
+
+// chooseRules selects what the rules chosen match, once they can be
+// matched, as applyRules does.
+func (m *Model) chooseRules(add bool) tea.Cmd {
+	if !m.pickReady() {
+		return nil
+	}
+	chosen := m.chosen()
+	m.picker = nil
+	return m.applyRules(chosen, add)
 }
 
 // applyRules selects what the rules match together, replacing the
@@ -280,6 +290,7 @@ func (m *Model) renderPick() []string {
 	rs := m.rules()
 	var lines []string
 	var keep keepLines
+	var owner []int
 	for i, r := range rs {
 		cursor := " "
 		if i == v.sel {
@@ -302,6 +313,9 @@ func (m *Model) renderPick() []string {
 			keep = keepLines{len(lines), len(rule)}
 		}
 		lines = append(lines, rule...)
+		for range rule {
+			owner = append(owner, i)
+		}
 	}
 	chosen := m.chosen()
 	head := st.group.Render("matches")
@@ -338,6 +352,7 @@ func (m *Model) renderPick() []string {
 		st.key.Render(keymap.Back)+" "+st.muted.Render("cancel"))...)
 	out, top := scrollBox(st, "select by rule", lines, foot, w, m.popupHeight(), v.top, keep, "")
 	v.top = top
+	v.items = boxItems(owner, top, len(out), len(foot))
 	return out
 }
 

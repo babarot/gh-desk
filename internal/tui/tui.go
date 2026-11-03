@@ -195,6 +195,8 @@ type Model struct {
 	helpTop       int             // the first line of the ? popup shown
 	helpFolded    map[string]bool // the ? popup's sections folded, by title
 	helpBox       helpBox
+	// popupAt is where the popup shown was last drawn, for the mouse.
+	popupAt popupBox
 	// line is what the status line says (ADR-025), and statusTickAt when
 	// the redraw asked for it is due.
 	line         statusline.Line
