@@ -27,9 +27,17 @@ leads on the site:
   {{- end -}}
   {{- with $u.Fragment }}{{ $href = printf "%s#%s" $href . }}{{ end -}}
   {{- $embed = eq .Title "playground" -}}
-  {{- if and $embed (not (strings.Contains $u.RawQuery "scenario=")) -}}
-    {{- /* An embedded playground is watched, so it has to play something. */ -}}
-    {{- errorf "%s: the playground embedded by %q plays no scenario; add ?scenario=" .Page.File.Path $dest -}}
+  {{- with $scenario := $u.Query.Get "scenario" -}}
+    {{- /* data/scenarios.json is written from the playground's scenarios
+           by a test, so a name here that is not there plays nothing. */ -}}
+    {{- if not (in hugo.Data.scenarios $scenario) -}}
+      {{- errorf "%s: the link %q names the scenario %q, which the playground does not have" $.Page.File.Path $dest $scenario -}}
+    {{- end -}}
+  {{- else -}}
+    {{- if $embed -}}
+      {{- /* An embedded playground is watched, so it has to play something. */ -}}
+      {{- errorf "%s: the playground embedded by %q plays no scenario; add ?scenario=" $.Page.File.Path $dest -}}
+    {{- end -}}
   {{- end -}}
 {{- else if and (not $u.IsAbs) (not (strings.HasPrefix $dest "#")) -}}
   {{- $dir := path.Dir .Page.File.Path -}}

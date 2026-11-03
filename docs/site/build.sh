@@ -30,7 +30,7 @@ esac
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
 cp "$site_dir/hugo.yaml" "$site_dir/go.mod" "$site_dir/go.sum" "$work/"
-cp -R "$site_dir/layouts" "$site_dir/assets" "$site_dir/static" "$work/"
+cp -R "$site_dir/layouts" "$site_dir/assets" "$site_dir/static" "$site_dir/data" "$work/"
 mkdir -p "$work/content" "$work/static"
 
 # The order of the pages in the sidebar; a page not listed comes after
