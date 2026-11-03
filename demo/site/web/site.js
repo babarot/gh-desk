@@ -350,7 +350,11 @@
   const label = () => { themeBtn.textContent = dark() ? 'light' : 'dark'; };
   themeBtn.addEventListener('click', () => {
     root.dataset.theme = dark() ? 'light' : 'dark';
-    try { localStorage.setItem('gh-desk-theme', root.dataset.theme); } catch (e) {}
+    // color-theme is the docs' key, so the docs open in the theme picked here.
+    try {
+      localStorage.setItem('gh-desk-theme', root.dataset.theme);
+      localStorage.setItem('color-theme', root.dataset.theme);
+    } catch (e) {}
     label();
     start();
   });

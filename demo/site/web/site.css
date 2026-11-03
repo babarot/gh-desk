@@ -231,11 +231,14 @@ footer.wrap {
   color: var(--mid); font-size: 14px;
 }
 
-/* The way from a card into the playground above. */
+/* The ways from a card into the playground above and into the docs. */
 .cards p.more { margin-top: 12px; display: flex; gap: 16px; font-size: 14px; font-weight: 600; }
 .cards p.more a { color: var(--accent); text-decoration: none; }
 .cards p.more a:hover { text-decoration: underline; }
 .cards p.more a:first-child::before { content: "▶ "; font-size: 11px; }
+.cards p.more a + a::after { content: " →"; }
+.next { margin-top: 28px; color: var(--mid); }
+.next a { color: var(--accent); font-weight: 600; }
 
 /* The player of a scenario (?scenario=), under the terminal like the
    controls of a video: pause, the steps on a track, and play again. */
@@ -277,8 +280,8 @@ footer.wrap {
 .watch .term-bar .full { display: inline; }
 
 /* play/ (.whole): the terminal on the whole window, a page of its
-   own; the bar leads to the page about gh-desk instead of out of a
-   frame. */
+   own; the bar leads to the page about gh-desk and to the docs instead
+   of out of a frame. */
 .term-bar .out { display: none; gap: 14px; }
 .whole .term-bar .out { display: flex; }
 .whole .term-bar .out a { color: var(--mid); text-decoration: none; }

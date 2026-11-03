@@ -17,6 +17,8 @@ It opens the pull requests asked of you, yours, the ones you are involved in, an
 
 ![gh-desk with a made-up organization: a question to Claude about a pull request, and the dependency updates approved and merged together](docs/demo.gif)
 
+Try it in your browser, against a made-up GitHub, at [babarot.me/gh-desk](https://babarot.me/gh-desk/). The [docs](https://babarot.me/gh-desk/docs/) explain the rest: what gh-desk aims for, how to use it, and every setting and key.
+
 ## Install
 
 As a [gh](https://cli.github.com/) extension, run as `gh desk`:
