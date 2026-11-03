@@ -30,7 +30,8 @@
 
 ## Decisions
 
-- Record a decision that sets the direction of the code as an ADR in `docs/adr/`, following `.claude/rules/adr-template.md`
+- Record a decision that sets the direction of the code as an ADR in `docs/adr/`, following `.claude/rules/adr.md`. It comes from babarot/github-config, and the Regomark workflow checks `docs/adr` against it
+- The lists an ADR names instead of copying are the package table (`arch_test.go`), the settings (`internal/config`), the default keys (`internal/tui/keymap`) and the log attribute names (`internal/logging`). A value left out of an ADR is a constant, as ADR-014 decides
 
 ## Test data
 

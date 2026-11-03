@@ -3,6 +3,8 @@
 ## Status
 
 Accepted
+Partly replaced by ADR-043
+Partly replaced by ADR-044
 
 ## Context
 

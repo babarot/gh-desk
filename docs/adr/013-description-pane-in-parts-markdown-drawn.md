@@ -3,6 +3,8 @@
 ## Status
 
 Accepted
+Partly replaced by ADR-020
+Partly replaced by ADR-035
 
 ## Context
 
