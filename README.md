@@ -31,6 +31,12 @@ Or with Go, run as `gh-desk`:
 go install github.com/babarot/gh-desk@latest
 ```
 
+Or with [Nix](https://nixos.org/), run as `gh-desk`:
+
+```sh
+nix profile install github:babarot/nur-packages#gh-desk
+```
+
 gh-desk reads GitHub with the account gh is logged in to (`gh auth login`). Asking Claude needs [Claude Code](https://docs.anthropic.com/en/docs/claude-code) and git; everything else works without them.
 
 ## Keys

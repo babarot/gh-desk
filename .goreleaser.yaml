@@ -17,11 +17,17 @@ builds:
 
 archives:
   # Raw binaries for gh extension install (requires {name}_{os}-{arch} pattern)
-  - formats: ["binary"]
+  - id: gh-extension
+    formats: ["binary"]
     name_template: >-
       {{ .ProjectName }}_
       {{- .Os }}-
       {{- .Arch }}
+
+  # For the Nix package, which needs an archive
+  - id: nix
+    formats: ["tar.gz"]
+    name_template: "{{ .ProjectName }}_{{ .Os }}_{{ .Arch }}"
 
 changelog:
   use: github-native
@@ -35,3 +41,18 @@ release:
     - `gh extension install babarot/gh-desk`
 
     - `go install github.com/babarot/gh-desk@{{ .Tag }}`
+
+    - [Nix](https://nixos.org/): `nix profile install github:babarot/nur-packages#gh-desk`
+
+# Writes pkgs/gh-desk/default.nix to babarot/nur-packages, which builds the
+# package from the tar.gz archives above
+nix:
+  - ids: [nix]
+    repository:
+      owner: babarot
+      name: nur-packages
+      token: "{{ .Env.NUR_GITHUB_TOKEN }}"
+    homepage: https://github.com/babarot/gh-desk
+    description: A desk in your terminal for the pull requests waiting on you
+    license: mit
+    main_program: gh-desk

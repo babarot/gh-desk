@@ -78,3 +78,4 @@ jobs:
           args: release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NUR_GITHUB_TOKEN: ${{ secrets.NUR_GITHUB_TOKEN }}
