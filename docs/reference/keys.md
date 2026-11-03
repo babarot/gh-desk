@@ -125,6 +125,7 @@ browse = []
 |---|---|
 | click | tab, row, pane tab |
 | double click | actions |
-| click twice | @you, an author, a PR: browser |
+| click twice | @you, an author, a PR: browser; an item of a popup: choose |
+| click outside | a popup: close |
 | wheel | scroll |
 | drag | the pane's top edge: resize |

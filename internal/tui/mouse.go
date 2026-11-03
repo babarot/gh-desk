@@ -10,13 +10,14 @@ import (
 	"github.com/charmbracelet/x/ansi"
 
 	"github.com/babarot/gh-desk/internal/model"
+	"github.com/babarot/gh-desk/internal/tui/keymap"
 )
 
 // The mouse points: it picks a tab or a row, folds a group with a click,
 // opens a pull request with a double click, opens a page in the browser
-// with a second click on its link, scrolls, and resizes the preview pane
-// by its top edge. Nothing that writes to GitHub is done with it. See
-// ADR-012 and ADR-035.
+// with a second click on its link, scrolls, resizes the preview pane by
+// its top edge, and picks in a popup or closes it. Nothing that writes to
+// GitHub is done with it. See ADR-012, ADR-035 and ADR-053.
 
 const (
 	// minPaneHeight is the fewest lines the pane is shown with.
@@ -54,9 +55,8 @@ type click struct {
 	at       time.Time
 }
 
-// mouse routes a mouse message. A popup or the filter being typed takes
-// no clicks; the help folds a section with one, goes with one outside
-// it, and scrolls with the wheel.
+// mouse routes a mouse message. A popup takes it before what is behind
+// it; see popupMouse. The filter being typed takes none.
 func (m *Model) mouse(msg tea.MouseMsg) tea.Cmd {
 	switch msg := msg.(type) {
 	case tea.MouseMotionMsg:
@@ -77,23 +77,10 @@ func (m *Model) mouse(msg tea.MouseMsg) tea.Cmd {
 	// leaves it.
 	prev := m.armed
 	m.armed = nil
-	if m.bulk != nil || m.notesAt != nil || m.picker != nil || m.menu != nil || m.confirm != nil || m.triage != nil && m.triage.open || m.filtering || m.compose != nil {
-		return nil
+	if cmd, ok := m.popupMouse(msg); ok {
+		return cmd
 	}
-	if m.help {
-		switch msg := msg.(type) {
-		case tea.MouseClickMsg:
-			if msg.Button == tea.MouseLeft {
-				m.helpClick(msg.X, msg.Y)
-			}
-		case tea.MouseWheelMsg:
-			switch msg.Button {
-			case tea.MouseWheelDown:
-				m.scrollHelp(wheelLines)
-			case tea.MouseWheelUp:
-				m.scrollHelp(-wheelLines)
-			}
-		}
+	if m.filtering {
 		return nil
 	}
 	// Pointing at the list or the header above the claude pane goes back
@@ -414,4 +401,165 @@ func (m *Model) savePane() tea.Cmd {
 		}
 		return nil
 	}
+}
+
+// popupBox is where the popup shown was last drawn.
+type popupBox struct{ x, y, w, h int }
+
+// boxAt is where overlay draws popup from line top of a screen width wide.
+func boxAt(popup []string, top, width int) popupBox {
+	if len(popup) == 0 {
+		return popupBox{}
+	}
+	w := lipgloss.Width(popup[0])
+	return popupBox{x: max((width-w)/2, 0), y: top, w: w, h: len(popup)}
+}
+
+func (b popupBox) has(x, y int) bool {
+	return x >= b.x && x < b.x+b.w && y >= b.y && y < b.y+b.h
+}
+
+// pointer is what the mouse keeps of a popup with a cursor: the item each
+// line of its box shows, and the item the last mouse input clicked.
+type pointer struct {
+	// items are by the line of the box, -1 on one that shows none.
+	items []int
+	// clicked is the item of the last click, while hit says the last
+	// mouse input was that click.
+	clicked int
+	hit     bool
+}
+
+// noItems is n lines of a popup's body that show no item.
+func noItems(n int) []int {
+	out := make([]int, n)
+	for i := range out {
+		out[i] = -1
+	}
+	return out
+}
+
+// boxItems are the items of the lines of a box scrollBox drew h lines tall
+// with a foot of feet lines, from the owners of its body's lines and the
+// first line it drew: the top edge, the body shown, then the foot.
+func boxItems(owner []int, top, h, feet int) []int {
+	items := []int{-1}
+	for j := top; j < len(owner) && len(items) < h-1-feet; j++ {
+		items = append(items, owner[j])
+	}
+	return items
+}
+
+// popupMouse gives mouse input to the popup shown, in the order keys go to
+// them; ok is false with none. Each takes it as listMouse or scrollMouse
+// does, and acts within ADR-012: what writes to GitHub stays on its key.
+// The text being written takes none, so a click does not throw it away.
+func (m *Model) popupMouse(msg tea.MouseMsg) (cmd tea.Cmd, ok bool) {
+	switch {
+	case m.bulk != nil:
+		if m.scrollMouse(msg, &m.bulk.offset) {
+			return m.bulkKey(keymap.Back), true
+		}
+	case m.notesAt != nil:
+		v := m.notesAt
+		n := len(m.noteLines())
+		if run, closed := m.listMouse(msg, &v.pointer, &v.sel, n); closed {
+			m.notesAt = nil
+		} else if run {
+			return m.chooseNote(), true
+		}
+	case m.picker != nil:
+		v := m.picker
+		if run, closed := m.listMouse(msg, &v.pointer, &v.sel, len(m.rules())); closed {
+			m.picker = nil
+		} else if run {
+			return m.chooseRules(false), true
+		}
+	case m.menu != nil:
+		return m.menuMouse(msg), true
+	case m.confirm != nil:
+		if m.scrollMouse(msg, &m.confirm.top) {
+			return m.confirmKey(keymap.Back), true
+		}
+	case m.triage != nil && m.triage.open:
+		tr := m.triage
+		top := tr.top
+		if m.scrollMouse(msg, &tr.top) {
+			// A request on its way is stopped by its key, not a click.
+			if !tr.asking {
+				m.closeTriage()
+			}
+		} else if tr.top != top {
+			tr.follow = false
+		}
+	case m.help:
+		switch msg := msg.(type) {
+		case tea.MouseClickMsg:
+			if msg.Button == tea.MouseLeft {
+				m.helpClick(msg.X, msg.Y)
+			}
+		case tea.MouseWheelMsg:
+			switch msg.Button {
+			case tea.MouseWheelDown:
+				m.scrollHelp(wheelLines)
+			case tea.MouseWheelUp:
+				m.scrollHelp(-wheelLines)
+			}
+		}
+	case m.compose != nil:
+	default:
+		return nil, false
+	}
+	return nil, true
+}
+
+// listMouse is mouse input on a popup with a cursor at *sel over n items.
+// The wheel moves the cursor, and a click on an item puts the cursor on
+// it; one more click on it gives run, so that a stray click runs nothing.
+// A click outside the popup gives closed.
+func (m *Model) listMouse(msg tea.MouseMsg, p *pointer, sel *int, n int) (run, closed bool) {
+	hit := p.hit
+	p.hit = false
+	switch msg := msg.(type) {
+	case tea.MouseWheelMsg:
+		switch msg.Button {
+		case tea.MouseWheelDown:
+			*sel = min(*sel+1, max(n-1, 0))
+		case tea.MouseWheelUp:
+			*sel = max(*sel-1, 0)
+		}
+	case tea.MouseClickMsg:
+		if msg.Button != tea.MouseLeft {
+			return false, false
+		}
+		if !m.popupAt.has(msg.X, msg.Y) {
+			return false, true
+		}
+		r := msg.Y - m.popupAt.y
+		if r >= len(p.items) || p.items[r] < 0 || p.items[r] >= n {
+			return false, false
+		}
+		i := p.items[r]
+		run = hit && p.clicked == i && *sel == i
+		*sel, p.clicked, p.hit = i, i, !run
+	}
+	return run, false
+}
+
+// scrollMouse is mouse input on a popup that scrolls from line *top: the
+// wheel scrolls it, and a click outside it gives closed.
+func (m *Model) scrollMouse(msg tea.MouseMsg, top *int) (closed bool) {
+	switch msg := msg.(type) {
+	case tea.MouseWheelMsg:
+		switch msg.Button {
+		case tea.MouseWheelDown:
+			// Kept within the body when it is drawn.
+			*top += wheelLines
+		case tea.MouseWheelUp:
+			*top = max(*top-wheelLines, 0)
+		}
+	case tea.MouseClickMsg:
+		return msg.Button == tea.MouseLeft && !m.popupAt.has(msg.X, msg.Y)
+	}
+	return false
 }

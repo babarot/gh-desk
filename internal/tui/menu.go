@@ -18,6 +18,7 @@ type actionMenu struct {
 	sel int
 	// top is the first line shown, kept by renderMenu so sel is in sight.
 	top int
+	pointer
 }
 
 // menuActions are the actions the menu can offer, in their default order:
@@ -353,6 +354,7 @@ func (m *Model) renderMenu() []string {
 		sel = min(m.menu.sel, len(its)-1)
 	}
 	var keep keepLines
+	owner := noItems(len(lines))
 	for i, it := range its {
 		cursor := " "
 		if i == sel {
@@ -370,6 +372,9 @@ func (m *Model) renderMenu() []string {
 			keep = keepLines{len(lines), len(item)}
 		}
 		lines = append(lines, item...)
+		for range item {
+			owner = append(owner, i)
+		}
 	}
 	foot := []string{"", st.key.Render(m.firstKey("choose")) + " " + st.muted.Render("run") +
 		st.dim.Render(" · ") + st.muted.Render("or the action's key") +
@@ -381,6 +386,32 @@ func (m *Model) renderMenu() []string {
 	out, top := scrollBox(st, title, lines, foot, w, m.popupHeight(), top, keep, "")
 	if m.menu != nil {
 		m.menu.top = top
+		m.menu.items = boxItems(owner, top, len(out), len(foot))
 	}
 	return out
+}
+
+// menuMouse is mouse input with the menu open: an item is run by a
+// second click on it, but for marking done in the inbox, which writes to
+// GitHub with no popup to confirm it (ADR-012, ADR-053).
+func (m *Model) menuMouse(msg tea.MouseMsg) tea.Cmd {
+	v := m.menu
+	its := m.menuItems()
+	if len(its) == 0 {
+		m.menu = nil
+		return nil
+	}
+	v.sel = min(v.sel, len(its)-1)
+	run, closed := m.listMouse(msg, &v.pointer, &v.sel, len(its))
+	switch {
+	case closed:
+		m.menu = nil
+	case run:
+		if it := its[v.sel]; it.action == "hide" && m.tab().inbox && !it.off {
+			m.refuse(m.keys.Help(it.action) + ": press " + m.firstKey(it.action) + ", as a click does not mark done on GitHub")
+			return nil
+		}
+		return m.runMenu(its[v.sel])
+	}
+	return nil
 }

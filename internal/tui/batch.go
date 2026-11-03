@@ -280,6 +280,7 @@ type notesView struct {
 	sel int
 	// top is the first line shown, kept by renderNotes so sel is in sight.
 	top int
+	pointer
 }
 
 type toastMsg struct{ n *note }
@@ -360,19 +361,30 @@ func (m *Model) notesKey(k string) tea.Cmd {
 		v.sel = min(v.sel+1, max(len(ls)-1, 0))
 	case is("up"):
 		v.sel = max(v.sel-1, 0)
-	case is("choose") && v.sel < len(ls):
-		l := ls[v.sel]
-		key := model.PRKey{}
-		switch {
-		case l.item != nil:
-			key = l.item.key
-		case len(l.n.items) > 0:
-			key = l.n.items[0].key
-		}
-		m.notesAt = nil
-		if key != (model.PRKey{}) {
-			return m.jumpTo(key)
-		}
+	case is("choose"):
+		return m.chooseNote()
+	}
+	return nil
+}
+
+// chooseNote goes to the pull request of the line under the cursor: an
+// item's, or a note's first.
+func (m *Model) chooseNote() tea.Cmd {
+	ls, v := m.noteLines(), m.notesAt
+	if v.sel >= len(ls) {
+		return nil
+	}
+	l := ls[v.sel]
+	key := model.PRKey{}
+	switch {
+	case l.item != nil:
+		key = l.item.key
+	case len(l.n.items) > 0:
+		key = l.n.items[0].key
+	}
+	m.notesAt = nil
+	if key != (model.PRKey{}) {
+		return m.jumpTo(key)
 	}
 	return nil
 }
@@ -412,6 +424,7 @@ func (m *Model) renderNotes() []string {
 	if len(ls) == 0 {
 		body = append(body, st.dim.Render("nothing yet"))
 	}
+	owner := noItems(len(body))
 	var keep keepLines
 	for i, l := range ls {
 		cursor := " "
@@ -439,11 +452,15 @@ func (m *Model) renderNotes() []string {
 			keep = keepLines{len(body), len(item)}
 		}
 		body = append(body, item...)
+		for range item {
+			owner = append(owner, i)
+		}
 	}
 	foot := []string{"", st.key.Render(m.firstKey("choose")) + " " + st.muted.Render("go to the pull request") +
 		st.dim.Render(" · ") + st.key.Render(keymap.Back) + " " + st.muted.Render("close")}
 	out, top := scrollBox(st, "notifications", body, foot, w, m.popupHeight(), v.top, keep, "")
 	v.top = top
+	v.items = boxItems(owner, top, len(out), len(foot))
 	return out
 }
 
