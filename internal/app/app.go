@@ -44,7 +44,6 @@ Commands:
   config     check, show or edit the config file (gh desk config help)
   gc         remove the worktrees of pull requests no longer open
   log        print where the log file is
-  version    print the version
 
 Flags:
 `
@@ -57,6 +56,7 @@ func Run(args []string, stdout, stderr io.Writer) int {
 	configPath := flags.String("config", config.FilePath(), "the config file")
 	debug := flags.Bool("debug", false, "log at debug level")
 	noCache := flags.Bool("no-cache", false, "neither show nor keep the lists last read")
+	showVersion := flags.Bool("version", false, "print the version")
 	flags.Usage = func() {
 		fmt.Fprint(stderr, usage)
 		flags.PrintDefaults()
@@ -67,15 +67,16 @@ func Run(args []string, stdout, stderr io.Writer) int {
 		}
 		return 2
 	}
+	if *showVersion {
+		fmt.Fprintln(stdout, version.String())
+		return 0
+	}
 	switch flags.Arg(0) {
 	case "", "gc":
 	case "config":
 		return configCommand(flags.Args()[1:], *configPath, *debug, stdout, stderr)
 	case "log":
 		fmt.Fprintln(stdout, logging.DefaultPath())
-		return 0
-	case "version":
-		fmt.Fprintln(stdout, version.String())
 		return 0
 	default:
 		fmt.Fprintf(stderr, "gh-desk: unknown command %q\n", flags.Arg(0))
