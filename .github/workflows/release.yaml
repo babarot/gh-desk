@@ -79,3 +79,14 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NUR_GITHUB_TOKEN: ${{ secrets.NUR_GITHUB_TOKEN }}
+
+  # The site is published with the release, from the commit released, so
+  # that what it shows is the gh-desk people install
+  pages:
+    if: needs.tagpr.outputs.tag != ''
+    needs: tagpr
+    uses: ./.github/workflows/pages.yaml
+    permissions:
+      contents: read
+      pages: write
+      id-token: write

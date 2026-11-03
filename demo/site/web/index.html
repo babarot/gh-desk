@@ -16,7 +16,12 @@
 // set before the page is drawn, so it does not flash.
 (() => {
   const root = document.documentElement, q = new URLSearchParams(location.search);
-  try { const t = localStorage.getItem('gh-desk-theme'); if (t) root.dataset.theme = t; } catch (e) {}
+  // The docs under docs/ keep the theme as color-theme (Hextra's key, which
+  // may also be "system"); the one picked last on either page is used.
+  try {
+    const t = localStorage.getItem('color-theme') || localStorage.getItem('gh-desk-theme');
+    if (t === 'dark' || t === 'light') root.dataset.theme = t;
+  } catch (e) {}
   if (q.get('theme') === 'dark' || q.get('theme') === 'light') root.dataset.theme = q.get('theme');
   if (q.has('embed') && q.get('embed') !== '0') root.classList.add('embed');
   // play/, the whole window: laid out as embedded, with the ways out of it.
@@ -38,6 +43,7 @@
   <nav>
     <a href="#try">Try it</a>
     <a href="#install">Install</a>
+    <a href="docs/">Docs</a>
     <a href="https://github.com/babarot/gh-desk">GitHub</a>
     <button class="theme" id="theme" type="button" aria-label="Switch color theme">dark</button>
   </nav>
@@ -56,7 +62,7 @@
         <div class="dots"><i></i><i></i><i></i></div>
         <span class="title">~ — gh desk</span>
         <a class="full" id="full" href="./" target="_blank" rel="noopener">Open the playground ↗</a>
-        <nav class="out"><a href="./">About gh-desk</a></nav>
+        <nav class="out"><a href="./">About gh-desk</a><a href="docs/">Docs</a></nav>
         <button id="restart" type="button">Restart</button>
       </div>
       <div class="screen" id="screen" aria-label="Terminal running gh-desk. Click it and type."></div>
@@ -90,32 +96,32 @@
       <article>
         <h3>Look before you merge</h3>
         <p><kbd>p</kbd> opens the pane under the list: the description beside the checks and reviews. <kbd>v</kbd> switches it to the diff, <kbd>]</kbd> and <kbd>[</kbd> move between files, and <kbd>J</kbd> <kbd>K</kbd> scroll it.</p>
-        <p class="more"><a href="?watch=1&amp;scenario=diff#try">Show me</a></p>
+        <p class="more"><a href="?watch=1&amp;scenario=diff#try">Show me</a><a href="docs/guides/reading/">Read more</a></p>
       </article>
       <article>
         <h3>Merge the bots in one go</h3>
         <p>Move to the bots and press <kbd>b</kbd> to unfold them, <kbd>S</kbd> to pick the rule <em>dependency bots</em>, then <kbd>M</kbd>. The popup says how each will be merged, and Claude reads the release notes for the ones that need care.</p>
-        <p class="more"><a href="?watch=1&amp;scenario=merge#try">Show me</a></p>
+        <p class="more"><a href="?watch=1&amp;scenario=merge#try">Show me</a><a href="docs/guides/approve-and-merge/">Read more</a></p>
       </article>
       <article>
         <h3>Ask Claude about one</h3>
         <p><kbd>i</kbd> on a pull request asks Claude to review it, in a worktree of its head. <kbd>ctrl+r</kbd> then drafts the review to post. Here the answers are written in advance.</p>
-        <p class="more"><a href="?watch=1&amp;scenario=claude#try">Show me</a></p>
+        <p class="more"><a href="?watch=1&amp;scenario=claude#try">Show me</a><a href="docs/guides/ask-claude/">Read more</a></p>
       </article>
       <article>
         <h3>Or tell Claude what you want</h3>
         <p><kbd>C</kbd> and type <em>merge the bots with passing checks</em>. Claude plans what to show and select; <kbd>enter</kbd> applies it, and nothing is sent until you confirm.</p>
-        <p class="more"><a href="?watch=1&amp;scenario=triage#try">Show me</a></p>
+        <p class="more"><a href="?watch=1&amp;scenario=triage#try">Show me</a><a href="docs/guides/ask-claude/#about-the-tab">Read more</a></p>
       </article>
       <article>
         <h3>Your notifications</h3>
         <p><kbd>4</kbd> or <kbd>tab</kbd> goes to the inbox: the pull requests in your notifications, with why each is there. <kbd>d</kbd> marks one done.</p>
-        <p class="more"><a href="?watch=1&amp;scenario=inbox#try">Show me</a></p>
+        <p class="more"><a href="?watch=1&amp;scenario=inbox#try">Show me</a><a href="docs/guides/tabs/#the-inbox">Read more</a></p>
       </article>
       <article>
         <h3>Every key</h3>
         <p><kbd>?</kbd> lists the keys of the screen you are on. They are bound by action name, and each can be changed in the config file.</p>
-        <p class="more"><a href="?watch=1&amp;scenario=help#try">Show me</a></p>
+        <p class="more"><a href="?watch=1&amp;scenario=help#try">Show me</a><a href="docs/reference/keys/">Read more</a></p>
       </article>
     </div>
   </section>
@@ -200,7 +206,7 @@
 <span class="k">light</span> = <span class="s">"github-light"</span></pre>
       </div>
 
-      <p class="sub cmds"><code>gh desk config check</code> finds the mistakes without starting, <code>gh desk config show --diff</code> prints what you changed from the defaults, and <code>gh desk config edit</code> opens the file and checks it when you close it.</p>
+      <p class="sub cmds"><code>gh desk config check</code> finds the mistakes without starting, <code>gh desk config show --diff</code> prints what you changed from the defaults, and <code>gh desk config edit</code> opens the file and checks it when you close it. Every setting is described in <a href="docs/reference/configuration/">the configuration reference</a>.</p>
     </div>
   </section>
 
@@ -260,6 +266,7 @@
           </div>
         </li>
       </ol>
+      <p class="next"><a href="docs/getting-started/">Getting started</a> walks through the first run, and <a href="docs/">the docs</a> explain the rest.</p>
     </div>
   </section>
 </main>
