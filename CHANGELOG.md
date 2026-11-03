@@ -1,5 +1,9 @@
 # Changelog
 
+## [v0.1.1](https://github.com/babarot/gh-desk/compare/v0.1.0...v0.1.1) - 2026-11-03
+### Improvements
+- Print the version with --version, not a version command by @babarot in https://github.com/babarot/gh-desk/pull/20
+
 ## [v0.1.0](https://github.com/babarot/gh-desk/commits/v0.1.0) - 2026-11-03
 ### New Features
 - Mark a draft of your own or of a bot ready on its way to a merge by @babarot in https://github.com/babarot/gh-desk/pull/8
