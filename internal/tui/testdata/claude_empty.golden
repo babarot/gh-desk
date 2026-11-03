@@ -18,7 +18,7 @@ triage // @me    1 review (3)   2 mine (1)   3 involved (0)   4 inbox (1)       
 
 
 
-╭ claude on acme/api#12 ─────────────────────────────────────────────────────────────────────────── at aaaaaaa · read-only · J/K ╮
+╭ claude on acme/api#12 ─────────────────────────────────────────────────────────────────── at aaaaaaa · read-only · pgup/pgdown ╮
 │                                                                                                                                │
 │                                                                                                                                │
 │                                                                                                                                │
@@ -31,4 +31,4 @@ triage // @me    1 review (3)   2 mine (1)   3 involved (0)   4 inbox (1)       
 │ ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯                           │
 ╰────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
                                                                                                                                   
-enter accept · tab fill in the suggestion · esc back                                                                              
+enter accept · tab fill in the suggestion · ctrl+r draft review · ctrl+o open in claude code · esc back                           

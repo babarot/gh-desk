@@ -1519,7 +1519,7 @@ func TestClaudeConversation(t *testing.T) {
 	}
 	golden(t, "claude", screen(m))
 
-	press(m, "i", "w", "h", "y", "?", "enter")
+	press(m, "w", "h", "y", "?", "enter")
 	if len(fc.asked) != 2 {
 		t.Fatalf("asked %d", len(fc.asked))
 	}
@@ -1532,9 +1532,9 @@ func TestClaudeConversation(t *testing.T) {
 	}
 
 	// Leaving and coming back keeps the conversation.
-	press(m, "backspace")
+	press(m, "esc")
 	if m.claudeOpen {
-		t.Fatal("backspace did not go back to the preview")
+		t.Fatal("esc did not go back to the preview")
 	}
 	press(m, "i")
 	if len(fc.asked) != 2 || !strings.Contains(screen(m), "Answer 2") {
@@ -1548,40 +1548,40 @@ func TestClaudeSuggestsAReview(t *testing.T) {
 	m, _ := startWith(t, fixture(), keymap.Default())
 	fc := fakeClaudeOf(t, m)
 	press(m, "i", "w", "tab")
-	if c := m.chat(); !c.typing || c.input.Value() != "w" {
-		t.Fatalf("typing %v, box %q", c.typing, c.input.Value())
+	if c := m.chat(); !m.typingChat() || c.input.Value() != "w" {
+		t.Fatalf("typing %v, box %q", m.typingChat(), c.input.Value())
 	}
 	press(m, "backspace", "tab", "enter")
 	if len(fc.asked) != 1 || !strings.HasSuffix(fc.asked[0].Prompt, "\n"+claude.ReviewQuestion) {
 		t.Fatalf("asked %+v", fc.asked)
 	}
-	press(m, "i", "tab")
+	press(m, "tab")
 	if c := m.chat(); c.input.Value() != "" || c.input.Placeholder == claude.ReviewQuestion || strings.Contains(screen(m), "fill in the suggestion") {
 		t.Errorf("a review is offered again: box %q, placeholder %q", c.input.Value(), c.input.Placeholder)
 	}
 }
 
-// The claude pane shows the conversation about the pull request under the
-// cursor, as the preview does; one with nothing asked is not begun by
-// moving onto it.
-func TestClaudePaneFollowsTheCursor(t *testing.T) {
+// While Claude answers, the claude pane takes every key but help: the list
+// does not move under it, backspace goes back while Claude goes on, and a
+// click on the list goes back to it.
+func TestClaudeWaitingTakesTheKeys(t *testing.T) {
 	m, _ := startWith(t, fixture(), keymap.Default())
-	fc := fakeClaudeOf(t, m)
-	press(m, "i", "tab", "enter")
-	press(m, "b", "j", "j", "j")
-	s := screen(m)
-	if p, _, _ := m.currentPR(); p.Key != key("acme", "api", 30) {
-		t.Fatalf("the cursor is on %v", p.Key)
+	press(m, "i")
+	c := m.chat()
+	chat.NewState(nil, logging.Discard(), func() time.Time { return now }, noStatus{}).Begin(c.Conversation, "And then?")
+	stopped := false
+	c.cancel = func() { stopped = true }
+	sel := m.tab().sel
+	press(m, "j", "q", "tab")
+	if m.tab().sel != sel || !m.claudeShown() || m.typingChat() {
+		t.Fatalf("the list moved, or the pane went or took typing: sel %d, shown %v", m.tab().sel, m.claudeShown())
 	}
-	if !strings.Contains(s, "claude on acme/api#30") || !strings.Contains(s, "i to ask Claude about this pull request") || strings.Contains(s, "Answer 1") {
-		t.Errorf("the pane does not show the pull request under the cursor:\n%s", s)
+	if s := screen(m); strings.Contains(s, "ask claude") || !strings.Contains(s, "backspace back, claude goes on") {
+		t.Errorf("the pane shows a text box while Claude answers:\n%s", s)
 	}
-	if len(fc.prepared) != 2 || len(m.chats) != 1 {
-		t.Errorf("moving onto a pull request began its conversation: prepared %d, conversations %d", len(fc.prepared), len(m.chats))
-	}
-	press(m, "k", "k", "k")
-	if s := screen(m); !strings.Contains(s, "claude on acme/api#12") || !strings.Contains(s, "Answer 1") {
-		t.Errorf("coming back does not show the conversation:\n%s", s)
+	press(m, "backspace")
+	if stopped || m.claudeOpen || !c.Running() {
+		t.Errorf("backspace stopped %v, left the pane open %v", stopped, m.claudeOpen)
 	}
 }
 
@@ -1589,7 +1589,7 @@ func TestClaudePaneFollowsTheCursor(t *testing.T) {
 // nothing on its way it goes back to the preview, as backspace does.
 func TestClaudeStoppedByEsc(t *testing.T) {
 	m, _ := startWith(t, fixture(), keymap.Default())
-	press(m, "i", "esc")
+	press(m, "i")
 	c := m.chat()
 	k := c.PR().Key
 	chat.NewState(nil, logging.Discard(), func() time.Time { return now }, noStatus{}).Begin(c.Conversation, "And then?")
@@ -1621,7 +1621,7 @@ func TestClaudeStoppedByEsc(t *testing.T) {
 func TestClaudeStopFreesTheConversation(t *testing.T) {
 	m, _ := startWith(t, fixture(), keymap.Default())
 	fc := fakeClaudeOf(t, m)
-	press(m, "i", "esc")
+	press(m, "i")
 	c := m.chat()
 	fc.wait = true
 	cmd := m.ask(c, "And then?", "And then?", false)
@@ -1632,7 +1632,7 @@ func TestClaudeStopFreesTheConversation(t *testing.T) {
 		t.Fatalf("running %v, turns %+v", c.Running(), ts)
 	}
 	fc.wait = false
-	press(m, "i", "tab", "enter")
+	press(m, "tab", "enter")
 	if len(fc.asked) != 2 || !strings.Contains(screen(m), "Answer 2") {
 		t.Errorf("the next question was not asked; asked %d:\n%s", len(fc.asked), screen(m))
 	}
@@ -1643,7 +1643,7 @@ func TestClaudeStopFreesTheConversation(t *testing.T) {
 // the row until the conversation is opened.
 func TestClaudeAnsweringElsewhere(t *testing.T) {
 	m, _ := startWith(t, fixture(), keymap.Default())
-	press(m, "i", "esc")
+	press(m, "i")
 	c := m.chat()
 	k := c.PR().Key
 	// A question asked 75 seconds ago, still on its way.
@@ -1671,7 +1671,7 @@ func TestClaudeAnsweringElsewhere(t *testing.T) {
 
 func TestClaudeDraft(t *testing.T) {
 	m, _ := startWith(t, fixture(), keymap.Default())
-	press(m, "i", "esc", "R")
+	press(m, "i", "ctrl+r")
 	if m.compose == nil {
 		t.Fatal("R did not open the draft")
 	}
@@ -1720,7 +1720,7 @@ func TestClaudeFirstFailureStartsAgain(t *testing.T) {
 	if !strings.Contains(screen(m), "rate limited") {
 		t.Fatalf("no error shown:\n%s", screen(m))
 	}
-	press(m, "i", "o", "k", "enter")
+	press(m, "o", "k", "enter")
 	if len(fc.asked) != 2 {
 		t.Fatalf("asked %d", len(fc.asked))
 	}

@@ -110,13 +110,14 @@ var Defaults = []Def{
 	{"triage_apply", ScopeTriage, []string{"enter"}, "apply"},
 	{"triage_more", ScopeTriage, []string{"i"}, "ask more"},
 
-	{"chat_more", ScopeChat, []string{"i"}, "ask"},
-	{"draft_review", ScopeChat, []string{"R"}, "draft review"},
-	{"open_claude", ScopeChat, []string{"O"}, "open in claude code"},
-	{"chat_approve", ScopeChat, []string{"A"}, "approve"},
-	{"chat_restart", ScopeChat, []string{"N"}, "start over"},
-	{"chat_close", ScopeChat, []string{"backspace"}, "back to the preview"},
+	// The text box has the focus while nothing is on its way, so these
+	// keys are not ones it types.
 	{"fill_suggestion", ScopeChat, []string{"tab"}, "fill in the suggestion"},
+	{"draft_review", ScopeChat, []string{"ctrl+r"}, "draft review"},
+	{"open_claude", ScopeChat, []string{"ctrl+o"}, "open in claude code"},
+	{"chat_restart", ScopeChat, []string{"ctrl+l"}, "start over"},
+	// Read while Claude answers, when there is no text box.
+	{"chat_close", ScopeChat, []string{"backspace"}, "back, claude goes on"},
 
 	{"next_kind", ScopeCompose, []string{"tab"}, "kind"},
 	{"post", ScopeCompose, []string{"ctrl+s"}, "post"},
@@ -134,7 +135,6 @@ var renamed = map[string]Action{
 	"open":          "menu",
 	"claude":        "triage",
 	"pr_claude":     "ask_claude",
-	"ask_more":      "chat_more",
 	"unfold":        "fold",
 	"toggle_bots":   "fold_bots",
 	"toggle_pane":   "preview",

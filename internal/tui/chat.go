@@ -17,7 +17,6 @@ import (
 	"github.com/babarot/gh-triage/internal/claude"
 	"github.com/babarot/gh-triage/internal/logging"
 	"github.com/babarot/gh-triage/internal/model"
-	"github.com/babarot/gh-triage/internal/runner"
 	"github.com/babarot/gh-triage/internal/tui/chat"
 	"github.com/babarot/gh-triage/internal/tui/keymap"
 )
@@ -51,9 +50,9 @@ type chatScreen struct {
 	scroll int
 	// draft is a review drafted while the screen was elsewhere, opened
 	// when it is shown again.
-	draft  *claude.Draft
-	typing bool
-	input  textarea.Model
+	draft *claude.Draft
+	// input is the text box, shown while nothing is on its way.
+	input textarea.Model
 	// cancel stops the question on its way, nil when none is; stopping is
 	// set once the user stopped it, until its end comes back.
 	cancel   context.CancelFunc
@@ -123,12 +122,12 @@ func (m *Model) openChat(p model.PR) tea.Cmd {
 		c = &chatScreen{Conversation: m.chatState.New(p), input: ta}
 		m.chats[p.Key] = c
 	}
-	m.claudeOpen, m.pane.on = true, true
+	m.claudeOpen, m.pane.on, m.chatKey = true, true, p.Key
 	if m.layout().pane == 0 {
 		m.say("the screen has no room for the pane")
 	}
 	m.syncChat(c, p)
-	typing := m.typeChat(c)
+	typing := m.focusChat(c)
 	if len(c.Turns()) == 0 && !c.Running() && c.Elsewhere() == "" {
 		return tea.Batch(m.prepareChat(c), typing)
 	}
@@ -139,10 +138,9 @@ func (m *Model) openChat(p model.PR) tea.Cmd {
 	return typing
 }
 
-// typeChat puts the focus in the text box of c, which suggests a review
+// focusChat puts the focus in the text box of c, which suggests a review
 // until one is asked.
-func (m *Model) typeChat(c *chatScreen) tea.Cmd {
-	c.typing = true
+func (m *Model) focusChat(c *chatScreen) tea.Cmd {
 	c.input.Placeholder = cmp.Or(suggestion(c), "Ask Claude")
 	c.input.SetWidth(chatInputWidth(m.paneInner()))
 	return c.input.Focus()
@@ -214,19 +212,6 @@ func (m *Model) syncChat(c *chatScreen, p model.PR) {
 	m.chatState.Sync(c.Conversation)
 }
 
-// followChat shows the conversation about the pull request the cursor
-// moved onto, while the claude pane is shown. One with nothing asked is
-// not begun until the user asks.
-func (m *Model) followChat() {
-	p, _, ok := m.currentPR()
-	if !ok || !m.claudeShown() {
-		return
-	}
-	if c, ok := m.chats[p.Key]; ok {
-		m.syncChat(c, p)
-	}
-}
-
 // closeChat shows the preview again in place of the claude pane. What
 // Claude is answering goes on.
 func (m *Model) closeChat() tea.Cmd {
@@ -248,25 +233,22 @@ func (m *Model) claudeShown() bool { return m.claudeOpen && m.layout().pane > 0 
 
 // showsChat reports whether the claude pane shows the conversation about
 // k.
-func (m *Model) showsChat(k model.PRKey) bool {
-	p, _, ok := m.currentPR()
-	return ok && p.Key == k && m.claudeShown()
-}
+func (m *Model) showsChat(k model.PRKey) bool { return m.claudeShown() && m.chatKey == k }
 
-// chat is the conversation about the pull request under the cursor, nil
-// when there is none.
-func (m *Model) chat() *chatScreen {
-	p, _, ok := m.currentPR()
-	if !ok {
-		return nil
-	}
-	return m.chats[p.Key]
-}
+// chat is the conversation the claude pane was opened on, nil when none
+// was.
+func (m *Model) chat() *chatScreen { return m.chats[m.chatKey] }
 
-// typingChat reports whether a question is being typed in the claude pane.
+// busy reports whether something is on its way in c: a question asked
+// here, or in another gh-triage. The text box is not shown meanwhile, as
+// nothing can be sent.
+func busy(c *chatScreen) bool { return c.Running() || c.Elsewhere() != "" }
+
+// typingChat reports whether keys go to the text box of the claude pane:
+// it is shown, and nothing is on its way.
 func (m *Model) typingChat() bool {
 	c := m.chat()
-	return c != nil && c.typing && m.claudeShown()
+	return c != nil && m.claudeShown() && !busy(c)
 }
 
 // paneInner is the width inside the pane's borders.
@@ -288,6 +270,9 @@ func (m *Model) watchChat() {
 	// Probed first: found free, the reading after it has the answer.
 	m.chatState.Probe(c.Conversation)
 	m.chatState.Sync(c.Conversation)
+	if !busy(c) {
+		m.focusChat(c)
+	}
 }
 
 // ask sends a question under the conversation's lock; the first one
@@ -381,7 +366,17 @@ func (m *Model) chatPrepared(msg chatPreparedMsg) tea.Cmd {
 	return listenChat(msg.ch)
 }
 
+// chatAnswer takes the end of a question, and gives the text box the
+// focus again when the claude pane shows the conversation.
 func (m *Model) chatAnswer(msg chatAnswerMsg) tea.Cmd {
+	cmd := m.chatAnswered(msg)
+	if c, ok := m.chats[msg.key]; ok && m.showsChat(msg.key) && !busy(c) {
+		return tea.Batch(cmd, m.focusChat(c))
+	}
+	return cmd
+}
+
+func (m *Model) chatAnswered(msg chatAnswerMsg) tea.Cmd {
 	c, ok := m.chats[msg.key]
 	if !ok {
 		return nil
@@ -450,128 +445,51 @@ func (m *Model) draftCompose(c *chatScreen, d claude.Draft) tea.Cmd {
 	return cmd
 }
 
-// chatTyping handles a key while a question is typed in the claude pane.
+// chatTyping handles a key while the text box of the claude pane has the
+// focus: nothing is on its way. esc goes back to the preview.
 func (m *Model) chatTyping(msg tea.KeyPressMsg) tea.Cmd {
 	c, k := m.chat(), msg.String()
+	is := func(a keymap.Action) bool { return m.keys.Matches(a, k) }
+	armed := c.restart
+	c.restart = false
 	switch {
 	case k == keymap.Back:
-		c.typing = false
-		c.input.Blur()
+		return m.closeChat()
+	case is("page_up"):
+		c.scroll += m.pane.height / 2
 		return nil
-	case m.keys.Matches("fill_suggestion", k):
+	case is("page_down"):
+		c.scroll = max(0, c.scroll-m.pane.height/2)
+		return nil
+	case is("fill_suggestion"):
 		if s := suggestion(c); s != "" && c.input.Value() == "" {
 			c.input.SetValue(s)
 		}
 		return nil
-	case m.keys.Matches("accept", k):
+	case is("accept"):
 		q := strings.TrimSpace(c.input.Value())
 		if q == "" {
 			return nil
 		}
-		if c.Running() {
-			m.refuse("Claude is still answering")
-			return nil
-		}
 		c.input.Reset()
-		c.typing = false
 		c.input.Blur()
 		return m.ask(c, q, q, false)
-	}
-	var cmd tea.Cmd
-	c.input, cmd = c.input.Update(msg)
-	return cmd
-}
-
-// chatKey handles a key while the claude pane is shown, before the list
-// does; handled is false for a key it leaves to the list, which moves the
-// cursor, and with it the conversation shown. esc stops what Claude is
-// answering, and otherwise steps back to the preview, as chat_close does.
-func (m *Model) chatKey(k string) (cmd tea.Cmd, handled bool) {
-	c := m.chat()
-	is := func(a keymap.Action) bool { return m.keys.Matches(a, k) }
-	armed := false
-	if c != nil {
-		armed, c.restart = c.restart, false
-	}
-	switch {
-	case k == keymap.Back:
-		if c != nil && c.cancel != nil && !c.stopping {
-			m.stopChat(c)
-			return nil, true
-		}
-		return m.closeChat(), true
-	case is("chat_close"):
-		return m.closeChat(), true
-	case is("preview_down"):
-		if c != nil {
-			c.scroll = max(0, c.scroll-3)
-		}
-		return nil, true
-	case is("preview_up"):
-		if c != nil {
-			c.scroll += 3
-		}
-		return nil, true
-	}
-	p, _, ok := m.currentPR()
-	if !ok {
-		return nil, false
-	}
-	// begin opens the conversation about p, with nothing asked, for a key
-	// that asks.
-	begin := func() tea.Cmd {
-		if c != nil {
-			return nil
-		}
-		cmd := m.openChat(p)
-		c = m.chat()
-		return cmd
-	}
-	switch {
-	case is("chat_more"):
-		if c == nil {
-			// Opening it puts the focus in its text box.
-			return begin(), true
-		}
-		return m.typeChat(c), true
 	case is("draft_review"):
-		cmd := begin()
-		if c == nil {
-			return cmd, true
-		}
-		// What is asked is the draft, not what the box would take.
-		c.typing = false
 		c.input.Blur()
-		return tea.Batch(cmd, m.ask(c, "Draft the review.", claude.DraftPrompt, true)), true
-	case is("chat_approve") && len(m.selected) == 0:
-		// With a selection, approve is the list's, on the selection.
-		if m.own(p) {
-			m.refuse("you cannot approve your own pull request")
-			return nil, true
-		}
-		if m.busy() {
-			return nil, true
-		}
-		return m.startBulkFor(runner.Approve, []model.PR{p}), true
+		return m.ask(c, "Draft the review.", claude.DraftPrompt, true)
 	case is("chat_restart"):
 		switch {
-		case c == nil || len(c.Turns()) == 0:
+		case len(c.Turns()) == 0:
 			m.refuse("nothing has been asked yet")
-		case c.Running():
-			m.refuse("wait for Claude to answer first")
 		case !armed:
 			c.restart = true
 			m.say(fmt.Sprintf("press %s again to start over: the conversation goes from gh-triage, and Claude Code keeps its session", m.firstKey("chat_restart")))
 		default:
-			return m.restartChat(c), true
+			return m.restartChat(c)
 		}
-		return nil, true
+		return nil
 	case is("open_claude"):
 		switch {
-		case c == nil:
-			m.refuse("the conversation has not started")
-		case c.Running():
-			m.refuse("wait for Claude to answer first")
 		case c.preparing:
 			// The lock is held for the worktree being made; nothing has
 			// started a session under it.
@@ -582,16 +500,42 @@ func (m *Model) chatKey(k string) (cmd tea.Cmd, handled bool) {
 			if !c.Started() {
 				c.Unlock()
 				m.refuse("the conversation has not started")
-				return nil, true
+				return nil
 			}
 			// Held while Claude Code has the session, so no other
 			// gh-triage resumes it meanwhile.
 			key := c.PR().Key
-			return tea.ExecProcess(m.claude.Interactive(key, c.Dir(), c.Session()), func(err error) tea.Msg { return claudeExitMsg{key: key, err: err} }), true
+			return tea.ExecProcess(m.claude.Interactive(key, c.Dir(), c.Session()), func(err error) tea.Msg { return claudeExitMsg{key: key, err: err} })
 		}
-		return nil, true
+		return nil
 	}
-	return nil, false
+	var cmd tea.Cmd
+	if !c.input.Focused() {
+		cmd = m.focusChat(c)
+	}
+	var typed tea.Cmd
+	c.input, typed = c.input.Update(msg)
+	return tea.Batch(cmd, typed)
+}
+
+// chatWaiting handles a key while the claude pane shows a question on its
+// way, which takes every key but help: esc stops it, as it does in Claude
+// Code, and chat_close goes back to the preview while it goes on. One
+// asked in another gh-triage cannot be stopped here; esc goes back.
+func (m *Model) chatWaiting(k string) tea.Cmd {
+	c := m.chat()
+	is := func(a keymap.Action) bool { return m.keys.Matches(a, k) }
+	switch {
+	case k == keymap.Back && c.cancel != nil && !c.stopping:
+		m.stopChat(c)
+	case k == keymap.Back, is("chat_close"):
+		return m.closeChat()
+	case is("page_up"):
+		c.scroll += m.pane.height / 2
+	case is("page_down"):
+		c.scroll = max(0, c.scroll-m.pane.height/2)
+	}
+	return nil
 }
 
 // claudeExitMsg is Claude Code's exit after O.
@@ -668,9 +612,6 @@ func (m *Model) chatLines(c *chatScreen, width int) []string {
 	// asked is when the question an answer is to was asked.
 	var asked time.Time
 	turns := c.Turns()
-	if len(turns) == 0 && !c.Running() && c.Elsewhere() == "" && !c.typing {
-		L = append(L, margin+st.dim.Render(fmt.Sprintf("%s to ask Claude about this pull request", m.firstKey("chat_more"))))
-	}
 	for i, t := range turns {
 		switch {
 		case t.You:
@@ -885,49 +826,40 @@ func firstLine(s string) string {
 // on the screen, nil when the box is not shown. It shows the conversation
 // about the pull request under the cursor.
 func (m *Model) renderClaude(b *strings.Builder, height int) *tea.Cursor {
-	st := m.st
+	c, st := m.chat(), m.st
+	if c == nil {
+		return nil
+	}
 	inner := m.paneInner()
 	top := strings.Count(b.String(), "\n")
-	title := st.mauve.Render("claude")
-	var info []string
-	var body []string
-	var ask []string
-	c := m.chat()
-	p, _, ok := m.currentPR()
-	switch {
-	case !ok:
-		body = []string{st.muted.Render("move onto a pull request to talk about it")}
-	case c == nil:
-		title += " " + st.muted.Render("on") + " " + st.sub1.Render(p.Key.String())
-		body = []string{spaces(chatMargin) + st.dim.Render(fmt.Sprintf("%s to ask Claude about this pull request", m.firstKey("chat_more")))}
-	default:
-		title += " " + st.muted.Render("on") + " " + st.sub1.Render(p.Key.String())
-		at := "at " + short(c.PR().HeadOID)
-		if c.Head() != "" && c.Head() != c.PR().HeadOID {
-			at += " (was " + short(c.Head()) + ")"
-		}
-		if c.Model() != "" {
-			info = append(info, c.Model())
-		}
-		info = append(info, at, "read-only")
-		if c.Cost() > 0 {
-			info = append(info, fmt.Sprintf("$%.2f", c.Cost()))
-		}
-		if c.typing {
-			ask = box(st, "ask claude", strings.Split(c.input.View(), "\n"), min(inner, chatMaxWidth))
-		}
-		bodyH := max(height-2-len(ask), 1)
-		L := m.chatLines(c, inner)
-		c.scroll = min(c.scroll, max(len(L)-bodyH, 0))
-		start := max(len(L)-bodyH-c.scroll, 0)
-		body = L[start:min(start+bodyH, len(L))]
+	title := st.mauve.Render("claude") + " " + st.muted.Render("on") + " " + st.sub1.Render(c.PR().Key.String())
+	at := "at " + short(c.PR().HeadOID)
+	if c.Head() != "" && c.Head() != c.PR().HeadOID {
+		at += " (was " + short(c.Head()) + ")"
 	}
-	info = append(info, m.firstKey("preview_down")+"/"+m.firstKey("preview_up"))
+	var info []string
+	if c.Model() != "" {
+		info = append(info, c.Model())
+	}
+	info = append(info, at, "read-only")
+	if c.Cost() > 0 {
+		info = append(info, fmt.Sprintf("$%.2f", c.Cost()))
+	}
+	var ask []string
+	if !busy(c) {
+		ask = box(st, "ask claude", strings.Split(c.input.View(), "\n"), min(inner, chatMaxWidth))
+	}
+	bodyH := max(height-2-len(ask), 1)
+	L := m.chatLines(c, inner)
+	c.scroll = min(c.scroll, max(len(L)-bodyH, 0))
+	start := max(len(L)-bodyH-c.scroll, 0)
+	body := L[start:min(start+bodyH, len(L))]
+	info = append(info, m.firstKey("page_up")+"/"+m.firstKey("page_down"))
 	head := st.border.Render("╭ ") + title + " "
 	right := " " + st.dim.Render(strings.Join(info, " · ")) + st.border.Render(" ╮")
 	fill := m.width - lipgloss.Width(head) - lipgloss.Width(right)
 	b.WriteString(head + st.border.Render(strings.Repeat("─", max(fill, 0))) + right + "\n")
-	bodyH := height - 2 - len(ask)
+	bodyH = height - 2 - len(ask)
 	for i := 0; i < height-2; i++ {
 		s := ""
 		switch {

@@ -3,9 +3,13 @@ package tui
 import (
 	"strings"
 	"testing"
+	"time"
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
+
+	"github.com/babarot/gh-triage/internal/logging"
+	"github.com/babarot/gh-triage/internal/tui/chat"
 )
 
 // helpText is the ? popup's lines, unstyled.
@@ -36,7 +40,10 @@ func TestHelpUnfoldsTheScreenItWasOpenedFrom(t *testing.T) {
 		t.Errorf("the ? popup covers the header:\n%s", screen(m))
 	}
 
-	press(m, "esc", "i", "esc", "?")
+	// ? is typed in the text box; it opens the keys while Claude answers.
+	press(m, "esc", "i")
+	chat.NewState(nil, logging.Discard(), func() time.Time { return now }, noStatus{}).Begin(m.chat().Conversation, "And then?")
+	press(m, "?")
 	if s := helpText(m); !strings.HasPrefix(s, "▾ claude on a pull request · works here") || !strings.Contains(s, "▸ the list and its preview (31) ─") {
 		t.Errorf("the Claude screen's section is not first and unfolded:\n%s", s)
 	}

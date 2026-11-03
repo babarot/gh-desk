@@ -136,5 +136,4 @@ func (m *Model) followCursor(before model.PRKey, had bool) {
 		return
 	}
 	m.movedOnto()
-	m.followChat()
 }

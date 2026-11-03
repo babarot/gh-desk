@@ -323,7 +323,7 @@ var ready = map[keymap.Action]bool{
 	"fold_bots": true, "show_settled": true, "filter": true,
 	"preview_down": true, "preview_up": true, "preview_grow": true, "preview_shrink": true, "next_file": true, "prev_file": true, "preview_tab": true, "fold": true, "preview": true,
 	"confirm": true, "next_kind": true, "post": true, "editor": true, "accept": true, "erase": true, "erase_word": true,
-	"triage": true, "triage_apply": true, "triage_more": true, "ask_claude": true, "chat_more": true, "fill_suggestion": true, "draft_review": true, "open_claude": true, "chat_approve": true, "chat_close": true,
+	"triage": true, "triage_apply": true, "triage_more": true, "ask_claude": true, "fill_suggestion": true, "draft_review": true, "open_claude": true, "chat_close": true,
 }
 
 // hints is the key line of what has the focus. It holds the ways in (the
@@ -363,12 +363,14 @@ func (m *Model) hints() string {
 		if c := m.chat(); c.input.Value() == "" && suggestion(c) != "" {
 			as = append(as, "fill_suggestion")
 		}
+		as = append(as, "draft_review", "open_claude")
 	case m.claudeShown():
-		as = []keymap.Action{"chat_more", "draft_review", "chat_approve", "open_claude", "chat_close", "help"}
-		// esc stops what Claude is answering; otherwise it does what
-		// chat_close does, which the line tells.
+		// While Claude answers: esc stops it, and chat_close goes back.
+		// One answering in another gh-triage is not stopped here, and
+		// esc goes back.
+		as = []keymap.Action{"chat_close", "help"}
 		back = ""
-		if c := m.chat(); c != nil && c.cancel != nil && !c.stopping {
+		if c := m.chat(); c.cancel != nil && !c.stopping {
 			back = "stop"
 		}
 	case len(m.selected) > 0:

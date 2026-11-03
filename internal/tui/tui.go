@@ -249,11 +249,13 @@ type Model struct {
 	confirm    *confirm
 	// chats are the conversations with Claude, by pull request; chatState
 	// keeps them and takes their locks. claudeOpen puts the claude pane in
-	// place of the preview, on the conversation about the pull request
-	// under the cursor.
+	// place of the preview.
 	chats      map[model.PRKey]*chatScreen
 	chatState  *chat.State
 	claudeOpen bool
+	// chatKey is the pull request the claude pane was opened on; it stays
+	// on it while the pane is open, as the list takes no keys meanwhile.
+	chatKey model.PRKey
 	// triage is the conversation with Claude about the lists, once begun.
 	triage *triage
 	// cautions are what Claude said of release notes, by notesID; empty
@@ -458,9 +460,7 @@ func (m *Model) key(msg tea.KeyPressMsg) tea.Cmd {
 		return nil
 	}
 	if m.claudeShown() {
-		if cmd, ok := m.chatKey(k); ok {
-			return cmd
-		}
+		return m.chatWaiting(k)
 	}
 	return m.listKey(k)
 }

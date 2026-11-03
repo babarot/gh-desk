@@ -96,16 +96,22 @@ func (m *Model) mouse(msg tea.MouseMsg) tea.Cmd {
 		}
 		return nil
 	}
+	// Pointing at the list or the header above the claude pane goes back
+	// to them, as the list takes no keys while the pane is shown.
+	var back tea.Cmd
+	if m.claudeShown() && msg.Mouse().Y < m.paneTop(m.layout()) {
+		back = m.closeChat()
+	}
 	switch msg := msg.(type) {
 	case tea.MouseWheelMsg:
-		return m.wheel(msg)
+		return tea.Batch(back, m.wheel(msg))
 	case tea.MouseClickMsg:
 		if msg.Button != tea.MouseLeft {
-			return nil
+			return back
 		}
-		return m.listClick(msg.X, msg.Y, prev)
+		return tea.Batch(back, m.listClick(msg.X, msg.Y, prev))
 	}
-	return nil
+	return back
 }
 
 // top is the first line under the header and the filter.
