@@ -36,7 +36,7 @@ func TestHelpUnfoldsTheScreenItWasOpenedFrom(t *testing.T) {
 		t.Errorf("the ? popup covers the header:\n%s", screen(m))
 	}
 
-	press(m, "esc", "i", "?")
+	press(m, "esc", "i", "esc", "?")
 	if s := helpText(m); !strings.HasPrefix(s, "▾ claude on a pull request · works here") || !strings.Contains(s, "▸ the list and its preview (31) ─") {
 		t.Errorf("the Claude screen's section is not first and unfolded:\n%s", s)
 	}

@@ -323,7 +323,7 @@ var ready = map[keymap.Action]bool{
 	"fold_bots": true, "show_settled": true, "filter": true,
 	"preview_down": true, "preview_up": true, "preview_grow": true, "preview_shrink": true, "next_file": true, "prev_file": true, "preview_tab": true, "fold": true, "preview": true,
 	"confirm": true, "next_kind": true, "post": true, "editor": true, "accept": true, "erase": true, "erase_word": true,
-	"triage": true, "triage_apply": true, "triage_more": true, "ask_claude": true, "chat_more": true, "chat_review": true, "draft_review": true, "open_claude": true, "chat_approve": true, "chat_close": true,
+	"triage": true, "triage_apply": true, "triage_more": true, "ask_claude": true, "chat_more": true, "fill_suggestion": true, "draft_review": true, "open_claude": true, "chat_approve": true, "chat_close": true,
 }
 
 // hints is the key line of what has the focus. It holds the ways in (the
@@ -356,10 +356,15 @@ func (m *Model) hints() string {
 		default:
 			as = []keymap.Action{"triage_more"}
 		}
-	case m.filtering, m.typingChat():
+	case m.filtering:
 		as = []keymap.Action{"accept"}
+	case m.typingChat():
+		as = []keymap.Action{"accept"}
+		if c := m.chat(); c.input.Value() == "" && suggestion(c) != "" {
+			as = append(as, "fill_suggestion")
+		}
 	case m.claudeShown():
-		as = []keymap.Action{"chat_more", "chat_review", "draft_review", "chat_approve", "open_claude", "chat_close", "help"}
+		as = []keymap.Action{"chat_more", "draft_review", "chat_approve", "open_claude", "chat_close", "help"}
 		// esc stops what Claude is answering; otherwise it does what
 		// chat_close does, which the line tells.
 		back = ""

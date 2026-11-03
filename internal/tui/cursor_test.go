@@ -25,7 +25,7 @@ func TestCursorAfterTheTypedText(t *testing.T) {
 		{"comment", []string{"c"}},
 		{"review", []string{"R"}},
 		{"claude", []string{"C"}},
-		{"chat", []string{"i", "i"}},
+		{"chat", []string{"i"}},
 		{"filter", []string{"/"}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

@@ -72,7 +72,7 @@ func startKept(t *testing.T, chats *fakeChats) (*Model, *fakeClaude) {
 func TestConversationGoesOnInAnotherLaunch(t *testing.T) {
 	chats := newFakeChats()
 	m1, fc1 := startKept(t, chats)
-	press(m1, "i", "v")
+	press(m1, "i", "tab", "enter")
 	press(m1, "i", "w", "h", "y", "?", "enter")
 	if len(fc1.asked) != 2 {
 		t.Fatalf("asked %d", len(fc1.asked))
@@ -86,7 +86,7 @@ func TestConversationGoesOnInAnotherLaunch(t *testing.T) {
 	}
 
 	m2, fc2 := startKept(t, chats)
-	press(m2, "i")
+	press(m2, "i", "esc")
 	if len(fc2.asked) != 0 {
 		t.Fatalf("a kept conversation was asked again: %+v", fc2.asked)
 	}
@@ -102,7 +102,7 @@ func TestConversationGoesOnInAnotherLaunch(t *testing.T) {
 	}
 
 	// The first gh-triage reads what the second one added.
-	press(m1, "esc", "i")
+	press(m1, "esc", "i", "esc")
 	if s := screen(m1); !strings.Contains(s, "more") {
 		t.Errorf("the other gh-triage's question is not shown:\n%s", s)
 	}
@@ -113,7 +113,7 @@ func TestConversationGoesOnInAnotherLaunch(t *testing.T) {
 func TestConversationOpensWithNothingAsked(t *testing.T) {
 	chats := newFakeChats()
 	m, fc := startKept(t, chats)
-	press(m, "i")
+	press(m, "i", "esc")
 	if len(fc.asked) != 0 || len(fc.prepared) != 1 || len(chats.held) != 0 {
 		t.Fatalf("asked %d, prepared %d, held %v", len(fc.asked), len(fc.prepared), chats.held)
 	}
@@ -134,7 +134,7 @@ func TestConversationOpensWithNothingAsked(t *testing.T) {
 func TestConversationLockKeptWhilePrepared(t *testing.T) {
 	chats := newFakeChats()
 	m, _ := startKept(t, chats)
-	press(m, "i")
+	press(m, "i", "esc")
 	k := m.chat().PR().Key
 	c := m.chat()
 	// The worktree is still being made: its message has not come.
@@ -158,7 +158,7 @@ func TestConversationCutShort(t *testing.T) {
 	chats.recs[k] = chat.Record{Key: k, Session: "taken", Dir: "/cache/worktrees/acme/api#12", Head: "aaaaaaa1", Rev: 1,
 		Turns: []chat.Turn{{You: true, Text: "Review this pull request.", Head: "aaaaaaa1"}}}
 	m, fc := startKept(t, chats)
-	press(m, "i")
+	press(m, "i", "esc")
 	if len(fc.asked) != 0 {
 		t.Fatalf("asked %d", len(fc.asked))
 	}
@@ -183,7 +183,7 @@ func TestConversationWorkedOnElsewhere(t *testing.T) {
 		Turns: []chat.Turn{{You: true, Text: "Review this pull request.", Head: "aaaaaaa1"}}}
 	chats.held[k] = "pid 42 in /there"
 	m, fc := startKept(t, chats)
-	press(m, "i")
+	press(m, "i", "esc")
 	if len(fc.asked) != 0 {
 		t.Fatalf("asked %d", len(fc.asked))
 	}
@@ -215,7 +215,7 @@ func TestConversationAfterTheHeadMoved(t *testing.T) {
 	chats.recs[k] = chat.Record{Key: k, Session: "s1", Started: true, Dir: "/cache/worktrees/acme/api#12", Head: "0000old", Rev: 2,
 		Turns: []chat.Turn{{You: true, Text: "Review this pull request.", Head: "0000old"}, {Text: "Fine."}}}
 	m, fc := startKept(t, chats)
-	press(m, "i")
+	press(m, "i", "esc")
 	if s := screen(m); !strings.Contains(s, "(was 0000old)") {
 		t.Errorf("the head kept is not shown:\n%s", s)
 	}
@@ -235,7 +235,7 @@ func TestConversationAfterTheHeadMoved(t *testing.T) {
 func TestConversationStartedOver(t *testing.T) {
 	chats := newFakeChats()
 	m, fc := startKept(t, chats)
-	press(m, "i", "v")
+	press(m, "i", "tab", "enter")
 	k := m.chat().PR().Key
 	before := chats.recs[k].Rev
 	press(m, "N")
@@ -248,7 +248,7 @@ func TestConversationStartedOver(t *testing.T) {
 	if len(fc.asked) != 1 || r.Rev <= before || len(r.Turns) != 0 || r.Session != "" || len(chats.held) != 0 {
 		t.Fatalf("asked %d, kept %+v, held %v; want an empty conversation, its rev past %d", len(fc.asked), r, chats.held, before)
 	}
-	press(m, "v")
+	press(m, "i", "tab", "enter")
 	if a := fc.asked[1]; !a.First || a.Session == fc.asked[0].Session {
 		t.Errorf("request %+v; want a new session", a)
 	}
@@ -258,7 +258,7 @@ func TestConversationNotKeptGoesOn(t *testing.T) {
 	chats := newFakeChats()
 	chats.saveErr = errors.New("read-only file system")
 	m, fc := startKept(t, chats)
-	press(m, "i", "v")
+	press(m, "i", "tab", "enter")
 	press(m, "esc", "i")
 	if len(fc.asked) != 1 || !strings.Contains(screen(m), "Answer 1") {
 		t.Errorf("the conversation did not go on in memory; asked %d:\n%s", len(fc.asked), screen(m))
@@ -268,11 +268,11 @@ func TestConversationNotKeptGoesOn(t *testing.T) {
 func TestConversationRemovedByGC(t *testing.T) {
 	chats := newFakeChats()
 	m, fc := startKept(t, chats)
-	press(m, "i", "v")
+	press(m, "i", "tab", "enter")
 	k := m.chat().PR().Key
 	press(m, "esc")
 	delete(chats.recs, k)
-	press(m, "i", "v")
+	press(m, "i", "tab", "enter")
 	if len(fc.asked) != 2 || !fc.asked[1].First {
 		t.Errorf("a conversation gc removed was not started anew: %+v", fc.asked)
 	}
@@ -294,9 +294,9 @@ func TestConversationKeptInThePane(t *testing.T) {
 func TestConversationAskedAfterAnotherAdded(t *testing.T) {
 	chats := newFakeChats()
 	m1, fc1 := startKept(t, chats)
-	press(m1, "i", "v")
+	press(m1, "i", "tab", "enter")
 	m2, _ := startKept(t, chats)
-	press(m2, "i", "i", "o", "n", "e", "enter")
+	press(m2, "i", "o", "n", "e", "enter")
 	press(m1, "i", "t", "w", "o", "enter")
 	if len(fc1.asked) != 2 {
 		t.Fatalf("asked %d", len(fc1.asked))

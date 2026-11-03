@@ -129,7 +129,7 @@ func TestChatAnswerWrapsAtMostWidth(t *testing.T) {
 func TestChatInputStaysInItsBox(t *testing.T) {
 	m, _ := startWith(t, fixture(), keymap.Default())
 	fakeClaudeOf(t, m)
-	press(m, "i", "i")
+	press(m, "i")
 	typed := strings.Repeat("x", 120)
 	press(m, strings.Split(typed, "")...)
 	for _, w := range []int{60, 180} {

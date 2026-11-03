@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"cmp"
 	"context"
 	"fmt"
 	"os/exec"
@@ -127,14 +128,35 @@ func (m *Model) openChat(p model.PR) tea.Cmd {
 		m.say("the screen has no room for the pane")
 	}
 	m.syncChat(c, p)
+	typing := m.typeChat(c)
 	if len(c.Turns()) == 0 && !c.Running() && c.Elsewhere() == "" {
-		return m.prepareChat(c)
+		return tea.Batch(m.prepareChat(c), typing)
 	}
 	if d := c.draft; d != nil {
 		c.draft = nil
-		return m.draftCompose(c, *d)
+		return tea.Batch(typing, m.draftCompose(c, *d))
 	}
-	return nil
+	return typing
+}
+
+// typeChat puts the focus in the text box of c, which suggests a review
+// until one is asked.
+func (m *Model) typeChat(c *chatScreen) tea.Cmd {
+	c.typing = true
+	c.input.Placeholder = cmp.Or(suggestion(c), "Ask Claude")
+	c.input.SetWidth(chatInputWidth(m.paneInner()))
+	return c.input.Focus()
+}
+
+// suggestion is what the text box of c offers to fill in: a review, until
+// one is asked in the conversation; empty after.
+func suggestion(c *chatScreen) string {
+	for _, t := range c.Turns() {
+		if t.You && t.Text == claude.ReviewQuestion {
+			return ""
+		}
+	}
+	return claude.ReviewQuestion
 }
 
 // prepareChat makes the worktree of a conversation with nothing asked yet,
@@ -436,6 +458,11 @@ func (m *Model) chatTyping(msg tea.KeyPressMsg) tea.Cmd {
 		c.typing = false
 		c.input.Blur()
 		return nil
+	case m.keys.Matches("fill_suggestion", k):
+		if s := suggestion(c); s != "" && c.input.Value() == "" {
+			c.input.SetValue(s)
+		}
+		return nil
 	case m.keys.Matches("accept", k):
 		q := strings.TrimSpace(c.input.Value())
 		if q == "" {
@@ -502,24 +529,19 @@ func (m *Model) chatKey(k string) (cmd tea.Cmd, handled bool) {
 	}
 	switch {
 	case is("chat_more"):
-		cmd := begin()
 		if c == nil {
-			return cmd, true
+			// Opening it puts the focus in its text box.
+			return begin(), true
 		}
-		c.typing = true
-		c.input.SetWidth(chatInputWidth(m.paneInner()))
-		return tea.Batch(cmd, c.input.Focus()), true
-	case is("chat_review"):
-		cmd := begin()
-		if c == nil {
-			return cmd, true
-		}
-		return tea.Batch(cmd, m.ask(c, claude.ReviewQuestion, claude.ReviewQuestion, false)), true
+		return m.typeChat(c), true
 	case is("draft_review"):
 		cmd := begin()
 		if c == nil {
 			return cmd, true
 		}
+		// What is asked is the draft, not what the box would take.
+		c.typing = false
+		c.input.Blur()
 		return tea.Batch(cmd, m.ask(c, "Draft the review.", claude.DraftPrompt, true)), true
 	case is("chat_approve") && len(m.selected) == 0:
 		// With a selection, approve is the list's, on the selection.
@@ -646,9 +668,8 @@ func (m *Model) chatLines(c *chatScreen, width int) []string {
 	// asked is when the question an answer is to was asked.
 	var asked time.Time
 	turns := c.Turns()
-	if len(turns) == 0 && !c.Running() && c.Elsewhere() == "" {
-		L = append(L, margin+st.dim.Render(fmt.Sprintf("%s to ask Claude about this pull request, %s for a review",
-			m.firstKey("chat_more"), m.firstKey("chat_review"))))
+	if len(turns) == 0 && !c.Running() && c.Elsewhere() == "" && !c.typing {
+		L = append(L, margin+st.dim.Render(fmt.Sprintf("%s to ask Claude about this pull request", m.firstKey("chat_more"))))
 	}
 	for i, t := range turns {
 		switch {
@@ -878,8 +899,7 @@ func (m *Model) renderClaude(b *strings.Builder, height int) *tea.Cursor {
 		body = []string{st.muted.Render("move onto a pull request to talk about it")}
 	case c == nil:
 		title += " " + st.muted.Render("on") + " " + st.sub1.Render(p.Key.String())
-		body = []string{spaces(chatMargin) + st.dim.Render(fmt.Sprintf("%s to ask Claude about this pull request, %s for a review",
-			m.firstKey("chat_more"), m.firstKey("chat_review")))}
+		body = []string{spaces(chatMargin) + st.dim.Render(fmt.Sprintf("%s to ask Claude about this pull request", m.firstKey("chat_more")))}
 	default:
 		title += " " + st.muted.Render("on") + " " + st.sub1.Render(p.Key.String())
 		at := "at " + short(c.PR().HeadOID)

@@ -111,12 +111,12 @@ var Defaults = []Def{
 	{"triage_more", ScopeTriage, []string{"i"}, "ask more"},
 
 	{"chat_more", ScopeChat, []string{"i"}, "ask"},
-	{"chat_review", ScopeChat, []string{"v"}, "review"},
 	{"draft_review", ScopeChat, []string{"R"}, "draft review"},
 	{"open_claude", ScopeChat, []string{"O"}, "open in claude code"},
 	{"chat_approve", ScopeChat, []string{"A"}, "approve"},
 	{"chat_restart", ScopeChat, []string{"N"}, "start over"},
 	{"chat_close", ScopeChat, []string{"backspace"}, "back to the preview"},
+	{"fill_suggestion", ScopeChat, []string{"tab"}, "fill in the suggestion"},
 
 	{"next_kind", ScopeCompose, []string{"tab"}, "kind"},
 	{"post", ScopeCompose, []string{"ctrl+s"}, "post"},
