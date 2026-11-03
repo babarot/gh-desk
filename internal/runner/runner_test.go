@@ -899,9 +899,21 @@ func TestMergeDraftReadiesFirst(t *testing.T) {
 	if e := last(evs[it2.PR.Key]); e.Result != Merged || !e.Readied || !e.Approved {
 		t.Errorf("bot's: last event = %+v", e)
 	}
-	want := "ready acme/api#1 h-1,merge acme/api#1 h-1 MERGE,ready acme/web#2 h-2,review acme/web#2 APPROVE h-2,merge acme/web#2 h-2 MERGE"
-	if got := strings.Join(f.calls, ","); got != want {
-		t.Errorf("calls = %v", got)
+	// The two repositories run side by side, so only the order within
+	// each pull request is fixed.
+	for pr, want := range map[string]string{
+		"acme/api#1": "ready acme/api#1 h-1,merge acme/api#1 h-1 MERGE",
+		"acme/web#2": "ready acme/web#2 h-2,review acme/web#2 APPROVE h-2,merge acme/web#2 h-2 MERGE",
+	} {
+		var got []string
+		for _, c := range f.calls {
+			if strings.Contains(c, " "+pr+" ") {
+				got = append(got, c)
+			}
+		}
+		if strings.Join(got, ",") != want {
+			t.Errorf("%s calls = %v", pr, got)
+		}
 	}
 }
 
