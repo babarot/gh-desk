@@ -91,7 +91,7 @@ func (m *Model) listKey(k string) tea.Cmd {
 	case is("triage"):
 		return m.openTriage()
 	case is("approve") && len(m.selected) > 0:
-		return m.startBulk(runner.Approve)
+		return m.startApprove()
 	case is("merge"):
 		return m.startBulk(runner.Merge)
 	case is("ready_for_review"):
@@ -99,8 +99,7 @@ func (m *Model) listKey(k string) tea.Cmd {
 	case is("comment"):
 		return m.startComment()
 	case is("review") && len(m.selected) > 0:
-		m.refuse("review: one pull request at a time")
-		return nil
+		return m.startReview()
 	case is("ask_claude") && len(m.selected) > 0:
 		m.refuse("ask claude: one pull request at a time")
 		return nil
@@ -185,9 +184,9 @@ func (m *Model) listKey(k string) tea.Cmd {
 		}
 		return move(t.sel + 1)
 	case is("approve"):
-		return m.askApprove(p)
+		return m.startApprove()
 	case is("review"):
-		return m.startCompose(p, model.EventComment)
+		return m.startReview()
 	case is("ask_claude"):
 		return m.openChat(p)
 	case is("browse"):

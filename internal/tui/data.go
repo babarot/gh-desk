@@ -372,11 +372,6 @@ type (
 		c   model.Comment
 		err error
 	}
-	reviewMsg struct {
-		pr    model.PR
-		event model.ReviewEvent
-		err   error
-	}
 	doneMsg struct {
 		n   model.Notification
 		err error
@@ -505,8 +500,6 @@ func (m *Model) handleData(msg tea.Msg) tea.Cmd {
 			return nil
 		}
 		msg.e.loading, msg.e.err, msg.e.val = false, msg.err, safeComment(msg.c)
-	case reviewMsg:
-		return m.reviewed(msg)
 	case postedMsg:
 		return m.posted(msg)
 	case doneMsg:

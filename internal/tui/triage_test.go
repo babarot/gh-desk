@@ -44,7 +44,7 @@ func TestTriagePlanApplied(t *testing.T) {
 	if p, _, _ := m.currentPR(); p.Key != key("acme", "api", 30) {
 		t.Errorf("cursor on %v", p.Key)
 	}
-	if m.bulk == nil || m.bulk.kind != runner.Approve || len(m.bulk.items) != 1 || m.bulk.by != "bots" {
+	if m.bulk == nil || m.bulk.kind != runner.Review || len(m.bulk.items) != 1 || m.bulk.by != "bots" {
 		t.Fatalf("bulk = %+v", m.bulk)
 	}
 	golden(t, "triage-confirm", screen(m))

@@ -58,6 +58,7 @@ type Layout interface {
 // Runner approves and merges batches of pull requests.
 type Runner interface {
 	Start(ctx context.Context, kind runner.Kind, items []runner.Item) (string, <-chan runner.Event)
+	StartReview(ctx context.Context, rv runner.ReviewText, items []runner.Item) (string, <-chan runner.Event)
 	Resume(ctx context.Context, ps []model.Pending) (string, <-chan runner.Event)
 }
 
@@ -216,16 +217,16 @@ type Model struct {
 
 	pane  pane
 	cache cache
-	// sending names the pull requests a comment or a review is on its way
-	// to; none other is sent until it is back. Empty when none is.
+	// sending names the pull requests a comment is on its way to; none
+	// other is sent until it is back. Empty when none is.
 	sending string
-	// sendingWhat is the review a single pull request is sent, while one
-	// is on its way.
-	sendingWhat string
 	// posting is the comment on its way, and unsent the text of one that
 	// failed on some, which the next comment starts with.
 	posting *posting
 	unsent  string
+	// unsentReview is the review that was not sent to some of its pull
+	// requests, which the next review starts with.
+	unsentReview *runner.ReviewText
 
 	selected map[model.PRKey]selection
 	bulk     *bulk

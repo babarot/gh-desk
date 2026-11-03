@@ -1,6 +1,5 @@
-// Package runner approves, merges and marks ready pull requests, many at
-// once, and
-// follows them until each is merged, skipped or stopped. It decides each
+// Package runner reviews, merges and marks ready pull requests, many at
+// once, and follows them until each is merged, skipped or stopped. It decides each
 // step with internal/plan from information read just before the step, and
 // acts only on the head the user confirmed.
 //
@@ -109,11 +108,21 @@ func (o Options) withDefaults() Options {
 type Kind int
 
 const (
-	Approve Kind = iota
+	// Review sends a review, of the kind and with the text StartReview
+	// is given.
+	Review Kind = iota
 	Merge
 	// Ready marks drafts ready for review.
 	Ready
 )
+
+// ReviewText is the review a Review batch sends to each of its pull
+// requests. It is held in memory only: a review batch is not recorded for
+// the next launch.
+type ReviewText struct {
+	Event model.ReviewEvent
+	Body  string
+}
 
 // Item is a pull request the user confirmed, with the head they saw.
 type Item struct {
@@ -135,6 +144,8 @@ const (
 	AutoMergeOn
 	// Readied is a draft marked ready for review.
 	Readied
+	// Reviewed is a review sent that is not an approval.
+	Reviewed
 	Skipped
 	Stopped
 	Failed
@@ -224,11 +235,18 @@ func New(gh GitHub, log *slog.Logger, opt Options) *Runner {
 	return &Runner{gh: gh, opt: opt.withDefaults(), log: log, busy: map[model.PRKey]bool{}, store: opt.Store, canWait: opt.CanWait}
 }
 
-// Start runs a batch and returns its ID and its events. The channel is
+// StartReview runs a batch that sends rv to each pull request, as Start
+// does a batch of another kind.
+func (r *Runner) StartReview(ctx context.Context, rv ReviewText, items []Item) (string, <-chan Event) {
+	return r.run(ctx, Review, items, nil, rv)
+}
+
+// Start runs a batch of a merge or a ready for review and returns its ID
+// and its events. The channel is
 // closed when every pull request has a final result and every auto-merge
 // it turned on is no longer watched. Canceling ctx stops it all.
 func (r *Runner) Start(ctx context.Context, kind Kind, items []Item) (string, <-chan Event) {
-	return r.run(ctx, kind, items, nil)
+	return r.run(ctx, kind, items, nil, ReviewText{})
 }
 
 // Resume goes on with the merges recorded by an earlier run. Each pull
@@ -242,10 +260,10 @@ func (r *Runner) Resume(ctx context.Context, ps []model.Pending) (string, <-chan
 			Head: p.Head, AutoMerge: p.AutoMerge}
 		pend[p.Key] = p
 	}
-	return r.run(ctx, Merge, items, pend)
+	return r.run(ctx, Merge, items, pend, ReviewText{})
 }
 
-func (r *Runner) run(ctx context.Context, kind Kind, items []Item, resume map[model.PRKey]model.Pending) (string, <-chan Event) {
+func (r *Runner) run(ctx context.Context, kind Kind, items []Item, resume map[model.PRKey]model.Pending, rv ReviewText) (string, <-chan Event) {
 	batch := logging.NewID()
 	log := r.log.With(logging.KeyBatch, batch)
 	events := make(chan Event, 64)
@@ -258,11 +276,15 @@ func (r *Runner) run(ctx context.Context, kind Kind, items []Item, resume map[mo
 		}
 		byRepo[repo] = append(byRepo[repo], it)
 	}
-	verb := map[Kind]string{Approve: "approve", Merge: "merge", Ready: "ready"}[kind]
+	verb := map[Kind]string{Review: "review", Merge: "merge", Ready: "ready"}[kind]
 	if resume != nil {
 		verb = "resume"
 	}
-	log.Info("batch start", "kind", verb, "prs", len(items), "repos", len(repos))
+	attrs := []any{"kind", verb, "prs", len(items), "repos", len(repos)}
+	if kind == Review {
+		attrs = append(attrs, "event", strings.ToLower(string(rv.Event)))
+	}
+	log.Info("batch start", attrs...)
 	var wg sync.WaitGroup
 	r.active.Add(1)
 	emit := func(e Event) {
@@ -295,8 +317,8 @@ func (r *Runner) run(ctx context.Context, kind Kind, items []Item, resume map[mo
 				case ok:
 					j.pend, j.approved = p, p.Approved
 					j.resume()
-				case kind == Approve:
-					j.approveOnly()
+				case kind == Review:
+					j.review(rv)
 				case kind == Ready:
 					j.markReady()
 				default:
@@ -453,7 +475,7 @@ func approvedBy(mi model.MergeInfo, login string) bool {
 	return false
 }
 
-var resultWord = map[Result]string{Running: "running", Approved: "approved", Merged: "merged", AutoMergeOn: "auto-merge-on", Readied: "readied",
+var resultWord = map[Result]string{Running: "running", Approved: "approved", Merged: "merged", AutoMergeOn: "auto-merge-on", Readied: "readied", Reviewed: "reviewed",
 	Skipped: "skipped", Stopped: "stopped", Failed: "failed"}
 
 // read reads the pull request and checks its head is the one confirmed.
@@ -475,22 +497,39 @@ func (j *job) read(details bool) (model.MergeInfo, bool) {
 	return mi, true
 }
 
-func (j *job) approveOnly() {
-	mi, ok := j.read(true)
+// review sends rv on the head the user confirmed, after reading the pull
+// request again and deciding again whether it takes it.
+func (j *job) review(rv ReviewText) {
+	approve := rv.Event == model.EventApprove
+	mi, ok := j.read(approve)
 	if !ok {
 		return
 	}
 	// Failing checks are let through here: the popup already left them out
 	// unless the user asked to include them.
-	d := plan.ForApprove(mi, j.it.PR, j.r.opt.Viewer, true, j.r.opt.Settings)
-	if !d.Approve {
+	d := plan.ForReview(mi, j.it.PR, j.r.opt.Viewer, rv.Event, true, j.r.opt.Settings)
+	if d.Step == plan.StepSkip {
 		j.say(Skipped, d.Reason)
 		return
 	}
-	if j.sendApproval() {
-		j.say(Approved, "approved")
+	if approve {
+		if j.sendApproval(rv.Body) {
+			j.say(Approved, "approved")
+		}
+		return
 	}
+	word := reviewWord[rv.Event]
+	j.say(Running, "sending the "+word)
+	pr := j.it.PR
+	pr.HeadOID = j.head
+	if err := j.r.gh.Review(j.ctx, pr, rv.Event, rv.Body); err != nil {
+		j.unsure(word + " failed: " + short(err))
+		return
+	}
+	j.say(Reviewed, word+" sent")
 }
+
+var reviewWord = map[model.ReviewEvent]string{model.EventComment: "review comment", model.EventRequestChanges: "request for changes"}
 
 // markReady marks a draft ready for review, on the head the user saw.
 func (j *job) markReady() {
@@ -510,7 +549,8 @@ func (j *job) markReady() {
 	j.say(Readied, "ready for review")
 }
 
-func (j *job) sendApproval() bool {
+// sendApproval approves with body, which may be empty.
+func (j *job) sendApproval(body string) bool {
 	j.say(Running, "approving")
 	// Recorded as on its way first: should gh-triage stop before the
 	// result is recorded, the next launch does not know whether the
@@ -522,7 +562,7 @@ func (j *job) sendApproval() bool {
 	}
 	pr := j.it.PR
 	pr.HeadOID = j.head
-	if err := j.r.gh.Review(j.ctx, pr, model.EventApprove, ""); err != nil {
+	if err := j.r.gh.Review(j.ctx, pr, model.EventApprove, body); err != nil {
 		j.unsure("approve failed: " + short(err))
 		return false
 	}
@@ -592,7 +632,7 @@ func (j *job) merge() {
 		return
 	}
 	if d.Approve {
-		if !j.sendApproval() {
+		if !j.sendApproval("") {
 			return
 		}
 		// Read again: the approval can change what is next.

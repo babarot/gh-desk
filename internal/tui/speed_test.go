@@ -189,7 +189,7 @@ func TestPopupFillsInAsItReads(t *testing.T) {
 	for i := len(prs); i < 7; i++ {
 		prs = append(prs, model.PR{ID: fmt.Sprintf("x%d", i), Key: key("acme", "extra", i), Title: fmt.Sprintf("Extra %d", i), HeadOID: "e"})
 	}
-	cmd := m.startBulkFor(runner.Merge, prs)
+	cmd := m.startBulkFor(runner.Merge, runner.ReviewText{}, prs)
 	parts := flatten(cmd)
 	if len(parts) != 2 {
 		t.Fatalf("%d reads, want 2 of 5 and 2", len(parts))

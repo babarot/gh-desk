@@ -35,6 +35,8 @@ type progress struct {
 // result, then writes one notification for it.
 type batchState struct {
 	kind runner.Kind
+	// review is what a batch of a review sends.
+	review runner.ReviewText
 	// resumed is set on the merges the last run was waiting for.
 	resumed bool
 	goes    map[model.PRKey]bool
@@ -92,7 +94,7 @@ func (m *Model) event(msg eventMsg) tea.Cmd {
 	}
 	m.progress[ev.Key] = pg
 	if ev.Approved {
-		m.markApproved(ev.Key)
+		m.markReviewed(ev.Key, model.ReviewApproved)
 	}
 	if ev.Result == runner.Merged {
 		m.merged[ev.Key] = true
@@ -100,11 +102,14 @@ func (m *Model) event(msg eventMsg) tea.Cmd {
 	if ev.Result == runner.Readied {
 		m.markReady(ev.Key)
 	}
+	bs := m.batches[msg.batch]
+	if ev.Result == runner.Reviewed && bs != nil {
+		m.markReviewed(ev.Key, reviewStates[bs.review.Event])
+	}
 	switch ev.Result {
-	case runner.Approved, runner.Merged, runner.AutoMergeOn:
+	case runner.Approved, runner.Reviewed, runner.Merged, runner.AutoMergeOn:
 		cmds = append(cmds, m.doneAfterReview(ev.Key))
 	}
-	bs := m.batches[msg.batch]
 	if bs == nil {
 		return tea.Batch(cmds...)
 	}
@@ -131,7 +136,14 @@ func (m *Model) event(msg eventMsg) tea.Cmd {
 	return tea.Batch(cmds...)
 }
 
-func (m *Model) markApproved(k model.PRKey) {
+// reviewStates are what a review of each kind leaves as the viewer's.
+var reviewStates = map[model.ReviewEvent]model.ReviewState{
+	model.EventApprove: model.ReviewApproved, model.EventComment: model.ReviewCommented, model.EventRequestChanges: model.ReviewChangesRequested,
+}
+
+// markReviewed shows the viewer's review on the pull request, in place of
+// the one before.
+func (m *Model) markReviewed(k model.PRKey, state model.ReviewState) {
 	p, ok := m.knownPR(k)
 	if !ok {
 		return
@@ -142,7 +154,7 @@ func (m *Model) markApproved(k model.PRKey) {
 			rs = append(rs, r)
 		}
 	}
-	p.Reviews = append(rs, model.Review{Author: m.viewer, State: model.ReviewApproved})
+	p.Reviews = append(rs, model.Review{Author: m.viewer, State: state})
 	m.updatePR(p)
 }
 
@@ -177,10 +189,12 @@ func (m *Model) noteBatch(bs *batchState) tea.Cmd {
 	}
 	items = append(items, bs.skipped...)
 	var parts []string
-	switch bs.kind {
-	case runner.Approve:
+	switch {
+	case bs.kind == runner.Review && bs.review.Event == model.EventApprove:
 		parts = append(parts, fmt.Sprintf("approved %d", count[runner.Approved]))
-	case runner.Ready:
+	case bs.kind == runner.Review:
+		parts = append(parts, fmt.Sprintf("sent %d", count[runner.Reviewed]))
+	case bs.kind == runner.Ready:
 		parts = append(parts, fmt.Sprintf("marked ready %d", count[runner.Readied]))
 	default:
 		parts = append(parts, fmt.Sprintf("merged %d", count[runner.Merged]))
@@ -198,7 +212,36 @@ func (m *Model) noteBatch(bs *batchState) tea.Cmd {
 	if count[runner.Stopped]+count[runner.Failed] > 0 {
 		icon = "✗"
 	}
-	return m.pushNote(icon, bulkVerbs[bs.kind]+" done: "+strings.Join(parts, ", "), items)
+	title := kindVerb(bs.kind, bs.review.Event) + " done: " + strings.Join(parts, ", ")
+	if bs.kind == runner.Review && m.keepUnsent(bs) {
+		title += fmt.Sprintf(" · those not sent are selected; %s to send it again", m.firstKey("review"))
+	}
+	return m.pushNote(icon, title, items)
+}
+
+// keepUnsent keeps a review that the runner did not send to some of its
+// pull requests (it failed, stopped on a moved head, or was skipped when
+// decided again): only those are left selected and the text comes back
+// in the next review, so none is sent it twice. It reports whether any
+// was left.
+func (m *Model) keepUnsent(bs *batchState) bool {
+	var left []model.PRKey
+	for _, k := range bs.order {
+		switch bs.done[k].result {
+		case runner.Failed, runner.Stopped, runner.Skipped:
+			left = append(left, k)
+		}
+	}
+	if len(left) == 0 {
+		return false
+	}
+	clear(m.selected)
+	for _, k := range left {
+		m.selected[k] = byHand
+	}
+	rv := bs.review
+	m.unsentReview = &rv
+	return true
 }
 
 // methodWord names a merge method as people say it.

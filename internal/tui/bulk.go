@@ -16,13 +16,16 @@ import (
 	"github.com/babarot/gh-triage/internal/tui/keymap"
 )
 
-// bulk is the confirm popup of an approve, a merge or a ready for review,
-// of one pull request
-// or of every one selected. It reads each pull request again, decides what
-// to do with it, and lists that, with the reason for every one it skips.
+// bulk is the confirm popup of a review, a merge or a ready for review, of
+// one pull request or of every one selected. It reads each pull request
+// again, decides what to do with it, and lists that, with the reason for
+// every one it skips.
 type bulk struct {
-	kind  runner.Kind
-	items []bulkItem
+	kind runner.Kind
+	// review is what a popup of a review sends; an approval from A has
+	// no body.
+	review runner.ReviewText
+	items  []bulkItem
 	// loading is set until every read is back; left counts them.
 	loading bool
 	left    int
@@ -69,14 +72,27 @@ type bulkItem struct {
 }
 
 // goes reports whether the item is acted on.
-func (it bulkItem) goes(kind runner.Kind) bool {
-	switch {
-	case !it.ok || it.moved || it.running || it.noWait:
+func (it bulkItem) goes() bool {
+	if !it.ok || it.moved || it.running || it.noWait {
 		return false
-	case kind == runner.Approve:
-		return it.d.Approve
 	}
 	return it.d.Step != plan.StepSkip
+}
+
+// approves reports whether the popup sends approvals.
+func (b *bulk) approves() bool {
+	return b.kind == runner.Review && b.review.Event == model.EventApprove
+}
+
+// verb names what the popup does, in its title and question.
+func (b *bulk) verb() string { return kindVerb(b.kind, b.review.Event) }
+
+// kindVerb names what a batch of kind does; a review by its event.
+func kindVerb(kind runner.Kind, ev model.ReviewEvent) string {
+	if kind == runner.Review {
+		return sentWord(false, ev)
+	}
+	return bulkVerbs[kind]
 }
 
 // lockedOut reports whether it is skipped only because the merge would
@@ -115,21 +131,31 @@ const (
 	bulkInFlight = 10
 )
 
-// startBulk opens the popup for the selected pull requests, or for the one
-// under the cursor when none is selected.
+// startBulk opens the popup of a merge or a ready for review for the
+// selected pull requests, or for the one under the cursor when none is
+// selected.
 func (m *Model) startBulk(kind runner.Kind) tea.Cmd {
 	if m.busy() {
 		return nil
 	}
 	if kind == runner.Merge {
 		// The gh-triage holding the record may have quit since.
-		return tea.Batch(m.takeLock(), m.startBulkOf(kind))
+		return tea.Batch(m.takeLock(), m.startBulkOf(kind, runner.ReviewText{}))
 	}
-	return m.startBulkOf(kind)
+	return m.startBulkOf(kind, runner.ReviewText{})
+}
+
+// startApprove opens the popup of an approval with no body: a review
+// written by A, which skips the text.
+func (m *Model) startApprove() tea.Cmd {
+	if m.busy() {
+		return nil
+	}
+	return m.startBulkOf(runner.Review, runner.ReviewText{Event: model.EventApprove})
 }
 
 // startBulkOf opens the popup of kind for what startBulk chose.
-func (m *Model) startBulkOf(kind runner.Kind) tea.Cmd {
+func (m *Model) startBulkOf(kind runner.Kind, rv runner.ReviewText) tea.Cmd {
 	var prs []model.PR
 	if len(m.selected) > 0 {
 		for _, t := range m.tabs {
@@ -140,21 +166,22 @@ func (m *Model) startBulkOf(kind runner.Kind) tea.Cmd {
 			}
 		}
 	} else if p, _, ok := m.currentPR(); ok {
-		if kind == runner.Approve && m.own(p) {
+		if kind == runner.Review && rv.Event == model.EventApprove && m.own(p) {
 			m.refuse("you cannot approve your own pull request")
 			return nil
 		}
 		prs = []model.PR{p}
 	}
-	return m.startBulkFor(kind, prs)
+	return m.startBulkFor(kind, rv, prs)
 }
 
-// startBulkFor opens the confirm popup for prs.
-func (m *Model) startBulkFor(kind runner.Kind, prs []model.PR) tea.Cmd {
+// startBulkFor opens the confirm popup for prs; rv is the review a popup
+// of a review sends.
+func (m *Model) startBulkFor(kind runner.Kind, rv runner.ReviewText, prs []model.PR) tea.Cmd {
 	if len(prs) == 0 {
 		return nil
 	}
-	b := &bulk{kind: kind, loading: true}
+	b := &bulk{kind: kind, review: rv, loading: true}
 	var ids []string
 	for _, p := range prs {
 		pg, inBatch := m.progress[p.Key]
@@ -273,7 +300,7 @@ func (m *Model) readNotes(b *bulk) tea.Cmd {
 	}
 	var ask []model.PR
 	for _, it := range b.items {
-		if _, known := m.cautions[notesID(it.pr)]; it.goes(b.kind) && it.pr.AuthorIsBot && !known {
+		if _, known := m.cautions[notesID(it.pr)]; it.goes() && it.pr.AuthorIsBot && !known {
 			ask = append(ask, it.pr)
 		}
 	}
@@ -341,8 +368,8 @@ func (m *Model) decideBulk() {
 			continue
 		}
 		switch b.kind {
-		case runner.Approve:
-			it.d = plan.ForApprove(it.mi, it.pr, m.viewer, b.includeFailing, m.set.Plan)
+		case runner.Review:
+			it.d = plan.ForReview(it.mi, it.pr, m.viewer, b.review.Event, b.includeFailing, m.set.Plan)
 		case runner.Ready:
 			it.d = plan.ForReady(it.mi)
 		default:
@@ -360,6 +387,7 @@ func (m *Model) bulkKey(k string) tea.Cmd {
 	is := func(a keymap.Action) bool { return m.keys.Matches(a, k) }
 	switch {
 	case k == keymap.Back:
+		// A review being written is under the popup, and comes back.
 		m.bulk = nil
 		m.say("canceled")
 	case is("down"):
@@ -367,7 +395,7 @@ func (m *Model) bulkKey(k string) tea.Cmd {
 		b.offset++
 	case is("up"):
 		b.offset = max(b.offset-1, 0)
-	case is("include_failing") && b.kind == runner.Approve && !b.loading:
+	case is("include_failing") && b.approves() && !b.loading:
 		b.includeFailing = !b.includeFailing
 		m.decideBulk()
 	case is("confirm") && !b.loading:
@@ -378,12 +406,14 @@ func (m *Model) bulkKey(k string) tea.Cmd {
 
 // runBulk starts the batch: what it skips leaves the selection at once and
 // keeps its reason on its row; what it acts on shows its progress there.
+// A review being written under the popup is closed once its batch starts;
+// with nothing to do, it is left open.
 func (m *Model) runBulk() tea.Cmd {
 	b := m.bulk
 	var items []runner.Item
-	bs := &batchState{kind: b.kind, goes: map[model.PRKey]bool{}, done: map[model.PRKey]progress{}}
+	bs := &batchState{kind: b.kind, review: b.review, goes: map[model.PRKey]bool{}, done: map[model.PRKey]progress{}}
 	for _, it := range b.items {
-		if it.goes(b.kind) {
+		if it.goes() {
 			items = append(items, runner.Item{PR: it.pr, Head: it.mi.HeadOID, AutoMerge: it.d.Step == plan.StepAutoMerge})
 			bs.goes[it.pr.Key] = true
 			bs.order = append(bs.order, it.pr.Key)
@@ -411,11 +441,18 @@ func (m *Model) runBulk() tea.Cmd {
 	}
 	for _, it := range items {
 		m.progress[it.PR.Key] = progress{text: "queued"}
-		if b.kind != runner.Approve {
+		if !b.approves() {
 			delete(m.selected, it.PR.Key)
 		}
 	}
-	id, ch := m.run.Start(m.ctx, b.kind, items)
+	var id string
+	var ch <-chan runner.Event
+	if b.kind == runner.Review {
+		m.compose = nil
+		id, ch = m.run.StartReview(m.ctx, b.review, items)
+	} else {
+		id, ch = m.run.Start(m.ctx, b.kind, items)
+	}
 	m.batches[id] = bs
 	m.batchOrder = append(m.batchOrder, id)
 	return listen(id, ch)
@@ -425,10 +462,10 @@ func (m *Model) runBulk() tea.Cmd {
 func (m *Model) renderBulk() []string {
 	b, st := m.bulk, m.st
 	w := min(max(m.width-6, 40), 130)
-	verb := bulkVerbs[b.kind]
+	verb := b.verb()
 	if b.kind == runner.Merge {
 		for _, it := range b.items {
-			if it.ok && it.d.Approve && it.goes(b.kind) {
+			if it.ok && it.d.Approve && it.goes() {
 				verb = "approve and merge"
 				break
 			}
@@ -444,6 +481,10 @@ func (m *Model) renderBulk() []string {
 		lines = append(lines, hang(st.teal.Render("✧ picked by Claude")+st.muted.Render(": "), st.muted.Render("“"+safeLine(firstLine(b.by))+"”"), inner)...)
 		lines = append(lines, "")
 	}
+	if body := b.review.Body; body != "" {
+		lines = append(lines, bodyLines(st, body, inner)...)
+		lines = append(lines, "")
+	}
 	if b.err != nil {
 		lines = append(lines, wrapped(st.red, "could not read them all: "+b.err.Error(), inner)...)
 	}
@@ -451,7 +492,7 @@ func (m *Model) renderBulk() []string {
 	auto := false
 	failing := 0
 	for _, it := range b.items {
-		if it.goes(b.kind) {
+		if it.goes() {
 			goes++
 			auto = auto || it.d.Step == plan.StepAutoMerge
 		}
@@ -467,12 +508,10 @@ func (m *Model) renderBulk() []string {
 		case !it.read:
 			// Shown from the list until it is read again.
 			mark, title, what = st.dim.Render(m.spinnerAt(i)), st.muted.Render(it.pr.Title), st.dim.Render("reading…")
-		case it.goes(b.kind):
+		case it.goes():
 			mark, title = st.mauve.Render("✓"), st.sub1.Render(it.pr.Title)
 			switch b.kind {
-			case runner.Approve:
-				what = st.green.Render("approve")
-			case runner.Ready:
+			case runner.Review, runner.Ready:
 				what = st.green.Render(it.d.Reason)
 			default:
 				if it.d.Approve {
@@ -488,7 +527,7 @@ func (m *Model) renderBulk() []string {
 			}
 		}
 		r := bulkRow{pr: it.pr, mark: mark, title: title, what: what}
-		if it.goes(b.kind) {
+		if it.goes() {
 			// On lines of their own, so a long one does not take the
 			// width of the title or of what is done.
 			if len(it.d.Notes) > 0 {
@@ -516,7 +555,7 @@ func (m *Model) renderBulk() []string {
 	case notesRead:
 		n := 0
 		for _, it := range b.items {
-			if m.cautions[notesID(it.pr)] != "" && it.goes(b.kind) {
+			if m.cautions[notesID(it.pr)] != "" && it.goes() {
 				n++
 			}
 		}
@@ -531,7 +570,7 @@ func (m *Model) renderBulk() []string {
 	if auto {
 		prose(st.dim, "Auto-merge also merges commits pushed after it is on, as GitHub does.")
 	}
-	if b.kind == runner.Approve && failing > 0 && !b.loading {
+	if b.approves() && failing > 0 && !b.loading {
 		state := "left out"
 		if b.includeFailing {
 			state = "included"
@@ -542,12 +581,21 @@ func (m *Model) renderBulk() []string {
 	case b.loading:
 	case b.kind == runner.Ready:
 		prose(st.dim, "Its reviewers are asked for a review once it is ready. Each acts only on the head shown when it was read.")
+	case b.kind == runner.Review && !b.approves():
+		prose(st.dim, "GitHub cannot take a review back. Each is sent on the head shown when it was read.")
 	default:
 		prose(st.dim, "GitHub cannot take an approval or a merge back. Each acts only on the head shown when it was read.")
 	}
 	hint := fmt.Sprintf("%s %d of %d? ", verb, goes, len(b.items))
 	if len(b.items) == 1 {
 		hint = verb + " this pull request? "
+	}
+	if b.kind == runner.Review && !b.approves() {
+		// A verb only for an approval: the others are things sent.
+		hint = fmt.Sprintf("send the %s to %d of %d? ", verb, goes, len(b.items))
+		if len(b.items) == 1 {
+			hint = "send the " + verb + "? "
+		}
 	}
 	if goes == 0 {
 		hint = "nothing to do "
@@ -666,7 +714,7 @@ func (m *Model) bulkName(pr model.PR, w int) string {
 func bulkNumber(pr model.PR) string { return fmt.Sprintf("#%d", pr.Key.Number) }
 
 // bulkVerbs name what a popup of each kind does, in its title and question.
-var bulkVerbs = map[runner.Kind]string{runner.Approve: "approve", runner.Merge: "merge", runner.Ready: "mark ready"}
+var bulkVerbs = map[runner.Kind]string{runner.Merge: "merge", runner.Ready: "mark ready"}
 
 func (m *Model) stepStyle(s plan.Step) styleFn {
 	switch s {

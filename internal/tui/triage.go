@@ -420,8 +420,11 @@ func (m *Model) applyTriage() tea.Cmd {
 			if m.busy() {
 				continue
 			}
-			kind := map[claude.Do]runner.Kind{claude.DoApprove: runner.Approve, claude.DoMerge: runner.Merge}[s.Do]
-			cmds = append(cmds, m.startBulkFor(kind, s.prs))
+			if s.Do == claude.DoApprove {
+				cmds = append(cmds, m.startBulkFor(runner.Review, runner.ReviewText{Event: model.EventApprove}, s.prs))
+			} else {
+				cmds = append(cmds, m.startBulkFor(runner.Merge, runner.ReviewText{}, s.prs))
+			}
 			m.bulk.by = last.request
 		}
 	}

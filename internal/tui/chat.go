@@ -433,12 +433,21 @@ func (m *Model) chatAnswered(msg chatAnswerMsg) tea.Cmd {
 
 // draftCompose opens the review popup with Claude's draft.
 func (m *Model) draftCompose(c *chatScreen, d claude.Draft) tea.Cmd {
-	ev := d.Event
 	pr := c.PR()
+	if m.compose != nil || m.bulk != nil {
+		// Another review is being written or asked about: the draft
+		// waits, as it does while the pane is not shown.
+		c.draft = &d
+		m.say(fmt.Sprintf("the review of %s is drafted; open Claude again to see it", pr.Key))
+		return nil
+	}
+	ev := d.Event
 	if m.own(pr) || pr.State != model.StateOpen {
 		ev = model.EventComment
 	}
-	cmd := m.startCompose(pr, ev)
+	// A review of the conversation's pull request alone, whatever is
+	// selected.
+	cmd := m.startCompose([]model.PR{pr}, ev)
 	if m.compose != nil {
 		m.compose.ta.SetValue(d.Body)
 	}

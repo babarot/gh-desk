@@ -24,6 +24,8 @@ type fakeGH struct {
 	reads        map[string]int
 	autoMergeErr error
 	commits      map[string]Commit
+	// bodies are the bodies of the reviews sent, by pull request ID.
+	bodies map[string]string
 }
 
 func (f *fakeGH) log(s string) { f.calls = append(f.calls, s) }
@@ -47,12 +49,18 @@ func (f *fakeGH) MergeInfo(ctx context.Context, ids []string, _ bool) (map[strin
 	return out, nil
 }
 
-func (f *fakeGH) Review(_ context.Context, pr model.PR, ev model.ReviewEvent, _ string) error {
+func (f *fakeGH) Review(_ context.Context, pr model.PR, ev model.ReviewEvent, body string) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.log(fmt.Sprintf("review %s %s %s", pr.Key, ev, pr.HeadOID))
+	if f.bodies == nil {
+		f.bodies = map[string]string{}
+	}
+	f.bodies[pr.ID] = body
+	state := map[model.ReviewEvent]model.ReviewState{model.EventApprove: model.ReviewApproved,
+		model.EventComment: model.ReviewCommented, model.EventRequestChanges: model.ReviewChangesRequested}[ev]
 	mi := f.prs[pr.ID]
-	mi.Reviews = append(mi.Reviews, model.Review{Author: "me", State: model.ReviewApproved})
+	mi.Reviews = append(mi.Reviews, model.Review{Author: "me", State: state})
 	return nil
 }
 
@@ -120,12 +128,22 @@ func pr(id, repo string, n int, author string) (model.MergeInfo, Item) {
 
 func runBatch(t *testing.T, f *fakeGH, kind Kind, items ...Item) map[model.PRKey][]Event {
 	t.Helper()
+	return runWith(t, f, func(ctx context.Context, r *Runner) <-chan Event { _, ch := r.Start(ctx, kind, items); return ch })
+}
+
+func runReview(t *testing.T, f *fakeGH, rv ReviewText, items ...Item) map[model.PRKey][]Event {
+	t.Helper()
+	return runWith(t, f, func(ctx context.Context, r *Runner) <-chan Event { _, ch := r.StartReview(ctx, rv, items); return ch })
+}
+
+func runWith(t *testing.T, f *fakeGH, start func(context.Context, *Runner) <-chan Event) map[model.PRKey][]Event {
+	t.Helper()
 	r := New(f, logging.Discard(), Options{Settings: settings, Viewer: "me", CanWait: true,
 		ChecksTimeout: time.Second, BlockedTimeout: 40 * time.Millisecond, WatchTimeout: time.Second,
 		PollFast: 5 * time.Millisecond, PollSlow: 5 * time.Millisecond, Recheck: 2 * time.Millisecond, RecheckFor: 50 * time.Millisecond})
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	_, events := r.Start(ctx, kind, items)
+	events := start(ctx, r)
 	out := map[model.PRKey][]Event{}
 	for e := range events {
 		out[e.Key] = append(out[e.Key], e)
@@ -306,7 +324,7 @@ func TestApproveOnly(t *testing.T) {
 	b, ib := pr("2", "web", 2, "alice")
 	b.Reviews = []model.Review{{Author: "me", State: model.ReviewApproved}}
 	f := newFake(a, b)
-	evs := runBatch(t, f, Approve, ia, ib)
+	evs := runReview(t, f, ReviewText{Event: model.EventApprove, Body: "LGTM"}, ia, ib)
 	if e := last(evs[ia.PR.Key]); e.Result != Approved {
 		t.Errorf("api#1: %+v", e)
 	}
@@ -315,6 +333,45 @@ func TestApproveOnly(t *testing.T) {
 	}
 	if strings.Contains(strings.Join(f.calls, ","), "merge") {
 		t.Errorf("approve merged: %v", f.calls)
+	}
+	if f.bodies["1"] != "LGTM" {
+		t.Errorf("body sent = %q", f.bodies["1"])
+	}
+}
+
+// A review of another kind is decided again before it is sent, and sent
+// on the head the user confirmed.
+func TestReview(t *testing.T) {
+	a, ia := pr("1", "api", 1, "alice")
+	b, ib := pr("2", "web", 2, "me")
+	c, ic := pr("3", "cli", 3, "alice")
+	c.State = model.StateMerged
+	d, id := pr("4", "app", 4, "alice")
+	d.HeadOID = "pushed"
+	f := newFake(a, b, c, d)
+	evs := runReview(t, f, ReviewText{Event: model.EventRequestChanges, Body: "please rebase"}, ia, ib, ic, id)
+	if e := last(evs[ia.PR.Key]); e.Result != Reviewed || e.Approved {
+		t.Errorf("api#1: %+v", e)
+	}
+	for _, it := range []Item{ib, ic} {
+		if e := last(evs[it.PR.Key]); e.Result != Skipped {
+			t.Errorf("%s: %+v", it.PR.Key, e)
+		}
+	}
+	if e := last(evs[id.PR.Key]); e.Result != Stopped {
+		t.Errorf("a pull request pushed to was not stopped: %+v", e)
+	}
+	if got := strings.Join(f.calls, ","); got != "review acme/api#1 REQUEST_CHANGES h-1" {
+		t.Errorf("calls = %s", got)
+	}
+
+	// A comment goes to one's own and to a merged pull request.
+	f = newFake(b, c)
+	evs = runReview(t, f, ReviewText{Event: model.EventComment, Body: "thanks"}, ib, ic)
+	for _, it := range []Item{ib, ic} {
+		if e := last(evs[it.PR.Key]); e.Result != Reviewed {
+			t.Errorf("comment on %s: %+v", it.PR.Key, e)
+		}
 	}
 }
 

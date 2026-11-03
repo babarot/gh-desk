@@ -190,6 +190,8 @@ func (m *Model) aboutMany(a keymap.Action, prs []model.PR) (string, bool) {
 		return of("mark ready", n), false
 	case "comment":
 		return fmt.Sprintf("the same comment on each of %d", len(prs)), false
+	case "review":
+		return fmt.Sprintf("the same review of each of %d", len(prs)), false
 	case "browse":
 		return fmt.Sprintf("open %d on github.com", len(prs)), false
 	case "hide":
@@ -291,13 +293,15 @@ func (m *Model) runMenu(it menuItem) tea.Cmd {
 	m.menu = nil
 	switch it.action {
 	case "approve":
-		return m.startBulk(runner.Approve)
+		return m.startApprove()
 	case "merge":
 		return m.startBulk(runner.Merge)
 	case "ready_for_review":
 		return m.startBulk(runner.Ready)
 	case "comment":
 		return m.startComment()
+	case "review":
+		return m.startReview()
 	}
 	if len(m.selected) > 0 {
 		switch it.action {
@@ -312,8 +316,6 @@ func (m *Model) runMenu(it menuItem) tea.Cmd {
 		return nil
 	}
 	switch it.action {
-	case "review":
-		return m.startCompose(p, model.EventComment)
 	case "ask_claude":
 		return m.openChat(p)
 	case "browse":

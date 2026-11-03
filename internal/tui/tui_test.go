@@ -159,6 +159,7 @@ func (f *fakeSource) Bodies(_ context.Context, ids []string) (map[string]string,
 // with the result results says, Approved or Merged by default.
 type fakeRunner struct {
 	kinds   []runner.Kind
+	reviews []runner.ReviewText
 	items   [][]runner.Item
 	results map[model.PRKey]runner.Event
 	resumed []model.Pending
@@ -173,7 +174,16 @@ func (r *fakeRunner) Resume(ctx context.Context, ps []model.Pending) (string, <-
 	return r.Start(ctx, runner.Merge, items)
 }
 
+func (r *fakeRunner) StartReview(_ context.Context, rv runner.ReviewText, items []runner.Item) (string, <-chan runner.Event) {
+	r.reviews = append(r.reviews, rv)
+	return r.start(runner.Review, rv, items)
+}
+
 func (r *fakeRunner) Start(_ context.Context, kind runner.Kind, items []runner.Item) (string, <-chan runner.Event) {
+	return r.start(kind, runner.ReviewText{}, items)
+}
+
+func (r *fakeRunner) start(kind runner.Kind, rv runner.ReviewText, items []runner.Item) (string, <-chan runner.Event) {
 	r.kinds = append(r.kinds, kind)
 	r.items = append(r.items, items)
 	ch := make(chan runner.Event, len(items))
@@ -181,10 +191,12 @@ func (r *fakeRunner) Start(_ context.Context, kind runner.Kind, items []runner.I
 		ev, ok := r.results[it.PR.Key]
 		if !ok {
 			ev = runner.Event{Result: runner.Merged, Text: "merged", Method: model.MethodMerge}
-			switch kind {
-			case runner.Approve:
+			switch {
+			case kind == runner.Review && rv.Event == model.EventApprove:
 				ev = runner.Event{Result: runner.Approved, Text: "approved", Approved: true}
-			case runner.Ready:
+			case kind == runner.Review:
+				ev = runner.Event{Result: runner.Reviewed, Text: "sent"}
+			case kind == runner.Ready:
 				ev = runner.Event{Result: runner.Readied, Text: "ready for review"}
 			}
 		}
@@ -658,12 +670,16 @@ func TestActionMenuSelection(t *testing.T) {
 	// space on #12, then on the team group under it, which selects #7.
 	press(m, "space", "space", "k", "enter")
 	golden(t, "action-menu-selection", screen(m))
-	press(m, "R")
-	if m.menu == nil || m.compose != nil || func() bool { k, _ := m.shownStatus(); return k != statusline.Refusal }() {
-		t.Fatalf("review on a selection ran: menu %v, compose %v", m.menu, m.compose)
+	press(m, "i")
+	if m.menu == nil || len(m.chats) != 0 || func() bool { k, _ := m.shownStatus(); return k != statusline.Refusal }() {
+		t.Fatalf("asking claude on a selection ran: menu %v", m.menu)
 	}
-	press(m, "A")
-	if m.menu != nil || m.bulk == nil || m.bulk.kind != runner.Approve {
+	press(m, "R")
+	if m.menu != nil || m.compose == nil || len(m.compose.prs) != 2 {
+		t.Fatalf("review did not open for the selection: %+v", m.compose)
+	}
+	press(m, "esc", "enter", "A")
+	if m.menu != nil || m.bulk == nil || m.bulk.kind != runner.Review {
 		t.Fatalf("approve did not open the approve popup for the selection: %v", m.bulk)
 	}
 }
@@ -703,7 +719,7 @@ func TestApprove(t *testing.T) {
 		t.Fatal("esc started the approve")
 	}
 	press(m, "A", "y")
-	if len(r.items) != 1 || r.kinds[0] != runner.Approve || r.items[0][0].Head != "aaaaaaa1" {
+	if len(r.items) != 1 || r.kinds[0] != runner.Review || r.items[0][0].Head != "aaaaaaa1" {
 		t.Errorf("batches = %+v", r.items)
 	}
 	if len(f.done) != 1 || f.done[0] != "acme/api#12" {
@@ -782,8 +798,8 @@ func TestCommentOnSelection(t *testing.T) {
 		t.Fatalf("c does not write the comment again for the one it failed on: %+v", m.compose)
 	}
 	press(m, "esc", "R")
-	if m.compose != nil || !strings.Contains(status(m), "one pull request at a time") {
-		t.Errorf("R on a selection opened: %q", status(m))
+	if m.compose == nil || m.compose.single || len(m.compose.prs) != 1 || m.compose.ta.Value() != "" {
+		t.Errorf("R on the selection did not open a review of it, apart from the comment: %+v", m.compose)
 	}
 }
 
@@ -799,21 +815,57 @@ func (f *failingComment) PostComment(ctx context.Context, p model.PR, body strin
 	return f.fakeSource.PostComment(ctx, p, body)
 }
 
-// R writes a review: a comment in it is a review of the head seen.
+// R writes a review, and the confirm popup of a batch asks about it: the
+// review is sent by the runner on the head the popup read. esc there
+// comes back to the review as it was written.
 func TestReviewWithBody(t *testing.T) {
 	f := fixture()
-	m := start(t, f, keymap.Default())
+	m, r := startWith(t, f, keymap.Default())
 	press(m, "R", "ctrl+s")
 	if !strings.Contains(status(m), "write the review comment first") {
 		t.Errorf("empty review was not refused: %q", status(m))
 	}
 	run(m, m.paste(tea.PasteMsg{Content: "Looks good, one question."}))
+	press(m, "ctrl+s")
+	if m.bulk == nil || m.bulk.kind != runner.Review || m.bulk.review.Body != "Looks good, one question." {
+		t.Fatalf("the confirm popup did not open: %+v", m.bulk)
+	}
+	golden(t, "review-confirm", screen(m))
+	press(m, "esc")
+	if m.bulk != nil || m.compose == nil || m.compose.ta.Value() != "Looks good, one question." {
+		t.Fatalf("esc lost the review: %+v", m.compose)
+	}
 	press(m, "ctrl+s", "y")
-	if len(f.reviews) != 1 || !strings.HasSuffix(f.reviews[0], "COMMENT aaaaaaa1 Looks good, one question.") || len(f.posted) != 0 {
-		t.Errorf("reviews = %q, posted = %q", f.reviews, f.posted)
+	if len(r.reviews) != 1 || r.reviews[0] != (runner.ReviewText{Event: model.EventComment, Body: "Looks good, one question."}) ||
+		len(r.items[0]) != 1 || r.items[0][0].Head != "aaaaaaa1" || len(f.reviews) != 0 || len(f.posted) != 0 {
+		t.Errorf("reviews = %+v, items = %+v, sent directly = %q", r.reviews, r.items, f.reviews)
 	}
 	if m.compose != nil {
 		t.Error("the popup stayed open")
+	}
+	if p, _ := m.knownPR(key("acme", "api", 12)); len(p.Reviews) == 0 || p.Reviews[len(p.Reviews)-1].State != model.ReviewCommented {
+		t.Errorf("the row does not show the review: %+v", p.Reviews)
+	}
+}
+
+// R on a selection sends the same review to each; those the runner did
+// not send it to are left selected, and the next R starts with it.
+func TestReviewOnSelection(t *testing.T) {
+	m, r := startWith(t, fixture(), keymap.Default())
+	r.results[key("acme", "web", 7)] = runner.Event{Result: runner.Stopped, Text: "head changed · confirm again"}
+	press(m, "space", "space", "k", "R", "tab", "tab")
+	run(m, m.paste(tea.PasteMsg{Content: "Please split this."}))
+	press(m, "ctrl+s", "y")
+	if len(r.reviews) != 1 || r.reviews[0].Event != model.EventRequestChanges || len(r.items[0]) != 2 {
+		t.Fatalf("reviews = %+v, items = %+v", r.reviews, r.items)
+	}
+	if len(m.selected) != 1 || !m.isSelected(key("acme", "web", 7)) {
+		t.Fatalf("selection = %v, want the one not sent", m.selected)
+	}
+	press(m, "R")
+	if m.compose == nil || len(m.compose.prs) != 1 || kinds[m.compose.kind] != model.EventRequestChanges ||
+		m.compose.ta.Value() != "Please split this." {
+		t.Fatalf("R does not start with the review not sent: %+v", m.compose)
 	}
 }
 
@@ -876,30 +928,25 @@ func TestComposePopup(t *testing.T) {
 	}
 }
 
+// A review confirmed and not yet sent leaves its pull request out of the
+// next one's popup, so it is not sent twice.
 func TestOneReviewAtATime(t *testing.T) {
-	f := fixture()
-	m := start(t, f, keymap.Default())
+	m := start(t, fixture(), keymap.Default())
 	press(m, "R")
 	run(m, m.paste(tea.PasteMsg{Content: "once"}))
+	press(m, "ctrl+s")
 	// y without running the command: the review is still on its way.
+	m.Update(keyMsg("y"))
+	press(m, "R")
+	run(m, m.paste(tea.PasteMsg{Content: "twice"}))
 	press(m, "ctrl+s")
-	_, cmd := m.Update(keyMsg("y"))
-	press(m, "ctrl+s")
-	if m.confirm != nil || !strings.Contains(status(m), "being sent") {
-		t.Errorf("a second review was asked for while one was on its way: %q", status(m))
+	if m.bulk == nil || len(m.bulk.items) != 1 || !m.bulk.items[0].running || m.bulk.items[0].goes() {
+		t.Fatalf("a second review was let through while one was on its way: %+v", m.bulk)
 	}
-	run(m, cmd)
-	if len(f.reviews) != 1 {
-		t.Errorf("reviews = %q", f.reviews)
-	}
-}
-
-func TestReviewOfAnotherPRKeepsTheDraft(t *testing.T) {
-	m := start(t, fixture(), keymap.Default())
-	press(m, "c")
-	m.handleData(reviewMsg{pr: model.PR{Key: key("acme", "web", 7)}, event: model.EventApprove})
-	if m.compose == nil {
-		t.Error("a review of another pull request closed the draft")
+	// Nothing to do: the review written stays.
+	press(m, "y")
+	if m.compose == nil || m.compose.ta.Value() != "twice" {
+		t.Errorf("the review was lost with nothing to send: %+v", m.compose)
 	}
 }
 
@@ -1741,6 +1788,30 @@ func TestClaudeDraft(t *testing.T) {
 	}
 }
 
+// Claude's draft is a review of its conversation's pull request alone,
+// whatever is selected when it comes, and waits while another review is
+// being written.
+func TestClaudeDraftIsOfItsPullRequest(t *testing.T) {
+	m := start(t, fixture(), keymap.Default())
+	press(m, "i", "esc")
+	c := m.chats[key("acme", "api", 12)]
+	if c == nil {
+		t.Fatal("no conversation")
+	}
+	m.selected[key("acme", "api", 12)] = byHand
+	m.selected[key("acme", "web", 7)] = byHand
+	d := claude.Draft{Event: model.EventApprove, Body: "Looks good."}
+	run(m, m.draftCompose(c, d))
+	if m.compose == nil || len(m.compose.prs) != 1 || m.compose.pr.Key != key("acme", "api", 12) {
+		t.Fatalf("the draft is not of its pull request alone: %+v", m.compose)
+	}
+	m.compose.ta.SetValue("my own words")
+	run(m, m.draftCompose(c, d))
+	if m.compose.ta.Value() != "my own words" || c.draft == nil {
+		t.Errorf("a draft took the place of the review being written: %q, kept %v", m.compose.ta.Value(), c.draft)
+	}
+}
+
 func TestReleaseNotesMarkBotPullRequests(t *testing.T) {
 	f := fixture()
 	f.info = map[model.PRKey]func(*model.MergeInfo){
@@ -1901,7 +1972,7 @@ func TestBulkRowsFit(t *testing.T) {
 func TestEnterConfirms(t *testing.T) {
 	m, r := startWith(t, fixture(), keymap.Default())
 	press(m, "A", "enter")
-	if len(r.items) != 1 || r.kinds[0] != runner.Approve {
+	if len(r.items) != 1 || r.kinds[0] != runner.Review {
 		t.Errorf("enter did not confirm the approve: batches = %+v", r.items)
 	}
 }

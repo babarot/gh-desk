@@ -13,7 +13,11 @@ import (
 )
 
 // batchWords names what a batch does while it runs.
-var batchWords = map[runner.Kind]string{runner.Approve: "approving", runner.Merge: "approving and merging", runner.Ready: "marking ready"}
+var batchWords = map[runner.Kind]string{runner.Merge: "approving and merging", runner.Ready: "marking ready"}
+
+// reviewingWords say what a batch of reviews of each kind is doing.
+var reviewingWords = map[model.ReviewEvent]string{model.EventApprove: "approving", model.EventComment: "sending review comments",
+	model.EventRequestChanges: "requesting changes"}
 
 // The status line (ADR-025) is decided by internal/statusline, whose state
 // only its methods change. Events are said with say, refuse and fail, and
@@ -65,7 +69,7 @@ func (m *Model) statusText() string {
 // activities is the work in progress, writes to GitHub first.
 func (m *Model) activities() []string {
 	var out []string
-	for _, f := range []func() string{m.postingActivity, m.reviewActivity, m.batchActivity, m.claudeActivity, m.refreshActivity} {
+	for _, f := range []func() string{m.postingActivity, m.batchActivity, m.claudeActivity, m.refreshActivity} {
 		if s := f(); s != "" {
 			out = append(out, s)
 		}
@@ -121,18 +125,13 @@ func (m *Model) batchActivity() string {
 			continue
 		}
 		verb := batchWords[bs.kind]
+		if bs.kind == runner.Review {
+			verb = reviewingWords[bs.review.Event]
+		}
 		if bs.resumed {
 			verb = "going on with merges"
 		}
 		parts = append(parts, fmt.Sprintf("%s… %d/%d", verb, len(bs.done), len(bs.goes)))
 	}
 	return strings.Join(parts, " · ")
-}
-
-// reviewActivity is a single review on its way.
-func (m *Model) reviewActivity() string {
-	if m.sending == "" || m.posting != nil || m.sendingWhat == "" {
-		return ""
-	}
-	return fmt.Sprintf("sending %s to %s…", m.sendingWhat, m.sending)
 }

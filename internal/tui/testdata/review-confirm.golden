@@ -1,0 +1,34 @@
+triage // @me    1 review (3)   2 mine (1)   3 involved (0)   4 inbox (1)                         1 to you · 1 to a team · 1 bots 
+    PR                        TITLE                                  AUTHOR          CI  REVIEW   WHY         SIZE          AGE
+  ▾╭ review comment ──────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+▎ ●│   Looks good, one question.                                                                                              │   
+  ▸│                                                                                                                          │
+  ▸│ ✓ acme/api#12 Add retries to the client                                                                                  │
+   │   └ comment                                                                                                              │
+   │                                                                                                                          │
+   │ GitHub cannot take a review back. Each is sent on the head shown when it was read.                                       │
+   │                                                                                                                          │
+   │ send the review comment? y yes · esc no                                                                                  │
+   ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+               │ ┃                                                                                                │
+               │ ┃                                                                                                │
+               │ ┃                                                                                                │
+               │ ┃                                                                                                │
+               │                                                                                                  │
+               │ ctrl+s post · tab kind · ctrl+e $EDITOR · esc discard                                            │
+               ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
+
+╭  overview   diff (2)  ────────────────────────────────────────────────────────────────────────────────── acme/api#12 · J/K · v ╮
+│ #12 Add retries to the client                                                       alice │ status    open                     │
+│ ▾ description ─────────────────────────────────────────────────────────────────────────── │ merge     merge now (merge commit) │
+│ │ What                                                                                    │ requested me @core                 │
+│ │ Retry failed requests.                                                                  │ checks    ✓1                       │
+│ ╵                                                                                         │ size      +40 −3 · 2 files         │
+│                                                                                           │ branch    retries                  │
+│ ▾ checks (1)  ✓1 ──────────────────────────────────────────────────────────────────────── │           → main                   │
+│ │ ✓ test                                                                                  │ updated   3h ago                   │
+│ ╵                                                                                         │                                    │
+│                                                                                           │                                    │
+╰────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+                                                                                                                                  
+y yes · f include failing · esc back                                                                                              
