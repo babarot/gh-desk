@@ -25,7 +25,7 @@ Where the checkout comes from matters too. A worktree added from the user's own 
 ## Consequences
 
 - A pull request cannot run anything on the user's machine through Claude Code, and Claude cannot read outside the worktree. What it can still do is answer badly or carry instructions in its answer; the user reads every draft before it is sent.
-- Restricted mode still loads the worktree's CLAUDE.md, which a pull request can add or change, as project instructions. It can steer the answer, but no tool can act on it; it is the same kind of risk as the description and the diff.
+- Restricted mode does not load CLAUDE.md, the worktree's or the user's, as instructions. Claude can still read the worktree's as a file, as it reads the description and the diff: a pull request can steer the answer through it, but no tool can act on it.
 - The user's own Claude Code settings (their hooks, their permission rules) do not apply in gh-triage either.
 - The cache holds a clone of each repository asked about. It grows with use; `gc` removes worktrees, not clones.
 - Restricted mode is a recent Claude Code flag; an older Claude Code fails on it, which shows as an error in the conversation rather than as an unrestricted run.

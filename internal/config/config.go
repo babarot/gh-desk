@@ -230,8 +230,8 @@ type Claude struct {
 	// ~ is the home directory.
 	Command string `toml:"command"`
 	Model   string `toml:"model"`
-	// AllowedTools are the tools Claude may use; the claude package checks
-	// them.
+	// AllowedTools are the tools Claude may use; the app package checks
+	// them against claude.Tools.
 	AllowedTools []string `toml:"allowed_tools"`
 	// Language is what Claude answers in, such as "Japanese".
 	Language string `toml:"language"`
