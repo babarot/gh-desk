@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"cmp"
 	"fmt"
 	"strings"
 
@@ -36,6 +37,9 @@ var helpScopes = []struct {
 }
 
 const helpKeyWidth = 16
+
+// homepage is where gh-desk lives, told at the foot of the ? popup.
+const homepage = "https://github.com/babarot/gh-desk"
 
 // helpScope is the scope of the screen ? was opened from.
 func (m *Model) helpScope() keymap.Scope {
@@ -125,10 +129,13 @@ func (m *Model) openHelp() {
 // helpLines are the lines of the ? popup w cells wide, with the title of
 // the section each header line is of ("" for the other lines). A section
 // whose keys work on the screen ? was opened from is drawn in color and
-// says so; the others are grayed.
+// says so; the others are grayed. The first line, before a blank one,
+// tells the version and the homepage, to the right.
 func (m *Model) helpLines(w int) ([]string, []string) {
 	st := m.st
-	var lines, heads []string
+	about := st.dim.Render(fmt.Sprintf("gh-desk %s · %s", cmp.Or(m.set.Version, "dev"), homepage))
+	lines := []string{strings.Repeat(" ", max(w-lipgloss.Width(about), 0)) + about, ""}
+	heads := []string{"", ""}
 	for _, s := range m.helpSections() {
 		mark, title, key, what := st.blue, st.blue.Bold(true), st.key, st.muted
 		if !s.works {

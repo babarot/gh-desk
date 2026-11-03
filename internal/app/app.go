@@ -183,6 +183,7 @@ func assemble(cfg config.File, warns []string, e env, log *slog.Logger) parts {
 	set := settings(cfg)
 	set.ConfigWarnings = warns
 	set.Viewer = e.viewer
+	set.Version = Version
 	set.Host = e.host
 	set.Chats = chatStore{state.OpenChats(e.stateDir, e.host)}
 	if !e.noCache {

@@ -12,10 +12,11 @@ import (
 	"github.com/babarot/gh-desk/internal/tui/chat"
 )
 
-// helpText is the ? popup's lines, unstyled.
+// helpText is the ? popup's lines after the version and the blank line
+// below it, unstyled.
 func helpText(m *Model) string {
 	lines, _ := m.helpLines(60)
-	return ansi.Strip(strings.Join(lines, "\n"))
+	return ansi.Strip(strings.Join(lines[2:], "\n"))
 }
 
 // The ? popup has a section for every scope; that of the screen it was
@@ -119,5 +120,17 @@ func TestHintsKeepHelpAndBack(t *testing.T) {
 		if got := last(m); !strings.HasSuffix(got, "? keys · esc clear") {
 			t.Errorf("width %d, a selection: key line = %q, want it to end with ? and esc", w, got)
 		}
+	}
+}
+
+// The ? popup begins with the version and the homepage, and a blank line.
+func TestHelpTellsTheVersion(t *testing.T) {
+	m := newModel(fixture(), cachedReview())
+	m.set.Version = "v1.2.3"
+	run(m, m.Init())
+	press(m, "?")
+	lines, _ := m.helpLines(60)
+	if first := ansi.Strip(lines[0]); !strings.HasSuffix(first, "gh-desk v1.2.3 · "+homepage) || lines[1] != "" {
+		t.Errorf("the ? popup does not begin with the version and a blank line:\n%s", ansi.Strip(strings.Join(lines, "\n")))
 	}
 }

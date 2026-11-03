@@ -122,6 +122,8 @@ type Settings struct {
 	// Shimmer runs a light over the text that says what is going on, and
 	// Wave puts each line of a table a frame of the spinner ahead.
 	Shimmer, Wave bool
+	// Version is gh-desk's version, told at the foot of the ? popup.
+	Version string
 	// Editor is the command ctrl+e runs to edit a review, with its
 	// arguments; empty turns it off.
 	Editor string
