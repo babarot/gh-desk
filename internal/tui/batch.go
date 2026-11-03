@@ -37,6 +37,9 @@ type batchState struct {
 	kind runner.Kind
 	// review is what a batch of a review sends.
 	review runner.ReviewText
+	// byClaude is set on a batch of a plan of Claude's, which acts on the
+	// pull requests it names, never on the selection.
+	byClaude bool
 	// resumed is set on the merges the last run was waiting for.
 	resumed bool
 	goes    map[model.PRKey]bool
@@ -213,7 +216,7 @@ func (m *Model) noteBatch(bs *batchState) tea.Cmd {
 		icon = "✗"
 	}
 	title := kindVerb(bs.kind, bs.review.Event) + " done: " + strings.Join(parts, ", ")
-	if bs.kind == runner.Review && m.keepUnsent(bs) {
+	if bs.kind == runner.Review && !bs.byClaude && m.keepUnsent(bs) {
 		title += fmt.Sprintf(" · those not sent are selected; %s to send it again", m.firstKey("review"))
 	}
 	return m.pushNote(icon, title, items)

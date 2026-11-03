@@ -336,8 +336,10 @@ func (m *Model) hints() string {
 	// a filter, and is not told when it would quit.
 	back := "back"
 	switch {
-	case m.bulk != nil:
+	case m.bulk != nil && m.bulk.approves():
 		as = []keymap.Action{"confirm", "include_failing"}
+	case m.bulk != nil:
+		as = []keymap.Action{"confirm"}
 	case m.picker != nil:
 		as = []keymap.Action{"toggle_rule", "choose", "add_to_selection", "filter_by_rule"}
 	case m.notesAt != nil, m.menu != nil:

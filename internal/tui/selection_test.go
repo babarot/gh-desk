@@ -5,6 +5,8 @@ import (
 	"strconv"
 	"testing"
 
+	"github.com/babarot/gh-triage/internal/model"
+	"github.com/babarot/gh-triage/internal/runner"
 	"github.com/babarot/gh-triage/internal/tui/keymap"
 )
 
@@ -98,5 +100,20 @@ func TestAskClaudeRefusesSelection(t *testing.T) {
 	press(m, "V", "i")
 	if len(m.chats) != 0 {
 		t.Error("a chat opened on a selection")
+	}
+}
+
+// A review batch of a plan of Claude's acts on the pull requests it
+// names: one it did not send leaves the user's selection as it was.
+func TestClaudeReviewKeepsTheSelection(t *testing.T) {
+	m := start(t, fixture(), keymap.Default())
+	m.selected[key("acme", "web", 7)] = byHand
+	k := key("acme", "api", 12)
+	bs := &batchState{kind: runner.Review, review: runner.ReviewText{Event: model.EventApprove}, byClaude: true,
+		goes: map[model.PRKey]bool{k: true}, order: []model.PRKey{k},
+		done: map[model.PRKey]progress{k: {result: runner.Stopped}}}
+	run(m, m.noteBatch(bs))
+	if len(m.selected) != 1 || !m.isSelected(key("acme", "web", 7)) || m.unsentReview != nil {
+		t.Errorf("selection = %v, unsent = %v", m.selected, m.unsentReview)
 	}
 }

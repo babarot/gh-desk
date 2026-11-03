@@ -411,7 +411,7 @@ func (m *Model) bulkKey(k string) tea.Cmd {
 func (m *Model) runBulk() tea.Cmd {
 	b := m.bulk
 	var items []runner.Item
-	bs := &batchState{kind: b.kind, review: b.review, goes: map[model.PRKey]bool{}, done: map[model.PRKey]progress{}}
+	bs := &batchState{kind: b.kind, review: b.review, byClaude: b.by != "", goes: map[model.PRKey]bool{}, done: map[model.PRKey]progress{}}
 	for _, it := range b.items {
 		if it.goes() {
 			items = append(items, runner.Item{PR: it.pr, Head: it.mi.HeadOID, AutoMerge: it.d.Step == plan.StepAutoMerge})
