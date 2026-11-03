@@ -1,0 +1,6 @@
+{{- /* The logo and the name, with "docs" after it; it leads to the docs'
+       home. The logo is assets/logo.svg, drawn in the site's blue. */ -}}
+<a class="hx:flex hx:items-center hx:hover:opacity-75 hx:ltr:mr-auto hx:rtl:ml-auto" href="{{ .Site.Home.RelPermalink }}">
+  <span class="desk-brand hx:select-none"><span class="desk-logo">{{ (resources.Get "logo.svg").Content | safeHTML }}</span>gh desk</span>
+  <span class="hx:ml-2 hx:text-gray-500 hx:select-none">docs</span>
+</a>

@@ -4,6 +4,8 @@
 
 [tools]
 golangci-lint = "2.15.0"
+# The docs site (docs/site); extended, which the Hextra theme asks for
+"aqua:gohugoio/hugo/hugo-extended" = "0.168.0"
 
 [tasks.build]
 description = "Build ./gh-desk"
@@ -54,4 +56,20 @@ description = "Check that the site builds: gh-desk compiled to WebAssembly again
 run = '''
 test -z "$(gofmt -l demo/site)" || { gofmt -l demo/site; echo "gofmt: the files above are not formatted"; exit 1; }
 demo/site/build.sh
+'''
+
+[tasks."docs:build"]
+description = "Build the docs site (Hugo with Hextra) from docs/ into ./site"
+run = "docs/site/build.sh"
+
+[tasks."docs:serve"]
+description = "Build the playground and the docs as published, and serve them on http://localhost:8080/gh-desk/"
+run = "docs/site/preview.sh"
+
+[tasks."docs:test"]
+description = "Check that the docs site builds: every link leads to a page, and Hugo warns of nothing"
+run = '''
+out=$(mktemp -d)
+trap 'rm -rf "$out"' EXIT
+docs/site/build.sh "$out"
 '''

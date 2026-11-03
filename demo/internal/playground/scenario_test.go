@@ -181,13 +181,14 @@ func (d *desk) screen() string { return ansi.Strip(d.m.View().Content) }
 // and checks the screen it ends on.
 func TestScenariosReachTheirScreen(t *testing.T) {
 	want := map[string][]string{
+		"tour":   {"acme/api#479", "Drop support for Go 1.22"},
 		"diff":   {"acme/api#482", "PRIMARY KEY (subscription_id, event_id, attempt)"},
-		"rules":  {"select by rule", "dependency bots"},
-		"merge":  {"approve and merge 5 of 5", "dependency bots: selected 5"},
-		"claude": {"claude on acme/api#482", "Neither blocks a merge"},
-		"triage": {"you  merge the bots with passing checks", "enter apply"},
-		"inbox":  {"acme/mobile#342", "mention"},
-		"help":   {"keys · z fold", "the list and its preview"},
+		"rules":  {"rule: dependency bots + recent · 5 PRs", "#486 fix(deps): update module golang.org/x/net to v0.33.0"},
+		"merge":  {"1 review (6)", "▸ requested from a team 2"},
+		"claude": {"acme/api#482 · review", "Nice change. Two notes:"},
+		"triage": {"1 review (6)", "▸ requested from a team 2"},
+		"inbox":  {"marked done: acme/api#482", "4 inbox (2)"},
+		"help":   {"keys · z fold", "▾ anywhere · works here"},
 	}
 	for _, s := range Scenarios() {
 		t.Run(s.Name, func(t *testing.T) {

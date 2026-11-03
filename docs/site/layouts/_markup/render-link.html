@@ -1,0 +1,75 @@
+{{- /*
+A link in docs/ is written to work on GitHub, and taken here to where it
+leads on the site:
+
+- to another page (foo.md), or to a directory or its README.md - that
+  page, or the page of the section; a link that leads to no page stops the
+  build
+- to the rest of the repository (an ADR, the code) - that file on GitHub
+- to the playground (params.playground) - the playground next to the docs,
+  on the whole window; one titled "playground" is embedded instead, a card
+  until it is clicked
+*/ -}}
+{{- $dest := .Destination -}}
+{{- $u := urls.Parse $dest -}}
+{{- $href := $dest -}}
+{{- $playground := site.Params.playground -}}
+{{- $embed := false -}}
+{{- $src := "" -}}
+{{- if strings.HasPrefix $dest $playground -}}
+  {{- /* The playground on the whole window, as the navbar's link opens
+         it; embedded, the playground's page in a frame. */ -}}
+  {{- $href = printf "%s../play/" site.Home.RelPermalink -}}
+  {{- $src = printf "%s../?embed=1&watch=1" site.Home.RelPermalink -}}
+  {{- with $u.RawQuery }}
+    {{- $href = printf "%s?%s" $href . -}}
+    {{- $src = printf "%s&%s" $src . -}}
+  {{- end -}}
+  {{- with $u.Fragment }}{{ $href = printf "%s#%s" $href . }}{{ end -}}
+  {{- $embed = eq .Title "playground" -}}
+  {{- with $scenario := $u.Query.Get "scenario" -}}
+    {{- /* data/scenarios.json is written from the playground's scenarios
+           by a test, so a name here that is not there plays nothing. */ -}}
+    {{- if not (in hugo.Data.scenarios $scenario) -}}
+      {{- errorf "%s: the link %q names the scenario %q, which the playground does not have" $.Page.File.Path $dest $scenario -}}
+    {{- end -}}
+  {{- else -}}
+    {{- if $embed -}}
+      {{- /* An embedded playground is watched, so it has to play something. */ -}}
+      {{- errorf "%s: the playground embedded by %q plays no scenario; add ?scenario=" $.Page.File.Path $dest -}}
+    {{- end -}}
+  {{- end -}}
+{{- else if and (not $u.IsAbs) (not (strings.HasPrefix $dest "#")) -}}
+  {{- $dir := path.Dir .Page.File.Path -}}
+  {{- $target := path.Clean (path.Join $dir $u.Path) -}}
+  {{- $page := "" -}}
+  {{- if not (strings.HasPrefix $target "../") -}}
+    {{- /* A README.md, or its directory as GitHub shows it, is the page of
+           its section. */ -}}
+    {{- if strings.HasSuffix $target "/README.md" -}}
+      {{- $page = site.GetPage (path.Dir $target) -}}
+    {{- else if strings.HasSuffix $u.Path ".md" -}}
+      {{- $page = site.GetPage $target -}}
+    {{- else if $u.Path -}}
+      {{- with site.GetPage $target }}{{ if .IsSection }}{{ $page = . }}{{ end }}{{ end -}}
+    {{- end -}}
+  {{- end -}}
+  {{- if $page -}}
+    {{- $href = $page.RelPermalink -}}
+    {{- with $u.Fragment }}{{ $href = printf "%s#%s" $href . }}{{ end -}}
+  {{- else if or (eq $target "adr") (strings.HasPrefix $target "adr/") (eq $target "architecture.md") (strings.HasPrefix $target "../") -}}
+    {{- /* docs/ sits at the top of the repository, so a path is the
+           repository's from there. */ -}}
+    {{- $href = printf "%s/blob/main/%s" site.Params.repository (path.Clean (path.Join "docs" $target)) -}}
+    {{- with $u.Fragment }}{{ $href = printf "%s#%s" $href . }}{{ end -}}
+  {{- else -}}
+    {{- errorf "%s: the link %q leads to no page" .Page.File.Path $dest -}}
+  {{- end -}}
+{{- end -}}
+{{- if $embed -}}
+{{- /* Embedded, the playground plays the screen like a video; the
+       visitor drives it on its own page. */ -}}
+<span class="desk-pg"><span class="desk-pg-bar"><i></i><i></i><i></i> {{ .Text | plainify }} <a href="{{ $href | safeURL }}">try it yourself ↗</a></span><button class="desk-pg-run" type="button" data-src="{{ $src | safeURL }}" data-title="{{ .Text | plainify }}"><span>▶</span> Loading gh-desk…</button><span class="desk-pg-skel"><span>▶</span><i></i></span></span>
+{{- else -}}
+<a href="{{ $href | safeURL }}"{{ with .Title }} title="{{ . }}"{{ end }}>{{ .Text | safeHTML }}</a>
+{{- end -}}

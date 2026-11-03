@@ -11,7 +11,8 @@
 // the ones before typed fast, with the world hurried when opts.hurry.
 // The page is told of its progress through opts.onReady(steps), each
 // step {key, help, delay} with delay in ms, opts.onStep(i) just before
-// step i is typed, and opts.onDone().
+// step i is typed, and opts.onDone(); opts.onUnknown() is told instead when
+// no scenario has the name.
 //
 // ghDesk.input(data) gives gh-desk what is typed, ghDesk.takeOver() stops
 // the scenario when the visitor acts, ghDesk.pause(true|false) holds and
@@ -112,6 +113,9 @@ type play struct {
 	// the step, since the page shows nothing of the way.
 	seek bool
 	ev   playground.Events
+	// unknown is told that no scenario has the name asked for, so the page
+	// does not wait for one.
+	unknown js.Value
 }
 
 // playOf reads the options of ghDesk.start.
@@ -145,6 +149,9 @@ func playOf(opts js.Value) play {
 	}
 	if f, ok := fn("onDone"); ok {
 		pl.ev.Done = func() { f.Invoke() }
+	}
+	if f, ok := fn("onUnknown"); ok {
+		pl.unknown = f
 	}
 	return pl
 }
@@ -268,6 +275,9 @@ func main() {
 	sc, ok := playground.FindScenario(st.play.scenario)
 	if st.play.scenario != "" && !ok {
 		js.Global().Get("console").Call("warn", "gh-desk: no scenario is named "+st.play.scenario)
+		if st.play.unknown.Type() == js.TypeFunction {
+			st.play.unknown.Invoke()
+		}
 	}
 	pl := st.play
 	for {

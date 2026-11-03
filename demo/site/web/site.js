@@ -133,6 +133,13 @@
     step(st.key, st.help);
     showNow(); marks();
   }
+  // No scenario has the name: gh-desk starts as it does without one, so the
+  // player has nothing to show and the screen nothing to wait for.
+  function onUnknown() {
+    pl.state = 'off';
+    playerEl.hidden = true;
+    if (pl.held) { release(); uncover(); }
+  }
   function onDone() {
     if (pl.held) { release(); uncover(); }
     pl.state = 'done';
@@ -304,7 +311,7 @@
     const mine = f => (...a) => { if (me === session) f(...a); };
     api.start(term.cols, term.rows, mine(write), {
       scenario, from, hurry: jump,
-      onReady: mine(onReady), onStep: mine(onStep), onDone: mine(onDone),
+      onReady: mine(onReady), onStep: mine(onStep), onDone: mine(onDone), onUnknown: mine(onUnknown),
     });
     term.onData(d => api.input(d));
     // A key or a click is the visitor's, and stops a scenario; onData

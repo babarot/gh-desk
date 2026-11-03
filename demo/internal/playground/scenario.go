@@ -44,6 +44,9 @@ type Step struct {
 	// Hold is a moment for the visitor to read what the step before
 	// showed; a replay on its way to a later step skips it.
 	Hold time.Duration
+	// Help is what the caption says the step does, in place of the
+	// action's help, where the key does something else on that screen.
+	Help string
 }
 
 // Scenarios are the scenarios the page can be opened with.
@@ -67,35 +70,94 @@ func Scenarios() []Scenario {
 			{Action: "prev_file", Hold: time.Second},
 			{Action: "next_file"},
 		}},
-		{Name: "rules", Title: "The rules that select pull requests", Steps: []Step{
-			{Action: "select_rule"},
-		}},
-		// The rules are those of the config file a first launch writes:
-		// "dependency bots" is the third.
-		{Name: "merge", Title: "The dependency updates selected by a rule, about to be merged", Steps: []Step{
-			{Action: "fold_bots"},
-			{Action: "select_rule"},
-			{Action: "down"},
-			{Action: "down"},
-			{Action: "choose"},
-			{Action: "merge", Wait: time.Second},
-		}},
-		// i opens the conversation suggesting a review, which tab fills in.
-		{Name: "claude", Title: "Claude's review of a pull request", Steps: []Step{
-			{Action: "ask_claude"},
-			{Action: "fill_suggestion", Wait: time.Second},
-			{Action: "accept"},
-		}},
-		{Name: "triage", Title: "A plan from Claude for what to merge", Steps: []Step{
-			{Action: "triage"},
-			{Text: "merge the bots with passing checks"},
-			{Action: "accept"},
-		}},
-		{Name: "inbox", Title: "The pull requests in your notifications", Steps: []Step{
+		// A walk round the screen as it starts: the tabs, then a pull
+		// request read from the list, its diff and back. The docs show it
+		// where they show gh-desk as a whole.
+		{Name: "tour", Title: "A walk round gh-desk as it starts", Steps: []Step{
+			{Action: "tab_2", Hold: time.Second},
+			{Action: "tab_3"},
 			{Action: "tab_4"},
+			{Action: "tab_1", Hold: time.Second},
+			{Action: "down"},
+			{Action: "down", Wait: -scroll},
+			{Action: "preview_tab", Hold: time.Second},
+			{Action: "next_file", Hold: time.Second},
+			{Action: "preview_down"},
+			{Action: "preview_tab", Hold: time.Second},
 		}},
-		{Name: "help", Title: "Every key of the list", Steps: []Step{
-			{Action: "help"},
+		// The popup of S, as the guide to rules tells it: each rule shows
+		// what it matches, two checked rules match what both do, and f
+		// narrows the tab to them, the first of which is then read. The rules are those of the config file
+		// a first launch writes: "dependency bots" is the third, "recent"
+		// the fifth.
+		{Name: "rules", Title: "The rules that select pull requests", Steps: []Step{
+			{Action: "select_rule", Hold: time.Second},
+			{Action: "down", Hold: time.Second},
+			{Action: "down", Hold: time.Second},
+			{Action: "toggle_rule", Hold: time.Second},
+			{Action: "down"},
+			{Action: "down", Wait: -scroll, Hold: time.Second},
+			{Action: "toggle_rule", Hold: time.Second},
+			{Action: "filter_by_rule", Hold: time.Second},
+			{Action: "down", Hold: time.Second},
+		}},
+		// The bots' dependency updates, from the rule that selects them to
+		// the merges done: the confirm popup, then the runner approving and
+		// merging each, and the list read again without them. The rules are
+		// those of the config file a first launch writes: "dependency bots"
+		// is the third.
+		{Name: "merge", Title: "The dependency updates selected by a rule, approved and merged", Steps: []Step{
+			{Action: "fold_bots", Hold: time.Second},
+			{Action: "select_rule", Hold: time.Second},
+			{Action: "down"},
+			{Action: "down", Wait: -scroll, Hold: time.Second},
+			{Action: "choose", Hold: time.Second},
+			{Action: "merge", Hold: time.Second},
+			{Action: "confirm", Wait: 2 * time.Second, Hold: time.Second},
+			{Action: "refresh", Wait: 5 * time.Second},
+		}},
+		// A conversation about acme/api#482: i opens it suggesting a
+		// review, which tab fills in; Claude reads the files and answers, is
+		// asked one more thing, and drafts the review, which opens in the
+		// review popup for the visitor to read; nothing is sent.
+		{Name: "claude", Title: "Claude's review of a pull request, a question, and the review it drafts", Steps: []Step{
+			{Action: "ask_claude", Hold: time.Second},
+			{Action: "fill_suggestion", Wait: time.Second},
+			{Action: "accept", Hold: time.Second},
+			{Text: "What happens when the retries run out?", Wait: 5 * time.Second, Hold: 2 * time.Second},
+			{Action: "accept"},
+			{Action: "draft_review", Wait: 4 * time.Second, Hold: 2 * time.Second},
+		}},
+		// A plan from Claude for the tab, applied: the request typed, the
+		// plan read, enter applying it (a filter, the bots selected, and
+		// their merge, which opens the confirm popup saying Claude picked
+		// them), the merges confirmed, and the list read again without them.
+		{Name: "triage", Title: "A plan from Claude for what to merge, applied and merged", Steps: []Step{
+			{Action: "triage", Hold: time.Second},
+			{Text: "merge the bots with passing checks", Hold: time.Second},
+			{Action: "accept"},
+			{Action: "triage_apply", Wait: 4 * time.Second, Hold: 2 * time.Second},
+			{Action: "confirm", Wait: time.Second, Hold: 2 * time.Second},
+			{Action: "refresh", Wait: 5 * time.Second},
+		}},
+		// The inbox: each notification read in the pane, with the comment
+		// that brought it; the settled ones shown, which takes the cursor to
+		// the top; the one there marked done.
+		{Name: "inbox", Title: "The pull requests in your notifications, read and marked done", Steps: []Step{
+			{Action: "tab_4", Hold: time.Second},
+			{Action: "down", Hold: time.Second},
+			{Action: "down", Hold: 2 * time.Second},
+			{Action: "show_settled", Hold: 2 * time.Second},
+			{Action: "hide", Hold: time.Second},
+		}},
+		// The keys: the list's own first, then down the popup to another
+		// screen's keys, unfolded.
+		{Name: "help", Title: "Every key, by the screen it works on", Steps: []Step{
+			{Action: "help", Hold: time.Second},
+			{Action: "page_down", Hold: 2 * time.Second},
+			{Action: "page_down", Hold: 2 * time.Second},
+			{Action: "fold", Hold: time.Second, Help: "fold or unfold a section"},
+			{Action: "page_down", Hold: 2 * time.Second},
 		}},
 	}
 }
@@ -149,6 +211,9 @@ func (s Scenario) Press(km keymap.Map) ([]Pressed, error) {
 			p = Pressed{Bytes: []byte(st.Text), Key: fmt.Sprintf("%q", st.Text)}
 		}
 		p.Wait, p.Hold = st.Wait, st.Hold
+		if st.Help != "" {
+			p.Help = st.Help
+		}
 		out = append(out, p)
 	}
 	return out, nil
