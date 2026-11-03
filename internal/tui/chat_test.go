@@ -122,9 +122,10 @@ func TestChatAnswerWrapsAtMostWidth(t *testing.T) {
 	}
 }
 
-// The text box stays in its box, as wide as the chat's text, when the
-// terminal is made narrower or wider while something is typed: what is
-// typed wraps inside the box rather than being cut at its edge.
+// The text box stays in its box in the claude pane, as wide as the chat's
+// text, when the terminal is made narrower or wider while something is
+// typed: what is typed wraps inside the box rather than being cut at its
+// edge.
 func TestChatInputStaysInItsBox(t *testing.T) {
 	m, _ := startWith(t, fixture(), keymap.Default())
 	fakeClaudeOf(t, m)
@@ -139,8 +140,11 @@ func TestChatInputStaysInItsBox(t *testing.T) {
 				continue
 			}
 			shown += strings.Count(l, "x")
-			if row := strings.TrimRight(l, " "); !strings.HasPrefix(row, "│") || !strings.HasSuffix(row, "│") || ansi.StringWidth(row) != min(w, chatMaxWidth) {
-				t.Errorf("at %d a typed row is %q", w, row)
+			// The pane's left border and a space come before the box.
+			inner, ok := strings.CutPrefix(l, "│ ")
+			bw := min(w-4, chatMaxWidth)
+			if row := ansi.Truncate(inner, bw, ""); !ok || !strings.HasPrefix(row, "│") || !strings.HasSuffix(row, "│") || ansi.StringWidth(row) != bw {
+				t.Errorf("at %d a typed row is %q", w, l)
 			}
 		}
 		if shown != len(typed) {

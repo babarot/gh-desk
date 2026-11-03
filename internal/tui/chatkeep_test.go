@@ -77,7 +77,7 @@ func TestConversationGoesOnInAnotherLaunch(t *testing.T) {
 	if len(fc1.asked) != 2 {
 		t.Fatalf("asked %d", len(fc1.asked))
 	}
-	k := m1.chatKey
+	k := m1.chat().PR().Key
 	if r := chats.recs[k]; len(r.Turns) != 4 || !r.Started || r.Session != fc1.asked[0].Session || r.Rev == 0 {
 		t.Fatalf("kept %+v", r)
 	}
@@ -124,7 +124,7 @@ func TestConversationOpensWithNothingAsked(t *testing.T) {
 	if r := fc.asked[0]; !r.First || !strings.Contains(r.Prompt, "<diff>") || !strings.HasSuffix(r.Prompt, "\nwhy?") || strings.Contains(r.Prompt, "Review this pull request.") {
 		t.Errorf("first request %+v", r)
 	}
-	if r := chats.recs[m.chatKey]; len(r.Turns) != 2 || r.Turns[0].Text != "why?" {
+	if r := chats.recs[m.chat().PR().Key]; len(r.Turns) != 2 || r.Turns[0].Text != "why?" {
 		t.Errorf("kept %+v", r)
 	}
 }
@@ -135,7 +135,7 @@ func TestConversationLockKeptWhilePrepared(t *testing.T) {
 	chats := newFakeChats()
 	m, _ := startKept(t, chats)
 	press(m, "i")
-	k := m.chatKey
+	k := m.chat().PR().Key
 	c := m.chat()
 	// The worktree is still being made: its message has not come.
 	if !m.chatState.Lock(c.Conversation) {
@@ -236,7 +236,7 @@ func TestConversationStartedOver(t *testing.T) {
 	chats := newFakeChats()
 	m, fc := startKept(t, chats)
 	press(m, "i", "v")
-	k := m.chatKey
+	k := m.chat().PR().Key
 	before := chats.recs[k].Rev
 	press(m, "N")
 	if len(chats.recs[k].Turns) == 0 {
@@ -269,7 +269,7 @@ func TestConversationRemovedByGC(t *testing.T) {
 	chats := newFakeChats()
 	m, fc := startKept(t, chats)
 	press(m, "i", "v")
-	k := m.chatKey
+	k := m.chat().PR().Key
 	press(m, "esc")
 	delete(chats.recs, k)
 	press(m, "i", "v")
@@ -302,7 +302,7 @@ func TestConversationAskedAfterAnotherAdded(t *testing.T) {
 		t.Fatalf("asked %d", len(fc1.asked))
 	}
 	var asked []string
-	for _, tr := range chats.recs[m1.chatKey].Turns {
+	for _, tr := range chats.recs[m1.chat().PR().Key].Turns {
 		if tr.You {
 			asked = append(asked, tr.Text)
 		}

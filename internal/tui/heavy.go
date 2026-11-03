@@ -125,7 +125,7 @@ func (m *Model) reading() bool {
 			return true
 		}
 	}
-	if c := m.chat(); m.view == viewChat && c != nil && c.Elsewhere() != "" {
+	if c := m.chat(); m.claudeShown() && c != nil && c.Elsewhere() != "" {
 		return true
 	}
 	for _, t := range m.tabs {

@@ -55,6 +55,8 @@ type Turn struct {
 	Text  string
 	Steps []claude.Step
 	Err   bool
+	// Stopped is set on what stands for an answer the user stopped.
+	Stopped bool
 	// Head is the head of the pull request a question was asked at.
 	Head string
 	At   time.Time
@@ -207,6 +209,13 @@ func (c *Conversation) Answered(a claude.Answer) {
 // tools Claude used for it.
 func (c *Conversation) Reply(text string, err bool, cost float64, at time.Time) {
 	c.turns = append(c.turns, Turn{Text: text, Steps: c.steps, Err: err, At: at, Cost: cost})
+	c.steps = nil
+}
+
+// Stop adds that the user stopped the answer, after the tools Claude used
+// before it was stopped.
+func (c *Conversation) Stop(at time.Time) {
+	c.turns = append(c.turns, Turn{Stopped: true, Steps: c.steps, At: at})
 	c.steps = nil
 }
 

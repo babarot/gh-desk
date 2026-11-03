@@ -576,12 +576,10 @@ func (m *Model) ensure() tea.Cmd {
 	if n != nil && n.Unread && n.LatestCommentURL != "" {
 		cmds = append(cmds, m.ensureComment(n.LatestCommentURL))
 	}
-	if m.view == viewList {
-		rs := m.rows(m.tab())
-		for _, d := range []int{1, -1, 2} {
-			if i := m.tab().sel + d; i >= 0 && i < len(rs) && rs[i].kind == rowPR {
-				cmds = append(cmds, m.ensureDiff(rs[i].pr))
-			}
+	rs := m.rows(m.tab())
+	for _, d := range []int{1, -1, 2} {
+		if i := m.tab().sel + d; i >= 0 && i < len(rs) && rs[i].kind == rowPR {
+			cmds = append(cmds, m.ensureDiff(rs[i].pr))
 		}
 	}
 	return tea.Batch(cmds...)

@@ -347,7 +347,6 @@ func (m *Model) jumpTo(k model.PRKey) tea.Cmd {
 		for j, r := range m.rows(t) {
 			if r.kind == rowPR && r.pr.Key == k {
 				m.cur, t.sel = i, j
-				m.view = viewList
 				m.pane.scroll = 0
 				return m.ensure()
 			}

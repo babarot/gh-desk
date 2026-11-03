@@ -116,6 +116,7 @@ var Defaults = []Def{
 	{"open_claude", ScopeChat, []string{"O"}, "open in claude code"},
 	{"chat_approve", ScopeChat, []string{"A"}, "approve"},
 	{"chat_restart", ScopeChat, []string{"N"}, "start over"},
+	{"chat_close", ScopeChat, []string{"backspace"}, "back to the preview"},
 
 	{"next_kind", ScopeCompose, []string{"tab"}, "kind"},
 	{"post", ScopeCompose, []string{"ctrl+s"}, "post"},

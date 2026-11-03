@@ -39,12 +39,10 @@ const helpKeyWidth = 16
 
 // helpScope is the scope of the screen ? was opened from.
 func (m *Model) helpScope() keymap.Scope {
-	switch m.view {
-	case viewChat:
+	if m.claudeShown() {
 		return keymap.ScopeChat
-	default:
-		return keymap.ScopeList
 	}
+	return keymap.ScopeList
 }
 
 // helpRows are the key rows of scope s. The tab_N actions, one key each,

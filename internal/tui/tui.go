@@ -168,13 +168,6 @@ type Settings struct {
 	Tick func(d time.Duration, msg tea.Msg) tea.Cmd
 }
 
-type view int
-
-const (
-	viewList view = iota
-	viewChat
-)
-
 // Model is the TUI's state.
 type Model struct {
 	src    Source
@@ -196,7 +189,6 @@ type Model struct {
 	unread  map[model.PRKey]model.Notification
 
 	width, height int
-	view          view
 	help          bool
 	helpTop       int             // the first line of the ? popup shown
 	helpFolded    map[string]bool // the ? popup's sections folded, by title
@@ -255,12 +247,13 @@ type Model struct {
 	refreshing *refreshRun
 	compose    *compose
 	confirm    *confirm
-	// chats are the conversations with Claude, by pull request, and
-	// chatKey the one on screen; chatState keeps them and takes their
-	// locks.
-	chats     map[model.PRKey]*chatScreen
-	chatKey   model.PRKey
-	chatState *chat.State
+	// chats are the conversations with Claude, by pull request; chatState
+	// keeps them and takes their locks. claudeOpen puts the claude pane in
+	// place of the preview, on the conversation about the pull request
+	// under the cursor.
+	chats      map[model.PRKey]*chatScreen
+	chatState  *chat.State
+	claudeOpen bool
 	// triage is the conversation with Claude about the lists, once begun.
 	triage *triage
 	// cautions are what Claude said of release notes, by notesID; empty
@@ -381,7 +374,7 @@ func (m *Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.compose.resize(m.width, m.height)
 		}
 		for _, c := range m.chats {
-			c.input.SetWidth(chatInputWidth(m.width))
+			c.input.SetWidth(chatInputWidth(m.paneInner()))
 		}
 		return m, nil
 	case tea.BackgroundColorMsg:
@@ -457,19 +450,19 @@ func (m *Model) key(msg tea.KeyPressMsg) tea.Cmd {
 		return m.filterKey(msg)
 	case m.compose != nil:
 		return m.composeKey(msg)
-	case m.view == viewChat && m.chat() != nil && m.chat().typing:
-		return m.chatKeyPress(msg)
+	case m.typingChat():
+		return m.chatTyping(msg)
 	}
 	if m.keys.Matches("help", k) {
 		m.openHelp()
 		return nil
 	}
-	switch m.view {
-	case viewChat:
-		return m.chatKeyPress(msg)
-	default:
-		return m.listKey(k)
+	if m.claudeShown() {
+		if cmd, ok := m.chatKey(k); ok {
+			return cmd
+		}
 	}
+	return m.listKey(k)
 }
 
 func (m *Model) paste(msg tea.PasteMsg) tea.Cmd {
@@ -483,7 +476,7 @@ func (m *Model) paste(msg tea.PasteMsg) tea.Cmd {
 		return cmd
 	case m.compose != nil:
 		return m.compose.update(msg)
-	case m.view == viewChat && m.chat() != nil && m.chat().typing:
+	case m.typingChat():
 		c := m.chat()
 		var cmd tea.Cmd
 		c.input, cmd = c.input.Update(msg)

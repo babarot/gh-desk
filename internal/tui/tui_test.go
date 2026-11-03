@@ -619,7 +619,7 @@ func TestActionMenu(t *testing.T) {
 	}
 	golden(t, "action-menu", screen(m))
 	press(m, "esc")
-	if m.menu != nil || m.view != viewList {
+	if m.menu != nil {
 		t.Fatal("esc did not close the menu")
 	}
 
@@ -632,7 +632,7 @@ func TestActionMenu(t *testing.T) {
 
 	press(m, "enter", "c")
 	if m.compose == nil || m.menu != nil {
-		t.Fatalf("c in the menu did not start a comment: view %v", m.view)
+		t.Fatal("c in the menu did not start a comment")
 	}
 }
 
@@ -871,8 +871,8 @@ func TestComposePopup(t *testing.T) {
 	run(m, m.paste(tea.PasteMsg{Content: "Does this retry on a 429?"}))
 	golden(t, "compose", screen(m))
 	press(m, "esc")
-	if m.compose != nil || m.view != viewList {
-		t.Errorf("esc left compose %v, view %v", m.compose, m.view)
+	if m.compose != nil {
+		t.Errorf("esc left compose %v", m.compose)
 	}
 }
 
@@ -1455,8 +1455,10 @@ type fakeClaude struct {
 	prepared []model.PRKey
 	// notes are the prompts Once was given.
 	notes []string
-	// fail makes the next question fail.
+	// fail makes the next question fail, and wait makes a question wait
+	// until it is stopped.
 	fail bool
+	wait bool
 	// plan is what Triage answers, and triaged the requests it was given.
 	plan    string
 	triaged []claude.Request
@@ -1467,8 +1469,12 @@ func (c *fakeClaude) Prepare(_ context.Context, k model.PRKey, head string) (str
 	return "/cache/worktrees/" + k.String(), nil
 }
 
-func (c *fakeClaude) Ask(_ context.Context, r claude.Request, progress func(claude.Step)) (claude.Answer, error) {
+func (c *fakeClaude) Ask(ctx context.Context, r claude.Request, progress func(claude.Step)) (claude.Answer, error) {
 	c.asked = append(c.asked, r)
+	if c.wait {
+		<-ctx.Done()
+		return claude.Answer{}, ctx.Err()
+	}
 	if c.fail {
 		c.fail = false
 		return claude.Answer{}, fmt.Errorf("claude: rate limited")
@@ -1499,8 +1505,8 @@ func TestClaudeConversation(t *testing.T) {
 	fc := fakeClaudeOf(t, m)
 	press(m, "i")
 	// Opened, nothing is asked; the worktree is made meanwhile.
-	if m.view != viewChat || len(fc.asked) != 0 || len(fc.prepared) != 1 {
-		t.Fatalf("view %v, asked %d, prepared %d", m.view, len(fc.asked), len(fc.prepared))
+	if !m.claudeShown() || len(fc.asked) != 0 || len(fc.prepared) != 1 {
+		t.Fatalf("claude shown %v, asked %d, prepared %d", m.claudeShown(), len(fc.asked), len(fc.prepared))
 	}
 	golden(t, "claude_empty", screen(m))
 	press(m, "v")
@@ -1526,13 +1532,90 @@ func TestClaudeConversation(t *testing.T) {
 	}
 
 	// Leaving and coming back keeps the conversation.
-	press(m, "esc")
-	if m.view != viewList {
-		t.Fatalf("view %v", m.view)
+	press(m, "backspace")
+	if m.claudeOpen {
+		t.Fatal("backspace did not go back to the preview")
 	}
 	press(m, "i")
 	if len(fc.asked) != 2 || !strings.Contains(screen(m), "Answer 2") {
 		t.Errorf("the conversation was not kept:\n%s", screen(m))
+	}
+}
+
+// The claude pane shows the conversation about the pull request under the
+// cursor, as the preview does; one with nothing asked is not begun by
+// moving onto it.
+func TestClaudePaneFollowsTheCursor(t *testing.T) {
+	m, _ := startWith(t, fixture(), keymap.Default())
+	fc := fakeClaudeOf(t, m)
+	press(m, "i", "v")
+	press(m, "b", "j", "j", "j")
+	s := screen(m)
+	if p, _, _ := m.currentPR(); p.Key != key("acme", "api", 30) {
+		t.Fatalf("the cursor is on %v", p.Key)
+	}
+	if !strings.Contains(s, "claude on acme/api#30") || !strings.Contains(s, "i to ask Claude about this pull request") || strings.Contains(s, "Answer 1") {
+		t.Errorf("the pane does not show the pull request under the cursor:\n%s", s)
+	}
+	if len(fc.prepared) != 2 || len(m.chats) != 1 {
+		t.Errorf("moving onto a pull request began its conversation: prepared %d, conversations %d", len(fc.prepared), len(m.chats))
+	}
+	press(m, "k", "k", "k")
+	if s := screen(m); !strings.Contains(s, "claude on acme/api#12") || !strings.Contains(s, "Answer 1") {
+		t.Errorf("coming back does not show the conversation:\n%s", s)
+	}
+}
+
+// esc stops what Claude is answering and leaves the pane open; with
+// nothing on its way it goes back to the preview, as backspace does.
+func TestClaudeStoppedByEsc(t *testing.T) {
+	m, _ := startWith(t, fixture(), keymap.Default())
+	press(m, "i")
+	c := m.chat()
+	k := c.PR().Key
+	chat.NewState(nil, logging.Discard(), func() time.Time { return now }, noStatus{}).Begin(c.Conversation, "And then?")
+	stopped := false
+	c.cancel = func() { stopped = true }
+	if s := screen(m); !strings.Contains(s, "esc stop") {
+		t.Errorf("the key line does not say esc stops:\n%s", s)
+	}
+	press(m, "esc")
+	if !stopped || !m.claudeShown() || !strings.Contains(screen(m), "stopping…") {
+		t.Fatalf("stopped %v, shown %v:\n%s", stopped, m.claudeShown(), screen(m))
+	}
+	m.Update(chatAnswerMsg{key: k, err: context.Canceled})
+	ts := c.Turns()
+	if last := ts[len(ts)-1]; !last.Stopped || last.Err {
+		t.Errorf("the last turn is %+v; want it stopped", last)
+	}
+	if s := screen(m); !strings.Contains(s, "⏺ stopped") || strings.Contains(s, "claude failed") {
+		t.Errorf("the stop is not shown as one:\n%s", s)
+	}
+	press(m, "esc")
+	if m.claudeOpen {
+		t.Error("esc with nothing on its way did not go back to the preview")
+	}
+}
+
+// A question stopped on its way still sends its end, which frees the
+// conversation for the next one.
+func TestClaudeStopFreesTheConversation(t *testing.T) {
+	m, _ := startWith(t, fixture(), keymap.Default())
+	fc := fakeClaudeOf(t, m)
+	press(m, "i")
+	c := m.chat()
+	fc.wait = true
+	cmd := m.ask(c, "And then?", "And then?", false)
+	press(m, "esc")
+	run(m, cmd)
+	ts := c.Turns()
+	if c.Running() || c.cancel != nil || len(ts) != 2 || !ts[1].Stopped {
+		t.Fatalf("running %v, turns %+v", c.Running(), ts)
+	}
+	fc.wait = false
+	press(m, "v")
+	if len(fc.asked) != 2 || !strings.Contains(screen(m), "Answer 2") {
+		t.Errorf("the next question was not asked; asked %d:\n%s", len(fc.asked), screen(m))
 	}
 }
 
@@ -1542,8 +1625,8 @@ func TestClaudeConversation(t *testing.T) {
 func TestClaudeAnsweringElsewhere(t *testing.T) {
 	m, _ := startWith(t, fixture(), keymap.Default())
 	press(m, "i")
-	k := m.chatKey
 	c := m.chat()
+	k := c.PR().Key
 	// A question asked 75 seconds ago, still on its way.
 	chat.NewState(nil, logging.Discard(), func() time.Time { return now.Add(-75 * time.Second) }, noStatus{}).Begin(c.Conversation, "And then?")
 	if s := screen(m); !strings.Contains(s, "thinking… 1m15s") {
@@ -1571,14 +1654,14 @@ func TestClaudeDraft(t *testing.T) {
 	m, _ := startWith(t, fixture(), keymap.Default())
 	press(m, "i", "R")
 	if m.compose == nil {
-		t.Fatalf("view %v", m.view)
+		t.Fatal("R did not open the draft")
 	}
 	if kinds[m.compose.kind] != model.EventApprove || m.compose.ta.Value() != "Looks good: the retry is bounded." {
 		t.Errorf("draft kind %v body %q", kinds[m.compose.kind], m.compose.ta.Value())
 	}
 	press(m, "esc")
-	if m.view != viewChat {
-		t.Errorf("discarding the draft went to %v", m.view)
+	if !m.claudeShown() {
+		t.Error("discarding the draft closed the claude pane")
 	}
 }
 

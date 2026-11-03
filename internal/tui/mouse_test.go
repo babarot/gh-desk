@@ -190,7 +190,7 @@ func TestClickOpensInTheBrowser(t *testing.T) {
 	if strings.Join(f.browsed, " ") != strings.Join(want, " ") {
 		t.Fatalf("browsed %q, want %q", f.browsed, want)
 	}
-	if m.view != viewList {
+	if m.menu != nil || m.claudeOpen {
 		t.Fatal("a click on a link opened the pull request")
 	}
 }

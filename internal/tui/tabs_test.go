@@ -152,7 +152,7 @@ func TestConfigWarningsAtStart(t *testing.T) {
 	}
 	// It names no pull request, so choosing it only closes the list.
 	press(m, "down", "enter")
-	if m.notesAt != nil || m.view != viewList {
-		t.Errorf("notes still open, or the view moved: %v", m.view)
+	if m.notesAt != nil {
+		t.Error("notes still open")
 	}
 }

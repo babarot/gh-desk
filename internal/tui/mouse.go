@@ -103,9 +103,7 @@ func (m *Model) mouse(msg tea.MouseMsg) tea.Cmd {
 		if msg.Button != tea.MouseLeft {
 			return nil
 		}
-		if m.view == viewList {
-			return m.listClick(msg.X, msg.Y, prev)
-		}
+		return m.listClick(msg.X, msg.Y, prev)
 	}
 	return nil
 }
@@ -128,21 +126,17 @@ func (m *Model) wheel(msg tea.MouseWheelMsg) tea.Cmd {
 	default:
 		return nil
 	}
-	switch m.view {
-	case viewChat:
-		// A chat's scroll counts up from its end.
-		if c := m.chat(); c != nil {
+	l := m.layout()
+	if top := m.paneTop(l); l.pane > 0 && msg.Y >= top {
+		if !m.claudeOpen {
+			m.pane.scroll = max(0, m.pane.scroll+step*wheelLines)
+		} else if c := m.chat(); c != nil {
+			// A chat's scroll counts up from its end.
 			c.scroll = max(0, c.scroll-step*wheelLines)
 		}
-	case viewList:
-		l := m.layout()
-		if top := m.paneTop(l); l.pane > 0 && msg.Y >= top {
-			m.pane.scroll = max(0, m.pane.scroll+step*wheelLines)
-			return nil
-		}
-		return m.moveTo(m.tab().sel + step)
+		return nil
 	}
-	return nil
+	return m.moveTo(m.tab().sel + step)
 }
 
 // paneTop is the line of the pane's top border.
@@ -174,7 +168,7 @@ func (m *Model) listClick(x, y int, prev *armed) tea.Cmd {
 	if top := m.paneTop(l); l.pane > 0 && y == top {
 		// The border carries the pane's tabs; anywhere else on it starts
 		// a resize.
-		if p, _, ok := m.currentPR(); ok {
+		if p, _, ok := m.currentPR(); ok && !m.claudeOpen {
 			ws := []int{lipgloss.Width(" overview "), lipgloss.Width(" " + m.diffTabName(p) + " ")}
 			if i := spanAt(ws, len(tabGap), x-2); i >= 0 {
 				if mode := []paneMode{paneOverview, paneDiff}[i]; mode != m.pane.mode {
@@ -190,6 +184,9 @@ func (m *Model) listClick(x, y int, prev *armed) tea.Cmd {
 	// A click on a file tab of the diff shows it, and one on the header
 	// of a part, or of a file of the diff, folds it.
 	if top := m.paneTop(l); l.pane > 0 && y > top {
+		if m.claudeOpen {
+			return nil
+		}
 		r := y - top - 1
 		if m.pane.mode == paneDiff && r == m.pane.tabRow {
 			// The pane's border and a space come before its lines.
@@ -252,7 +249,7 @@ func (m *Model) disarm() {
 // the same link is still where it was clicked.
 func (m *Model) drawArmed(lines []string) []string {
 	a := m.armed
-	if a == nil || m.view != viewList || !m.set.Now().Before(a.until) || a.y >= len(lines) {
+	if a == nil || !m.set.Now().Before(a.until) || a.y >= len(lines) {
 		return lines
 	}
 	if s, ok := m.linkUnder(a.x, a.y); !ok || s != a.spot {
@@ -289,7 +286,7 @@ func (m *Model) linkUnder(x, y int) (spot, bool) {
 	l := m.layout()
 	if top := m.paneTop(l); l.pane > 0 && y >= top {
 		r := y - top - 1
-		if y == top || m.pane.mode == paneDiff && r == m.pane.tabRow || r >= len(m.pane.links) {
+		if y == top || m.claudeOpen || m.pane.mode == paneDiff && r == m.pane.tabRow || r >= len(m.pane.links) {
 			return spot{}, false
 		}
 		for _, k := range m.pane.links[r] {

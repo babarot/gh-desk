@@ -41,21 +41,15 @@ func (m *Model) render() (string, *tea.Cursor) {
 		}
 		b.WriteString(m.renderFilter() + "\n")
 	}
-	body := m.height - 3
-	if m.filterLine() {
-		body--
-	}
-	switch m.view {
-	case viewChat:
-		if c := m.renderChat(&b, body); c != nil {
+	l := m.layout()
+	m.renderList(&b, l.list)
+	switch {
+	case l.pane > 0 && m.claudeOpen:
+		if c := m.renderClaude(&b, l.pane); c != nil {
 			cur = c
 		}
-	default:
-		l := m.layout()
-		m.renderList(&b, l.list)
-		if l.pane > 0 {
-			m.renderPane(&b, l.pane)
-		}
+	case l.pane > 0:
+		m.renderPane(&b, l.pane)
 	}
 	b.WriteString(fit(m.statusText(), m.width) + "\n")
 	b.WriteString(fit(m.hints(), m.width))
@@ -329,7 +323,7 @@ var ready = map[keymap.Action]bool{
 	"fold_bots": true, "show_settled": true, "filter": true,
 	"preview_down": true, "preview_up": true, "preview_grow": true, "preview_shrink": true, "next_file": true, "prev_file": true, "preview_tab": true, "fold": true, "preview": true,
 	"confirm": true, "next_kind": true, "post": true, "editor": true, "accept": true, "erase": true, "erase_word": true,
-	"triage": true, "triage_apply": true, "triage_more": true, "ask_claude": true, "chat_more": true, "chat_review": true, "draft_review": true, "open_claude": true, "chat_approve": true,
+	"triage": true, "triage_apply": true, "triage_more": true, "ask_claude": true, "chat_more": true, "chat_review": true, "draft_review": true, "open_claude": true, "chat_approve": true, "chat_close": true,
 }
 
 // hints is the key line of what has the focus. It holds the ways in (the
@@ -362,15 +356,19 @@ func (m *Model) hints() string {
 		default:
 			as = []keymap.Action{"triage_more"}
 		}
-	case m.view == viewList && len(m.selected) > 0:
+	case m.filtering, m.typingChat():
+		as = []keymap.Action{"accept"}
+	case m.claudeShown():
+		as = []keymap.Action{"chat_more", "chat_review", "draft_review", "chat_approve", "open_claude", "chat_close", "help"}
+		// esc stops what Claude is answering; otherwise it does what
+		// chat_close does, which the line tells.
+		back = ""
+		if c := m.chat(); c != nil && c.cancel != nil && !c.stopping {
+			back = "stop"
+		}
+	case len(m.selected) > 0:
 		as = []keymap.Action{"menu", "select", "select_shown", "clear_selection", "help"}
 		back = "clear"
-	case m.filtering:
-		as = []keymap.Action{"accept"}
-	case m.view == viewChat && m.chat() != nil && m.chat().typing:
-		as = []keymap.Action{"accept"}
-	case m.view == viewChat:
-		as = []keymap.Action{"chat_more", "chat_review", "draft_review", "chat_approve", "open_claude", "help"}
 	default:
 		as = []keymap.Action{"menu", "select", "select_rule", "triage"}
 		if m.tab().inbox {
