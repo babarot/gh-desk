@@ -9,7 +9,22 @@
 <meta property="og:title" content="gh-desk">
 <meta property="og:description" content="A desk in your terminal for the pull requests waiting on you. Try it in the browser.">
 <script>
-try { const t = localStorage.getItem('gh-desk-theme'); if (t) document.documentElement.dataset.theme = t; } catch (e) {}
+// ?theme=dark|light overrides the theme picked on this site, ?embed=1
+// shows only the terminal, for a page that embeds it, play/ (a copy of
+// this page that demo/site/build.sh writes) shows only the terminal on the
+// whole window, as a page of its own, and ?watch=1 only shows; they are
+// set before the page is drawn, so it does not flash.
+(() => {
+  const root = document.documentElement, q = new URLSearchParams(location.search);
+  try { const t = localStorage.getItem('gh-desk-theme'); if (t) root.dataset.theme = t; } catch (e) {}
+  if (q.get('theme') === 'dark' || q.get('theme') === 'light') root.dataset.theme = q.get('theme');
+  if (q.has('embed') && q.get('embed') !== '0') root.classList.add('embed');
+  // play/, the whole window: laid out as embedded, with the ways out of it.
+  if (/\/play\/(index\.html)?$/.test(location.pathname)) root.classList.add('embed', 'whole');
+  // ?watch=1 only shows: the keys and clicks of the visitor do not reach
+  // gh-desk, and a scenario plays like a video.
+  if (q.has('watch') && q.get('watch') !== '0') root.classList.add('watch');
+})();
 </script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -40,10 +55,19 @@ try { const t = localStorage.getItem('gh-desk-theme'); if (t) document.documentE
       <div class="term-bar">
         <div class="dots"><i></i><i></i><i></i></div>
         <span class="title">~ — gh desk</span>
+        <a class="full" id="full" href="./" target="_blank" rel="noopener">Open the playground ↗</a>
+        <nav class="out"><a href="./">About gh-desk</a></nav>
         <button id="restart" type="button">Restart</button>
       </div>
       <div class="screen" id="screen" aria-label="Terminal running gh-desk. Click it and type."></div>
       <div class="loading" id="loading">Loading gh-desk…</div>
+      <div class="player" id="player" hidden>
+        <button class="pp" id="pp" type="button" aria-label="Pause">❚❚</button>
+        <div class="track" id="track" title="Go to a step"><div class="fill" id="fill"></div></div>
+        <span class="now" id="now"></span>
+        <button class="again" id="again" type="button" aria-label="Play from the start" title="Play from the start">↺</button>
+      </div>
+      <div class="caption" id="caption" aria-live="polite" hidden></div>
     </div>
 
     <div class="keys" id="keys">
@@ -66,26 +90,32 @@ try { const t = localStorage.getItem('gh-desk-theme'); if (t) document.documentE
       <article>
         <h3>Look before you merge</h3>
         <p><kbd>p</kbd> opens the pane under the list: the description beside the checks and reviews. <kbd>v</kbd> switches it to the diff, <kbd>]</kbd> and <kbd>[</kbd> move between files, and <kbd>J</kbd> <kbd>K</kbd> scroll it.</p>
+        <p class="more"><a href="?watch=1&amp;scenario=diff#try">Show me</a></p>
       </article>
       <article>
         <h3>Merge the bots in one go</h3>
         <p>Move to the bots and press <kbd>b</kbd> to unfold them, <kbd>S</kbd> to pick the rule <em>dependency bots</em>, then <kbd>M</kbd>. The popup says how each will be merged, and Claude reads the release notes for the ones that need care.</p>
+        <p class="more"><a href="?watch=1&amp;scenario=merge#try">Show me</a></p>
       </article>
       <article>
         <h3>Ask Claude about one</h3>
         <p><kbd>i</kbd> on a pull request asks Claude to review it, in a worktree of its head. <kbd>ctrl+r</kbd> then drafts the review to post. Here the answers are written in advance.</p>
+        <p class="more"><a href="?watch=1&amp;scenario=claude#try">Show me</a></p>
       </article>
       <article>
         <h3>Or tell Claude what you want</h3>
         <p><kbd>C</kbd> and type <em>merge the bots with passing checks</em>. Claude plans what to show and select; <kbd>enter</kbd> applies it, and nothing is sent until you confirm.</p>
+        <p class="more"><a href="?watch=1&amp;scenario=triage#try">Show me</a></p>
       </article>
       <article>
         <h3>Your notifications</h3>
         <p><kbd>4</kbd> or <kbd>tab</kbd> goes to the inbox: the pull requests in your notifications, with why each is there. <kbd>d</kbd> marks one done.</p>
+        <p class="more"><a href="?watch=1&amp;scenario=inbox#try">Show me</a></p>
       </article>
       <article>
         <h3>Every key</h3>
         <p><kbd>?</kbd> lists the keys of the screen you are on. They are bound by action name, and each can be changed in the config file.</p>
+        <p class="more"><a href="?watch=1&amp;scenario=help#try">Show me</a></p>
       </article>
     </div>
   </section>
