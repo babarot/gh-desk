@@ -82,8 +82,21 @@ func Scenarios() []Scenario {
 			{Action: "preview_down"},
 			{Action: "preview_tab", Hold: time.Second},
 		}},
+		// The popup of S, as the guide to rules tells it: each rule shows
+		// what it matches, two checked rules match what both do, and f
+		// narrows the tab to them, the first of which is then read. The rules are those of the config file
+		// a first launch writes: "dependency bots" is the third, "recent"
+		// the fifth.
 		{Name: "rules", Title: "The rules that select pull requests", Steps: []Step{
-			{Action: "select_rule"},
+			{Action: "select_rule", Hold: time.Second},
+			{Action: "down", Hold: time.Second},
+			{Action: "down", Hold: time.Second},
+			{Action: "toggle_rule", Hold: time.Second},
+			{Action: "down"},
+			{Action: "down", Wait: -scroll, Hold: time.Second},
+			{Action: "toggle_rule", Hold: time.Second},
+			{Action: "filter_by_rule", Hold: time.Second},
+			{Action: "down", Hold: time.Second},
 		}},
 		// The rules are those of the config file a first launch writes:
 		// "dependency bots" is the third.
