@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/babarot/gh-triage/internal/model"
+	"github.com/babarot/gh-triage/internal/plan"
 	"github.com/babarot/gh-triage/internal/runner"
 	"github.com/babarot/gh-triage/internal/tui/keymap"
 )
@@ -115,5 +116,61 @@ func TestClaudeReviewKeepsTheSelection(t *testing.T) {
 	run(m, m.noteBatch(bs))
 	if len(m.selected) != 1 || !m.isSelected(key("acme", "web", 7)) || m.unsentReview != nil {
 		t.Errorf("selection = %v, unsent = %v", m.selected, m.unsentReview)
+	}
+}
+
+// d puts away only what the tab shows: a selected notification the filter
+// leaves out is neither marked done nor taken out of the selection.
+func TestDoneSkipsWhatIsNotShown(t *testing.T) {
+	f := fixture()
+	m := start(t, f, keymap.Default())
+	press(m, "4", "a", "V")
+	if len(m.selected) != 2 {
+		t.Fatalf("selected = %v", m.selected)
+	}
+	press(m, "/", "r", "e", "t", "r", "i", "e", "s", "enter", "d")
+	if len(f.done) != 1 || f.done[0] != "acme/api#12" {
+		t.Errorf("done = %v, want only the one shown", f.done)
+	}
+	if len(m.selected) != 1 || !m.isSelected(key("acme", "api", 9)) {
+		t.Errorf("selection = %v, want the one not shown", m.selected)
+	}
+}
+
+// A folded group is shown by its header: d on its selected pull requests
+// puts them away.
+func TestHideFoldedGroup(t *testing.T) {
+	m := start(t, fixture(), keymap.Default())
+	rs := m.rows(m.tab())
+	at := -1
+	for i, r := range rs {
+		if r.kind == rowGroup && r.group == plan.GroupBots {
+			at = i
+		}
+	}
+	if at < 0 || !m.tab().folded[plan.GroupBots] {
+		t.Fatalf("no folded bots group in %+v", rs)
+	}
+	m.tab().sel = at
+	press(m, "space", "d")
+	if !m.tab().hidden[key("acme", "api", 30)] {
+		t.Errorf("the folded group's pull request was not hidden: %v", m.tab().hidden)
+	}
+}
+
+// A selected notification whose done failed comes back selected, so d can
+// try it again; one that was not selected does not.
+func TestFailedDoneSelectedAgain(t *testing.T) {
+	m := start(t, fixture(), keymap.Default())
+	m.src = failingDone{fixture()}
+	press(m, "4", "a", "V", "d")
+	if len(m.selected) != 2 {
+		t.Errorf("selection after failures = %v, want both again", m.selected)
+	}
+	m = start(t, fixture(), keymap.Default())
+	m.src = failingDone{fixture()}
+	press(m, "4", "d")
+	if len(m.selected) != 0 {
+		t.Errorf("a failed done of one not selected made a selection: %v", m.selected)
 	}
 }

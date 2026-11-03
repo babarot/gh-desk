@@ -294,48 +294,43 @@ func (m *Model) hide(p model.PR, n *model.Notification) tea.Cmd {
 
 // putAway hides k in the tab shown and takes it out of the selection; in
 // the inbox, with its notification n, it also marks n done, and done says
-// so.
+// so. One selected that fails to be marked done is selected again.
 func (m *Model) putAway(k model.PRKey, n *model.Notification) (cmd tea.Cmd, done bool) {
 	t := m.tab()
 	t.hidden[k] = true
+	was := m.isSelected(k)
 	delete(m.selected, k)
 	if !t.inbox || n == nil {
 		return nil, false
 	}
 	delete(m.unread, k)
 	note := *n
-	return func() tea.Msg { return doneMsg{note, m.src.MarkDone(m.ctx, note)} }, true
+	return func() tea.Msg { return doneMsg{note, m.src.MarkDone(m.ctx, note), was} }, true
 }
 
-// selectedHere are the selected pull requests the tab shown has and has
-// not put away, each with its notification in the inbox.
+// selectedHere are the selected pull requests the tab shown shows, each
+// with its notification in the inbox: through the filter and the rules,
+// and in the inbox not left out as settled. A folded group counts as
+// shown, since its header is. What is selected and not shown is never put
+// away unseen.
 func (m *Model) selectedHere() ([]model.PRKey, []*model.Notification) {
 	t := m.tab()
 	var ks []model.PRKey
 	var ns []*model.Notification
-	if t.inbox {
-		for i := range t.notifs {
-			n := &t.notifs[i]
-			if m.isSelected(n.Key) && !t.hidden[n.Key] && !slices.Contains(ks, n.Key) {
-				ks, ns = append(ks, n.Key), append(ns, n)
-			}
-		}
-		return ks, ns
-	}
-	for _, p := range m.allOf(t) {
-		if m.isSelected(p.Key) && !t.hidden[p.Key] && !slices.Contains(ks, p.Key) {
-			ks, ns = append(ks, p.Key), append(ns, nil)
+	for _, r := range m.rowsOf(t, m.filter, t.ruleFilter, nil) {
+		if r.kind == rowPR && m.isSelected(r.pr.Key) && !slices.Contains(ks, r.pr.Key) {
+			ks, ns = append(ks, r.pr.Key), append(ns, r.notif)
 		}
 	}
 	return ks, ns
 }
 
-// hideSelected puts away the selected pull requests of the tab shown, as
-// hide does one; those of other tabs stay selected.
+// hideSelected puts away the selected pull requests the tab shown shows,
+// as hide does one; the others stay selected.
 func (m *Model) hideSelected() tea.Cmd {
 	ks, ns := m.selectedHere()
 	if len(ks) == 0 {
-		m.refuse("hide: none of the selection is in this tab")
+		m.refuse("hide: none of the selection is shown here")
 		return nil
 	}
 	cmds := []tea.Cmd{nil}
@@ -348,7 +343,7 @@ func (m *Model) hideSelected() tea.Cmd {
 		what = fmt.Sprintf("marked done: %d pull requests", len(ks))
 	}
 	if left := len(m.selected); left > 0 {
-		what += fmt.Sprintf("; %d selected in other tabs stay", left)
+		what += fmt.Sprintf("; %d selected not shown here stay selected", left)
 	}
 	m.say(what)
 	cmds[0] = m.ensure()

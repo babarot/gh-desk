@@ -197,14 +197,14 @@ func (m *Model) aboutMany(a keymap.Action, prs []model.PR) (string, bool) {
 	case "hide":
 		ks, _ := m.selectedHere()
 		if len(ks) == 0 {
-			return "none of them is in this tab", true
+			return "none of them is shown here", true
 		}
 		what := fmt.Sprintf("hide %d from this tab", len(ks))
 		if m.tab().inbox {
 			what = fmt.Sprintf("mark %d done", len(ks))
 		}
 		if skip := len(prs) - len(ks); skip > 0 {
-			what += fmt.Sprintf(", skip %d of other tabs", skip)
+			what += fmt.Sprintf(", skip %d not shown here", skip)
 		}
 		return what, false
 	}

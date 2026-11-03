@@ -179,7 +179,7 @@ func (m *Model) doneAfterReview(k model.PRKey) tea.Cmd {
 	}
 	delete(m.unread, k)
 	m.inboxTab().hidden[k] = true
-	return func() tea.Msg { return doneMsg{n, m.src.MarkDone(m.ctx, n)} }
+	return func() tea.Msg { return doneMsg{n: n, err: m.src.MarkDone(m.ctx, n)} }
 }
 
 func (m *Model) noteBatch(bs *batchState) tea.Cmd {

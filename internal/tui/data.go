@@ -375,6 +375,9 @@ type (
 	doneMsg struct {
 		n   model.Notification
 		err error
+		// selected is set when the pull request was selected before it
+		// was put away, so a failure selects it again.
+		selected bool
 	}
 	browseMsg struct{ err error }
 )
@@ -508,7 +511,12 @@ func (m *Model) handleData(msg tea.Msg) tea.Cmd {
 			if msg.n.Unread {
 				m.unread[msg.n.Key] = msg.n
 			}
-			return m.failNoted(fmt.Sprintf("could not mark %s done: %v", msg.n.Key, msg.err), msg.n.Key)
+			what := fmt.Sprintf("could not mark %s done: %v", msg.n.Key, msg.err)
+			if msg.selected {
+				m.selected[msg.n.Key] = byHand
+				what += fmt.Sprintf(" · it is selected again; %s to try again", m.firstKey("hide"))
+			}
+			return m.failNoted(what, msg.n.Key)
 		}
 	case browseMsg:
 		if msg.err != nil {
