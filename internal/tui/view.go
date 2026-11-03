@@ -329,7 +329,7 @@ var ready = map[keymap.Action]bool{
 	"fold_bots": true, "show_settled": true, "filter": true,
 	"preview_down": true, "preview_up": true, "preview_grow": true, "preview_shrink": true, "next_file": true, "prev_file": true, "preview_tab": true, "fold": true, "preview": true,
 	"confirm": true, "next_kind": true, "post": true, "editor": true, "accept": true, "erase": true, "erase_word": true,
-	"triage": true, "triage_apply": true, "triage_more": true, "ask_claude": true, "chat_more": true, "draft_review": true, "open_claude": true, "chat_approve": true,
+	"triage": true, "triage_apply": true, "triage_more": true, "ask_claude": true, "chat_more": true, "chat_review": true, "draft_review": true, "open_claude": true, "chat_approve": true,
 }
 
 // hints is the key line of what has the focus. It holds the ways in (the
@@ -370,7 +370,7 @@ func (m *Model) hints() string {
 	case m.view == viewChat && m.chat() != nil && m.chat().typing:
 		as = []keymap.Action{"accept"}
 	case m.view == viewChat:
-		as = []keymap.Action{"chat_more", "draft_review", "chat_approve", "open_claude", "help"}
+		as = []keymap.Action{"chat_more", "chat_review", "draft_review", "chat_approve", "open_claude", "help"}
 	default:
 		as = []keymap.Action{"menu", "select", "select_rule", "triage"}
 		if m.tab().inbox {

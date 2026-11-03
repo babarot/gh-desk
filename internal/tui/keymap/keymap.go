@@ -110,7 +110,8 @@ var Defaults = []Def{
 	{"triage_apply", ScopeTriage, []string{"enter"}, "apply"},
 	{"triage_more", ScopeTriage, []string{"i"}, "ask more"},
 
-	{"chat_more", ScopeChat, []string{"i"}, "ask more"},
+	{"chat_more", ScopeChat, []string{"i"}, "ask"},
+	{"chat_review", ScopeChat, []string{"v"}, "review"},
 	{"draft_review", ScopeChat, []string{"R"}, "draft review"},
 	{"open_claude", ScopeChat, []string{"O"}, "open in claude code"},
 	{"chat_approve", ScopeChat, []string{"A"}, "approve"},

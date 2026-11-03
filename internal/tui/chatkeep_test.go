@@ -72,7 +72,7 @@ func startKept(t *testing.T, chats *fakeChats) (*Model, *fakeClaude) {
 func TestConversationGoesOnInAnotherLaunch(t *testing.T) {
 	chats := newFakeChats()
 	m1, fc1 := startKept(t, chats)
-	press(m1, "i")
+	press(m1, "i", "v")
 	press(m1, "i", "w", "h", "y", "?", "enter")
 	if len(fc1.asked) != 2 {
 		t.Fatalf("asked %d", len(fc1.asked))
@@ -105,6 +105,50 @@ func TestConversationGoesOnInAnotherLaunch(t *testing.T) {
 	press(m1, "esc", "i")
 	if s := screen(m1); !strings.Contains(s, "more") {
 		t.Errorf("the other gh-triage's question is not shown:\n%s", s)
+	}
+}
+
+// Opened with nothing asked, a conversation makes its worktree under its
+// lock and frees it; the first question typed carries the pull request.
+func TestConversationOpensWithNothingAsked(t *testing.T) {
+	chats := newFakeChats()
+	m, fc := startKept(t, chats)
+	press(m, "i")
+	if len(fc.asked) != 0 || len(fc.prepared) != 1 || len(chats.held) != 0 {
+		t.Fatalf("asked %d, prepared %d, held %v", len(fc.asked), len(fc.prepared), chats.held)
+	}
+	press(m, "i", "w", "h", "y", "?", "enter")
+	if len(fc.asked) != 1 {
+		t.Fatalf("asked %d", len(fc.asked))
+	}
+	if r := fc.asked[0]; !r.First || !strings.Contains(r.Prompt, "<diff>") || !strings.HasSuffix(r.Prompt, "\nwhy?") || strings.Contains(r.Prompt, "Review this pull request.") {
+		t.Errorf("first request %+v", r)
+	}
+	if r := chats.recs[m.chatKey]; len(r.Turns) != 2 || r.Turns[0].Text != "why?" {
+		t.Errorf("kept %+v", r)
+	}
+}
+
+// Claude Code in the terminal, refused while the worktree is made, leaves
+// the lock to it.
+func TestConversationLockKeptWhilePrepared(t *testing.T) {
+	chats := newFakeChats()
+	m, _ := startKept(t, chats)
+	press(m, "i")
+	k := m.chatKey
+	c := m.chat()
+	// The worktree is still being made: its message has not come.
+	if !m.chatState.Lock(c.Conversation) {
+		t.Fatal("could not take the lock")
+	}
+	c.preparing = true
+	press(m, "O")
+	if chats.held[k] == "" {
+		t.Fatal("the lock was freed while the worktree is made")
+	}
+	m.Update(chatReadyMsg{key: k, dir: "/cache/worktrees/" + k.String()})
+	if chats.held[k] != "" {
+		t.Error("the lock is held after the worktree was made")
 	}
 }
 
@@ -191,23 +235,22 @@ func TestConversationAfterTheHeadMoved(t *testing.T) {
 func TestConversationStartedOver(t *testing.T) {
 	chats := newFakeChats()
 	m, fc := startKept(t, chats)
-	press(m, "i")
+	press(m, "i", "v")
 	k := m.chatKey
 	before := chats.recs[k].Rev
 	press(m, "N")
-	if len(fc.asked) != 1 {
+	if len(chats.recs[k].Turns) == 0 {
 		t.Fatalf("started over at the first press")
 	}
+	// Started over, nothing is asked, and the lock is free.
 	press(m, "N")
-	if len(fc.asked) != 2 {
-		t.Fatalf("asked %d", len(fc.asked))
-	}
 	r := chats.recs[k]
+	if len(fc.asked) != 1 || r.Rev <= before || len(r.Turns) != 0 || r.Session != "" || len(chats.held) != 0 {
+		t.Fatalf("asked %d, kept %+v, held %v; want an empty conversation, its rev past %d", len(fc.asked), r, chats.held, before)
+	}
+	press(m, "v")
 	if a := fc.asked[1]; !a.First || a.Session == fc.asked[0].Session {
 		t.Errorf("request %+v; want a new session", a)
-	}
-	if r.Rev <= before || len(r.Turns) != 2 || r.Session != fc.asked[1].Session {
-		t.Errorf("kept %+v; want the new conversation, its rev past %d", r, before)
 	}
 }
 
@@ -215,7 +258,7 @@ func TestConversationNotKeptGoesOn(t *testing.T) {
 	chats := newFakeChats()
 	chats.saveErr = errors.New("read-only file system")
 	m, fc := startKept(t, chats)
-	press(m, "i")
+	press(m, "i", "v")
 	press(m, "esc", "i")
 	if len(fc.asked) != 1 || !strings.Contains(screen(m), "Answer 1") {
 		t.Errorf("the conversation did not go on in memory; asked %d:\n%s", len(fc.asked), screen(m))
@@ -225,11 +268,11 @@ func TestConversationNotKeptGoesOn(t *testing.T) {
 func TestConversationRemovedByGC(t *testing.T) {
 	chats := newFakeChats()
 	m, fc := startKept(t, chats)
-	press(m, "i")
+	press(m, "i", "v")
 	k := m.chatKey
 	press(m, "esc")
 	delete(chats.recs, k)
-	press(m, "i")
+	press(m, "i", "v")
 	if len(fc.asked) != 2 || !fc.asked[1].First {
 		t.Errorf("a conversation gc removed was not started anew: %+v", fc.asked)
 	}
@@ -251,7 +294,7 @@ func TestConversationKeptInThePane(t *testing.T) {
 func TestConversationAskedAfterAnotherAdded(t *testing.T) {
 	chats := newFakeChats()
 	m1, fc1 := startKept(t, chats)
-	press(m1, "i")
+	press(m1, "i", "v")
 	m2, _ := startKept(t, chats)
 	press(m2, "i", "i", "o", "n", "e", "enter")
 	press(m1, "i", "t", "w", "o", "enter")

@@ -1498,11 +1498,17 @@ func TestClaudeConversation(t *testing.T) {
 	m, _ := startWith(t, fixture(), keymap.Default())
 	fc := fakeClaudeOf(t, m)
 	press(m, "i")
-	if m.view != viewChat || len(fc.asked) != 1 {
-		t.Fatalf("view %v, asked %d", m.view, len(fc.asked))
+	// Opened, nothing is asked; the worktree is made meanwhile.
+	if m.view != viewChat || len(fc.asked) != 0 || len(fc.prepared) != 1 {
+		t.Fatalf("view %v, asked %d, prepared %d", m.view, len(fc.asked), len(fc.prepared))
+	}
+	golden(t, "claude_empty", screen(m))
+	press(m, "v")
+	if len(fc.asked) != 1 {
+		t.Fatalf("asked %d", len(fc.asked))
 	}
 	first := fc.asked[0]
-	if !first.First || !strings.Contains(first.Prompt, "<diff>") || first.Dir == "" {
+	if !first.First || !strings.Contains(first.Prompt, "<diff>") || !strings.HasSuffix(first.Prompt, "\n"+claude.ReviewQuestion) || first.Dir == "" {
 		t.Errorf("first request %+v", first)
 	}
 	golden(t, "claude", screen(m))
@@ -1515,7 +1521,7 @@ func TestClaudeConversation(t *testing.T) {
 		t.Errorf("second request %+v", r)
 	}
 	// The worktree is put at the head shown before each question.
-	if len(fc.prepared) != 2 {
+	if len(fc.prepared) != 3 {
 		t.Errorf("the worktree was prepared %d times", len(fc.prepared))
 	}
 
@@ -1608,7 +1614,7 @@ func TestClaudeFirstFailureStartsAgain(t *testing.T) {
 	m, _ := startWith(t, fixture(), keymap.Default())
 	fc := fakeClaudeOf(t, m)
 	fc.fail = true
-	press(m, "i")
+	press(m, "i", "v")
 	if !strings.Contains(screen(m), "rate limited") {
 		t.Fatalf("no error shown:\n%s", screen(m))
 	}

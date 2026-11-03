@@ -56,7 +56,7 @@ func TestLiveClaude(t *testing.T) {
 	c := claude.New(claude.Options{Model: model, Tools: []string{"Read", "Grep", "Glob"}, Log: logging.Discard()})
 	session := claude.NewSession()
 	steps := func(s claude.Step) { t.Logf("  ⏺ %s %s", s.Tool, s.Arg) }
-	a, err := c.Ask(ctx, claude.Request{Dir: dir, Session: session, First: true, Prompt: claude.ReviewPrompt(p, d, diff)}, steps)
+	a, err := c.Ask(ctx, claude.Request{Dir: dir, Session: session, First: true, Prompt: claude.PRPrompt(p, d, diff) + "\n" + claude.ReviewQuestion}, steps)
 	if err != nil {
 		t.Fatal(err)
 	}

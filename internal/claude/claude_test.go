@@ -157,9 +157,9 @@ func TestParseCautions(t *testing.T) {
 	}
 }
 
-func TestReviewPromptCutsLongDiffs(t *testing.T) {
+func TestPRPromptCutsLongDiffs(t *testing.T) {
 	p := model.PR{Key: model.PRKey{Owner: "acme", Repo: "api", Number: 1}, Title: "Add a thing"}
-	got := ReviewPrompt(p, model.Detail{Body: "body"}, []byte(strings.Repeat("x", maxDiff+10)))
+	got := PRPrompt(p, model.Detail{Body: "body"}, []byte(strings.Repeat("x", maxDiff+10)))
 	if !strings.Contains(got, "the diff is cut here") || strings.Count(got, "x") > maxDiff+5 {
 		t.Error("a long diff is not cut")
 	}

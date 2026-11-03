@@ -14,6 +14,7 @@ import (
 	"github.com/charmbracelet/x/ansi"
 
 	"github.com/babarot/gh-triage/internal/claude"
+	"github.com/babarot/gh-triage/internal/logging"
 	"github.com/babarot/gh-triage/internal/model"
 	"github.com/babarot/gh-triage/internal/runner"
 	"github.com/babarot/gh-triage/internal/tui/chat"
@@ -55,6 +56,9 @@ type chatScreen struct {
 	back   view
 	// restart is set by a first press of chat_restart, until the next key.
 	restart bool
+	// preparing is set while the worktree is made before anything is
+	// asked.
+	preparing bool
 }
 
 // chatStatus puts what a conversation says went wrong on the status line.
@@ -98,7 +102,8 @@ func listenChat(ch <-chan tea.Msg) tea.Cmd {
 }
 
 // openChat opens the conversation about p: the one in this gh-triage, or
-// the one kept, or a new one started with a review.
+// the one kept, or a new one with nothing asked, whose worktree is made
+// meanwhile.
 func (m *Model) openChat(p model.PR) tea.Cmd {
 	if m.claude == nil {
 		m.refuse("Claude is not available")
@@ -127,11 +132,54 @@ func (m *Model) openChat(p model.PR) tea.Cmd {
 	m.chatState.Probe(c.Conversation)
 	m.chatState.Sync(c.Conversation)
 	if len(c.Turns()) == 0 && !c.Running() && c.Elsewhere() == "" {
-		return m.ask(c, "Review this pull request.", "", false)
+		return m.prepareChat(c)
 	}
 	if d := c.draft; d != nil {
 		c.draft = nil
 		return m.draftCompose(c, *d)
+	}
+	return nil
+}
+
+// prepareChat makes the worktree of a conversation with nothing asked yet,
+// so its first question does not wait for a clone. It holds the
+// conversation's lock meanwhile, as a question does: a worktree is moved
+// only under it. A question asked meanwhile takes the lock on, and its
+// own Prepare waits for this one.
+func (m *Model) prepareChat(c *chatScreen) tea.Cmd {
+	if c.preparing || c.Running() || !m.chatState.Lock(c.Conversation) {
+		return nil
+	}
+	c.preparing = true
+	key, head := c.PR().Key, c.PR().HeadOID
+	return func() tea.Msg {
+		dir, err := m.claude.Prepare(m.ctx, key, head)
+		return chatReadyMsg{key: key, dir: dir, err: err}
+	}
+}
+
+// chatReadyMsg is the end of prepareChat.
+type chatReadyMsg struct {
+	key model.PRKey
+	dir string
+	err error
+}
+
+func (m *Model) chatReady(msg chatReadyMsg) tea.Cmd {
+	c, ok := m.chats[msg.key]
+	if !ok {
+		return nil
+	}
+	c.preparing = false
+	switch {
+	case msg.err != nil:
+		// The first question makes it again, and says what went wrong.
+		m.log.Debug("worktree not made ahead", logging.KeyPR, msg.key.String(), "err", msg.err.Error())
+	case !c.Started():
+		c.Prepared(msg.dir, "")
+	}
+	if !c.Running() {
+		c.Unlock()
 	}
 	return nil
 }
@@ -213,13 +261,9 @@ func (m *Model) ask(c *chatScreen, shown, prompt string, draft bool) tea.Cmd {
 				send(chatAnswerMsg{key: key, err: fmt.Errorf("could not read the diff: %w", err)})
 				return
 			}
-			// What was asked goes after the review a new session begins
-			// with.
-			if prompt != "" {
-				prompt = claude.ReviewPrompt(pr, d, diff) + "\n" + prompt
-			} else {
-				prompt = claude.ReviewPrompt(pr, d, diff)
-			}
+			// A new session is told about the pull request first, and
+			// then asked what was asked.
+			prompt = claude.PRPrompt(pr, d, diff) + "\n" + prompt
 		case moved != "":
 			diff, err := m.src.Diff(ctx, pr)
 			if err != nil {
@@ -349,6 +393,8 @@ func (m *Model) chatKeyPress(msg tea.KeyPressMsg) tea.Cmd {
 		switch {
 		case c.Running():
 			m.refuse("wait for Claude to answer first")
+		case len(c.Turns()) == 0:
+			m.refuse("nothing has been asked yet")
 		case !armed:
 			c.restart = true
 			m.say(fmt.Sprintf("press %s again to start over: the conversation goes from gh-triage, and Claude Code keeps its session", m.firstKey("chat_restart")))
@@ -376,6 +422,8 @@ func (m *Model) chatKeyPress(msg tea.KeyPressMsg) tea.Cmd {
 		c.typing = true
 		c.input.SetWidth(chatInputWidth(m.width))
 		return c.input.Focus()
+	case is("chat_review"):
+		return m.ask(c, claude.ReviewQuestion, claude.ReviewQuestion, false)
 	case is("draft_review"):
 		return m.ask(c, "Draft the review.", claude.DraftPrompt, true)
 	case is("chat_approve"):
@@ -391,6 +439,10 @@ func (m *Model) chatKeyPress(msg tea.KeyPressMsg) tea.Cmd {
 		switch {
 		case c.Running():
 			m.refuse("wait for Claude to answer first")
+		case c.preparing:
+			// The lock is held for the worktree being made; nothing has
+			// started a session under it.
+			m.refuse("the conversation has not started")
 		case !m.chatState.Lock(c.Conversation):
 		default:
 			m.chatState.Reload(c.Conversation)
@@ -426,13 +478,13 @@ func (m *Model) claudeExited(msg claudeExitMsg) tea.Cmd {
 	return nil
 }
 
-// restartChat starts the conversation over and asks for a review again.
+// restartChat starts the conversation over, with nothing asked.
 func (m *Model) restartChat(c *chatScreen) tea.Cmd {
 	if !m.chatState.Restart(c.Conversation) {
 		return nil
 	}
 	c.draft, c.scroll = nil, 0
-	return m.ask(c, "Review this pull request.", "", false)
+	return nil
 }
 
 // The chat is laid out as Claude Code lays out a conversation: a question
@@ -482,6 +534,10 @@ func (m *Model) chatLines(c *chatScreen, width int) []string {
 	// asked is when the question an answer is to was asked.
 	var asked time.Time
 	turns := c.Turns()
+	if len(turns) == 0 && !c.Running() && c.Elsewhere() == "" {
+		L = append(L, margin+st.dim.Render(fmt.Sprintf("%s to ask Claude about this pull request, %s for a review",
+			m.firstKey("chat_more"), m.firstKey("chat_review"))))
+	}
 	for i, t := range turns {
 		switch {
 		case t.You:

@@ -525,6 +525,8 @@ func (m *Model) handleData(msg tea.Msg) tea.Cmd {
 		return m.notesRead(msg)
 	case chatStepMsg:
 		return m.chatStep(msg)
+	case chatReadyMsg:
+		return m.chatReady(msg)
 	case chatPreparedMsg:
 		return m.chatPrepared(msg)
 	case chatAnswerMsg:

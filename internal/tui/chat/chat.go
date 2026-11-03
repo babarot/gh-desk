@@ -446,8 +446,8 @@ func (s *State) Keep(c *Conversation) {
 	c.Unlock()
 }
 
-// Restart starts c over, under its lock, which the first question takes
-// on. What is kept is replaced rather than removed, so its rev goes on
+// Restart starts c over, with nothing asked, under its lock, which it
+// frees after. What is kept is replaced rather than removed, so its rev goes on
 // rising and another gh-triage sees its own as older; Claude Code keeps
 // the old session. It reports false, having said why, when another
 // gh-triage holds the lock.
@@ -458,6 +458,7 @@ func (s *State) Restart(c *Conversation) bool {
 	s.Reload(c)
 	c.load(Record{Key: c.pr.Key, Rev: c.rev})
 	s.save(c)
+	c.Unlock()
 	s.log.Info("conversation started over", logging.KeyPR, c.pr.Key.String())
 	return true
 }

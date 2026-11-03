@@ -19,11 +19,13 @@ Be concrete and brief: name the file and line, say what is wrong and why it matt
 // from the worktree.
 const maxDiff = 200_000
 
-// ReviewPrompt is the first question about a pull request: review it, given
-// what GitHub knows about it.
-func ReviewPrompt(p model.PR, d model.Detail, diff []byte) string {
+// ReviewQuestion asks for a review of the pull request.
+const ReviewQuestion = "Review this pull request."
+
+// PRPrompt is what GitHub knows about a pull request, marked as data. It
+// goes before the first question of a session, whatever that question is.
+func PRPrompt(p model.PR, d model.Detail, diff []byte) string {
 	var b strings.Builder
-	b.WriteString("Review this pull request.\n\n")
 	fmt.Fprintf(&b, "<pull_request>\n%s: %s\nauthor: %s\nbranch: %s into %s\nhead: %s\nchanged: %d files, +%d -%d\n</pull_request>\n\n",
 		p.Key, p.Title, p.Author, p.HeadRef, p.BaseRef, p.HeadOID, p.ChangedFiles, p.Additions, p.Deletions)
 	fmt.Fprintf(&b, "<description>\n%s\n</description>\n\n", strings.TrimSpace(d.Body))
