@@ -15,8 +15,8 @@ depends = ["build"]
 run = "gh extension install . --force"
 
 [tasks.clean]
-description = "Remove ./gh-desk and coverage.out"
-run = "rm -f gh-desk coverage.out"
+description = "Remove ./gh-desk, dist and coverage.out"
+run = "rm -rf gh-desk dist coverage.out"
 
 [tasks.test]
 description = "Check formatting, and run the Go tests with the race detector, writing coverage.out"
@@ -26,5 +26,12 @@ go test -race ./... -coverprofile=coverage.out -covermode=atomic
 '''
 
 [tasks.lint]
-description = "Run golangci-lint"
-run = "golangci-lint run ./..."
+description = "Run golangci-lint, and check that go.mod and go.sum are tidy"
+run = '''
+golangci-lint run ./...
+go mod tidy -diff
+'''
+
+[tasks.vuln]
+description = "Check the dependencies and the standard library for known vulnerabilities"
+run = "go run golang.org/x/vuln/cmd/govulncheck@v1.8.0 ./..."

@@ -32,10 +32,8 @@ import (
 	"github.com/babarot/gh-desk/internal/tui"
 	"github.com/babarot/gh-desk/internal/tui/chat"
 	"github.com/babarot/gh-desk/internal/tui/keymap"
+	"github.com/babarot/gh-desk/internal/version"
 )
-
-// Version is set at build time.
-var Version = "dev"
 
 // EnvLogLevel overrides [log] level in the config file.
 const EnvLogLevel = "GH_DESK_LOG_LEVEL"
@@ -77,7 +75,7 @@ func Run(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintln(stdout, logging.DefaultPath())
 		return 0
 	case "version":
-		fmt.Fprintln(stdout, Version)
+		fmt.Fprintln(stdout, version.String())
 		return 0
 	default:
 		fmt.Fprintf(stderr, "gh-desk: unknown command %q\n", flags.Arg(0))
@@ -101,7 +99,7 @@ func Run(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintln(stderr, err)
 		return 1
 	}
-	log.Info("start", logging.KeyVersion, Version, "config", *configPath, "log", logging.DefaultPath(),
+	log.Info("start", logging.KeyVersion, version.String(), "config", *configPath, "log", logging.DefaultPath(),
 		"log_level", level.Level().String(), "refresh", cfg.RefreshInterval().String())
 
 	gh, err := github.New(log, github.Options{})
@@ -183,7 +181,7 @@ func assemble(cfg config.File, warns []string, e env, log *slog.Logger) parts {
 	set := settings(cfg)
 	set.ConfigWarnings = warns
 	set.Viewer = e.viewer
-	set.Version = Version
+	set.Version = version.String()
 	set.Host = e.host
 	set.Chats = chatStore{state.OpenChats(e.stateDir, e.host)}
 	if !e.noCache {

@@ -15,6 +15,7 @@ import (
 	"github.com/babarot/gh-desk/internal/model"
 	"github.com/babarot/gh-desk/internal/state"
 	"github.com/babarot/gh-desk/internal/tui/keymap"
+	"github.com/babarot/gh-desk/internal/version"
 )
 
 func TestKeysTemplateLoadsUncommented(t *testing.T) {
@@ -134,7 +135,7 @@ func TestLevelPrecedence(t *testing.T) {
 
 func TestRunSubcommands(t *testing.T) {
 	var out, errb bytes.Buffer
-	if code := Run([]string{"version"}, &out, &errb); code != 0 || strings.TrimSpace(out.String()) != Version {
+	if code := Run([]string{"version"}, &out, &errb); code != 0 || strings.TrimSpace(out.String()) != version.String() {
 		t.Errorf("version: code %d, out %q", code, out.String())
 	}
 	out.Reset()

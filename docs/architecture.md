@@ -7,6 +7,7 @@ gh-desk is split into packages by layer. A package imports only packages of lowe
 |---|---|---|---|---|
 | 0 | `internal/model` | Shared types: pull requests and their names | - | - |
 | 0 | `internal/logging` | The slog logger and the log file | - | - |
+| 0 | `internal/version` | The release version, which tagpr updates | - | - |
 | 0 | `internal/near` | The closest of a few names to one mistyped, for a did-you-mean | - | - |
 | 0 | `internal/tui/statusline` | What the status line shows: events for a moment, work in progress, the row's result | - | - |
 | 1 | `internal/config` | Reading the config file and reporting its mistakes | `near` | `github.com/pelletier/go-toml/v2` |
@@ -20,7 +21,7 @@ gh-desk is split into packages by layer. A package imports only packages of lowe
 | 3 | `internal/runner` | Bulk approve and merge, auto-merge watching, resuming | `model`, `logging`, `plan` | - |
 | 3 | `internal/tui/chat` | The conversations with Claude about pull requests: what each holds, keeping them and their locks | `model`, `logging`, `claude` | - |
 | 4 | `internal/tui` | The terminal UI | `model`, `logging`, `plan`, `diff`, `tui/keymap`, `runner`, `claude`, `listcache`, `tui/statusline`, `tui/chat` | `charm.land/bubbletea/v2`, `charm.land/bubbles/v2`, `charm.land/lipgloss/v2`, `github.com/charmbracelet/x/ansi`, `golang.org/x/net/html` |
-| 5 | `internal/app` | Putting it together: flags, config, log, and starting the TUI | `model`, `logging`, `config`, `tui/keymap`, `plan`, `github`, `state`, `claude`, `listcache`, `runner`, `tui`, `tui/chat` | - |
+| 5 | `internal/app` | Putting it together: flags, config, log, and starting the TUI | `model`, `logging`, `config`, `tui/keymap`, `plan`, `github`, `state`, `claude`, `listcache`, `runner`, `tui`, `tui/chat`, `version` | - |
 | 6 | `main` | Calls app.Run | `app` | - |
 
 Standard library packages that reach outside the process:

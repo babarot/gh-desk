@@ -1,0 +1,37 @@
+version: 2
+
+builds:
+  - env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - windows
+      - darwin
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w
+    flags:
+      - -trimpath
+
+archives:
+  # Raw binaries for gh extension install (requires {name}_{os}-{arch} pattern)
+  - formats: ["binary"]
+    name_template: >-
+      {{ .ProjectName }}_
+      {{- .Os }}-
+      {{- .Arch }}
+
+changelog:
+  use: github-native
+
+release:
+  prerelease: auto
+  draft: false
+  footer: >-
+    ### Installation
+
+    - `gh extension install babarot/gh-desk`
+
+    - `go install github.com/babarot/gh-desk@{{ .Tag }}`
