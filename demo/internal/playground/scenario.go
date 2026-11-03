@@ -44,6 +44,9 @@ type Step struct {
 	// Hold is a moment for the visitor to read what the step before
 	// showed; a replay on its way to a later step skips it.
 	Hold time.Duration
+	// Help is what the caption says the step does, in place of the
+	// action's help, where the key does something else on that screen.
+	Help string
 }
 
 // Scenarios are the scenarios the page can be opened with.
@@ -137,11 +140,24 @@ func Scenarios() []Scenario {
 			{Action: "confirm", Wait: time.Second, Hold: 2 * time.Second},
 			{Action: "refresh", Wait: 5 * time.Second},
 		}},
-		{Name: "inbox", Title: "The pull requests in your notifications", Steps: []Step{
-			{Action: "tab_4"},
+		// The inbox: each notification read in the pane, with the comment
+		// that brought it; the settled ones shown, which takes the cursor to
+		// the top; the one there marked done.
+		{Name: "inbox", Title: "The pull requests in your notifications, read and marked done", Steps: []Step{
+			{Action: "tab_4", Hold: time.Second},
+			{Action: "down", Hold: time.Second},
+			{Action: "down", Hold: 2 * time.Second},
+			{Action: "show_settled", Hold: 2 * time.Second},
+			{Action: "hide", Hold: time.Second},
 		}},
-		{Name: "help", Title: "Every key of the list", Steps: []Step{
-			{Action: "help"},
+		// The keys: the list's own first, then down the popup to another
+		// screen's keys, unfolded.
+		{Name: "help", Title: "Every key, by the screen it works on", Steps: []Step{
+			{Action: "help", Hold: time.Second},
+			{Action: "page_down", Hold: 2 * time.Second},
+			{Action: "page_down", Hold: 2 * time.Second},
+			{Action: "fold", Hold: time.Second, Help: "fold or unfold a section"},
+			{Action: "page_down", Hold: 2 * time.Second},
 		}},
 	}
 }
@@ -195,6 +211,9 @@ func (s Scenario) Press(km keymap.Map) ([]Pressed, error) {
 			p = Pressed{Bytes: []byte(st.Text), Key: fmt.Sprintf("%q", st.Text)}
 		}
 		p.Wait, p.Hold = st.Wait, st.Hold
+		if st.Help != "" {
+			p.Help = st.Help
+		}
 		out = append(out, p)
 	}
 	return out, nil

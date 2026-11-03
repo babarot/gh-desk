@@ -187,8 +187,8 @@ func TestScenariosReachTheirScreen(t *testing.T) {
 		"merge":  {"1 review (6)", "▸ requested from a team 2"},
 		"claude": {"acme/api#482 · review", "Nice change. Two notes:"},
 		"triage": {"1 review (6)", "▸ requested from a team 2"},
-		"inbox":  {"acme/mobile#342", "mention"},
-		"help":   {"keys · z fold", "the list and its preview"},
+		"inbox":  {"marked done: acme/api#482", "4 inbox (2)"},
+		"help":   {"keys · z fold", "▾ anywhere · works here"},
 	}
 	for _, s := range Scenarios() {
 		t.Run(s.Name, func(t *testing.T) {
