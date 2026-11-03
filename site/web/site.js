@@ -36,7 +36,26 @@
     term.loadAddon(new Unicode11Addon.Unicode11Addon());
     term.unicode.activeVersion = '11';
     term.open(screen);
-    fit.fit();
+    // The WebGL renderer draws the box-drawing characters itself, filling
+    // the cell, so the borders join across the line height. The DOM
+    // renderer, left when WebGL is missing, draws them from the font.
+    try {
+      const gl = new WebglAddon.WebglAddon();
+      gl.onContextLoss(() => gl.dispose());
+      term.loadAddon(gl);
+    } catch (e) {}
+    size();
+  }
+
+  // size fits the terminal to the screen, but never narrower than minCols:
+  // on a phone the list would cut every title short, so the terminal is
+  // made wider than the screen and scrolls sideways instead.
+  const minCols = 80;
+  function size() {
+    const d = fit && fit.proposeDimensions();
+    if (!d || !d.cols || !d.rows) return;
+    const cols = Math.max(d.cols, minCols);
+    if (cols !== term.cols || d.rows !== term.rows) term.resize(cols, d.rows);
   }
 
   // start runs a new gh-desk in a new terminal. A Go program runs once,
@@ -64,9 +83,9 @@
     term.focus();
   }
 
-  new ResizeObserver(() => { if (fit) fit.fit(); }).observe(screen);
+  new ResizeObserver(size).observe(screen);
 
-  const keyOf = { '\\t': '\t', '\\r': '\r', '\\x1b': '\x1b' };
+  const keyOf = { '\\t': '\t', '\\r': '\r', '\\x1b': '\x1b', '\\x12': '\x12' };
   document.querySelectorAll('#keys button').forEach(b => b.addEventListener('click', () => {
     const k = keyOf[b.dataset.k] ?? b.dataset.k;
     if (globalThis.ghDesk) globalThis.ghDesk.input(k);
