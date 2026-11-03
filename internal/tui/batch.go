@@ -102,7 +102,7 @@ func (m *Model) event(msg eventMsg) tea.Cmd {
 	if ev.Result == runner.Merged {
 		m.merged[ev.Key] = true
 	}
-	if ev.Result == runner.Readied {
+	if ev.Result == runner.Readied || ev.Readied {
 		m.markReady(ev.Key)
 	}
 	bs := m.batches[msg.batch]

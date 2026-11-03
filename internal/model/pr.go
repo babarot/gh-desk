@@ -264,7 +264,11 @@ type Pending struct {
 	Approved bool `json:"approved"`
 	// Approving is set while an approval is being sent: if gh-desk
 	// stops then, whether it reached GitHub is not known.
-	Approving     bool          `json:"approving"`
+	Approving bool `json:"approving"`
+	// Readied is set once marking the draft ready is sent or on its way:
+	// a draft found again after it was turned back by someone, and stops
+	// the merge instead of being marked ready again.
+	Readied       bool          `json:"readied"`
 	ChecksWaited  time.Duration `json:"checks_waited"`
 	BlockedWaited time.Duration `json:"blocked_waited"`
 	Watched       time.Duration `json:"watched"`

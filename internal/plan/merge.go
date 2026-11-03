@@ -45,7 +45,10 @@ type Settings struct {
 
 // Decision is what to do with one pull request.
 type Decision struct {
-	// Approve is whether to approve it first.
+	// Ready is whether to mark it ready for review first: a draft of the
+	// viewer's or of a bot.
+	Ready bool
+	// Approve is whether to approve it first, after Ready.
 	Approve bool
 	Step    Step
 	Method  model.MergeMethod
@@ -205,18 +208,26 @@ func ForReady(mi model.MergeInfo) Decision {
 	return Decision{Reason: "mark ready for review"}
 }
 
-// ForMerge decides merging a pull request, approving it first when the
-// viewer has to. It is called again with fresh information before each
+// ForMerge decides merging a pull request, marking it ready for review
+// first when it is a draft of the viewer's or of a bot, and approving it
+// when the viewer has to. Another person's draft is left: the author has
+// said it is not ready. It is called again with fresh information before each
 // write, so what it decided when the user said yes is checked against what
 // is true when it acts.
 func ForMerge(mi model.MergeInfo, pr model.PR, viewer string, set Settings) Decision {
 	d := Decision{Notes: notes(mi, set)}
-	skip := func(why string) Decision { d.Step, d.Reason, d.Approve, d.Method = StepSkip, why, false, ""; return d }
+	skip := func(why string) Decision {
+		d.Step, d.Reason, d.Ready, d.Approve, d.Method = StepSkip, why, false, false, ""
+		return d
+	}
 	if mi.State != model.StateOpen {
 		return skip(stateWord(mi.State))
 	}
 	if mi.Draft {
-		return skip("draft")
+		if pr.Author != viewer && !pr.AuthorIsBot {
+			return skip("someone else's draft")
+		}
+		d.Ready = true
 	}
 	if Failing(mi) {
 		return skip("checks failing")
@@ -227,6 +238,13 @@ func ForMerge(mi model.MergeInfo, pr model.PR, viewer string, set Settings) Deci
 	}
 	d.Method = method
 	d.Approve = needsApproval(mi, pr, viewer)
+	if d.Ready {
+		// What GitHub says of a draft is only that it is one. Marking it
+		// ready starts its checks, so it waits for them; the runner
+		// decides again once it is ready.
+		d.Notes = append(d.Notes, "marking it ready asks for its reviews; it stays ready if the merge stops")
+		return blocked(d, mi, set)
+	}
 	switch mi.MergeState {
 	case model.MergeDirty:
 		return skip("conflicts")
@@ -245,14 +263,21 @@ func ForMerge(mi model.MergeInfo, pr model.PR, viewer string, set Settings) Deci
 		}
 		d.Step, d.Reason = StepUpdate, "update the branch, then merge"
 	case model.MergeBlocked:
-		if set.AutoMerge && mi.Repo.AutoMerge {
-			d.Step, d.Reason = StepAutoMerge, "turn on auto-merge"
-			d.Notes = append(d.Notes, "auto-merge also merges commits pushed after it is on")
-		} else {
-			d.Step, d.Reason = StepWait, "wait for checks, then merge"
-		}
+		return blocked(d, mi, set)
 	default:
 		return skip("cannot be merged: " + string(mi.MergeState))
+	}
+	return d
+}
+
+// blocked is the step of a pull request that waits for its checks or
+// rules: auto-merge where the repository allows it, waiting otherwise.
+func blocked(d Decision, mi model.MergeInfo, set Settings) Decision {
+	if set.AutoMerge && mi.Repo.AutoMerge {
+		d.Step, d.Reason = StepAutoMerge, "turn on auto-merge"
+		d.Notes = append(d.Notes, "auto-merge also merges commits pushed after it is on")
+	} else {
+		d.Step, d.Reason = StepWait, "wait for checks, then merge"
 	}
 	return d
 }

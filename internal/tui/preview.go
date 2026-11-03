@@ -530,6 +530,9 @@ func (m *Model) paneBody(p model.PR, n *model.Notification, e *entry[[]diff.File
 		if d.Method != "" {
 			how += " (" + methodWord(d.Method) + ")"
 		}
+		if d.Ready {
+			how = "mark ready, then " + how
+		}
 		meta += "  " + st.muted.Render("merge:") + " " + m.stepStyle(d.Step).Render(how)
 	}
 	top := []string{meta}

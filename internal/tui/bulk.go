@@ -464,11 +464,19 @@ func (m *Model) renderBulk() []string {
 	w := min(max(m.width-6, 40), 130)
 	verb := b.verb()
 	if b.kind == runner.Merge {
+		ready, approve := false, false
 		for _, it := range b.items {
-			if it.ok && it.d.Approve && it.goes() {
-				verb = "approve and merge"
-				break
+			if it.ok && it.goes() {
+				ready, approve = ready || it.d.Ready, approve || it.d.Approve
 			}
+		}
+		switch {
+		case ready && approve:
+			verb = "ready, approve and merge"
+		case ready:
+			verb = "ready and merge"
+		case approve:
+			verb = "approve and merge"
 		}
 	}
 	inner := w - 4
@@ -514,8 +522,11 @@ func (m *Model) renderBulk() []string {
 			case runner.Review, runner.Ready:
 				what = st.green.Render(it.d.Reason)
 			default:
+				if it.d.Ready {
+					what = st.green.Render("ready") + st.dim.Render(" → ")
+				}
 				if it.d.Approve {
-					what = st.green.Render("approve") + st.dim.Render(" → ")
+					what += st.green.Render("approve") + st.dim.Render(" → ")
 				}
 				what += m.stepStyle(it.d.Step).Render(it.d.Reason) + " " + st.dim.Render("("+methodWord(it.d.Method)+")")
 			}

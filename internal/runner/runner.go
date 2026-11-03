@@ -164,6 +164,8 @@ type Event struct {
 	Text string
 	// Approved is set when an approval was sent.
 	Approved bool
+	// Readied is set when a draft was marked ready on its way to a merge.
+	Readied bool
 	// Method is how it was merged, on a Merged event gh-desk made.
 	Method model.MergeMethod
 	// Watch is set on events of a pull request put on auto-merge, after
@@ -350,6 +352,8 @@ type job struct {
 	wg   *sync.WaitGroup
 	// approved is set once this job sent an approval.
 	approved bool
+	// readied is set once this job marked the draft ready.
+	readied bool
 	// watching is set once the pull request is handed to watch, which
 	// releases it.
 	watching bool
@@ -367,7 +371,7 @@ type job struct {
 }
 
 func (j *job) say(res Result, text string) {
-	j.emit(Event{Key: j.it.PR.Key, Result: res, Text: text, Approved: j.approved})
+	j.emit(Event{Key: j.it.PR.Key, Result: res, Text: text, Approved: j.approved, Readied: j.readied})
 	if !res.Final() {
 		return
 	}
@@ -383,7 +387,7 @@ func (j *job) say(res Result, text string) {
 // locked skips a merge that would wait without the record of pending
 // merges, which another gh-desk holds.
 func (j *job) locked(text string) {
-	j.emit(Event{Key: j.it.PR.Key, Result: Skipped, Text: text, Approved: j.approved, Locked: true})
+	j.emit(Event{Key: j.it.PR.Key, Result: Skipped, Text: text, Approved: j.approved, Readied: j.readied, Locked: true})
 	j.log.Info("pr end", logging.KeyStep, resultWord[Skipped], "why", text)
 }
 
@@ -587,7 +591,7 @@ func (j *job) decide() (model.MergeInfo, plan.Decision, bool) {
 		}
 		d := plan.ForMerge(mi, j.it.PR, j.r.opt.Viewer, j.r.opt.Settings)
 		j.log.Debug("decided", logging.KeyStep, string(d.Step), "merge_state", string(mi.MergeState), "approve", d.Approve)
-		if j.dismissed(d) {
+		if j.dismissed(d) || j.redrafted(d) {
 			return mi, d, false
 		}
 		if d.Step != plan.StepRecheck {
@@ -631,11 +635,15 @@ func (j *job) merge() {
 		j.say(Failed, "could not record the pending merge; nothing was sent")
 		return
 	}
-	if d.Approve {
-		if !j.sendApproval("") {
-			return
-		}
-		// Read again: the approval can change what is next.
+	if d.Ready && !j.readyToMerge() {
+		return
+	}
+	if d.Approve && !j.sendApproval("") {
+		return
+	}
+	if d.Ready || d.Approve {
+		// Read again: marking it ready and the approval change what is
+		// next.
 		if mi, d, ok = j.decide(); !ok {
 			return
 		}
@@ -647,7 +655,7 @@ func (j *job) merge() {
 			d.Step = plan.StepWait
 		}
 		if waits(d.Step) && !j.canWait {
-			j.locked("approved; locked by another gh-desk")
+			j.locked("approved or ready; locked by another gh-desk")
 			return
 		}
 	}
@@ -667,6 +675,36 @@ func (j *job) merge() {
 	}
 }
 
+// redrafted stops the job when a decision asks to mark the pull request
+// ready although gh-desk did: someone turned it back to a draft, and
+// marking it again would undo them.
+func (j *job) redrafted(d plan.Decision) bool {
+	if !d.Ready || (!j.pend.Readied && !j.readied) {
+		return false
+	}
+	j.say(Stopped, "a draft again · confirm again")
+	return true
+}
+
+// readyToMerge marks the draft ready for review, on the head the user saw,
+// as the first step of its merge.
+func (j *job) readyToMerge() bool {
+	j.say(Running, "marking ready")
+	// Recorded first, as an approval is: should gh-desk stop before the
+	// result is known, a draft found at the next launch stops the merge.
+	j.pend.Readied = true
+	if !j.save() {
+		j.say(Failed, "could not record the pending merge; nothing was sent")
+		return false
+	}
+	if err := j.r.gh.MarkReady(j.ctx, j.it.PR.Key, j.it.PR.ID, j.head); err != nil {
+		j.unsure("ready for review failed: " + short(err))
+		return false
+	}
+	j.readied = true
+	return true
+}
+
 // dismissed stops the job when a decision asks to approve although the
 // user's approval was recorded: it was dismissed, and approving again
 // would undo whoever dismissed it.
@@ -682,7 +720,7 @@ func (j *job) mergeNow(method model.MergeMethod) bool {
 	j.say(Running, "merging")
 	err := j.r.gh.Merge(j.ctx, j.it.PR.Key, j.it.PR.ID, j.head, method)
 	if err == nil {
-		j.emit(Event{Key: j.it.PR.Key, Result: Merged, Text: "merged", Approved: j.approved, Method: method})
+		j.emit(Event{Key: j.it.PR.Key, Result: Merged, Text: "merged", Approved: j.approved, Readied: j.readied, Method: method})
 		j.log.Info("pr end", logging.KeyStep, resultWord[Merged], "method", string(method))
 		j.forget()
 		return true
