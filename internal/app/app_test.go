@@ -216,15 +216,3 @@ func TestGCRemovesClosedOnly(t *testing.T) {
 		t.Errorf("out = %s", out.String())
 	}
 }
-
-// TestDemo checks that the config file written on first run gives the
-// demo its settings without a mistake.
-func TestDemo(t *testing.T) {
-	set, _, _, err := Demo()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(set.Tabs) == 0 {
-		t.Error("the demo has no tabs")
-	}
-}

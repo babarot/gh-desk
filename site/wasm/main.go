@@ -21,9 +21,12 @@ import (
 	"github.com/charmbracelet/colorprofile"
 
 	"github.com/babarot/gh-desk/internal/app"
+	"github.com/babarot/gh-desk/internal/config"
 	"github.com/babarot/gh-desk/internal/logging"
 	"github.com/babarot/gh-desk/internal/runner"
 	"github.com/babarot/gh-desk/internal/tui"
+	"github.com/babarot/gh-desk/internal/tui/keymap"
+	"github.com/babarot/gh-desk/internal/version"
 	"github.com/babarot/gh-desk/site/demo"
 )
 
@@ -132,10 +135,13 @@ func main() {
 
 // run runs gh-desk until it quits, in a new world.
 func (t *terminal) run(out output) error {
-	set, km, cfg, err := app.Demo()
+	// The config file a first launch writes, read without a disk.
+	cfg, _, err := config.Parse("~/.config/gh-desk/config.toml", []byte(config.Template(app.KeysTemplate())))
 	if err != nil {
 		return err
 	}
+	set, km := app.Settings(cfg), keymap.Default()
+	set.Version = version.String()
 	w := demo.New(time.Now)
 	set.Viewer = demo.Viewer
 	set.Host = "github.com"
