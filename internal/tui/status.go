@@ -63,10 +63,6 @@ func (m *Model) statusText() string {
 		return m.st.peach.Render(text)
 	case statusline.Activity:
 		return m.activityText()
-	case statusline.Info:
-		if m.told.cells > 0 && text == m.told.text {
-			return readBar(m.st, m.told.cells, m.told.cells) + " " + m.st.muted.Render(text)
-		}
 	}
 	return m.st.muted.Render(text)
 }
@@ -147,43 +143,29 @@ func (m *Model) tabActivity() (text string, full, cells int) {
 	return text, full, cells
 }
 
-// telling is a reading of the shown tab the status line tells: of which
-// tab, whether it is r's, and the cells of its bar, zero for none.
-type telling struct {
-	tab   int
-	byR   bool
-	cells int
-}
+// telling is r's reading of the shown tab, told on the status line: of
+// which tab.
+type telling struct{ tab int }
 
-// told is the end of a reading said on the status line, with the cells of
-// its bar shown full before it.
-type told struct {
-	text  string
-	cells int
-}
-
-// endTabReading says, for a moment, that the reading the status line told
-// is over, when it was r's or had a bar: led by its bar shown full, when
-// it had one. The first reading of a small tab says nothing, as its rows
-// do; a reading that failed has said so, and one of a tab no longer shown
-// says nothing.
+// endTabReading says, for a moment, that r's reading of the shown tab is
+// over. The first reading ends without a word, as its rows say it; a
+// reading that failed has said so, and one of a tab no longer shown says
+// nothing.
 func (m *Model) endTabReading() {
-	if text, _, cells := m.tabActivity(); text != "" {
-		m.telling = &telling{tab: m.cur, byR: m.refreshing != nil, cells: cells}
+	if text, _, _ := m.tabActivity(); text != "" {
+		m.telling = nil
+		if m.refreshing != nil {
+			m.telling = &telling{tab: m.cur}
+		}
 		return
 	}
 	tl := m.telling
 	m.telling = nil
 	t := m.tab()
-	if tl == nil || !tl.byR && tl.cells == 0 || tl.tab != m.cur || !m.tabDone(t) || t.err != nil || !t.asOf.IsZero() {
+	if tl == nil || tl.tab != m.cur || !m.tabDone(t) || t.err != nil || !t.asOf.IsZero() {
 		return
 	}
-	text := "read " + t.name
-	if tl.byR {
-		text = "refreshed"
-	}
-	m.told = told{text: text, cells: tl.cells}
-	m.say(text)
+	m.say("refreshed")
 }
 
 // readBarMax is the most cells a bar of how far a reading is takes.

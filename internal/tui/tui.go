@@ -247,10 +247,9 @@ type Model struct {
 	refreshed map[int]time.Time
 	// refreshing is the reading r started, while it lasts.
 	refreshing *refreshRun
-	// telling is the reading of the shown tab the status line tells,
-	// while it lasts, and told the end of one said there.
+	// telling is r's reading of the shown tab, while it lasts, so that
+	// its end is said.
 	telling *telling
-	told    told
 	compose *compose
 	confirm *confirm
 	// chats are the conversations with Claude, by pull request; chatState

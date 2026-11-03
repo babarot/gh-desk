@@ -164,22 +164,18 @@ func TestTabReadingBar(t *testing.T) {
 	}
 }
 
-// The end of a reading the status line told is said there for a moment,
-// led by its bar shown full when it had one.
+// The end of r's reading is said for a moment; the first reading and the
+// clock's say nothing.
 func TestTabReadingEnd(t *testing.T) {
 	m, _ := startWith(t, fixture(), keymap.Default())
+	if got := status(m); got != "" {
+		t.Errorf("status after the first reading = %q", got)
+	}
 	_, cmd := m.Update(keyMsg("r"))
 	run(m, cmd)
 	if got := status(m); got != "refreshed" {
 		t.Errorf("status after r = %q", got)
 	}
-	// A reading of a large tab, told with a bar, ends.
-	m.telling = &telling{tab: m.cur, cells: readBarMax}
-	m.endTabReading()
-	if got := status(m); got != "▰▰▰▰▰▰▰▰▰▰▰▰ read review" {
-		t.Errorf("status after the first reading = %q", got)
-	}
-	// The clock's reading says nothing.
 	clockAt(m, statusline.InfoFor)
 	run(m, m.autoRefresh())
 	if got := status(m); got != "" {
