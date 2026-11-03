@@ -218,6 +218,27 @@ func TestWaitForChecksThenMerge(t *testing.T) {
 	}
 }
 
+// The viewer's own pull request blocked by a required review is merged as
+// an admin once its checks pass, without an approval.
+func TestOwnBlockedMergesAsAdmin(t *testing.T) {
+	mi, it := pr("1", "api", 1, "me")
+	mi.MergeState, mi.AdminMerge = model.MergeBlocked, true
+	mi.Checks = []model.Check{{Name: "build", State: model.CheckPending, Required: true}}
+	f := newFake(mi)
+	f.onRead = func(_ string, mi *model.MergeInfo, n int) {
+		if n > 3 {
+			mi.Checks[0].State = model.CheckSuccess
+		}
+	}
+	evs := runBatch(t, f, Merge, it)
+	if e := last(evs[it.PR.Key]); e.Result != Merged || e.Approved {
+		t.Errorf("last event = %+v", e)
+	}
+	if want := "merge acme/api#1 h-1 MERGE"; strings.Join(f.calls, ",") != want {
+		t.Errorf("calls = %v", f.calls)
+	}
+}
+
 func TestHeadChangedStops(t *testing.T) {
 	mi, it := pr("1", "api", 1, "alice")
 	mi.HeadOID = "pushed-later"

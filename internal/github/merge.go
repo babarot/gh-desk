@@ -15,7 +15,7 @@ import (
 
 const infoFields = `
   id number state isDraft headRefOid baseRefOid mergeStateStatus reviewDecision
-  autoMergeRequest { enabledAt }
+  viewerCanMergeAsAdmin autoMergeRequest { enabledAt }
   repository { nameWithOwner mergeCommitAllowed squashMergeAllowed rebaseMergeAllowed autoMergeAllowed }
   latestReviews(first: 20) { nodes { author { login } state } }
   commits(last: 1) { nodes { commit { statusCheckRollup { state } } } }`
@@ -31,7 +31,8 @@ type commitsNode struct {
 type rollupNode struct {
 	State    string
 	Contexts *struct {
-		Nodes []struct {
+		PageInfo struct{ HasNextPage bool }
+		Nodes    []struct {
 			Typename   string `json:"__typename"`
 			Name       string
 			Status     string
@@ -52,8 +53,11 @@ type infoNode struct {
 	BaseRefOid       string
 	MergeStateStatus string
 	ReviewDecision   string
-	AutoMergeRequest *struct{ EnabledAt time.Time }
-	Repository       struct {
+	// ViewerCanMergeAsAdmin is whether the viewer can merge past the base
+	// branch's rules.
+	ViewerCanMergeAsAdmin bool
+	AutoMergeRequest      *struct{ EnabledAt time.Time }
+	Repository            struct {
 		NameWithOwner      string
 		MergeCommitAllowed bool
 		SquashMergeAllowed bool
@@ -76,7 +80,8 @@ func (n infoNode) toModel() model.MergeInfo {
 		Key: model.PRKey{Owner: owner, Repo: repo, Number: n.Number}, ID: n.ID, State: model.PRState(n.State),
 		Draft: n.IsDraft, HeadOID: n.HeadRefOid, BaseOID: n.BaseRefOid, MergeState: model.MergeState(n.MergeStateStatus),
 		Decision: model.ReviewDecision(n.ReviewDecision), AutoMerge: n.AutoMergeRequest != nil,
-		Repo: model.RepoMerge{AutoMerge: n.Repository.AutoMergeAllowed},
+		AdminMerge: n.ViewerCanMergeAsAdmin,
+		Repo:       model.RepoMerge{AutoMerge: n.Repository.AutoMergeAllowed},
 	}
 	if n.Repository.MergeCommitAllowed {
 		mi.Repo.Methods = append(mi.Repo.Methods, model.MethodMerge)
@@ -97,6 +102,7 @@ func (n infoNode) toModel() model.MergeInfo {
 			mi.Rollup = model.CheckState(rollup.State)
 			if rollup.Contexts != nil {
 				mi.Checks = []model.Check{}
+				mi.ChecksPartial = rollup.Contexts.PageInfo.HasNextPage
 				for _, c := range rollup.Contexts.Nodes {
 					switch c.Typename {
 					case "CheckRun":
@@ -140,7 +146,7 @@ func (c *Client) MergeInfo(ctx context.Context, ids []string, details bool) (map
 		if details {
 			// isRequired needs the pull request, so each one is asked for
 			// with its own ID.
-			fmt.Fprintf(&b, `  commits2: commits(last: 1) { nodes { commit { statusCheckRollup { state contexts(first: 100) { nodes {
+			fmt.Fprintf(&b, `  commits2: commits(last: 1) { nodes { commit { statusCheckRollup { state contexts(first: 100) { pageInfo { hasNextPage } nodes {
     __typename
     ... on CheckRun { name status conclusion isRequired(pullRequestId: %q) }
     ... on StatusContext { context state isRequired(pullRequestId: %q) }

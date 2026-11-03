@@ -85,6 +85,63 @@ func TestForMerge(t *testing.T) {
 	}
 }
 
+// The viewer's own blocked pull request is merged as an admin when GitHub
+// says the viewer can, once its required checks have finished; another
+// person's, or one the viewer cannot merge as an admin, waits as before.
+func TestForMergeAsAdmin(t *testing.T) {
+	blocked := func(admin bool, checks ...model.Check) model.MergeInfo {
+		mi := info(model.MergeBlocked)
+		mi.AdminMerge, mi.Repo.AutoMerge, mi.Checks = admin, true, append([]model.Check{}, checks...)
+		return mi
+	}
+	running := model.Check{Name: "build", State: model.CheckPending, Required: true}
+	passed := model.Check{Name: "build", State: model.CheckSuccess, Required: true}
+	approval := model.Check{Name: "policy-bot: main", State: model.CheckPending, Required: true}
+	unread := blocked(true)
+	unread.Checks = nil
+	partial := blocked(true, passed)
+	partial.ChecksPartial = true
+	tests := []struct {
+		name  string
+		mi    model.MergeInfo
+		pr    model.PR
+		step  Step
+		admin bool
+		note  bool
+	}{
+		{"own, checks passed", blocked(true, passed), model.PR{Author: "me"}, StepMerge, true, true},
+		{"own, no checks", blocked(true), model.PR{Author: "me"}, StepMerge, true, true},
+		{"own, only an approval check left", blocked(true, passed, approval), model.PR{Author: "me"}, StepMerge, true, true},
+		{"own, checks running", blocked(true, running), model.PR{Author: "me"}, StepWait, false, true},
+		{"own, checks not read", unread, model.PR{Author: "me"}, StepWait, false, true},
+		{"own, checks not all read", partial, model.PR{Author: "me"}, StepAutoMerge, false, false},
+		{"own, not an admin", blocked(false, passed), model.PR{Author: "me"}, StepAutoMerge, false, false},
+		{"another person's", blocked(true, passed), model.PR{Author: "alice"}, StepAutoMerge, false, false},
+		{"a bot's", blocked(true, passed), model.PR{Author: "renovate", AuthorIsBot: true}, StepAutoMerge, false, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			d := ForMerge(tt.mi, tt.pr, "me", set)
+			if d.Step != tt.step || d.Admin != tt.admin {
+				t.Errorf("ForMerge = %+v; want step %s admin %v", d, tt.step, tt.admin)
+			}
+			said := len(d.Notes) > 0 && strings.Contains(d.Notes[0], "as an admin")
+			if said != tt.note {
+				t.Errorf("notes %q; want the admin merge said first: %v", d.Notes, tt.note)
+			}
+		})
+	}
+	failing := blocked(true, model.Check{Name: "build", State: model.CheckFailure, Required: true})
+	if d := ForMerge(failing, model.PR{Author: "me"}, "me", set); d.Step != StepSkip || d.Admin {
+		t.Errorf("failing: %+v", d)
+	}
+	draft := blocked(true, passed)
+	draft.Draft, draft.MergeState = true, model.MergeDraft
+	if d := ForMerge(draft, model.PR{Author: "me"}, "me", set); !d.Ready || d.Step != StepWait || d.Admin || !strings.Contains(d.Notes[0], "as an admin") {
+		t.Errorf("own draft: %+v", d)
+	}
+}
+
 // A draft of the viewer's or of a bot is marked ready first, then waits for
 // the checks that starts; the approval is the viewer's to send only on a
 // bot's.

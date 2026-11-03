@@ -222,11 +222,16 @@ type MergeInfo struct {
 	Decision   ReviewDecision
 	// AutoMerge is whether auto-merge is on.
 	AutoMerge bool
-	Rollup    CheckState
+	// AdminMerge is whether the viewer can merge it as an admin, past the
+	// rules of its base branch.
+	AdminMerge bool
+	Rollup     CheckState
 	// Checks and Files are read only when asked for; nil otherwise.
 	Checks []Check
-	Files  []string
-	Repo   RepoMerge
+	// ChecksPartial is whether more checks were reported than were read.
+	ChecksPartial bool
+	Files         []string
+	Repo          RepoMerge
 	// Reviews are the latest review of each reviewer.
 	Reviews []Review
 }

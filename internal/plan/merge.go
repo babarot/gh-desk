@@ -54,6 +54,9 @@ type Decision struct {
 	Method  model.MergeMethod
 	// Reason says why it is skipped, or how it will be merged.
 	Reason string
+	// Admin is whether it is merged as an admin, past the rules of its base
+	// branch.
+	Admin bool
 	// Notes are what the user should know before saying yes.
 	Notes []string
 }
@@ -217,7 +220,7 @@ func ForReady(mi model.MergeInfo) Decision {
 func ForMerge(mi model.MergeInfo, pr model.PR, viewer string, set Settings) Decision {
 	d := Decision{Notes: notes(mi, set)}
 	skip := func(why string) Decision {
-		d.Step, d.Reason, d.Ready, d.Approve, d.Method = StepSkip, why, false, false, ""
+		d.Step, d.Reason, d.Ready, d.Approve, d.Method, d.Admin = StepSkip, why, false, false, "", false
 		return d
 	}
 	if mi.State != model.StateOpen {
@@ -243,6 +246,13 @@ func ForMerge(mi model.MergeInfo, pr model.PR, viewer string, set Settings) Deci
 		// ready starts its checks, so it waits for them; the runner
 		// decides again once it is ready.
 		d.Notes = append(d.Notes, "marking it ready asks for its reviews; it stays ready if the merge stops")
+		if asAdmin(mi, pr, viewer) {
+			// Auto-merge would wait for the review an admin merge goes
+			// past; waiting here decides again once it is ready.
+			d.Step, d.Reason = StepWait, "wait for checks, then merge, as admin if blocked"
+			d.Notes = append([]string{adminNote}, d.Notes...)
+			return d
+		}
 		return blocked(d, mi, set)
 	}
 	switch mi.MergeState {
@@ -263,6 +273,9 @@ func ForMerge(mi model.MergeInfo, pr model.PR, viewer string, set Settings) Deci
 		}
 		d.Step, d.Reason = StepUpdate, "update the branch, then merge"
 	case model.MergeBlocked:
+		if asAdmin(mi, pr, viewer) {
+			return adminMerge(d, mi, set)
+		}
 		return blocked(d, mi, set)
 	default:
 		return skip("cannot be merged: " + string(mi.MergeState))
@@ -281,6 +294,37 @@ func blocked(d Decision, mi model.MergeInfo, set Settings) Decision {
 	}
 	return d
 }
+
+// asAdmin reports whether a blocked pull request is merged as an admin:
+// it is the viewer's own, which nobody else may be there to approve, and
+// GitHub says the viewer can merge past the base branch's rules. Another
+// person's pull request waits for its reviews as before.
+func asAdmin(mi model.MergeInfo, pr model.PR, viewer string) bool {
+	return pr.Author == viewer && mi.AdminMerge
+}
+
+// adminMerge is the step of the viewer's own blocked pull request that the
+// viewer can merge as an admin: merge it once its required checks have
+// finished, wait for them before. An admin merge goes past required checks
+// too, so it never goes before they are known to have passed.
+//
+// Checks not all read leave it to wait as before: one not read may be
+// failing.
+func adminMerge(d Decision, mi model.MergeInfo, set Settings) Decision {
+	if mi.ChecksPartial {
+		return blocked(d, mi, set)
+	}
+	// The note goes first: the popup shows the first note of a row.
+	d.Notes = append([]string{adminNote}, d.Notes...)
+	if mi.Checks == nil || ChecksRunning(mi, set.ApprovalChecks) {
+		d.Step, d.Reason = StepWait, "wait for checks, then merge as admin"
+		return d
+	}
+	d.Step, d.Reason, d.Admin = StepMerge, "merge as admin", true
+	return d
+}
+
+const adminNote = "merges as an admin, past the rules of the base branch"
 
 func stateWord(s model.PRState) string {
 	switch s {
