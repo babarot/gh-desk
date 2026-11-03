@@ -206,17 +206,17 @@ func TestClickOnALinkWaitsForASecond(t *testing.T) {
 		mouseAt(m, tea.MouseClickMsg{X: x, Y: y, Button: tea.MouseLeft})
 	}
 
-	// One click shows "open" over the link and opens nothing.
+	// One click shows "open?" over the link and opens nothing.
 	click(x+1, y)
 	if len(f.browsed) != 0 {
 		t.Fatalf("one click opened %q", f.browsed)
 	}
-	if l := strings.Split(screen(m), "\n")[y]; !strings.Contains(l, "open ") || strings.Contains(l, "alice") {
+	if l := strings.Split(screen(m), "\n")[y]; !strings.Contains(l, "open?") || strings.Contains(l, "alice") {
 		t.Fatalf("the link does not wait for a second click:\n%s", l)
 	}
 	// It keeps the background of the row it is on, the cursor's here.
 	raw, _ := m.render()
-	if want := m.st.peach.Bold(true).Background(m.st.sel.GetBackground()).Underline(true).Render("open"); !strings.Contains(strings.Split(raw, "\n")[y], want) {
+	if want := m.st.peach.Bold(true).Background(m.st.sel.GetBackground()).Underline(true).Render("open?"); !strings.Contains(strings.Split(raw, "\n")[y], want) {
 		t.Fatalf("%q is not drawn on the row's background:\n%q", "open", strings.Split(raw, "\n")[y])
 	}
 

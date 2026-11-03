@@ -248,7 +248,7 @@ func (m *Model) disarm() {
 	}
 }
 
-// drawArmed draws "open" over the link waiting for its second click, while
+// drawArmed draws "open?" over the link waiting for its second click, while
 // the same link is still where it was clicked.
 func (m *Model) drawArmed(lines []string) []string {
 	a := m.armed
@@ -270,7 +270,7 @@ func (m *Model) drawArmed(lines []string) []string {
 		}
 	}
 	// Only the word is underlined, not the rest of the link's cells.
-	label := ansi.Truncate("open", a.w, "…")
+	label := ansi.Truncate("open?", a.w, "…")
 	lines[a.y] = place(lines[a.y], style.Underline(true).Render(label)+style.Render(spaces(a.w-lipgloss.Width(label))), a.x)
 	return lines
 }
