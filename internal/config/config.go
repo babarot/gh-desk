@@ -243,10 +243,10 @@ type Claude struct {
 	ReleaseNotesCheck bool `toml:"release_notes_check"`
 	// MCPServers are the MCP servers of the conversation about a pull
 	// request, by name, as Claude Code configures a server, with Tools
-	// (`tools`) added (ADR-033).
+	// (`tools`) added (ADR-037).
 	MCPServers map[string]map[string]any `toml:"mcp_servers"`
 	// Plugins are the directories of plugins whose skills the
-	// conversation takes (ADR-033); ~ is the home directory.
+	// conversation takes (ADR-037); ~ is the home directory.
 	Plugins []string `toml:"plugins"`
 }
 

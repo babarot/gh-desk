@@ -9,7 +9,7 @@
 // run is restricted: no settings files are read, the file tools see only
 // the worktree and the skills given to it, and the built-in tools are the read-only ones the config
 // names. No MCP server is started and no skill is given but those the user
-// configured for the conversation (ADR-033), and no hook runs.
+// configured for the conversation (ADR-037), and no hook runs.
 package claude
 
 import (
@@ -52,7 +52,7 @@ type Options struct {
 	Instructions string
 	// MCPConfig is the file of the MCP servers of a conversation, as
 	// WriteMCPConfig wrote it, and MCPTools their tools that may run
-	// without a prompt; empty when there are none (ADR-033).
+	// without a prompt; empty when there are none (ADR-037).
 	MCPConfig string
 	MCPTools  []string
 	// PluginDir is the plugin of the skills of a conversation, as
@@ -112,7 +112,7 @@ func NewSession() string {
 // guard is what the runs that may take the user's MCP servers and skills
 // (the conversation, and Claude Code in the terminal) take whether or not
 // any are configured: no hooks, of a plugin or of a skill, none of Claude
-// Code's own skills, and no shell commands in a skill (ADR-033).
+// Code's own skills, and no shell commands in a skill (ADR-037).
 const guard = `{"disableAllHooks":true,"disableBundledSkills":true,"disableSkillShellExecution":true}`
 
 // restricted are the flags every run takes, interactive or not.

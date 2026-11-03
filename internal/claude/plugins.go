@@ -15,7 +15,7 @@ import (
 )
 
 // Skill is a skill of a plugin the user named, to be given to Claude
-// (ADR-033).
+// (ADR-037).
 type Skill struct {
 	// Plugin is which of the plugins it is in, counted from 0.
 	Plugin int

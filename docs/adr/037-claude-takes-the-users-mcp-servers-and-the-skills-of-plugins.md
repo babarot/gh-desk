@@ -1,4 +1,4 @@
-# ADR-033: Claude takes the user's MCP servers and the skills of their plugins
+# ADR-037: Claude takes the user's MCP servers and the skills of their plugins
 
 ## Status
 
