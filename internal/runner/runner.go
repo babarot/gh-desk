@@ -661,7 +661,7 @@ func (j *job) merge() {
 	}
 	switch d.Step {
 	case plan.StepMerge:
-		j.mergeNow(d.Method)
+		j.mergeDecided(d)
 	case plan.StepAutoMerge:
 		j.autoMerge(d.Method)
 	case plan.StepUpdate:
@@ -714,6 +714,15 @@ func (j *job) dismissed(d plan.Decision) bool {
 	}
 	j.say(Stopped, "your approval was dismissed · confirm again")
 	return true
+}
+
+// mergeDecided merges as decided, saying first when it goes past the base
+// branch's rules as an admin.
+func (j *job) mergeDecided(d plan.Decision) {
+	if d.Admin {
+		j.log.Info("merging as admin", "method", string(d.Method))
+	}
+	j.mergeNow(d.Method)
 }
 
 func (j *job) mergeNow(method model.MergeMethod) bool {
@@ -863,7 +872,7 @@ func (j *job) wait() {
 		}
 		switch d.Step {
 		case plan.StepMerge:
-			j.mergeNow(d.Method)
+			j.mergeDecided(d)
 			return
 		case plan.StepSkip:
 			j.say(Skipped, d.Reason)
