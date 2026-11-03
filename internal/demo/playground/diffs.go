@@ -1,4 +1,4 @@
-package demo
+package playground
 
 import (
 	"fmt"
@@ -29,7 +29,9 @@ func patch(path string, hunks ...string) string {
 		var start int
 		var section string
 		fields := strings.SplitN(strings.TrimPrefix(head, "@@ "), " ", 2)
-		fmt.Sscan(fields[0], &start)
+		if _, err := fmt.Sscan(fields[0], &start); err != nil {
+			panic("demo diff of " + path + ": a hunk starts with " + head)
+		}
 		if len(fields) == 2 {
 			section = " " + fields[1]
 		}

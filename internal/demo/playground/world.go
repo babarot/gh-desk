@@ -1,12 +1,17 @@
-// Package demo is a made-up GitHub, and a Claude that answers from a
-// script, for the demo on the site: gh-desk runs in the browser against
-// them, with nothing sent anywhere. Every repository, person and pull
-// request in it is invented.
+// Package playground is a made-up GitHub, and a Claude that answers from a
+// script, for the playground on the site: gh-desk runs in the browser
+// against them, with nothing sent anywhere. Every repository, person and
+// pull request in it is invented.
+//
+// It is apart from internal/demo, which is the world of the recordings:
+// a recording follows a script, while visitors to the site go anywhere,
+// so every pull request here has its diff and Claude's answers, and the
+// triage works (ADR-047).
 //
 // The world moves on its own a little, so that the screen has something
 // to show: checks still running finish a while after the start, and a
 // merge waiting for them goes on when they do.
-package demo
+package playground
 
 import (
 	"context"

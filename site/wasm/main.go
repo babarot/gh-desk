@@ -1,7 +1,7 @@
 //go:build js && wasm
 
 // The demo on the site: gh-desk compiled to WebAssembly, run against the
-// made-up GitHub of package demo, in a terminal the page draws with
+// made-up GitHub of internal/demo/playground, in a terminal the page draws with
 // xterm.js.
 //
 // The page calls ghDesk.start(cols, rows, write) once the wasm is loaded:
@@ -22,12 +22,12 @@ import (
 
 	"github.com/babarot/gh-desk/internal/app"
 	"github.com/babarot/gh-desk/internal/config"
+	"github.com/babarot/gh-desk/internal/demo/playground"
 	"github.com/babarot/gh-desk/internal/logging"
 	"github.com/babarot/gh-desk/internal/runner"
 	"github.com/babarot/gh-desk/internal/tui"
 	"github.com/babarot/gh-desk/internal/tui/keymap"
 	"github.com/babarot/gh-desk/internal/version"
-	"github.com/babarot/gh-desk/site/demo"
 )
 
 // input is what is typed, waiting to be read. Writes never block: they
@@ -142,13 +142,13 @@ func (t *terminal) run(out output) error {
 	}
 	set, km := app.Settings(cfg), keymap.Default()
 	set.Version = version.String()
-	w := demo.New(time.Now)
-	set.Viewer = demo.Viewer
+	w := playground.New(time.Now)
+	set.Viewer = playground.Viewer
 	set.Host = "github.com"
 	set.CanWait = true
 	log := logging.Discard()
 	// The world moves in seconds, so the runner looks often.
-	rn := runner.New(w.Runner(), log, runner.Options{Settings: set.Plan, Viewer: demo.Viewer, CanWait: true,
+	rn := runner.New(w.Runner(), log, runner.Options{Settings: set.Plan, Viewer: playground.Viewer, CanWait: true,
 		ChecksTimeout: cfg.Merge.ChecksTimeout.D, BlockedTimeout: cfg.Merge.BlockedTimeout.D,
 		PollFast: 3 * time.Second, PollSlow: 5 * time.Second, Recheck: time.Second, RecheckFor: 10 * time.Second})
 	m := tui.New(w.Source(), rn, w.Claude(), km, log, set)

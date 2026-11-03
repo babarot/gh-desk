@@ -50,11 +50,8 @@ depends = ["site:build"]
 run = "python3 -m http.server 8080 --bind 127.0.0.1 --directory site/web"
 
 [tasks."site:test"]
-description = "Run the tests of the demo's made-up GitHub, and build the demo"
+description = "Check that the site builds: gh-desk compiled to WebAssembly against internal/demo/playground"
 run = '''
-cd site
-test -z "$(gofmt -l .)" || { gofmt -l .; echo "gofmt: the files above are not formatted"; exit 1; }
-go vet ./...
-go test -race ./...
-./build.sh
+test -z "$(gofmt -l site)" || { gofmt -l site; echo "gofmt: the files above are not formatted"; exit 1; }
+site/build.sh
 '''

@@ -1,4 +1,4 @@
-package demo
+package playground
 
 import (
 	"context"
@@ -183,8 +183,9 @@ func parseRows(prompt string) []row {
 				r.mine = m[2]
 			case "size":
 				var a, d int
-				fmt.Sscanf(m[2], "+%d-%d", &a, &d)
-				r.size = a + d
+				if _, err := fmt.Sscanf(m[2], "+%d-%d", &a, &d); err == nil {
+					r.size = a + d
+				}
 			}
 		}
 		rows = append(rows, r)

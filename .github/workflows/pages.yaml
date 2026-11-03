@@ -1,7 +1,7 @@
 name: Pages
 
 # The site: gh-desk compiled to WebAssembly, running in the browser against
-# the made-up GitHub of site/demo. It is built from the code on main, so it
+# the made-up GitHub of internal/demo/playground. It is built from the code on main, so it
 # is deployed whenever that code changes.
 on:
   push:
