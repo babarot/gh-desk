@@ -186,7 +186,7 @@ func TestScenariosReachTheirScreen(t *testing.T) {
 		"rules":  {"rule: dependency bots + recent · 5 PRs", "#486 fix(deps): update module golang.org/x/net to v0.33.0"},
 		"merge":  {"1 review (6)", "▸ requested from a team 2"},
 		"claude": {"acme/api#482 · review", "Nice change. Two notes:"},
-		"triage": {"you  merge the bots with passing checks", "enter apply"},
+		"triage": {"1 review (6)", "▸ requested from a team 2"},
 		"inbox":  {"acme/mobile#342", "mention"},
 		"help":   {"keys · z fold", "the list and its preview"},
 	}

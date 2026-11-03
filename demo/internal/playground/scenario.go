@@ -111,7 +111,7 @@ func Scenarios() []Scenario {
 			{Action: "choose", Hold: time.Second},
 			{Action: "merge", Hold: time.Second},
 			{Action: "confirm", Wait: 2 * time.Second, Hold: time.Second},
-			{Action: "refresh", Wait: 3 * time.Second},
+			{Action: "refresh", Wait: 5 * time.Second},
 		}},
 		// A conversation about acme/api#482: i opens it suggesting a
 		// review, which tab fills in; Claude reads the files and answers, is
@@ -125,10 +125,17 @@ func Scenarios() []Scenario {
 			{Action: "accept"},
 			{Action: "draft_review", Wait: 4 * time.Second, Hold: 2 * time.Second},
 		}},
-		{Name: "triage", Title: "A plan from Claude for what to merge", Steps: []Step{
-			{Action: "triage"},
-			{Text: "merge the bots with passing checks"},
+		// A plan from Claude for the tab, applied: the request typed, the
+		// plan read, enter applying it (a filter, the bots selected, and
+		// their merge, which opens the confirm popup saying Claude picked
+		// them), the merges confirmed, and the list read again without them.
+		{Name: "triage", Title: "A plan from Claude for what to merge, applied and merged", Steps: []Step{
+			{Action: "triage", Hold: time.Second},
+			{Text: "merge the bots with passing checks", Hold: time.Second},
 			{Action: "accept"},
+			{Action: "triage_apply", Wait: 4 * time.Second, Hold: 2 * time.Second},
+			{Action: "confirm", Wait: time.Second, Hold: 2 * time.Second},
+			{Action: "refresh", Wait: 5 * time.Second},
 		}},
 		{Name: "inbox", Title: "The pull requests in your notifications", Steps: []Step{
 			{Action: "tab_4"},

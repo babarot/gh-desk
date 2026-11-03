@@ -16,7 +16,7 @@ Claude answers in `claude.language`, and follows `claude.instructions` in every 
 
 `C` asks Claude about the tab shown, in your own words, such as "merge the bots with passing checks". Claude answers with a plan of what to filter, fold, select, and at the end approve or merge; it does not act on the screen itself. `enter` applies the plan, and an approve or a merge in it opens the confirm popup with the pull requests Claude named.
 
-[A plan from Claude](https://babarot.me/gh-desk/?scenario=triage "playground")
+[A plan from Claude, applied and merged](https://babarot.me/gh-desk/?scenario=triage "playground")
 
 Claude is given only the rows of the tab shown, so it cannot name a pull request of another tab. A pull request that has left the tab, or whose head moved since Claude saw it, is left out of the plan, and the plan says why.
 
