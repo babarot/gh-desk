@@ -36,6 +36,14 @@
     term.loadAddon(new Unicode11Addon.Unicode11Addon());
     term.unicode.activeVersion = '11';
     term.open(screen);
+    // The WebGL renderer draws the box-drawing characters itself, filling
+    // the cell, so the borders join across the line height. The DOM
+    // renderer, left when WebGL is missing, draws them from the font.
+    try {
+      const gl = new WebglAddon.WebglAddon();
+      gl.onContextLoss(() => gl.dispose());
+      term.loadAddon(gl);
+    } catch (e) {}
     size();
   }
 
