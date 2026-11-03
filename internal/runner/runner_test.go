@@ -876,3 +876,58 @@ func TestReadyOnly(t *testing.T) {
 		t.Errorf("calls = %v", f.calls)
 	}
 }
+
+// A draft goes to its merge marked ready first, then approved when it is
+// not the viewer's.
+func TestMergeDraftReadiesFirst(t *testing.T) {
+	mine, it := pr("1", "api", 1, "me")
+	bots, it2 := pr("2", "web", 2, "renovate")
+	it2.PR.AuthorIsBot = true
+	for _, mi := range []*model.MergeInfo{&mine, &bots} {
+		mi.Draft, mi.MergeState = true, model.MergeDraft
+	}
+	f := newFake(mine, bots)
+	f.onRead = func(_ string, mi *model.MergeInfo, _ int) {
+		if !mi.Draft && mi.MergeState == model.MergeDraft {
+			mi.MergeState = model.MergeClean
+		}
+	}
+	evs := runBatch(t, f, Merge, it, it2)
+	if e := last(evs[it.PR.Key]); e.Result != Merged || !e.Readied || e.Approved {
+		t.Errorf("own: last event = %+v", e)
+	}
+	if e := last(evs[it2.PR.Key]); e.Result != Merged || !e.Readied || !e.Approved {
+		t.Errorf("bot's: last event = %+v", e)
+	}
+	want := "ready acme/api#1 h-1,merge acme/api#1 h-1 MERGE,ready acme/web#2 h-2,review acme/web#2 APPROVE h-2,merge acme/web#2 h-2 MERGE"
+	if got := strings.Join(f.calls, ","); got != want {
+		t.Errorf("calls = %v", got)
+	}
+}
+
+// A draft gh-desk marked ready and found a draft again was turned back by
+// someone: it is not marked ready again.
+func TestRedraftedStops(t *testing.T) {
+	mi, it := pr("1", "api", 1, "me")
+	mi.Draft, mi.MergeState = true, model.MergeDraft
+	f := newFake(mi)
+	f.onRead = func(_ string, mi *model.MergeInfo, _ int) {
+		// Turned back at once, as if by the author.
+		mi.Draft = true
+	}
+	_, ch := newRunner(f, newStore()).Start(context.Background(), Merge, []Item{it})
+	es := drain(t, ch)
+	if e := last(es); e.Result != Stopped || !strings.Contains(e.Text, "draft again") {
+		t.Errorf("last %+v", e)
+	}
+	if want := "ready acme/api#1 h-1"; strings.Join(f.calls, ",") != want {
+		t.Errorf("calls = %v", f.calls)
+	}
+
+	p := model.Pending{Key: mi.Key, ID: "1", Head: "h-1", Author: "me", Readied: true}
+	f.calls = nil
+	_, ch = newRunner(f, newStore()).Resume(context.Background(), []model.Pending{p})
+	if e := last(drain(t, ch)); e.Result != Stopped || len(f.calls) != 0 {
+		t.Errorf("resumed: last %+v, calls %v", e, f.calls)
+	}
+}

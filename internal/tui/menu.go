@@ -121,7 +121,12 @@ func (m *Model) aboutOne(a keymap.Action, p model.PR) (string, bool) {
 		if d.Method != "" {
 			how += " (" + methodWord(d.Method) + ")"
 		}
-		if d.Approve {
+		switch {
+		case d.Ready && d.Approve:
+			how = "mark ready, approve, then " + how
+		case d.Ready:
+			how = "mark ready, then " + how
+		case d.Approve:
 			how = "approve, then " + how
 		}
 		return how, false

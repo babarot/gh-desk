@@ -1,6 +1,7 @@
 package plan
 
 import (
+	"slices"
 	"strings"
 	"testing"
 
@@ -42,7 +43,7 @@ func TestForMerge(t *testing.T) {
 			return mi
 		}, human, StepMerge, false, "merge now", model.MethodMerge},
 		{"dirty", func() model.MergeInfo { return info(model.MergeDirty) }, human, StepSkip, false, "conflicts", ""},
-		{"draft", func() model.MergeInfo { mi := info(model.MergeClean); mi.Draft = true; return mi }, human, StepSkip, false, "draft", ""},
+		{"someone else's draft", func() model.MergeInfo { mi := info(model.MergeDraft); mi.Draft = true; return mi }, human, StepSkip, false, "someone else's draft", ""},
 		{"merged", func() model.MergeInfo { mi := info(model.MergeClean); mi.State = model.StateMerged; return mi }, human, StepSkip, false, "merged", ""},
 		{"unknown rechecks", func() model.MergeInfo { return info(model.MergeUnknown) }, human, StepRecheck, true, "", model.MethodMerge},
 		{"behind human updates", func() model.MergeInfo { return info(model.MergeBehind) }, human, StepUpdate, true, "", model.MethodMerge},
@@ -81,6 +82,44 @@ func TestForMerge(t *testing.T) {
 				t.Errorf("ForMerge = %+v; want step %s approve %v method %s reason %q", d, tt.step, tt.approve, tt.method, tt.reason)
 			}
 		})
+	}
+}
+
+// A draft of the viewer's or of a bot is marked ready first, then waits for
+// the checks that starts; the approval is the viewer's to send only on a
+// bot's.
+func TestForMergeDraft(t *testing.T) {
+	draft := func(autoMerge bool) model.MergeInfo {
+		mi := info(model.MergeDraft)
+		mi.Draft, mi.Repo.AutoMerge = true, autoMerge
+		return mi
+	}
+	tests := []struct {
+		name    string
+		mi      model.MergeInfo
+		pr      model.PR
+		step    Step
+		approve bool
+	}{
+		{"own waits", draft(false), model.PR{Author: "me"}, StepWait, false},
+		{"own on auto-merge", draft(true), model.PR{Author: "me"}, StepAutoMerge, false},
+		{"bot's is approved", draft(false), model.PR{Author: "renovate", AuthorIsBot: true}, StepWait, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			d := ForMerge(tt.mi, tt.pr, "me", set)
+			if !d.Ready || d.Step != tt.step || d.Approve != tt.approve || d.Method != model.MethodMerge {
+				t.Errorf("ForMerge = %+v; want ready, step %s approve %v", d, tt.step, tt.approve)
+			}
+			if !slices.ContainsFunc(d.Notes, func(n string) bool { return strings.Contains(n, "stays ready") }) {
+				t.Errorf("notes %q do not say it stays ready", d.Notes)
+			}
+		})
+	}
+	failing := draft(false)
+	failing.Rollup = model.CheckFailure
+	if d := ForMerge(failing, model.PR{Author: "me"}, "me", set); d.Step != StepSkip || d.Ready {
+		t.Errorf("failing draft: %+v", d)
 	}
 }
 

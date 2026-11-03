@@ -374,6 +374,9 @@ func (m *Model) facts(p model.PR, d *entry[model.Detail], width int) []line {
 		if dec.Method != "" {
 			how += " (" + methodWord(dec.Method) + ")"
 		}
+		if dec.Ready {
+			how = "mark ready, then " + how
+		}
 		add("merge", words(how, m.stepStyle(dec.Step))...)
 	}
 	var reviews []fact
