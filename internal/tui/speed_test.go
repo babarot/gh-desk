@@ -13,6 +13,7 @@ import (
 	"github.com/babarot/gh-desk/internal/plan"
 	"github.com/babarot/gh-desk/internal/runner"
 	"github.com/babarot/gh-desk/internal/tui/keymap"
+	"github.com/babarot/gh-desk/internal/tui/statusline"
 )
 
 // fakeLists is a cache in memory.
@@ -160,6 +161,29 @@ func TestTabReadingBar(t *testing.T) {
 	m.refreshing = &refreshRun{tabs: []int{0}, cleared: 2}
 	if got := status(m); got != "▰▰▰▰▰▰▱▱▱▱▱▱ refreshing · 2 results cleared" {
 		t.Errorf("status of r = %q", got)
+	}
+}
+
+// The end of a reading the status line told is said there for a moment,
+// led by its bar shown full when it had one.
+func TestTabReadingEnd(t *testing.T) {
+	m, _ := startWith(t, fixture(), keymap.Default())
+	_, cmd := m.Update(keyMsg("r"))
+	run(m, cmd)
+	if got := status(m); got != "refreshed" {
+		t.Errorf("status after r = %q", got)
+	}
+	// A reading of a large tab, told with a bar, ends.
+	m.telling = &telling{tab: m.cur, cells: readBarMax}
+	m.endTabReading()
+	if got := status(m); got != "▰▰▰▰▰▰▰▰▰▰▰▰ read review" {
+		t.Errorf("status after the first reading = %q", got)
+	}
+	// The clock's reading says nothing.
+	clockAt(m, statusline.InfoFor)
+	run(m, m.autoRefresh())
+	if got := status(m); got != "" {
+		t.Errorf("status after the clock's reading = %q", got)
 	}
 }
 

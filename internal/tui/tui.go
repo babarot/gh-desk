@@ -247,8 +247,12 @@ type Model struct {
 	refreshed map[int]time.Time
 	// refreshing is the reading r started, while it lasts.
 	refreshing *refreshRun
-	compose    *compose
-	confirm    *confirm
+	// telling is the reading of the shown tab the status line tells,
+	// while it lasts, and told the end of one said there.
+	telling *telling
+	told    told
+	compose *compose
+	confirm *confirm
 	// chats are the conversations with Claude, by pull request; chatState
 	// keeps them and takes their locks. claudeOpen puts the claude pane in
 	// place of the preview.
@@ -362,10 +366,12 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		_, cmd := m.update(msg)
 		m.followCursor(before.Key, had)
+		m.endTabReading()
 		m.endRefresh()
 		return m, tea.Batch(cmd, m.spin(), m.statusTick())
 	}
 	_, cmd := m.update(msg)
+	m.endTabReading()
 	m.endRefresh()
 	return m, tea.Batch(cmd, m.spin(), m.statusTick())
 }
