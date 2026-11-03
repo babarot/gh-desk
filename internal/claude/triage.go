@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/babarot/gh-triage/internal/model"
+	"github.com/babarot/gh-desk/internal/model"
 )
 
 const triageInstructions = `You help the user triage the GitHub pull requests of the tab their screen shows. Each question comes with that tab's list as the screen shows it, inside <list>, and the user's request, inside <request>. Answer with a short reply, no more than three lines, in the language the request is written in, and a plan of actions that the screen applies when the user accepts it. The other tabs are out of reach: when the request is about them, say that the user can switch to that tab and ask there.

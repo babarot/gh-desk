@@ -1,11 +1,11 @@
-// gh-triage is a gh extension for reviewing and merging the pull requests
+// gh-desk is a gh extension for reviewing and merging the pull requests
 // that reach you, from the terminal.
 package main
 
 import (
 	"os"
 
-	"github.com/babarot/gh-triage/internal/app"
+	"github.com/babarot/gh-desk/internal/app"
 )
 
 func main() {

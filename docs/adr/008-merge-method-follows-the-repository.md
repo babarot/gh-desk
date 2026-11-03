@@ -6,7 +6,7 @@ Accepted
 
 ## Context
 
-GitHub's API needs a merge method for every merge, and repositories differ: some allow only squash, some only merge commits, some all three. Which one is right is a repository's convention, which the repository's settings already express by what they allow. A setting per repository in gh-triage would repeat that and drift from it.
+GitHub's API needs a merge method for every merge, and repositories differ: some allow only squash, some only merge commits, some all three. Which one is right is a repository's convention, which the repository's settings already express by what they allow. A setting per repository in gh-desk would repeat that and drift from it.
 
 ## Decision
 

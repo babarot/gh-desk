@@ -10,10 +10,10 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 
-	"github.com/babarot/gh-triage/internal/model"
-	"github.com/babarot/gh-triage/internal/plan"
-	"github.com/babarot/gh-triage/internal/runner"
-	"github.com/babarot/gh-triage/internal/tui/keymap"
+	"github.com/babarot/gh-desk/internal/model"
+	"github.com/babarot/gh-desk/internal/plan"
+	"github.com/babarot/gh-desk/internal/runner"
+	"github.com/babarot/gh-desk/internal/tui/keymap"
 )
 
 // selection is who selected a pull request: the user, or Claude in a plan

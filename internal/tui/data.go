@@ -9,9 +9,9 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/babarot/gh-triage/internal/diff"
-	"github.com/babarot/gh-triage/internal/model"
-	"github.com/babarot/gh-triage/internal/plan"
+	"github.com/babarot/gh-desk/internal/diff"
+	"github.com/babarot/gh-desk/internal/model"
+	"github.com/babarot/gh-desk/internal/plan"
 )
 
 // tab is one tab: a section of pull requests, or the inbox.

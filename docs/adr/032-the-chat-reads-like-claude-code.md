@@ -8,7 +8,7 @@ Accepted
 
 The chat with Claude about a pull request marked each turn with a short colored word, "you" or "claude", and listed every tool Claude used, with its full path, above the answer. A long conversation was hard to scan: the turns ran into each other, the tools pushed the answer off the screen, and a question showed only its first line.
 
-The users of gh-triage use Claude Code, and `O` opens the same conversation there. Claude Code already has a way of drawing a conversation that they read every day.
+The users of gh-desk use Claude Code, and `O` opens the same conversation there. Claude Code already has a way of drawing a conversation that they read every day.
 
 ## Decision
 

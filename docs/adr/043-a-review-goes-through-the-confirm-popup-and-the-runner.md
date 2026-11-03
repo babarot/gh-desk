@@ -10,7 +10,7 @@ A review reached GitHub by three ways. Approve (A) went through the confirm popu
 
 ## Decision
 
-- Every review gh-triage sends goes through the confirm popup and the runner, as approve and merge do (ADR-006). Writing it and sending it are two steps: the text is written first, then the popup reads each pull request again and lists what will be sent and why the rest is skipped.
+- Every review gh-desk sends goes through the confirm popup and the runner, as approve and merge do (ADR-006). Writing it and sending it are two steps: the text is written first, then the popup reads each pull request again and lists what will be sent and why the rest is skipped.
 - R writes a review of the selection or of the pull request under the cursor, of any kind. A is R with approve and no body: it opens the popup at once.
 - `internal/plan` decides whether each pull request takes the review, by its kind; the runner decides again before it writes, and stops one whose head moved.
 - A review is not recorded for the next launch. ADR-009 says this of approve batches, since an approval is a single write that ends at once; this extends it to every review, and adds that the record would hold its body on disk. One cut off by quitting is told as not known to have reached GitHub.

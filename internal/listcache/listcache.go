@@ -1,10 +1,10 @@
-// Package listcache keeps the lists gh-triage last read in a file, so the
+// Package listcache keeps the lists gh-desk last read in a file, so the
 // next launch shows them at once while it reads them again.
 //
 // The file belongs to one account on one host: one written for another is
 // not used, and is replaced whole on the next write. Each list is kept by
 // its search, so a tab whose search changed starts empty, and a write
-// replaces only the lists it names, leaving those of a gh-triage started
+// replaces only the lists it names, leaving those of a gh-desk started
 // with another config.
 package listcache
 
@@ -17,7 +17,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/babarot/gh-triage/internal/model"
+	"github.com/babarot/gh-desk/internal/model"
 )
 
 // version is the file's format; a file of another one is not used.
@@ -129,7 +129,7 @@ func (c *Cache) PutInbox(in Inbox) error {
 }
 
 // update reads the file again, changes it and writes it through a
-// temporary file of its own, so two gh-triage writing at once never rename
+// temporary file of its own, so two gh-desk writing at once never rename
 // each other's half-written file. One of another account is replaced, not
 // changed, so no list of that account is left on disk.
 func (c *Cache) update(change func(*file)) error {

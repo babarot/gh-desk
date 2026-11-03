@@ -6,7 +6,7 @@ import (
 
 	"github.com/charmbracelet/x/ansi"
 
-	"github.com/babarot/gh-triage/internal/runner"
+	"github.com/babarot/gh-desk/internal/runner"
 )
 
 // columnsLine is the line of the list's column titles.

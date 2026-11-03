@@ -8,10 +8,10 @@ import (
 	"time"
 )
 
-// Runs keeps a directory for each running gh-triage, for files that live
+// Runs keeps a directory for each running gh-desk, for files that live
 // only as long as it does (what is given to Claude Code). Each holds a lock
-// while its gh-triage runs, so one whose lock is free was left by a
-// gh-triage that did not exit cleanly.
+// while its gh-desk runs, so one whose lock is free was left by a
+// gh-desk that did not exit cleanly.
 type Runs struct {
 	Dir string
 }
@@ -19,7 +19,7 @@ type Runs struct {
 const (
 	runPrefix = "run-"
 	runLock   = ".lock"
-	// youngRun is how new a directory Sweep leaves alone, as its gh-triage
+	// youngRun is how new a directory Sweep leaves alone, as its gh-desk
 	// may not have taken its lock yet.
 	youngRun = time.Minute
 )

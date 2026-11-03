@@ -9,8 +9,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/babarot/gh-triage/internal/logging"
-	"github.com/babarot/gh-triage/internal/model"
+	"github.com/babarot/gh-desk/internal/logging"
+	"github.com/babarot/gh-desk/internal/model"
 )
 
 const stream = `{"type":"system","subtype":"init"}
@@ -58,7 +58,7 @@ func fakeClaude(t *testing.T) (bin, dir string) {
 printf '%s\0' "$@" > "` + dir + `/args"
 cat > "` + dir + `/stdin"
 pwd > "` + dir + `/pwd"
-env | grep -E "^GH_TRIAGE_(OWNER|REPO|NUMBER|URL)=" > "` + dir + `/env"
+env | grep -E "^GH_DESK_(OWNER|REPO|NUMBER|URL)=" > "` + dir + `/env"
 echo '{"type":"result","is_error":false,"result":"ok","total_cost_usd":0.1}'
 `
 	if err := os.WriteFile(bin, []byte(script), 0o755); err != nil {

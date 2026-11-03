@@ -7,13 +7,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/babarot/gh-triage/internal/model"
+	"github.com/babarot/gh-desk/internal/model"
 )
 
 func TestChats(t *testing.T) {
 	dir := t.TempDir()
 	c := OpenChats(dir, "github.com")
-	k := model.PRKey{Owner: "babarot", Repo: "gh-triage", Number: 3}
+	k := model.PRKey{Owner: "babarot", Repo: "gh-desk", Number: 3}
 	if _, ok, err := c.Load(k); ok || err != nil {
 		t.Fatalf("Load before any = %v, %v", ok, err)
 	}
@@ -27,7 +27,7 @@ func TestChats(t *testing.T) {
 	if !ok || err != nil || got.Session != "s1" || got.Rev != 1 || len(got.Turns) != 2 || got.Turns[1].Steps[0].Arg != "main.go" {
 		t.Fatalf("Load = %+v, %v, %v", got, ok, err)
 	}
-	if fi, err := os.Stat(filepath.Join(dir, "chats", "github.com", "babarot", "gh-triage", "3.json")); err != nil || fi.Mode().Perm() != 0o600 {
+	if fi, err := os.Stat(filepath.Join(dir, "chats", "github.com", "babarot", "gh-desk", "3.json")); err != nil || fi.Mode().Perm() != 0o600 {
 		t.Errorf("file %v, %v; want mode 0600", fi, err)
 	}
 	keys, err := c.Keys()
@@ -49,7 +49,7 @@ func TestChats(t *testing.T) {
 func TestChatOfAnotherFormatIsNotRead(t *testing.T) {
 	dir := t.TempDir()
 	c := OpenChats(dir, "")
-	k := model.PRKey{Owner: "babarot", Repo: "gh-triage", Number: 3}
+	k := model.PRKey{Owner: "babarot", Repo: "gh-desk", Number: 3}
 	p := c.path(k)
 	if err := os.MkdirAll(filepath.Dir(p), 0o700); err != nil {
 		t.Fatal(err)
@@ -64,7 +64,7 @@ func TestChatOfAnotherFormatIsNotRead(t *testing.T) {
 
 func TestChatLock(t *testing.T) {
 	c := OpenChats(t.TempDir(), "github.com")
-	k := model.PRKey{Owner: "babarot", Repo: "gh-triage", Number: 3}
+	k := model.PRKey{Owner: "babarot", Repo: "gh-desk", Number: 3}
 	unlock, held, _, err := c.Lock(k)
 	if !held || err != nil {
 		t.Fatalf("Lock = %v, %v", held, err)

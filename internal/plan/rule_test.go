@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/babarot/gh-triage/internal/model"
+	"github.com/babarot/gh-desk/internal/model"
 )
 
 func TestRuleMatch(t *testing.T) {

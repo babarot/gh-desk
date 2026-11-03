@@ -19,9 +19,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/babarot/gh-triage/internal/logging"
-	"github.com/babarot/gh-triage/internal/model"
-	"github.com/babarot/gh-triage/internal/plan"
+	"github.com/babarot/gh-desk/internal/logging"
+	"github.com/babarot/gh-desk/internal/model"
+	"github.com/babarot/gh-desk/internal/plan"
 )
 
 // GitHub is what the runner needs from GitHub.
@@ -35,7 +35,7 @@ type GitHub interface {
 	CommitInfo(ctx context.Context, key model.PRKey, oid string) (Commit, error)
 }
 
-// Commit is what tells a commit gh-triage made by updating a branch from
+// Commit is what tells a commit gh-desk made by updating a branch from
 // one someone pushed.
 type Commit struct {
 	Parents []string
@@ -60,7 +60,7 @@ type Store interface {
 type Options struct {
 	Store Store
 	// CanWait allows merges that wait (for checks, a branch update,
-	// auto-merge). It is set when this gh-triage holds the record of
+	// auto-merge). It is set when this gh-desk holds the record of
 	// pending merges; without it nothing would go on with them after
 	// quitting, so they are skipped.
 	CanWait  bool
@@ -74,7 +74,7 @@ type Options struct {
 	BlockedTimeout time.Duration
 	// WatchTimeout is how long a pull request put on auto-merge is
 	// followed, 24h unless set: the merge is GitHub's, so this decides
-	// only how long gh-triage watches for the result (ADR-006).
+	// only how long gh-desk watches for the result (ADR-006).
 	WatchTimeout time.Duration
 	// PollFast is how often a waiting pull request is read in its first
 	// minute, PollSlow after it and while watching auto-merge.
@@ -164,13 +164,13 @@ type Event struct {
 	Text string
 	// Approved is set when an approval was sent.
 	Approved bool
-	// Method is how it was merged, on a Merged event gh-triage made.
+	// Method is how it was merged, on a Merged event gh-desk made.
 	Method model.MergeMethod
 	// Watch is set on events of a pull request put on auto-merge, after
 	// its batch has ended.
 	Watch bool
 	// Locked is set on a skip because the merge would wait while another
-	// gh-triage holds the record of pending merges.
+	// gh-desk holds the record of pending merges.
 	Locked bool
 }
 
@@ -193,7 +193,7 @@ type Runner struct {
 }
 
 // Adopt gives the runner the record of pending merges after it started
-// without it, once this gh-triage took the lock from one that quit.
+// without it, once this gh-desk took the lock from one that quit.
 // Merges confirmed from then on may wait; jobs already running go on
 // without it, so none waits unrecorded.
 func (r *Runner) Adopt(s Store) {
@@ -251,7 +251,7 @@ func (r *Runner) Start(ctx context.Context, kind Kind, items []Item) (string, <-
 
 // Resume goes on with the merges recorded by an earlier run. Each pull
 // request is read again first: one whose head moved, that was closed, or
-// whose approval by gh-triage was dismissed is stopped, not merged.
+// whose approval by gh-desk was dismissed is stopped, not merged.
 func (r *Runner) Resume(ctx context.Context, ps []model.Pending) (string, <-chan Event) {
 	items := make([]Item, len(ps))
 	pend := map[model.PRKey]model.Pending{}
@@ -372,7 +372,7 @@ func (j *job) say(res Result, text string) {
 		return
 	}
 	j.log.Info("pr end", logging.KeyStep, resultWord[res], "why", text)
-	// The record goes only with an end that is known: not when gh-triage
+	// The record goes only with an end that is known: not when gh-desk
 	// is quitting, not when a read or a write failed midway, and not when
 	// GitHub's auto-merge is left to watch.
 	if res != AutoMergeOn && !j.keep && j.ctx.Err() == nil {
@@ -381,7 +381,7 @@ func (j *job) say(res Result, text string) {
 }
 
 // locked skips a merge that would wait without the record of pending
-// merges, which another gh-triage holds.
+// merges, which another gh-desk holds.
 func (j *job) locked(text string) {
 	j.emit(Event{Key: j.it.PR.Key, Result: Skipped, Text: text, Approved: j.approved, Locked: true})
 	j.log.Info("pr end", logging.KeyStep, resultWord[Skipped], "why", text)
@@ -414,7 +414,7 @@ func (j *job) save() bool {
 }
 
 // waits reports whether a step waits after this run's first write, which
-// only a gh-triage holding the record may start.
+// only a gh-desk holding the record may start.
 func waits(s plan.Step) bool {
 	return s == plan.StepWait || s == plan.StepUpdate || s == plan.StepAutoMerge
 }
@@ -552,7 +552,7 @@ func (j *job) markReady() {
 // sendApproval approves with body, which may be empty.
 func (j *job) sendApproval(body string) bool {
 	j.say(Running, "approving")
-	// Recorded as on its way first: should gh-triage stop before the
+	// Recorded as on its way first: should gh-desk stop before the
 	// result is recorded, the next launch does not know whether the
 	// approval reached GitHub, and stops unless it finds it there.
 	j.pend.Approving = true
@@ -619,7 +619,7 @@ func (j *job) merge() {
 		d.Step = plan.StepWait
 	}
 	if waits(d.Step) && !j.canWait {
-		j.locked("locked by another gh-triage")
+		j.locked("locked by another gh-desk")
 		return
 	}
 	// The user's approval the merge starts with is recorded too, so the
@@ -647,7 +647,7 @@ func (j *job) merge() {
 			d.Step = plan.StepWait
 		}
 		if waits(d.Step) && !j.canWait {
-			j.locked("approved; locked by another gh-triage")
+			j.locked("approved; locked by another gh-desk")
 			return
 		}
 	}
@@ -815,7 +815,7 @@ func (j *job) updateBranch(base string) bool {
 // gives up when required checks run past ChecksTimeout, or when it stays
 // blocked BlockedTimeout after its required checks finished.
 func (j *job) wait() {
-	// The times waited carry on from a record, so time gh-triage was not
+	// The times waited carry on from a record, so time gh-desk was not
 	// running is not counted.
 	last := time.Now()
 	for {

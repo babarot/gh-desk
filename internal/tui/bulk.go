@@ -9,11 +9,11 @@ import (
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
 
-	"github.com/babarot/gh-triage/internal/claude"
-	"github.com/babarot/gh-triage/internal/model"
-	"github.com/babarot/gh-triage/internal/plan"
-	"github.com/babarot/gh-triage/internal/runner"
-	"github.com/babarot/gh-triage/internal/tui/keymap"
+	"github.com/babarot/gh-desk/internal/claude"
+	"github.com/babarot/gh-desk/internal/model"
+	"github.com/babarot/gh-desk/internal/plan"
+	"github.com/babarot/gh-desk/internal/runner"
+	"github.com/babarot/gh-desk/internal/tui/keymap"
 )
 
 // bulk is the confirm popup of a review, a merge or a ready for review, of
@@ -40,7 +40,7 @@ type bulk struct {
 	// by is the request Claude picked the pull requests for, empty when
 	// the user picked them.
 	by string
-	// tookOver is set when this gh-triage took the record of pending
+	// tookOver is set when this gh-desk took the record of pending
 	// merges over while the popup was open.
 	tookOver bool
 }
@@ -66,7 +66,7 @@ type bulkItem struct {
 	moved bool
 	// running is set when another batch is still working on it.
 	running bool
-	// noWait is set when the merge would wait while another gh-triage
+	// noWait is set when the merge would wait while another gh-desk
 	// holds the record of pending merges.
 	noWait bool
 }
@@ -96,13 +96,13 @@ func kindVerb(kind runner.Kind, ev model.ReviewEvent) string {
 }
 
 // lockedOut reports whether it is skipped only because the merge would
-// wait while another gh-triage holds the record of pending merges.
+// wait while another gh-desk holds the record of pending merges.
 func (it bulkItem) lockedOut() bool {
 	return it.ok && !it.moved && !it.running && it.noWait
 }
 
 // why is why it is skipped; refresh names the key that reads it again,
-// and locked the gh-triage holding the record of pending merges.
+// and locked the gh-desk holding the record of pending merges.
 func (it bulkItem) why(refresh, locked string) string {
 	switch {
 	case !it.ok:
@@ -139,7 +139,7 @@ func (m *Model) startBulk(kind runner.Kind) tea.Cmd {
 		return nil
 	}
 	if kind == runner.Merge {
-		// The gh-triage holding the record may have quit since.
+		// The gh-desk holding the record may have quit since.
 		return tea.Batch(m.takeLock(), m.startBulkOf(kind, runner.ReviewText{}))
 	}
 	return m.startBulkOf(kind, runner.ReviewText{})
@@ -474,7 +474,7 @@ func (m *Model) renderBulk() []string {
 	inner := w - 4
 	var lines []string
 	if b.tookOver {
-		lines = append(lines, wrapped(st.teal, "↻ The other gh-triage quit; this one runs the merges that wait now.", inner)...)
+		lines = append(lines, wrapped(st.teal, "↻ The other gh-desk quit; this one runs the merges that wait now.", inner)...)
 		lines = append(lines, "")
 	}
 	if b.by != "" {

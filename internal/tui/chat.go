@@ -14,11 +14,11 @@ import (
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
 
-	"github.com/babarot/gh-triage/internal/claude"
-	"github.com/babarot/gh-triage/internal/logging"
-	"github.com/babarot/gh-triage/internal/model"
-	"github.com/babarot/gh-triage/internal/tui/chat"
-	"github.com/babarot/gh-triage/internal/tui/keymap"
+	"github.com/babarot/gh-desk/internal/claude"
+	"github.com/babarot/gh-desk/internal/logging"
+	"github.com/babarot/gh-desk/internal/model"
+	"github.com/babarot/gh-desk/internal/tui/chat"
+	"github.com/babarot/gh-desk/internal/tui/keymap"
 )
 
 // Claude asks Claude Code about pull requests. The app package passes the
@@ -105,7 +105,7 @@ func listenChat(ch <-chan tea.Msg) tea.Cmd {
 }
 
 // openChat shows the claude pane in place of the preview, on the
-// conversation about p: the one in this gh-triage, or the one kept, or a
+// conversation about p: the one in this gh-desk, or the one kept, or a
 // new one with nothing asked, whose worktree is made meanwhile.
 func (m *Model) openChat(p model.PR) tea.Cmd {
 	if m.claude == nil {
@@ -202,12 +202,12 @@ func (m *Model) chatReady(msg chatReadyMsg) tea.Cmd {
 
 // syncChat brings c, about p, up to date as it is shown: with the pull
 // request as the list has it now, whose head may have moved, and with
-// what another gh-triage left of it.
+// what another gh-desk left of it.
 func (m *Model) syncChat(c *chatScreen, p model.PR) {
 	c.SetPR(p)
 	c.unseen = false
 	// Probed before reading: a lock found free means what is read is
-	// what the other gh-triage left.
+	// what the other gh-desk left.
 	m.chatState.Probe(c.Conversation)
 	m.chatState.Sync(c.Conversation)
 }
@@ -240,7 +240,7 @@ func (m *Model) showsChat(k model.PRKey) bool { return m.claudeShown() && m.chat
 func (m *Model) chat() *chatScreen { return m.chats[m.chatKey] }
 
 // busy reports whether something is on its way in c: a question asked
-// here, or in another gh-triage. The text box is not shown meanwhile, as
+// here, or in another gh-desk. The text box is not shown meanwhile, as
 // nothing can be sent.
 func busy(c *chatScreen) bool { return c.Running() || c.Elsewhere() != "" }
 
@@ -255,12 +255,12 @@ func (m *Model) typingChat() bool {
 func (m *Model) paneInner() int { return max(m.width-4, 10) }
 
 // watchEvery is how often a conversation on screen is read again while
-// another gh-triage works on it. A constant: reading is a stat and a small
+// another gh-desk works on it. A constant: reading is a stat and a small
 // file.
 const watchEvery = time.Second
 
 // watchChat reads the conversation on screen again while another
-// gh-triage works on it, as the spinner turns, so its answer shows when
+// gh-desk works on it, as the spinner turns, so its answer shows when
 // it comes. It only reads; nothing is written on a timer.
 func (m *Model) watchChat() {
 	c := m.chat()
@@ -278,7 +278,7 @@ func (m *Model) watchChat() {
 // ask sends a question under the conversation's lock; the first one
 // carries the pull request, and one asked after the head moved says so.
 // The worktree is moved to the head shown before each question, as
-// another gh-triage or gh triage gc may have moved or removed it.
+// another gh-desk or gh desk gc may have moved or removed it.
 func (m *Model) ask(c *chatScreen, shown, prompt string, draft bool) tea.Cmd {
 	moved, ok := m.chatState.Begin(c.Conversation, shown)
 	if !ok {
@@ -393,7 +393,7 @@ func (m *Model) chatAnswered(msg chatAnswerMsg) tea.Cmd {
 		c.Reply(text, err, cost, m.set.Now())
 	}
 	// Kept with the answer, then the session is free for another
-	// gh-triage.
+	// gh-desk.
 	defer m.chatState.Keep(c.Conversation)
 	if msg.err != nil && stopped {
 		// As a failure, a session not started is made anew at the next
@@ -492,7 +492,7 @@ func (m *Model) chatTyping(msg tea.KeyPressMsg) tea.Cmd {
 			m.refuse("nothing has been asked yet")
 		case !armed:
 			c.restart = true
-			m.say(fmt.Sprintf("press %s again to start over: the conversation goes from gh-triage, and Claude Code keeps its session", m.firstKey("chat_restart")))
+			m.say(fmt.Sprintf("press %s again to start over: the conversation goes from gh-desk, and Claude Code keeps its session", m.firstKey("chat_restart")))
 		default:
 			return m.restartChat(c)
 		}
@@ -512,7 +512,7 @@ func (m *Model) chatTyping(msg tea.KeyPressMsg) tea.Cmd {
 				return nil
 			}
 			// Held while Claude Code has the session, so no other
-			// gh-triage resumes it meanwhile.
+			// gh-desk resumes it meanwhile.
 			key := c.PR().Key
 			return tea.ExecProcess(m.claude.Interactive(key, c.Dir(), c.Session()), func(err error) tea.Msg { return claudeExitMsg{key: key, err: err} })
 		}
@@ -530,7 +530,7 @@ func (m *Model) chatTyping(msg tea.KeyPressMsg) tea.Cmd {
 // chatWaiting handles a key while the claude pane shows a question on its
 // way, which takes every key but help: esc stops it, as it does in Claude
 // Code, and chat_close goes back to the preview while it goes on. One
-// asked in another gh-triage cannot be stopped here; esc goes back.
+// asked in another gh-desk cannot be stopped here; esc goes back.
 func (m *Model) chatWaiting(k string) tea.Cmd {
 	c := m.chat()
 	is := func(a keymap.Action) bool { return m.keys.Matches(a, k) }
@@ -635,11 +635,11 @@ func (m *Model) chatLines(c *chatScreen, width int) []string {
 			L = append(L, m.questionLines(t.Text, textW)...)
 			if i == len(turns)-1 && !c.Running() {
 				// A question with no answer is on its way in another
-				// gh-triage, or was cut short when one quit.
+				// gh-desk, or was cut short when one quit.
 				if c.Elsewhere() != "" {
-					L = append(L, "", margin+m.working(st.muted, "answering in another gh-triage ("+c.Elsewhere()+")…"))
+					L = append(L, "", margin+m.working(st.muted, "answering in another gh-desk ("+c.Elsewhere()+")…"))
 				} else {
-					L = append(L, "", margin+st.dim.Render("interrupted: gh-triage was closed before the answer"))
+					L = append(L, "", margin+st.dim.Render("interrupted: gh-desk was closed before the answer"))
 				}
 			}
 		case t.Stopped:

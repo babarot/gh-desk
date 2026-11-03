@@ -15,8 +15,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/babarot/gh-triage/internal/logging"
-	"github.com/babarot/gh-triage/internal/model"
+	"github.com/babarot/gh-desk/internal/logging"
+	"github.com/babarot/gh-desk/internal/model"
 )
 
 // Workspace keeps a clone of each repository in the cache and a worktree
@@ -81,7 +81,7 @@ func (w *Workspace) Prepare(ctx context.Context, k model.PRKey, head string) (st
 		log.Info("cloned", logging.KeyDurationMS, time.Since(start).Milliseconds())
 	}
 	if !w.has(ctx, repo, head) {
-		ref := fmt.Sprintf("+refs/pull/%d/head:refs/gh-triage/pull/%d", k.Number, k.Number)
+		ref := fmt.Sprintf("+refs/pull/%d/head:refs/gh-desk/pull/%d", k.Number, k.Number)
 		if _, err := git(ctx, repo, "fetch", "--quiet", "origin", ref); err != nil {
 			return "", err
 		}
@@ -133,7 +133,7 @@ func (w *Workspace) clone(ctx context.Context, k model.PRKey, dir string) error 
 	if err := os.MkdirAll(filepath.Dir(dir), 0o755); err != nil {
 		return err
 	}
-	// A directory of its own, so two gh-triage cloning at once do not
+	// A directory of its own, so two gh-desk cloning at once do not
 	// write into one.
 	parent, err := os.MkdirTemp(filepath.Dir(dir), "."+filepath.Base(dir)+"-")
 	if err != nil {
@@ -158,7 +158,7 @@ func (w *Workspace) clone(ctx context.Context, k model.PRKey, dir string) error 
 		return err
 	}
 	if err := os.Rename(tmp, dir); err != nil {
-		// Another gh-triage cloned it first.
+		// Another gh-desk cloned it first.
 		if _, serr := os.Stat(filepath.Join(dir, ".git")); serr == nil {
 			return nil
 		}
@@ -213,7 +213,7 @@ func (w *Workspace) Remove(ctx context.Context, k model.PRKey) error {
 		}
 		_, _ = git(ctx, repo, "worktree", "prune")
 	}
-	_, _ = git(ctx, repo, "update-ref", "-d", fmt.Sprintf("refs/gh-triage/pull/%d", k.Number))
+	_, _ = git(ctx, repo, "update-ref", "-d", fmt.Sprintf("refs/gh-desk/pull/%d", k.Number))
 	return nil
 }
 

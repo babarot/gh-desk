@@ -7,8 +7,8 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/babarot/gh-triage/internal/model"
-	"github.com/babarot/gh-triage/internal/tui/keymap"
+	"github.com/babarot/gh-desk/internal/model"
+	"github.com/babarot/gh-desk/internal/tui/keymap"
 )
 
 func TestFirstInbox(t *testing.T) {

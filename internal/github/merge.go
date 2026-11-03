@@ -9,8 +9,8 @@ import (
 
 	"github.com/cli/go-gh/v2/pkg/api"
 
-	"github.com/babarot/gh-triage/internal/logging"
-	"github.com/babarot/gh-triage/internal/model"
+	"github.com/babarot/gh-desk/internal/logging"
+	"github.com/babarot/gh-desk/internal/model"
 )
 
 const infoFields = `
@@ -246,7 +246,7 @@ func (c *Client) UpdateBranch(ctx context.Context, key model.PRKey, id, head str
 }`, map[string]any{"id": id, "head": head})
 }
 
-// Commit is what tells a commit gh-triage made by updating a branch from
+// Commit is what tells a commit gh-desk made by updating a branch from
 // one someone pushed.
 type Commit struct {
 	Parents []string

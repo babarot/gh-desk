@@ -3,7 +3,7 @@ package plan
 import (
 	"slices"
 
-	"github.com/babarot/gh-triage/internal/model"
+	"github.com/babarot/gh-desk/internal/model"
 )
 
 // Step is what merging a pull request takes next.

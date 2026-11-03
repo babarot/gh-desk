@@ -11,14 +11,14 @@ import (
 	"strings"
 	"time"
 
-	"github.com/babarot/gh-triage/internal/model"
+	"github.com/babarot/gh-desk/internal/model"
 )
 
 // Chats keeps the conversations with Claude about pull requests, one file
 // a pull request under chats/<host> in the state directory, so a
-// conversation goes on after gh-triage quits and in another gh-triage.
+// conversation goes on after gh-desk quits and in another gh-desk.
 // Each has a lock of its own, held while Claude Code works on its session,
-// so two gh-triage never resume one session at once. See ADR-031.
+// so two gh-desk never resume one session at once. See ADR-031.
 type Chats struct {
 	dir string
 }
@@ -42,7 +42,7 @@ type ChatRecord struct {
 	Model string  `json:"model,omitempty"`
 	Cost  float64 `json:"cost,omitempty"`
 	// Rev rises by one at each write and never goes down while the file
-	// is there, so a gh-triage can tell that what it holds is older.
+	// is there, so a gh-desk can tell that what it holds is older.
 	Rev   int        `json:"rev"`
 	Turns []ChatTurn `json:"turns"`
 }
@@ -127,7 +127,7 @@ func (c *Chats) Save(r ChatRecord) error {
 }
 
 // Remove forgets the conversation about k. Its lock file stays: a lock is
-// on the file, and one made again would let a gh-triage that still has
+// on the file, and one made again would let a gh-desk that still has
 // the old one open hold the lock beside one that opened the new one.
 func (c *Chats) Remove(k model.PRKey) error {
 	err := os.Remove(c.path(k))
@@ -174,7 +174,7 @@ func (c *Chats) Keys() ([]model.PRKey, error) {
 }
 
 // Lock takes the lock of the conversation about k without waiting. When
-// another gh-triage holds it, held is false and who names that one as far
+// another gh-desk holds it, held is false and who names that one as far
 // as its lock file says. unlock releases the lock; the operating system
 // releases it too when this process exits, however it exits.
 func (c *Chats) Lock(k model.PRKey) (unlock func(), held bool, who string, err error) {

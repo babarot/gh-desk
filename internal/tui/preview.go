@@ -9,9 +9,9 @@ import (
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
 
-	"github.com/babarot/gh-triage/internal/diff"
-	"github.com/babarot/gh-triage/internal/model"
-	"github.com/babarot/gh-triage/internal/plan"
+	"github.com/babarot/gh-desk/internal/diff"
+	"github.com/babarot/gh-desk/internal/model"
+	"github.com/babarot/gh-desk/internal/plan"
 )
 
 type paneMode int

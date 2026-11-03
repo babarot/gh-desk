@@ -11,19 +11,19 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
 
-	"github.com/babarot/gh-triage/internal/claude"
-	"github.com/babarot/gh-triage/internal/logging"
-	"github.com/babarot/gh-triage/internal/model"
-	"github.com/babarot/gh-triage/internal/plan"
-	"github.com/babarot/gh-triage/internal/runner"
-	"github.com/babarot/gh-triage/internal/tui/keymap"
+	"github.com/babarot/gh-desk/internal/claude"
+	"github.com/babarot/gh-desk/internal/logging"
+	"github.com/babarot/gh-desk/internal/model"
+	"github.com/babarot/gh-desk/internal/plan"
+	"github.com/babarot/gh-desk/internal/runner"
+	"github.com/babarot/gh-desk/internal/tui/keymap"
 )
 
 // triage is the conversation with Claude about the lists, opened by C on
 // the list. Claude answers with a plan of actions. The plan is checked
 // against the lists each time it is shown and when it is applied, and is
 // applied only when the user accepts it; approving and merging go through
-// the confirm popup as ever. The conversation lasts while gh-triage runs,
+// the confirm popup as ever. The conversation lasts while gh-desk runs,
 // and the popup opens and closes over it.
 type triage struct {
 	open    bool

@@ -8,11 +8,11 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 
-	"github.com/babarot/gh-triage/internal/model"
-	"github.com/babarot/gh-triage/internal/plan"
-	"github.com/babarot/gh-triage/internal/runner"
-	"github.com/babarot/gh-triage/internal/tui/keymap"
-	"github.com/babarot/gh-triage/internal/tui/statusline"
+	"github.com/babarot/gh-desk/internal/model"
+	"github.com/babarot/gh-desk/internal/plan"
+	"github.com/babarot/gh-desk/internal/runner"
+	"github.com/babarot/gh-desk/internal/tui/keymap"
+	"github.com/babarot/gh-desk/internal/tui/statusline"
 )
 
 type styleFn = lipgloss.Style
@@ -26,7 +26,7 @@ type progress struct {
 	// detail is the whole of what text says in a few words, for the
 	// status line; empty when text is all there is.
 	detail string
-	// locked is set on a merge skipped because another gh-triage holds
+	// locked is set on a merge skipped because another gh-desk holds
 	// the record of pending merges; its row starts with the word.
 	locked bool
 }
@@ -296,7 +296,7 @@ func (m *Model) pushNote(icon, title string, items []noteItem) tea.Cmd {
 }
 
 // configNote tells of the config file's warnings, which did not stop
-// gh-triage, in a notification.
+// gh-desk, in a notification.
 func (m *Model) configNote() tea.Cmd {
 	ws := m.set.ConfigWarnings
 	if len(ws) == 0 {

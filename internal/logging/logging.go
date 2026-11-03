@@ -1,4 +1,4 @@
-// Package logging makes the logger gh-triage writes its log file with: JSON
+// Package logging makes the logger gh-desk writes its log file with: JSON
 // lines through log/slog, to a file under the state directory, never to the
 // terminal the TUI draws on.
 //
@@ -41,8 +41,8 @@ const (
 	DefaultKeep    = 3
 )
 
-// DefaultPath is where the log file goes: $XDG_STATE_HOME/gh-triage/logs,
-// or ~/.local/state/gh-triage/logs.
+// DefaultPath is where the log file goes: $XDG_STATE_HOME/gh-desk/logs,
+// or ~/.local/state/gh-desk/logs.
 func DefaultPath() string {
 	dir := os.Getenv("XDG_STATE_HOME")
 	if dir == "" {
@@ -52,7 +52,7 @@ func DefaultPath() string {
 		}
 		dir = filepath.Join(home, ".local", "state")
 	}
-	return filepath.Join(dir, "gh-triage", "logs", "gh-triage.log")
+	return filepath.Join(dir, "gh-desk", "logs", "gh-desk.log")
 }
 
 // ParseLevel reads a level as written in the config file or the

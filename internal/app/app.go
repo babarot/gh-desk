@@ -1,4 +1,4 @@
-// Package app puts gh-triage together: it reads the flags and the config
+// Package app puts gh-desk together: it reads the flags and the config
 // file, opens the log, builds the keymap, and starts the TUI. It is the only
 // package that knows every other one; the rest receive what they need from
 // here.
@@ -20,30 +20,30 @@ import (
 	"strings"
 	"time"
 
-	"github.com/babarot/gh-triage/internal/claude"
-	"github.com/babarot/gh-triage/internal/config"
-	"github.com/babarot/gh-triage/internal/github"
-	"github.com/babarot/gh-triage/internal/listcache"
-	"github.com/babarot/gh-triage/internal/logging"
-	"github.com/babarot/gh-triage/internal/model"
-	"github.com/babarot/gh-triage/internal/plan"
-	"github.com/babarot/gh-triage/internal/runner"
-	"github.com/babarot/gh-triage/internal/state"
-	"github.com/babarot/gh-triage/internal/tui"
-	"github.com/babarot/gh-triage/internal/tui/chat"
-	"github.com/babarot/gh-triage/internal/tui/keymap"
+	"github.com/babarot/gh-desk/internal/claude"
+	"github.com/babarot/gh-desk/internal/config"
+	"github.com/babarot/gh-desk/internal/github"
+	"github.com/babarot/gh-desk/internal/listcache"
+	"github.com/babarot/gh-desk/internal/logging"
+	"github.com/babarot/gh-desk/internal/model"
+	"github.com/babarot/gh-desk/internal/plan"
+	"github.com/babarot/gh-desk/internal/runner"
+	"github.com/babarot/gh-desk/internal/state"
+	"github.com/babarot/gh-desk/internal/tui"
+	"github.com/babarot/gh-desk/internal/tui/chat"
+	"github.com/babarot/gh-desk/internal/tui/keymap"
 )
 
 // Version is set at build time.
 var Version = "dev"
 
 // EnvLogLevel overrides [log] level in the config file.
-const EnvLogLevel = "GH_TRIAGE_LOG_LEVEL"
+const EnvLogLevel = "GH_DESK_LOG_LEVEL"
 
-const usage = `Usage: gh triage [flags] [command]
+const usage = `Usage: gh desk [flags] [command]
 
 Commands:
-  config     check, show or edit the config file (gh triage config help)
+  config     check, show or edit the config file (gh desk config help)
   gc         remove the worktrees of pull requests no longer open
   log        print where the log file is
   version    print the version
@@ -51,10 +51,10 @@ Commands:
 Flags:
 `
 
-// Run runs gh-triage with args (without the program name) and returns the
+// Run runs gh-desk with args (without the program name) and returns the
 // exit code.
 func Run(args []string, stdout, stderr io.Writer) int {
-	flags := flag.NewFlagSet("gh-triage", flag.ContinueOnError)
+	flags := flag.NewFlagSet("gh-desk", flag.ContinueOnError)
 	flags.SetOutput(stderr)
 	configPath := flags.String("config", config.FilePath(), "the config file")
 	debug := flags.Bool("debug", false, "log at debug level")
@@ -80,7 +80,7 @@ func Run(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintln(stdout, Version)
 		return 0
 	default:
-		fmt.Fprintf(stderr, "gh-triage: unknown command %q\n", flags.Arg(0))
+		fmt.Fprintf(stderr, "gh-desk: unknown command %q\n", flags.Arg(0))
 		flags.Usage()
 		return 2
 	}
@@ -88,7 +88,7 @@ func Run(args []string, stdout, stderr io.Writer) int {
 	level := new(slog.LevelVar)
 	log, closeLog, err := logging.Open(logging.Options{Level: level})
 	if err != nil {
-		fmt.Fprintf(stderr, "gh-triage: open the log file: %v\n", err)
+		fmt.Fprintf(stderr, "gh-desk: open the log file: %v\n", err)
 		return 1
 	}
 	defer closeLog.Close()
@@ -107,7 +107,7 @@ func Run(args []string, stdout, stderr io.Writer) int {
 	gh, err := github.New(log, github.Options{})
 	if err != nil {
 		log.Error("github client", "err", err.Error())
-		fmt.Fprintf(stderr, "gh-triage: %v (is gh logged in? try gh auth login)\n", err)
+		fmt.Fprintf(stderr, "gh-desk: %v (is gh logged in? try gh auth login)\n", err)
 		return 1
 	}
 	if flags.Arg(0) == "gc" {
@@ -115,7 +115,7 @@ func Run(args []string, stdout, stderr io.Writer) int {
 		chats := state.OpenChats(state.DefaultDir(), github.DefaultHost())
 		if err := gc(context.Background(), ws, chats, runs(cfg), gh, stdout); err != nil {
 			log.Error("gc", "err", err.Error())
-			fmt.Fprintf(stderr, "gh-triage: gc: %v\n", err)
+			fmt.Fprintf(stderr, "gh-desk: gc: %v\n", err)
 			return 1
 		}
 		return 0
@@ -125,7 +125,7 @@ func Run(args []string, stdout, stderr io.Writer) int {
 	viewer, err := gh.Viewer(ctx)
 	if err != nil {
 		log.Error("viewer", "err", err.Error())
-		fmt.Fprintf(stderr, "gh-triage: could not read who you are on GitHub: %v\n", err)
+		fmt.Fprintf(stderr, "gh-desk: could not read who you are on GitHub: %v\n", err)
 		return 1
 	}
 	p := assemble(cfg, warns, env{gh: gh, host: github.DefaultHost(), viewer: viewer, stateDir: state.DefaultDir(),
@@ -133,7 +133,7 @@ func Run(args []string, stdout, stderr io.Writer) int {
 	start := time.Now()
 	err = tui.Run(ctx, source{gh}, p.rn, p.cl, km, log, p.set)
 	// Stop the batches and wait for them to stop writing the record before
-	// the lock goes, so another gh-triage never shares it.
+	// the lock goes, so another gh-desk never shares it.
 	cancel()
 	p.rn.Wait()
 	if p.store != nil {
@@ -145,7 +145,7 @@ func Run(args []string, stdout, stderr io.Writer) int {
 	p.release()
 	log.Info("exit", logging.KeyDurationMS, time.Since(start).Milliseconds(), "err", errString(err))
 	if err != nil {
-		fmt.Fprintf(stderr, "gh-triage: %v (run %s)\n", err, run)
+		fmt.Fprintf(stderr, "gh-desk: %v (run %s)\n", err, run)
 		return 1
 	}
 	return 0
@@ -195,7 +195,7 @@ func assemble(cfg config.File, warns []string, e env, log *slog.Logger) parts {
 	} else {
 		set.PaneHeight = h
 	}
-	// One gh-triage at a time keeps the record of merges it waits for;
+	// One gh-desk at a time keeps the record of merges it waits for;
 	// another one runs without waiting merges.
 	store, err := state.Open(e.stateDir)
 	if err != nil {
@@ -209,13 +209,13 @@ func assemble(cfg config.File, warns []string, e env, log *slog.Logger) parts {
 		set.Resume = store.Pending()
 		log.Info("pending merges", "count", len(set.Resume))
 	} else {
-		log.Info("another gh-triage holds the record of pending merges")
+		log.Info("another gh-desk holds the record of pending merges")
 	}
 	rn := runner.New(runnerGitHub{e.gh}, log, runner.Options{Settings: set.Plan, Viewer: e.viewer, Store: rstore, CanWait: rstore != nil,
 		ChecksTimeout: cfg.Merge.ChecksTimeout.D, BlockedTimeout: cfg.Merge.BlockedTimeout.D})
 	var lock *pendingLock
 	if store == nil && err == nil {
-		// Taken over once the other gh-triage quits.
+		// Taken over once the other gh-desk quits.
 		lock = &pendingLock{dir: e.stateDir, rn: rn}
 		set.Lock = lock
 	}
@@ -241,7 +241,7 @@ func assemble(cfg config.File, warns []string, e env, log *slog.Logger) parts {
 	return parts{set: set, rn: rn, cl: cl, store: store, lock: lock, release: release}
 }
 
-// runs are the directories of the running gh-triage, in the cache.
+// runs are the directories of the running gh-desk, in the cache.
 func runs(cfg config.File) state.Runs { return state.Runs{Dir: filepath.Join(cfg.CacheDir(), "runs")} }
 
 // conversationFiles writes what the conversation with Claude is given
@@ -305,14 +305,14 @@ type prReader interface {
 
 // gc removes the worktrees and the conversations kept of pull requests
 // that are no longer open. A pull request GitHub does not return (deleted,
-// or out of reach) is kept, and so is one whose conversation a gh-triage
+// or out of reach) is kept, and so is one whose conversation a gh-desk
 // is working on: its lock is taken first, without waiting.
 func gc(ctx context.Context, ws *claude.Workspace, chats *state.Chats, rs state.Runs, gh prReader, out io.Writer) error {
-	// The files of a gh-triage that did not exit cleanly.
+	// The files of a gh-desk that did not exit cleanly.
 	if n, err := rs.Sweep(); err != nil {
 		return err
 	} else if n > 0 {
-		fmt.Fprintf(out, "removed the files of %d gh-triage no longer running\n", n)
+		fmt.Fprintf(out, "removed the files of %d gh-desk no longer running\n", n)
 	}
 	wts, err := ws.Worktrees()
 	if err != nil {
@@ -349,7 +349,7 @@ func gc(ctx context.Context, ws *claude.Workspace, chats *state.Chats, rs state.
 				return fmt.Errorf("%s: %w", k, err)
 			}
 			if !held {
-				fmt.Fprintf(out, "kept %s: a gh-triage (%s) is talking with Claude about it\n", k, cmp.Or(who, "another process"))
+				fmt.Fprintf(out, "kept %s: a gh-desk (%s) is talking with Claude about it\n", k, cmp.Or(who, "another process"))
 				continue
 			}
 			err = func() error {

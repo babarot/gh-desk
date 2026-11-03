@@ -6,11 +6,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/babarot/gh-triage/internal/model"
+	"github.com/babarot/gh-desk/internal/model"
 )
 
 func TestPutAndOpen(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "gh-triage", "lists.json")
+	path := filepath.Join(t.TempDir(), "gh-desk", "lists.json")
 	c, err := Open(path, "github.com", "me")
 	if err != nil {
 		t.Fatal(err)
@@ -70,7 +70,7 @@ func TestAnotherAccountIsNotUsed(t *testing.T) {
 	}
 }
 
-// A write keeps the lists of other searches, written by a gh-triage with
+// A write keeps the lists of other searches, written by a gh-desk with
 // another config.
 func TestWriteKeepsOtherLists(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "lists.json")

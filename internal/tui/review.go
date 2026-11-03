@@ -10,9 +10,9 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 
-	"github.com/babarot/gh-triage/internal/model"
-	"github.com/babarot/gh-triage/internal/runner"
-	"github.com/babarot/gh-triage/internal/tui/keymap"
+	"github.com/babarot/gh-desk/internal/model"
+	"github.com/babarot/gh-desk/internal/runner"
+	"github.com/babarot/gh-desk/internal/tui/keymap"
 )
 
 // kinds are the kinds of review, in the order the review popup cycles
@@ -221,7 +221,7 @@ func (m *Model) openEditor() tea.Cmd {
 		m.refuse("set review.editor or $EDITOR to write the review in an editor")
 		return nil
 	}
-	f, err := os.CreateTemp("", "gh-triage-review-*.md")
+	f, err := os.CreateTemp("", "gh-desk-review-*.md")
 	if err != nil {
 		m.fail("could not make a file for the editor: " + err.Error())
 		return nil

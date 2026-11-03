@@ -5,22 +5,22 @@ import (
 	"os"
 	"testing"
 
-	"github.com/babarot/gh-triage/internal/claude"
-	"github.com/babarot/gh-triage/internal/github"
-	"github.com/babarot/gh-triage/internal/logging"
-	"github.com/babarot/gh-triage/internal/model"
+	"github.com/babarot/gh-desk/internal/claude"
+	"github.com/babarot/gh-desk/internal/github"
+	"github.com/babarot/gh-desk/internal/logging"
+	"github.com/babarot/gh-desk/internal/model"
 )
 
 // TestLiveClaude reviews a public pull request with Claude Code, as C
 // does: it reads the pull request from GitHub (only reads), makes its
 // worktree in a temporary cache, asks for a review, asks more in the same
 // session, and drafts a review. It costs a few Claude calls. Run it with
-// GH_TRIAGE_LIVE_CLAUDE=owner/repo#n, and GH_TRIAGE_LIVE_MODEL to pick the
+// GH_DESK_LIVE_CLAUDE=owner/repo#n, and GH_DESK_LIVE_MODEL to pick the
 // model (sonnet by default).
 func TestLiveClaude(t *testing.T) {
-	target := os.Getenv("GH_TRIAGE_LIVE_CLAUDE")
+	target := os.Getenv("GH_DESK_LIVE_CLAUDE")
 	if target == "" {
-		t.Skip("set GH_TRIAGE_LIVE_CLAUDE=owner/repo#n to ask Claude about a pull request")
+		t.Skip("set GH_DESK_LIVE_CLAUDE=owner/repo#n to ask Claude about a pull request")
 	}
 	key, err := model.ParsePRKey(target)
 	if err != nil {
@@ -49,7 +49,7 @@ func TestLiveClaude(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	model := os.Getenv("GH_TRIAGE_LIVE_MODEL")
+	model := os.Getenv("GH_DESK_LIVE_MODEL")
 	if model == "" {
 		model = "sonnet"
 	}

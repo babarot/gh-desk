@@ -16,11 +16,11 @@ A new conversation about a pull request (ADR-010, ADR-031) asked Claude for a re
 - The worktree is made as a conversation with nothing asked is opened, so the first question does not wait for a clone. It is made under the conversation's lock, as for a question, because the worktree is moved only under that lock (ADR-031). A question asked meanwhile takes the lock on, and waits for the worktree.
 - Starting over (`chat_restart`) leaves a conversation with nothing asked, and frees the lock.
 - This replaces, in ADR-031, "starts a new one with a review" in the sentence on `chat_restart`, "losing it costs a new review" (losing it costs a new session), and "its next question starts a new session with a review" (its next question starts a new session, with the pull request before it).
-- Rejected: handing the worktree to Claude Code in the terminal instead. Claude would not know the description or the diff, and what was said there would not be kept in gh-triage, nor turned into a review to post.
+- Rejected: handing the worktree to Claude Code in the terminal instead. Claude would not know the description or the diff, and what was said there would not be kept in gh-desk, nor turned into a review to post.
 - Rejected: a setting for the automatic review. One key gives the same review, and the setting would not be something that differs between users (ADR-014).
 
 ## Consequences
 
 - A review takes a key it did not take before.
-- Opening a conversation clones the repository and checks out the pull request even when nothing is then asked. The worktree goes when the pull request is closed (`gh triage gc`); the clone stays, as before.
-- While the worktree is made, another gh-triage cannot ask about that pull request, and is told that Claude is working on it.
+- Opening a conversation clones the repository and checks out the pull request even when nothing is then asked. The worktree goes when the pull request is closed (`gh desk gc`); the clone stays, as before.
+- While the worktree is made, another gh-desk cannot ask about that pull request, and is told that Claude is working on it.

@@ -5,16 +5,16 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/babarot/gh-triage/internal/model"
-	"github.com/babarot/gh-triage/internal/plan"
+	"github.com/babarot/gh-desk/internal/model"
+	"github.com/babarot/gh-desk/internal/plan"
 )
 
-// Lock is the lock on the record of pending merges, which one gh-triage
-// holds at a time (ADR-009). The app package passes it to a gh-triage
+// Lock is the lock on the record of pending merges, which one gh-desk
+// holds at a time (ADR-009). The app package passes it to a gh-desk
 // started while another held it.
 type Lock interface {
 	// Take tries to take the lock again; ok is false while another
-	// gh-triage still holds it. Once taken, merges may wait, and pending
+	// gh-desk still holds it. Once taken, merges may wait, and pending
 	// are the merges the one that quit was waiting for.
 	Take() (pending []model.Pending, ok bool, err error)
 	// Holder is who holds the lock, as it wrote itself in: its process
@@ -32,15 +32,15 @@ type lockMsg struct {
 	known   bool
 }
 
-// holder is the gh-triage holding the lock, as last read.
+// holder is the gh-desk holding the lock, as last read.
 type holder struct {
 	pid   int
 	dir   string
 	known bool
 }
 
-// takeLock tries the lock again when this gh-triage runs without it: at
-// start, when the merge popup opens, and on refresh, so a gh-triage that
+// takeLock tries the lock again when this gh-desk runs without it: at
+// start, when the merge popup opens, and on refresh, so a gh-desk that
 // quit hands its merges that wait over without this one starting again.
 func (m *Model) takeLock() tea.Cmd {
 	if m.set.CanWait || m.set.Lock == nil || m.taking {
@@ -80,7 +80,7 @@ func (m *Model) tookLock(msg lockMsg) tea.Cmd {
 			m.decideBulk()
 		}
 	}
-	text := "the other gh-triage quit · this one runs the merges that wait now"
+	text := "the other gh-desk quit · this one runs the merges that wait now"
 	var cmd tea.Cmd
 	if len(msg.pending) > 0 {
 		m.set.Resume = msg.pending
@@ -92,20 +92,20 @@ func (m *Model) tookLock(msg lockMsg) tea.Cmd {
 	return tea.Batch(cmd, m.pushNote("✓", text, nil))
 }
 
-// lockedBy names the gh-triage holding the lock, for a row.
+// lockedBy names the gh-desk holding the lock, for a row.
 func (m *Model) lockedBy() string {
 	if m.holder.known {
 		return fmt.Sprintf("locked by pid %d", m.holder.pid)
 	}
-	return "locked by another gh-triage"
+	return "locked by another gh-desk"
 }
 
 // lockedHolder names it in full, for a sentence.
 func (m *Model) lockedHolder() string {
 	if m.holder.known {
-		return fmt.Sprintf("another gh-triage (pid %d · %s)", m.holder.pid, m.holder.dir)
+		return fmt.Sprintf("another gh-desk (pid %d · %s)", m.holder.pid, m.holder.dir)
 	}
-	return "another gh-triage"
+	return "another gh-desk"
 }
 
 // lockedDetail is the full reason of a merge skipped for the lock, shown

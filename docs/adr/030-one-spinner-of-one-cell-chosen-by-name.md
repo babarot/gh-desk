@@ -6,7 +6,7 @@ Accepted
 
 ## Context
 
-gh-triage showed one spinner, a braille one written in the code, wherever something was being read: in cells of a table, in place of a count not known yet, and before a line that says what is going on. Dozens can be on the screen at once, and they turn together, since each frame is worked out from the clock and one tick draws them all.
+gh-desk showed one spinner, a braille one written in the code, wherever something was being read: in cells of a table, in place of a count not known yet, and before a line that says what is going on. Dozens can be on the screen at once, and they turn together, since each frame is worked out from the clock and one tick draws them all.
 
 Users differ in how much motion they want and in what their terminal draws well, so the spinner became a setting (ADR-014). Collections such as cli-spinners and bubbles' presets were looked at for what to offer. Many of their frames take more than one cell, are emoji, or contain East Asian Ambiguous characters (`●`, `•`, `◐`, the block elements of a bar, `…`), which a terminal set for Japanese draws two cells wide, so a spinner in a column would move every column after it.
 

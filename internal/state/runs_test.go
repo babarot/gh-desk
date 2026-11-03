@@ -13,7 +13,7 @@ func TestRunsSweepKeepsLiveRuns(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// A run left by a gh-triage that did not exit cleanly: its directory
+	// A run left by a gh-desk that did not exit cleanly: its directory
 	// is there, its lock is free.
 	dead := filepath.Join(r.Dir, runPrefix+"dead")
 	young := filepath.Join(r.Dir, runPrefix+"young")

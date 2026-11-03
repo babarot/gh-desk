@@ -16,15 +16,15 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
 
-	"github.com/babarot/gh-triage/internal/claude"
-	"github.com/babarot/gh-triage/internal/diff"
-	"github.com/babarot/gh-triage/internal/logging"
-	"github.com/babarot/gh-triage/internal/model"
-	"github.com/babarot/gh-triage/internal/plan"
-	"github.com/babarot/gh-triage/internal/runner"
-	"github.com/babarot/gh-triage/internal/tui/chat"
-	"github.com/babarot/gh-triage/internal/tui/keymap"
-	"github.com/babarot/gh-triage/internal/tui/statusline"
+	"github.com/babarot/gh-desk/internal/claude"
+	"github.com/babarot/gh-desk/internal/diff"
+	"github.com/babarot/gh-desk/internal/logging"
+	"github.com/babarot/gh-desk/internal/model"
+	"github.com/babarot/gh-desk/internal/plan"
+	"github.com/babarot/gh-desk/internal/runner"
+	"github.com/babarot/gh-desk/internal/tui/chat"
+	"github.com/babarot/gh-desk/internal/tui/keymap"
+	"github.com/babarot/gh-desk/internal/tui/statusline"
 )
 
 var update = flag.Bool("update", false, "rewrite the golden files")
@@ -1365,7 +1365,7 @@ func TestNoWaitingWithoutTheLock(t *testing.T) {
 	m, r := startWith(t, f, keymap.Default())
 	m.set.CanWait = false
 	press(m, "M")
-	if !strings.Contains(screen(m), "another gh-triage") {
+	if !strings.Contains(screen(m), "another gh-desk") {
 		t.Errorf("popup does not say why:\n%s", screen(m))
 	}
 	press(m, "y")
@@ -1374,7 +1374,7 @@ func TestNoWaitingWithoutTheLock(t *testing.T) {
 	}
 }
 
-// fakeLock is the lock another gh-triage holds until free is set.
+// fakeLock is the lock another gh-desk holds until free is set.
 type fakeLock struct {
 	free    bool
 	pending []model.Pending
@@ -1389,7 +1389,7 @@ func (l *fakeLock) Take() ([]model.Pending, bool, error) {
 	return l.pending, true, nil
 }
 
-func (l *fakeLock) Holder() (int, string, bool) { return 4242, "~/src/acme/gh-triage", true }
+func (l *fakeLock) Holder() (int, string, bool) { return 4242, "~/src/acme/gh-desk", true }
 
 // moveTo moves the cursor down to k.
 func moveTo(t *testing.T, m *Model, k model.PRKey) {
@@ -1415,7 +1415,7 @@ func TestLockedRowAndCursor(t *testing.T) {
 	k := key("acme", "api", 12)
 	moveTo(t, m, k)
 	press(m, "M")
-	if s := screen(m); !strings.Contains(s, "skip · locked by pid 4242 · would wait") || !strings.Contains(s, "~/src/acme/gh-triage") {
+	if s := screen(m); !strings.Contains(s, "skip · locked by pid 4242 · would wait") || !strings.Contains(s, "~/src/acme/gh-desk") {
 		t.Fatalf("popup does not say what holds it:\n%s", s)
 	}
 	press(m, "y")
@@ -1475,10 +1475,10 @@ func TestTakeLockOver(t *testing.T) {
 		t.Fatalf("popup with the lock held:\n%s", screen(m))
 	}
 	press(m, "esc")
-	// The other gh-triage quits.
+	// The other gh-desk quits.
 	l.free = true
 	press(m, "M")
-	if s := screen(m); strings.Contains(s, "skip · locked") || !strings.Contains(s, "The other gh-triage quit") {
+	if s := screen(m); strings.Contains(s, "skip · locked") || !strings.Contains(s, "The other gh-desk quit") {
 		t.Fatalf("popup after it quit:\n%s", s)
 	}
 	if len(r.resumed) != 1 || r.resumed[0].Key != waited.Key {

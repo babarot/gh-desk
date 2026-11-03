@@ -8,9 +8,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/babarot/gh-triage/internal/logging"
-	"github.com/babarot/gh-triage/internal/model"
-	"github.com/babarot/gh-triage/internal/plan"
+	"github.com/babarot/gh-desk/internal/logging"
+	"github.com/babarot/gh-desk/internal/model"
+	"github.com/babarot/gh-desk/internal/plan"
 )
 
 // fakeGH is GitHub as a few pull requests whose state tests change as the
@@ -523,7 +523,7 @@ func TestAdoptReachesOnlyLaterJobs(t *testing.T) {
 	st := newStore()
 	f.onRead = func(_ string, mi *model.MergeInfo, n int) {
 		if n == 1 {
-			// The other gh-triage quits while the job reads.
+			// The other gh-desk quits while the job reads.
 			r.Adopt(st)
 		}
 		if n > 5 {
@@ -746,7 +746,7 @@ func TestResumedWatchDoesNotBlock(t *testing.T) {
 }
 
 // An approval the user gave before the merge is recorded, so a dismissal
-// while gh-triage was closed stops it instead of approving again.
+// while gh-desk was closed stops it instead of approving again.
 func TestApprovalBeforeMergeIsRecorded(t *testing.T) {
 	mi, it := pr("1", "api", 1, "alice")
 	mi.MergeState = model.MergeBlocked

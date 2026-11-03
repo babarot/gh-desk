@@ -1,4 +1,4 @@
-// Package tui is gh-triage's terminal UI. It reads keys through the keymap
+// Package tui is gh-desk's terminal UI. It reads keys through the keymap
 // by action name, never by key, and learns about GitHub only through the
 // Source the app package hands it.
 package tui
@@ -11,13 +11,13 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/babarot/gh-triage/internal/logging"
-	"github.com/babarot/gh-triage/internal/model"
-	"github.com/babarot/gh-triage/internal/plan"
-	"github.com/babarot/gh-triage/internal/runner"
-	"github.com/babarot/gh-triage/internal/tui/chat"
-	"github.com/babarot/gh-triage/internal/tui/keymap"
-	"github.com/babarot/gh-triage/internal/tui/statusline"
+	"github.com/babarot/gh-desk/internal/logging"
+	"github.com/babarot/gh-desk/internal/model"
+	"github.com/babarot/gh-desk/internal/plan"
+	"github.com/babarot/gh-desk/internal/runner"
+	"github.com/babarot/gh-desk/internal/tui/chat"
+	"github.com/babarot/gh-desk/internal/tui/keymap"
+	"github.com/babarot/gh-desk/internal/tui/statusline"
 )
 
 // Source is what the TUI needs from GitHub. The app package passes the
@@ -136,7 +136,7 @@ type Settings struct {
 	Rules []plan.Rule
 	// Resume are the merges an earlier run was waiting for.
 	Resume []model.Pending
-	// CanWait is whether this gh-triage holds the lock on the record of
+	// CanWait is whether this gh-desk holds the lock on the record of
 	// pending merges. Without it, merges that wait are left out, since
 	// nothing would go on with them after quitting.
 	CanWait bool
@@ -145,10 +145,10 @@ type Settings struct {
 	// start.
 	ConfigWarnings []string
 	// StoreProblem says why the record could not be opened, when it was
-	// not another gh-triage holding it.
+	// not another gh-desk holding it.
 	StoreProblem string
 	// Lock is tried again while CanWait is false, to take the record
-	// over from a gh-triage that quit; nil never tries.
+	// over from a gh-desk that quit; nil never tries.
 	Lock Lock
 	// Host is the GitHub host the profiles and pull requests are on, for
 	// their web pages; empty is github.com.
@@ -159,7 +159,7 @@ type Settings struct {
 	// Lists are the lists last read; nil keeps none.
 	Lists Lists
 	// Chats keep the conversations with Claude; nil keeps them only while
-	// gh-triage runs.
+	// gh-desk runs.
 	Chats chat.Store
 	// Refresh is how often the shown tab is read again; zero turns it off.
 	Refresh time.Duration
@@ -198,7 +198,7 @@ type Model struct {
 	// the redraw asked for it is due.
 	line         statusline.Line
 	statusTickAt time.Time
-	// holder is the gh-triage holding the record of pending merges, while
+	// holder is the gh-desk holding the record of pending merges, while
 	// this one runs without it.
 	holder holder
 	// taking is set while a try to take the lock is on its way.

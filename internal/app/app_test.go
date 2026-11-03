@@ -9,12 +9,12 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/babarot/gh-triage/internal/claude"
-	"github.com/babarot/gh-triage/internal/config"
-	"github.com/babarot/gh-triage/internal/logging"
-	"github.com/babarot/gh-triage/internal/model"
-	"github.com/babarot/gh-triage/internal/state"
-	"github.com/babarot/gh-triage/internal/tui/keymap"
+	"github.com/babarot/gh-desk/internal/claude"
+	"github.com/babarot/gh-desk/internal/config"
+	"github.com/babarot/gh-desk/internal/logging"
+	"github.com/babarot/gh-desk/internal/model"
+	"github.com/babarot/gh-desk/internal/state"
+	"github.com/babarot/gh-desk/internal/tui/keymap"
 )
 
 func TestKeysTemplateLoadsUncommented(t *testing.T) {
@@ -86,7 +86,7 @@ func TestEditorPrecedence(t *testing.T) {
 }
 
 func TestSetupWritesTemplateAndReportsMistakes(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "gh-triage", "config.toml")
+	path := filepath.Join(t.TempDir(), "gh-desk", "config.toml")
 	var buf bytes.Buffer
 	log := logging.New(&buf, slog.LevelInfo)
 	level := new(slog.LevelVar)
@@ -139,7 +139,7 @@ func TestRunSubcommands(t *testing.T) {
 	}
 	out.Reset()
 	t.Setenv("XDG_STATE_HOME", "/tmp/state")
-	if code := Run([]string{"log"}, &out, &errb); code != 0 || strings.TrimSpace(out.String()) != "/tmp/state/gh-triage/logs/gh-triage.log" {
+	if code := Run([]string{"log"}, &out, &errb); code != 0 || strings.TrimSpace(out.String()) != "/tmp/state/gh-desk/logs/gh-desk.log" {
 		t.Errorf("log: code %d, out %q", code, out.String())
 	}
 	if code := Run([]string{"nope"}, &out, &errb); code != 2 {
@@ -181,7 +181,7 @@ func TestGCRemovesClosedOnly(t *testing.T) {
 	}
 	// Conversations kept: one of the merged pull request, one of a closed
 	// pull request with no worktree, and one of a closed pull request a
-	// gh-triage is talking about.
+	// gh-desk is talking about.
 	closed, talking := model.PRKey{Owner: "acme", Repo: "web", Number: 4}, model.PRKey{Owner: "acme", Repo: "web", Number: 5}
 	chats := state.OpenChats(t.TempDir(), "github.com")
 	for _, k := range []model.PRKey{open, merged, closed, talking} {

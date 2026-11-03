@@ -19,7 +19,7 @@ import (
 type Skill struct {
 	// Plugin is which of the plugins it is in, counted from 0.
 	Plugin int
-	// Name is what Claude Code calls it, under the plugin gh-triage makes.
+	// Name is what Claude Code calls it, under the plugin gh-desk makes.
 	Name string
 	// Dir is its directory in the plugin.
 	Dir string
@@ -32,12 +32,12 @@ type SkillProblem struct {
 	Message string
 }
 
-// PluginName is the name of the plugin gh-triage makes of the skills, the
+// PluginName is the name of the plugin gh-desk makes of the skills, the
 // part before the colon in a skill's name.
-const PluginName = "gh-triage"
+const PluginName = "gh-desk"
 
 // PluginSkills are the skills of the plugins in dirs, checked against
-// allowed, the tools gh-triage lets Claude use (CheckSkill). Only skills
+// allowed, the tools gh-desk lets Claude use (CheckSkill). Only skills
 // are taken; nothing else of a plugin is.
 func PluginSkills(dirs []string, allowed []string) ([]Skill, []SkillProblem) {
 	var skills []Skill
@@ -90,7 +90,7 @@ func PluginSkills(dirs []string, allowed []string) ([]Skill, []SkillProblem) {
 // refused when anything in it is a symlink, when its SKILL.md has no
 // frontmatter that reads, or when its allowed-tools grants a tool outside
 // allowed: Claude Code lets such a tool run without a prompt, beyond the
-// tools gh-triage allows.
+// tools gh-desk allows.
 func CheckSkill(dir string, allowed []string) (string, error) {
 	err := filepath.WalkDir(dir, func(p string, d fs.DirEntry, err error) error {
 		if err != nil {
@@ -126,7 +126,7 @@ func CheckSkill(dir string, allowed []string) (string, error) {
 		}
 		for _, t := range tools {
 			if !slices.Contains(allowed, t) {
-				return "", fmt.Errorf("%s grants %q, which gh-triage does not allow (it may grant only %s)", k, t, strings.Join(allowed, ", "))
+				return "", fmt.Errorf("%s grants %q, which gh-desk does not allow (it may grant only %s)", k, t, strings.Join(allowed, ", "))
 			}
 		}
 	}
@@ -215,7 +215,7 @@ func splitTools(s string) []string {
 	return out
 }
 
-// WritePlugin makes the plugin gh-triage gives Claude in dir, a copy of
+// WritePlugin makes the plugin gh-desk gives Claude in dir, a copy of
 // skills, and checks the copy again, so that what was checked is what is
 // given. It returns the plugin's directory.
 func WritePlugin(dir string, skills []Skill, allowed []string) (string, error) {
@@ -223,7 +223,7 @@ func WritePlugin(dir string, skills []Skill, allowed []string) (string, error) {
 	if err := os.MkdirAll(filepath.Join(root, ".claude-plugin"), 0o700); err != nil {
 		return "", err
 	}
-	manifest := fmt.Sprintf(`{"name":%q,"description":"The skills gh-triage gives Claude, copied from the plugins in claude.plugins"}`, PluginName)
+	manifest := fmt.Sprintf(`{"name":%q,"description":"The skills gh-desk gives Claude, copied from the plugins in claude.plugins"}`, PluginName)
 	if err := os.WriteFile(filepath.Join(root, ".claude-plugin", "plugin.json"), []byte(manifest), 0o600); err != nil {
 		return "", err
 	}

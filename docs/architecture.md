@@ -1,6 +1,6 @@
 # Architecture
 
-gh-triage is split into packages by layer. A package imports only packages of lower layers, and only the outside modules listed for it. The table below is what `arch_test.go` checks; `go test -run TestArchitectureDoc -update` rewrites it from the test, and the test fails when the two differ.
+gh-desk is split into packages by layer. A package imports only packages of lower layers, and only the outside modules listed for it. The table below is what `arch_test.go` checks; `go test -run TestArchitectureDoc -update` rewrites it from the test, and the test fails when the two differ.
 
 <!-- layers:start -->
 | Layer | Package | Does | May import | Outside modules |
@@ -14,7 +14,7 @@ gh-triage is split into packages by layer. A package imports only packages of lo
 | 1 | `internal/plan` | Deciding how to merge each pull request; selection rules | `model` | - |
 | 1 | `internal/diff` | Reading patches and the words that changed | - | - |
 | 2 | `internal/github` | GitHub's GraphQL and REST APIs | `model`, `logging` | `github.com/cli/go-gh/v2` |
-| 2 | `internal/state` | The pending-merge record and its lock; the conversations with Claude and their locks; the directories of the running gh-triage; the screen layout kept between launches | `model` | - |
+| 2 | `internal/state` | The pending-merge record and its lock; the conversations with Claude and their locks; the directories of the running gh-desk; the screen layout kept between launches | `model` | - |
 | 2 | `internal/claude` | Running claude -p and the pull request worktrees, and the skills of the plugins given to it | `model`, `logging` | `gopkg.in/yaml.v3` |
 | 2 | `internal/listcache` | The lists last read, kept on disk for the next launch | `model` | - |
 | 3 | `internal/runner` | Bulk approve and merge, auto-merge watching, resuming | `model`, `logging`, `plan` | - |
@@ -44,7 +44,7 @@ Standard library packages that reach outside the process:
 
 ## Logging
 
-The log is JSON lines written with `log/slog` to `$XDG_STATE_HOME/gh-triage/logs/gh-triage.log` (`gh triage log` prints the path), never to the terminal. The level is `info` unless `--debug`, `GH_TRIAGE_LOG_LEVEL` or `[log] level` says otherwise, in that order. The file is moved aside at startup when it is over 10 MB, and three old files are kept.
+The log is JSON lines written with `log/slog` to `$XDG_STATE_HOME/gh-desk/logs/gh-desk.log` (`gh desk log` prints the path), never to the terminal. The level is `info` unless `--debug`, `GH_DESK_LOG_LEVEL` or `[log] level` says otherwise, in that order. The file is moved aside at startup when it is over 10 MB, and three old files are kept.
 
 Every line carries `run`, an ID for the process. Code that starts an operation adds `op`, and bulk approve and merge add `batch`, `pr` and `step`, with `logger.With`, and passes the logger down. Calls to GitHub log `gh_request_id`, `gql_cost`, `gql_remaining` and `duration_ms`.
 

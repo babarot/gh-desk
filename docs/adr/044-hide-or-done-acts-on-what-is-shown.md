@@ -6,7 +6,7 @@ Accepted
 
 ## Context
 
-ADR-042 has hide or done act on the selected pull requests of the tab shown, without a confirm. A selection is not what the screen shows: a filter typed after selecting, the rules a tab is narrowed to, or the inbox leaving settled pull requests out can leave a selected notification off the screen. Done on the selection marked those done too, though the user never saw them, and gh-triage cannot take a done back. Approve and merge also act on a selection out of sight, but their confirm popup lists every pull request before anything is written; done has no popup.
+ADR-042 has hide or done act on the selected pull requests of the tab shown, without a confirm. A selection is not what the screen shows: a filter typed after selecting, the rules a tab is narrowed to, or the inbox leaving settled pull requests out can leave a selected notification off the screen. Done on the selection marked those done too, though the user never saw them, and gh-desk cannot take a done back. Approve and merge also act on a selection out of sight, but their confirm popup lists every pull request before anything is written; done has no popup.
 
 A done that failed brought its notification back to the inbox, but not to the selection. After a comment or a review that failed on some, those are selected again; after done they were not, so which ones failed had to be read from the notifications.
 

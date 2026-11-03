@@ -9,7 +9,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/babarot/gh-triage/internal/model"
+	"github.com/babarot/gh-desk/internal/model"
 )
 
 // Group is where a pull request is listed in a grouped tab. A group says

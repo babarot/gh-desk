@@ -1,6 +1,6 @@
-// Package state keeps the merges gh-triage is waiting for, so they go on
+// Package state keeps the merges gh-desk is waiting for, so they go on
 // at the next launch: pending.json under the state directory, next to a
-// lock only one gh-triage holds at a time. The operating system releases
+// lock only one gh-desk holds at a time. The operating system releases
 // the lock when its holder exits, however it exits, so a crash never
 // leaves it behind.
 package state
@@ -15,10 +15,10 @@ import (
 	"slices"
 	"sync"
 
-	"github.com/babarot/gh-triage/internal/model"
+	"github.com/babarot/gh-desk/internal/model"
 )
 
-// DefaultDir is $XDG_STATE_HOME/gh-triage, or ~/.local/state/gh-triage.
+// DefaultDir is $XDG_STATE_HOME/gh-desk, or ~/.local/state/gh-desk.
 func DefaultDir() string {
 	dir := os.Getenv("XDG_STATE_HOME")
 	if dir == "" {
@@ -28,7 +28,7 @@ func DefaultDir() string {
 		}
 		dir = filepath.Join(home, ".local", "state")
 	}
-	return filepath.Join(dir, "gh-triage")
+	return filepath.Join(dir, "gh-desk")
 }
 
 // Store is the record of pending merges, held under the lock.
@@ -41,7 +41,7 @@ type Store struct {
 }
 
 // Open takes the lock in dir and reads the record. It returns a nil Store
-// and no error when another gh-triage holds the lock.
+// and no error when another gh-desk holds the lock.
 func Open(dir string) (*Store, error) {
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return nil, err
@@ -73,14 +73,14 @@ func Open(dir string) (*Store, error) {
 }
 
 // holder is who holds the lock, written in the lock file so another
-// gh-triage can say which one keeps the merges that wait.
+// gh-desk can say which one keeps the merges that wait.
 type holder struct {
 	PID int    `json:"pid"`
 	Dir string `json:"dir"`
 }
 
 // writeHolder writes this process into the lock file it holds. A failure
-// leaves the others saying "another gh-triage" without naming it.
+// leaves the others saying "another gh-desk" without naming it.
 func writeHolder(f *os.File) {
 	dir, _ := os.Getwd()
 	b, err := json.Marshal(holder{PID: os.Getpid(), Dir: dir})
@@ -94,7 +94,7 @@ func writeHolder(f *os.File) {
 
 // Holder reads who holds the lock in dir: its process ID and the directory
 // it was started in. It reports false when the lock file names no one, as
-// one written by an older gh-triage does.
+// one written by an older gh-desk does.
 func Holder(dir string) (pid int, wd string, ok bool) {
 	b, err := os.ReadFile(filepath.Join(dir, "pending.lock"))
 	if err != nil {

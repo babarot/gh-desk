@@ -6,10 +6,10 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/babarot/gh-triage/internal/model"
-	"github.com/babarot/gh-triage/internal/plan"
-	"github.com/babarot/gh-triage/internal/runner"
-	"github.com/babarot/gh-triage/internal/tui/keymap"
+	"github.com/babarot/gh-desk/internal/model"
+	"github.com/babarot/gh-desk/internal/plan"
+	"github.com/babarot/gh-desk/internal/runner"
+	"github.com/babarot/gh-desk/internal/tui/keymap"
 )
 
 // startSet starts the TUI with set, width columns wide.
@@ -140,7 +140,7 @@ func TestGroupLeftOutIsNotSelected(t *testing.T) {
 
 func TestConfigWarningsAtStart(t *testing.T) {
 	set := testSettings()
-	set.ConfigWarnings = []string{"~/.config/gh-triage/config.toml:4:9: tabs[0].query has no is:pr"}
+	set.ConfigWarnings = []string{"~/.config/gh-desk/config.toml:4:9: tabs[0].query has no is:pr"}
 	m := startSet(t, set, 130)
 	if s := screen(m); !strings.Contains(s, "the config file has 1 warning") {
 		t.Fatalf("no notification of the warning at start:\n%s", s)

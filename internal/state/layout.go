@@ -10,7 +10,7 @@ import (
 )
 
 // Layout is how the screen was left, kept in layout.json under the state
-// directory for the next launch. It takes no lock: two gh-triage writing it
+// directory for the next launch. It takes no lock: two gh-desk writing it
 // at once leave the one written last.
 type Layout struct {
 	path string

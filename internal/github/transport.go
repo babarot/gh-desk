@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/babarot/gh-triage/internal/logging"
+	"github.com/babarot/gh-desk/internal/logging"
 )
 
 // transport logs every request to GitHub at debug, with GitHub's request ID

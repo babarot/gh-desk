@@ -6,12 +6,12 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/babarot/gh-triage/internal/model"
-	"github.com/babarot/gh-triage/internal/runner"
-	"github.com/babarot/gh-triage/internal/state"
+	"github.com/babarot/gh-desk/internal/model"
+	"github.com/babarot/gh-desk/internal/runner"
+	"github.com/babarot/gh-desk/internal/state"
 )
 
-// pendingLock is the lock on the record of pending merges for a gh-triage
+// pendingLock is the lock on the record of pending merges for a gh-desk
 // started while another held it. Once that one quits, Take takes the lock
 // and hands the record to the runner, so merges may wait from then on.
 type pendingLock struct {

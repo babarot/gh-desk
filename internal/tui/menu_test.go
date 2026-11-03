@@ -4,8 +4,8 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/babarot/gh-triage/internal/runner"
-	"github.com/babarot/gh-triage/internal/tui/keymap"
+	"github.com/babarot/gh-desk/internal/runner"
+	"github.com/babarot/gh-desk/internal/tui/keymap"
 )
 
 // The menu offers the actions the config file names, in its order; one

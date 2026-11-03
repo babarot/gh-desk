@@ -1,4 +1,4 @@
-// Package github is gh-triage's only way to GitHub: it searches pull
+// Package github is gh-desk's only way to GitHub: it searches pull
 // requests, reads notifications, details and diffs, and sends reviews, with
 // the token and host gh is logged in with. It returns model types.
 package github
@@ -21,8 +21,8 @@ import (
 	"github.com/cli/go-gh/v2/pkg/auth"
 	"github.com/cli/go-gh/v2/pkg/browser"
 
-	"github.com/babarot/gh-triage/internal/logging"
-	"github.com/babarot/gh-triage/internal/model"
+	"github.com/babarot/gh-desk/internal/logging"
+	"github.com/babarot/gh-desk/internal/model"
 )
 
 // Client talks to GitHub.

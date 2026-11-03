@@ -5,16 +5,16 @@ import (
 	"os"
 	"testing"
 
-	"github.com/babarot/gh-triage/internal/logging"
-	"github.com/babarot/gh-triage/internal/model"
+	"github.com/babarot/gh-desk/internal/logging"
+	"github.com/babarot/gh-desk/internal/model"
 )
 
 // TestLiveMergeInfo reads a public pull request from GitHub with gh's
-// login. It only reads. Run it with GH_TRIAGE_LIVE=owner/repo#n.
+// login. It only reads. Run it with GH_DESK_LIVE=owner/repo#n.
 func TestLiveMergeInfo(t *testing.T) {
-	target := os.Getenv("GH_TRIAGE_LIVE")
+	target := os.Getenv("GH_DESK_LIVE")
 	if target == "" {
-		t.Skip("set GH_TRIAGE_LIVE=owner/repo#n to read a pull request from GitHub")
+		t.Skip("set GH_DESK_LIVE=owner/repo#n to read a pull request from GitHub")
 	}
 	key, err := model.ParsePRKey(target)
 	if err != nil {

@@ -30,8 +30,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/babarot/gh-triage/internal/logging"
-	"github.com/babarot/gh-triage/internal/model"
+	"github.com/babarot/gh-desk/internal/logging"
+	"github.com/babarot/gh-desk/internal/model"
 )
 
 // Tools are the tools Claude may be given; each only reads.
@@ -159,7 +159,7 @@ func (c *Claude) Ask(ctx context.Context, r Request, progress func(Step)) (Answe
 }
 
 // skillPath is p, when it is in a skill given to Claude, as the skill's
-// name and the path in it rather than where gh-triage copied it.
+// name and the path in it rather than where gh-desk copied it.
 func (c *Claude) skillPath(p string) string {
 	if c.opt.PluginDir == "" {
 		return p
@@ -196,10 +196,10 @@ func prEnv(k model.PRKey) []string {
 		return nil
 	}
 	return append(os.Environ(),
-		"GH_TRIAGE_OWNER="+k.Owner,
-		"GH_TRIAGE_REPO="+k.Repo,
-		"GH_TRIAGE_NUMBER="+strconv.Itoa(k.Number),
-		"GH_TRIAGE_URL=https://github.com/"+k.Owner+"/"+k.Repo,
+		"GH_DESK_OWNER="+k.Owner,
+		"GH_DESK_REPO="+k.Repo,
+		"GH_DESK_NUMBER="+strconv.Itoa(k.Number),
+		"GH_DESK_URL=https://github.com/"+k.Owner+"/"+k.Repo,
 	)
 }
 

@@ -25,7 +25,7 @@ GitHub's search is also slow: its response time grows with the number of results
 ## Consequences
 
 - A tab shows what is open now, with its state, in one query per page.
-- A review sent from gh-triage can mark the pull request's notification done (`review.mark_done`), so the inbox empties as the work is done.
+- A review sent from gh-desk can mark the pull request's notification done (`review.mark_done`), so the inbox empties as the work is done.
 - The first page of a large tab is visible after a few seconds, and the rest fills in; the count in the tab's title is GitHub's total from the first page.
 - Showing whether only approval checks are pending (◌ in the CI column) needs each check of each pull request with pending checks, one more query per list.
 - The inbox cannot be left out of the tabs: that would need notifications read apart from any tab, which they are not.

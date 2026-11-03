@@ -14,7 +14,7 @@ import (
 // theirs: the file, line and column, what is wrong, and the line with the
 // mistake marked.
 //
-//	~/.config/gh-triage/config.toml:14:12: "shift+a" is never read; write "A"
+//	~/.config/gh-desk/config.toml:14:12: "shift+a" is never read; write "A"
 //	   |
 //	14 | approve = ["shift+a"]
 //	   |           ^~~~~~~~~
@@ -34,7 +34,7 @@ type Problem struct {
 	// a setting.
 	AtKey bool
 	// Warn marks what is likely not what was meant but does not stop
-	// gh-triage, rather than a mistake that does.
+	// gh-desk, rather than a mistake that does.
 	Warn bool
 	// Line and Col place the mistake when the file says where it is
 	// itself, as for a file that does not parse; they win over Key.

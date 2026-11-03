@@ -7,10 +7,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/babarot/gh-triage/internal/config"
+	"github.com/babarot/gh-desk/internal/config"
 )
 
-// runConfig runs gh triage --config path config args.
+// runConfig runs gh desk --config path config args.
 func runConfig(t *testing.T, path string, args ...string) (int, string, string) {
 	t.Helper()
 	var out, errb bytes.Buffer
@@ -107,7 +107,7 @@ quit = ["q", "Q"]
 }
 
 func TestConfigInitEditSchema(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "gh-triage", "config.toml")
+	path := filepath.Join(t.TempDir(), "gh-desk", "config.toml")
 	if code, out, _ := runConfig(t, path, "init"); code != 0 || !strings.Contains(out, "wrote") {
 		t.Fatalf("init: code %d, out %q", code, out)
 	}

@@ -1,4 +1,4 @@
-module github.com/babarot/gh-triage
+module github.com/babarot/gh-desk
 
 go 1.26.0
 

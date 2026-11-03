@@ -385,11 +385,11 @@ var settings = []setting{
 	{Key: "merge.methods", Kind: listKind{Values: MergeMethods, NonEmpty: true}, Value: func(f File) any { return f.Merge.Methods },
 		Doc: `The order of preference among the methods a repository allows: "merge", "squash", "rebase". The first one the repository allows is used.`},
 	{Key: "merge.auto_merge", Kind: boolKind{}, Value: func(f File) any { return f.Merge.AutoMerge },
-		Doc: "Use GitHub's auto-merge where the repository allows it; elsewhere gh-triage waits for the checks and merges when they pass. Commits pushed after auto-merge is turned on are merged too, as GitHub does."},
+		Doc: "Use GitHub's auto-merge where the repository allows it; elsewhere gh-desk waits for the checks and merges when they pass. Commits pushed after auto-merge is turned on are merged too, as GitHub does."},
 	{Key: "merge.checks_timeout", Kind: durationKind{}, Value: func(f File) any { return f.Merge.ChecksTimeout },
-		Doc: "Where gh-triage waits, how long to wait for required checks still running. Only the time gh-triage is running counts."},
+		Doc: "Where gh-desk waits, how long to wait for required checks still running. Only the time gh-desk is running counts."},
 	{Key: "merge.blocked_timeout", Kind: durationKind{}, Value: func(f File) any { return f.Merge.BlockedTimeout },
-		Doc: "Where gh-triage waits, how long a pull request may stay blocked by another rule (a second approval, code owners) after its required checks finished. Only the time gh-triage is running counts."},
+		Doc: "Where gh-desk waits, how long a pull request may stay blocked by another rule (a second approval, code owners) after its required checks finished. Only the time gh-desk is running counts."},
 	{Key: "merge.update_branch", Kind: enumKind{UpdateBranchValues}, Value: func(f File) any { return f.Merge.UpdateBranch },
 		Doc: `Whose branch is updated when it is behind its base: "humans" (default), "all" or "never". Bots rebase their own branches, and some (renovate) stop updating a branch someone else committed to.`},
 
@@ -409,12 +409,12 @@ var settings = []setting{
 	{Key: "claude.release_notes_check", Kind: boolKind{}, Value: func(f File) any { return f.Claude.ReleaseNotesCheck },
 		Doc: "Let Claude read the release notes of the bot pull requests in the merge popup, and mark those that need care."},
 	{Key: "claude.mcp_servers", Kind: mcpServersKind{}, Value: func(f File) any { return f.Claude.MCPServers },
-		Example: `{ recall = { command = "recall", args = ["mcp", "--repo", "${GH_TRIAGE_URL}"], tools = ["recall_search", "recall_list", "recall_export"] } }`,
-		Doc:     "MCP servers for the conversation about a pull request, by name, written as Claude Code configures a server (command, args, env; or type, url, headers), with tools: the server's tools that may run without a prompt. A server started with a command runs in the cache, not in the worktree. ${GH_TRIAGE_OWNER}, ${GH_TRIAGE_REPO}, ${GH_TRIAGE_NUMBER} and ${GH_TRIAGE_URL} (the repository's URL) are the pull request; pass secrets as ${VAR} from your environment. What the pull request says may call these tools: a server that reads private data, together with WebFetch, lets it send the data out."},
+		Example: `{ recall = { command = "recall", args = ["mcp", "--repo", "${GH_DESK_URL}"], tools = ["recall_search", "recall_list", "recall_export"] } }`,
+		Doc:     "MCP servers for the conversation about a pull request, by name, written as Claude Code configures a server (command, args, env; or type, url, headers), with tools: the server's tools that may run without a prompt. A server started with a command runs in the cache, not in the worktree. ${GH_DESK_OWNER}, ${GH_DESK_REPO}, ${GH_DESK_NUMBER} and ${GH_DESK_URL} (the repository's URL) are the pull request; pass secrets as ${VAR} from your environment. What the pull request says may call these tools: a server that reads private data, together with WebFetch, lets it send the data out."},
 
 	{Key: "claude.plugins", Kind: listKind{}, Value: func(f File) any { return f.Claude.Plugins },
 		Example: `["~/.claude/plugins/cache/<marketplace>/<plugin>/<version>"]`,
-		Doc:     "Plugins whose skills the conversation about a pull request takes, as their directories (~ is your home). Only the skills are taken, copied when gh-triage starts, as gh-triage:<name>; the rest of a plugin (hooks, MCP servers, language servers, commands) is not. A skill whose allowed-tools grants a tool outside allowed_tools, Skill and the tools of mcp_servers is a mistake."},
+		Doc:     "Plugins whose skills the conversation about a pull request takes, as their directories (~ is your home). Only the skills are taken, copied when gh-desk starts, as gh-desk:<name>; the rest of a plugin (hooks, MCP servers, language servers, commands) is not. A skill whose allowed-tools grants a tool outside allowed_tools, Skill and the tools of mcp_servers is a mistake."},
 	{Key: "theme.dark", Kind: enumKind{Themes}, Value: func(f File) any { return f.Theme.Dark },
 		Doc: `The color scheme on a dark terminal, and on one that does not tell its background.`},
 	{Key: "theme.light", Kind: enumKind{Themes}, Value: func(f File) any { return f.Theme.Light },
@@ -427,10 +427,10 @@ var settings = []setting{
 		Doc: "Put each line of a table a frame of the spinner ahead of the one above it, so that a wave runs down a column being read."},
 
 	{Key: "log.level", Kind: stringKind{}, Value: func(f File) any { return f.Log.Level },
-		Doc: `How much goes to the log file: "debug", "info" (default), "warn" or "error". --debug and GH_TRIAGE_LOG_LEVEL take precedence. gh triage log prints where the file is.`},
+		Doc: `How much goes to the log file: "debug", "info" (default), "warn" or "error". --debug and GH_DESK_LOG_LEVEL take precedence. gh desk log prints where the file is.`},
 
-	{Key: "cache.dir", Kind: stringKind{NonEmpty: true}, Value: func(f File) any { return f.Cache.Dir }, Example: `"~/.cache/gh-triage"`,
-		Doc: "Where gh-triage keeps its clones and the worktrees Claude reads, and the lists last read (lists.json, shown at once at the next launch) (~ is your home); by default $XDG_CACHE_HOME/gh-triage, or ~/.cache/gh-triage."},
+	{Key: "cache.dir", Kind: stringKind{NonEmpty: true}, Value: func(f File) any { return f.Cache.Dir }, Example: `"~/.cache/gh-desk"`,
+		Doc: "Where gh-desk keeps its clones and the worktrees Claude reads, and the lists last read (lists.json, shown at once at the next launch) (~ is your home); by default $XDG_CACHE_HOME/gh-desk, or ~/.cache/gh-desk."},
 }
 
 // elems are the keys of the arrays of tables.
@@ -469,7 +469,7 @@ func checkSettings(f File) Problems {
 	return ps
 }
 
-const templateHead = `# gh-triage settings. Uncomment a line to change it.
+const templateHead = `# gh-desk settings. Uncomment a line to change it.
 
 # The tabs, in the order shown; the keys 1 to 9 go to them. Tabs given here
 # replace all four below, and one of them must be the inbox. A tab is a
@@ -564,7 +564,7 @@ const keysHead = `[keys]
 
 // SchemaURL is where the JSON Schema of the file is published; the
 // template names it for editors that read it (taplo).
-const SchemaURL = "https://raw.githubusercontent.com/babarot/gh-triage/main/docs/config.schema.json"
+const SchemaURL = "https://raw.githubusercontent.com/babarot/gh-desk/main/docs/config.schema.json"
 
 // Template is the config file written on first run: every setting at its
 // default, commented out, so a default changed later still applies until
@@ -648,7 +648,7 @@ func Schema() []byte {
 		"additionalProperties": key}
 	s := map[string]any{
 		"$schema":              "http://json-schema.org/draft-07/schema#",
-		"title":                "gh-triage config",
+		"title":                "gh-desk config",
 		"type":                 "object",
 		"additionalProperties": false,
 		"properties":           props,

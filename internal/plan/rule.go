@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/babarot/gh-triage/internal/model"
+	"github.com/babarot/gh-desk/internal/model"
 )
 
 // Rule picks pull requests for S: a pull request matches when it meets

@@ -6,7 +6,7 @@ Accepted
 
 ## Context
 
-gh-triage will grow parts that are easy to tangle: a TUI, a GitHub client, a runner that approves and merges many pull requests while waiting for checks, a record of pending merges that survives a restart, and a Claude Code subprocess. Once the bulk merge logic calls into the TUI, or the TUI calls GitHub directly, the irreversible parts (approving, merging) can no longer be tested without a terminal and a network, and untangling them later costs more than keeping them apart from the start.
+gh-desk will grow parts that are easy to tangle: a TUI, a GitHub client, a runner that approves and merges many pull requests while waiting for checks, a record of pending merges that survives a restart, and a Claude Code subprocess. Once the bulk merge logic calls into the TUI, or the TUI calls GitHub directly, the irreversible parts (approving, merging) can no longer be tested without a terminal and a network, and untangling them later costs more than keeping them apart from the start.
 
 ## Decision
 

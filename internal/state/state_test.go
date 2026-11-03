@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/babarot/gh-triage/internal/model"
+	"github.com/babarot/gh-desk/internal/model"
 )
 
 func TestStore(t *testing.T) {
@@ -53,7 +53,7 @@ func TestHolderUnknown(t *testing.T) {
 	if _, _, ok := Holder(dir); ok {
 		t.Fatal("Holder with no lock file reported one")
 	}
-	// An older gh-triage leaves the lock file empty.
+	// An older gh-desk leaves the lock file empty.
 	if err := os.WriteFile(filepath.Join(dir, "pending.lock"), nil, 0o600); err != nil {
 		t.Fatal(err)
 	}

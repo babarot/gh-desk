@@ -10,14 +10,14 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/babarot/gh-triage/internal/logging"
-	"github.com/babarot/gh-triage/internal/model"
+	"github.com/babarot/gh-desk/internal/logging"
+	"github.com/babarot/gh-desk/internal/model"
 )
 
 func TestWriteMCPConfig(t *testing.T) {
 	dir, cwd := t.TempDir(), t.TempDir()
 	servers := map[string]map[string]any{
-		"recall": {"command": "recall", "args": []any{"mcp", "--repo", "${GH_TRIAGE_URL}"}, "env": map[string]any{"TOKEN": "${TOKEN}"}, "tools": []any{"recall_search", "recall_list"}},
+		"recall": {"command": "recall", "args": []any{"mcp", "--repo", "${GH_DESK_URL}"}, "env": map[string]any{"TOKEN": "${TOKEN}"}, "tools": []any{"recall_search", "recall_list"}},
 		"web":    {"type": "http", "url": "https://example.com/mcp", "tools": []any{"fetch"}},
 	}
 	path, tools, err := WriteMCPConfig(dir, cwd, servers)
@@ -67,7 +67,7 @@ func TestConversationTakesServersAndGuard(t *testing.T) {
 	wt := t.TempDir()
 	c := New(Options{Bin: bin, Model: "opus", Tools: []string{"Read"}, MCPConfig: "/cache/runs/run-1/mcp.json",
 		MCPTools: []string{"mcp__recall__recall_search"}, Log: logging.Discard()})
-	pr := model.PRKey{Owner: "babarot", Repo: "gh-triage", Number: 7}
+	pr := model.PRKey{Owner: "babarot", Repo: "gh-desk", Number: 7}
 	if _, err := c.Ask(context.Background(), Request{PR: pr, Dir: wt, Session: "s-1", First: true, Prompt: "Review."}, func(Step) {}); err != nil {
 		t.Fatal(err)
 	}
@@ -77,11 +77,11 @@ func TestConversationTakesServersAndGuard(t *testing.T) {
 			t.Errorf("%v not in %q", want, conv)
 		}
 	}
-	if env := read(t, filepath.Join(out, "env")); !strings.Contains(env, "GH_TRIAGE_URL=https://github.com/babarot/gh-triage\n") || !strings.Contains(env, "GH_TRIAGE_NUMBER=7\n") {
+	if env := read(t, filepath.Join(out, "env")); !strings.Contains(env, "GH_DESK_URL=https://github.com/babarot/gh-desk\n") || !strings.Contains(env, "GH_DESK_NUMBER=7\n") {
 		t.Errorf("env = %q", env)
 	}
 	cmd := c.Interactive(pr, wt, "s-1")
-	if i := slices.Index(cmd.Args, "--settings"); i < 0 || cmd.Args[i+1] != guard || !slices.Contains(cmd.Args, "/cache/runs/run-1/mcp.json") || !slices.Contains(cmd.Env, "GH_TRIAGE_REPO=gh-triage") {
+	if i := slices.Index(cmd.Args, "--settings"); i < 0 || cmd.Args[i+1] != guard || !slices.Contains(cmd.Args, "/cache/runs/run-1/mcp.json") || !slices.Contains(cmd.Env, "GH_DESK_REPO=gh-desk") {
 		t.Errorf("interactive = %q", cmd.Args)
 	}
 

@@ -9,7 +9,7 @@ import (
 
 // themes are the color schemes that can be chosen by name.
 var themes = map[string]palette{
-	// default is gh-triage's own: Catppuccin Mocha made lighter, so that
+	// default is gh-desk's own: Catppuccin Mocha made lighter, so that
 	// the surfaces stand out on a terminal.
 	"default": {
 		dark: true,

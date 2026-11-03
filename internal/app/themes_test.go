@@ -4,8 +4,8 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/babarot/gh-triage/internal/config"
-	"github.com/babarot/gh-triage/internal/tui"
+	"github.com/babarot/gh-desk/internal/config"
+	"github.com/babarot/gh-desk/internal/tui"
 )
 
 // TestThemesInStep keeps the themes the config file takes the same as

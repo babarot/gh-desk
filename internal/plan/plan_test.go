@@ -4,7 +4,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/babarot/gh-triage/internal/model"
+	"github.com/babarot/gh-desk/internal/model"
 )
 
 func TestGroupOf(t *testing.T) {

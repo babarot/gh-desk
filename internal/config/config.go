@@ -1,4 +1,4 @@
-// Package config reads gh-triage's config file, writes it out with every
+// Package config reads gh-desk's config file, writes it out with every
 // setting at its default on first run, and reports each mistake where it is
 // in the file.
 //
@@ -26,7 +26,7 @@ import (
 
 	"github.com/pelletier/go-toml/v2"
 
-	"github.com/babarot/gh-triage/internal/near"
+	"github.com/babarot/gh-desk/internal/near"
 )
 
 // The values of the settings that take one of a few.
@@ -160,7 +160,7 @@ type Checks struct {
 // Review configures sending a review.
 type Review struct {
 	// MarkDone marks a pull request's notification done after a review
-	// is sent from gh-triage.
+	// is sent from gh-desk.
 	MarkDone bool
 	// Editor is the command ctrl+e runs to write a review, with its
 	// arguments; "" when not set, which takes $VISUAL, then $EDITOR.
@@ -176,7 +176,7 @@ type Merge struct {
 	AutoMerge bool
 	// ChecksTimeout is how long to wait for required checks still running,
 	// and BlockedTimeout how long a pull request may stay blocked after
-	// they finished. Both count only time gh-triage is running.
+	// they finished. Both count only time gh-desk is running.
 	ChecksTimeout  Duration
 	BlockedTimeout Duration
 	// UpdateBranch is who gets their branch updated when behind: "humans",
@@ -290,12 +290,12 @@ type Theme struct {
 
 // Log configures the log file.
 type Log struct {
-	// Level is debug, info, warn or error; --debug and GH_TRIAGE_LOG_LEVEL
+	// Level is debug, info, warn or error; --debug and GH_DESK_LOG_LEVEL
 	// take precedence.
 	Level string `toml:"level"`
 }
 
-// Cache configures where gh-triage keeps what it can read again.
+// Cache configures where gh-desk keeps what it can read again.
 type Cache struct {
 	// Dir holds the clones and worktrees Claude reads, and the lists last
 	// read; ~ is the home directory.
@@ -330,7 +330,7 @@ func defaultCacheDir() string {
 	if dir == "" {
 		dir = filepath.Join(homeDir(), ".cache")
 	}
-	return filepath.Join(dir, "gh-triage")
+	return filepath.Join(dir, "gh-desk")
 }
 
 // Keys are the actions under [keys], by name.
@@ -377,14 +377,14 @@ func homeDir() string {
 	return "."
 }
 
-// FilePath is where the config file is: $XDG_CONFIG_HOME/gh-triage, or
-// ~/.config/gh-triage.
+// FilePath is where the config file is: $XDG_CONFIG_HOME/gh-desk, or
+// ~/.config/gh-desk.
 func FilePath() string {
 	dir := os.Getenv("XDG_CONFIG_HOME")
 	if dir == "" {
 		dir = filepath.Join(homeDir(), ".config")
 	}
-	return filepath.Join(dir, "gh-triage", "config.toml")
+	return filepath.Join(dir, "gh-desk", "config.toml")
 }
 
 // WriteTemplate writes Template(keys) to path unless a file is already
@@ -498,7 +498,7 @@ func set[T any](dst *T, p *T) {
 // keys left out of the file keep their defaults. A key it does not know is
 // an error, since it would otherwise be ignored without a word. The
 // problems returned with a File are warnings: what is likely not what was
-// meant, which does not stop gh-triage.
+// meant, which does not stop gh-desk.
 func Load(path string) (File, Problems, error) {
 	src, err := os.ReadFile(path)
 	if err != nil {
@@ -891,7 +891,7 @@ var moved = map[string]string{
 	"ui":                  `moved: theme is theme.dark and theme.light; stale_days and home_owners are under [list]; editor is review.editor; approval_checks is checks.approval`,
 	"refresh":             `moved: refresh.interval is list.refresh, and "0" is "off"`,
 	"preview.description": `moved to "description.style"`,
-	"merge.watch_timeout": `is no longer a setting: gh-triage watches a pull request on auto-merge for 24h, and GitHub's auto-merge goes on after`,
+	"merge.watch_timeout": `is no longer a setting: gh-desk watches a pull request on auto-merge for 24h, and GitHub's auto-merge goes on after`,
 }
 
 // settingsIn are the keys the file may have in table, a path of table

@@ -1,6 +1,6 @@
 // Package chat holds the conversations with Claude about pull requests:
 // what each one holds, keeping them between launches and between
-// gh-triage, and their locks (ADR-031). How a conversation is drawn, what
+// gh-desk, and their locks (ADR-031). How a conversation is drawn, what
 // the keys do in it and which one is on screen are internal/tui's. Only
 // this package changes a conversation; see ADR-033.
 package chat
@@ -13,13 +13,13 @@ import (
 	"sync"
 	"time"
 
-	"github.com/babarot/gh-triage/internal/claude"
-	"github.com/babarot/gh-triage/internal/logging"
-	"github.com/babarot/gh-triage/internal/model"
+	"github.com/babarot/gh-desk/internal/claude"
+	"github.com/babarot/gh-desk/internal/logging"
+	"github.com/babarot/gh-desk/internal/model"
 )
 
 // Store keeps the conversations with Claude between launches and between
-// gh-triage, one a pull request, each with a lock held while Claude Code
+// gh-desk, one a pull request, each with a lock held while Claude Code
 // works on its session. See ADR-031.
 type Store interface {
 	// Load reads the conversation about k; ok is false when there is none.
@@ -29,7 +29,7 @@ type Store interface {
 	// Keys are the pull requests that have a conversation kept.
 	Keys() ([]model.PRKey, error)
 	// Lock takes the lock of k without waiting; held is false when
-	// another gh-triage holds it, and who names that one when it can.
+	// another gh-desk holds it, and who names that one when it can.
 	Lock(k model.PRKey) (unlock func(), held bool, who string, err error)
 }
 
@@ -89,7 +89,7 @@ type Status interface {
 
 // Conversation is a conversation with Claude about one pull request. It
 // stays when the screen is left, and goes on when it is opened again; when
-// kept, also after gh-triage quits and in another gh-triage.
+// kept, also after gh-desk quits and in another gh-desk.
 type Conversation struct {
 	pr model.PR
 	// session is made when a question starts it, as an ID Claude Code may
@@ -119,7 +119,7 @@ type Conversation struct {
 	// on its session: a question on its way, or Claude Code in the
 	// terminal.
 	lock func()
-	// elsewhere names the gh-triage that holds the lock, when another one
+	// elsewhere names the gh-desk that holds the lock, when another one
 	// does, as last found at probed.
 	elsewhere string
 	probed    time.Time
@@ -166,7 +166,7 @@ func (c *Conversation) Cost() float64 { return c.cost }
 // Model is the model that answered last.
 func (c *Conversation) Model() string { return c.model }
 
-// Elsewhere names the gh-triage working on the conversation, when another
+// Elsewhere names the gh-desk working on the conversation, when another
 // one is, as last found at Probed.
 func (c *Conversation) Elsewhere() string { return c.elsewhere }
 
@@ -234,7 +234,7 @@ func (c *Conversation) record() Record {
 }
 
 // load puts what is kept of the conversation in c, leaving what belongs
-// to this gh-triage (the lock, the question on its way).
+// to this gh-desk (the lock, the question on its way).
 func (c *Conversation) load(r Record) {
 	c.session, c.started, c.dir, c.head, c.model, c.cost, c.rev = r.Session, r.Started, r.Dir, r.Head, r.Model, r.Cost, r.Rev
 	c.turns = slices.Clone(r.Turns)
@@ -243,7 +243,7 @@ func (c *Conversation) load(r Record) {
 // State keeps the conversations and takes their locks, and moves a
 // question along.
 type State struct {
-	// store keeps the conversations; nil keeps them only while gh-triage
+	// store keeps the conversations; nil keeps them only while gh-desk
 	// runs.
 	store  Store
 	log    *slog.Logger
@@ -259,7 +259,7 @@ type State struct {
 	asking *sync.WaitGroup
 }
 
-// NewState keeps the conversations in store, or only while gh-triage runs
+// NewState keeps the conversations in store, or only while gh-desk runs
 // when store is nil.
 func NewState(store Store, log *slog.Logger, now func() time.Time, status Status) *State {
 	return &State{store: store, log: log, now: now, status: status,
@@ -279,7 +279,7 @@ func (s *State) Asking() *sync.WaitGroup { return s.asking }
 func (s *State) kept(c *Conversation) bool { return s.store != nil && c.persist }
 
 // Sync makes c what is kept of it, when what is kept is newer, unless this
-// gh-triage holds its lock and is working on it: then what is kept has not
+// gh-desk holds its lock and is working on it: then what is kept has not
 // changed.
 func (s *State) Sync(c *Conversation) {
 	if c.lock != nil {
@@ -289,10 +289,10 @@ func (s *State) Sync(c *Conversation) {
 }
 
 // Reload makes c what is kept of it, when what is kept is newer: written by
-// another gh-triage, or started over there. A conversation that was kept
-// and is gone was removed by gh triage gc, and is dropped here too, so it
+// another gh-desk, or started over there. A conversation that was kept
+// and is gone was removed by gh desk gc, and is dropped here too, so it
 // is not written back. Right after its lock is taken, it reads what
-// another gh-triage wrote before letting go.
+// another gh-desk wrote before letting go.
 func (s *State) Reload(c *Conversation) {
 	if !s.kept(c) {
 		return
@@ -318,7 +318,7 @@ func (s *State) Reload(c *Conversation) {
 	}
 }
 
-// Probe finds out whether another gh-triage is working on c's session, by
+// Probe finds out whether another gh-desk is working on c's session, by
 // taking its lock for a moment: a lock cannot be looked at otherwise.
 func (s *State) Probe(c *Conversation) {
 	c.elsewhere, c.probed = "", s.now()
@@ -330,16 +330,16 @@ func (s *State) Probe(c *Conversation) {
 	case err != nil:
 		s.log.Warn("could not try the lock of a conversation", logging.KeyPR, c.pr.Key.String(), "err", err.Error())
 	case !held:
-		c.elsewhere = cmp.Or(who, "another gh-triage")
+		c.elsewhere = cmp.Or(who, "another gh-desk")
 	default:
 		unlock()
 	}
 }
 
-// Lock takes c's lock unless this gh-triage holds it. It reports false,
-// having said why, when another gh-triage holds it. A lock that cannot be
+// Lock takes c's lock unless this gh-desk holds it. It reports false,
+// having said why, when another gh-desk holds it. A lock that cannot be
 // taken at all (the state directory cannot be written) leaves the
-// conversation in this gh-triage alone, no longer kept.
+// conversation in this gh-desk alone, no longer kept.
 func (s *State) Lock(c *Conversation) bool {
 	if s.store == nil || c.lock != nil {
 		return true
@@ -351,8 +351,8 @@ func (s *State) Lock(c *Conversation) bool {
 		s.stopKeeping(c, err)
 		return true
 	case !held:
-		c.elsewhere = cmp.Or(who, "another gh-triage")
-		s.status.Refuse("Claude is working on this conversation in another gh-triage (" + c.elsewhere + ")")
+		c.elsewhere = cmp.Or(who, "another gh-desk")
+		s.status.Refuse("Claude is working on this conversation in another gh-desk (" + c.elsewhere + ")")
 		return false
 	}
 	c.lock, c.elsewhere = unlock, ""
@@ -360,7 +360,7 @@ func (s *State) Lock(c *Conversation) bool {
 }
 
 // save keeps c, under its lock. A write that fails stops keeping it for
-// this run, so a later one cannot write over what another gh-triage wrote
+// this run, so a later one cannot write over what another gh-desk wrote
 // meanwhile.
 func (s *State) save(c *Conversation) {
 	if !s.kept(c) {
@@ -448,7 +448,7 @@ func (s *State) Begin(c *Conversation, shown string) (moved string, ok bool) {
 }
 
 // Keep keeps c once its question is answered, or has failed, and frees
-// the session for another gh-triage.
+// the session for another gh-desk.
 func (s *State) Keep(c *Conversation) {
 	c.steps = nil
 	s.save(c)
@@ -457,9 +457,9 @@ func (s *State) Keep(c *Conversation) {
 
 // Restart starts c over, with nothing asked, under its lock, which it
 // frees after. What is kept is replaced rather than removed, so its rev goes on
-// rising and another gh-triage sees its own as older; Claude Code keeps
+// rising and another gh-desk sees its own as older; Claude Code keeps
 // the old session. It reports false, having said why, when another
-// gh-triage holds the lock.
+// gh-desk holds the lock.
 func (s *State) Restart(c *Conversation) bool {
 	if !s.Lock(c) {
 		return false

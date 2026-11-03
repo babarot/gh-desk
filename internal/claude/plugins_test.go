@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/babarot/gh-triage/internal/logging"
+	"github.com/babarot/gh-desk/internal/logging"
 )
 
 // plugin makes a plugin in a new directory, files by path under it.
@@ -42,7 +42,7 @@ func TestPluginSkillsTakeOnlySkills(t *testing.T) {
 		"commands/c.md":                   "a command",
 	})
 	skills, ps := PluginSkills([]string{dir}, allowed)
-	if len(ps) > 0 || len(skills) != 1 || skills[0].Name != "gh-triage:review" {
+	if len(ps) > 0 || len(skills) != 1 || skills[0].Name != "gh-desk:review" {
 		t.Fatalf("skills %+v, problems %+v", skills, ps)
 	}
 	root, err := WritePlugin(t.TempDir(), skills, allowed)
@@ -148,9 +148,9 @@ func TestConversationTakesSkills(t *testing.T) {
 
 func TestStepArgOfSkillsAndServers(t *testing.T) {
 	for in, want := range map[string]string{
-		`{"skill":"gh-triage:review-checklist"}`: "gh-triage:review-checklist",
-		`{"query":"retry policy","limit":5}`:     "retry policy",
-		`{"file_path":"/a/b.go"}`:                "/a/b.go",
+		`{"skill":"gh-desk:review-checklist"}`: "gh-desk:review-checklist",
+		`{"query":"retry policy","limit":5}`:   "retry policy",
+		`{"file_path":"/a/b.go"}`:              "/a/b.go",
 	} {
 		if got := stepArg([]byte(in)); got != want {
 			t.Errorf("stepArg(%s) = %q, want %q", in, got, want)
@@ -158,7 +158,7 @@ func TestStepArgOfSkillsAndServers(t *testing.T) {
 	}
 	c := New(Options{PluginDir: "/cache/runs/run-1/plugin", Log: logging.Discard()})
 	for p, want := range map[string]string{
-		"/cache/runs/run-1/plugin/skills/review/references/how.md": "gh-triage:review/references/how.md",
+		"/cache/runs/run-1/plugin/skills/review/references/how.md": "gh-desk:review/references/how.md",
 		"/cache/runs/run-1/plugin/.claude-plugin/plugin.json":      "/cache/runs/run-1/plugin/.claude-plugin/plugin.json",
 		"/work/tree/main.go": "/work/tree/main.go",
 	} {

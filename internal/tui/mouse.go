@@ -9,7 +9,7 @@ import (
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
 
-	"github.com/babarot/gh-triage/internal/model"
+	"github.com/babarot/gh-desk/internal/model"
 )
 
 // The mouse points: it picks a tab or a row, folds a group with a click,
@@ -283,7 +283,7 @@ func (m *Model) drawArmed(lines []string) []string {
 // the list.
 func (m *Model) linkUnder(x, y int) (spot, bool) {
 	if y == 0 {
-		lead := lipgloss.Width(m.st.app.Render("triage") + m.st.dim.Render(" // "))
+		lead := lipgloss.Width(m.st.app.Render("desk") + m.st.dim.Render(" // "))
 		if name := m.viewerName(); name != "" && spanAt([]int{lipgloss.Width(name)}, 0, x-lead) == 0 {
 			return spot{url: m.webURL(m.viewer), x: lead, y: y, w: lipgloss.Width(name), row: -1}, true
 		}

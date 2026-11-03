@@ -8,14 +8,14 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/babarot/gh-triage/internal/model"
-	"github.com/babarot/gh-triage/internal/runner"
-	"github.com/babarot/gh-triage/internal/tui/chat"
-	"github.com/babarot/gh-triage/internal/tui/keymap"
+	"github.com/babarot/gh-desk/internal/model"
+	"github.com/babarot/gh-desk/internal/runner"
+	"github.com/babarot/gh-desk/internal/tui/chat"
+	"github.com/babarot/gh-desk/internal/tui/keymap"
 )
 
 // fakeChats keeps conversations in memory. Two Models given one stand for
-// two gh-triage sharing the state directory.
+// two gh-desk sharing the state directory.
 type fakeChats struct {
 	recs map[model.PRKey]chat.Record
 	// held names who holds each lock.
@@ -105,10 +105,10 @@ func TestConversationGoesOnInAnotherLaunch(t *testing.T) {
 		t.Errorf("request %+v; want the session kept resumed", r)
 	}
 
-	// The first gh-triage reads what the second one added.
+	// The first gh-desk reads what the second one added.
 	press(m1, "esc", "i")
 	if s := chatText(m1); !strings.Contains(s, "more") {
-		t.Errorf("the other gh-triage's question is not shown:\n%s", s)
+		t.Errorf("the other gh-desk's question is not shown:\n%s", s)
 	}
 }
 
@@ -166,7 +166,7 @@ func TestConversationCutShort(t *testing.T) {
 	if len(fc.asked) != 0 {
 		t.Fatalf("asked %d", len(fc.asked))
 	}
-	if s := screen(m); !strings.Contains(s, "interrupted: gh-triage was closed before the answer") {
+	if s := screen(m); !strings.Contains(s, "interrupted: gh-desk was closed before the answer") {
 		t.Errorf("no interrupted:\n%s", s)
 	}
 	// A session that never answered is not used again: Claude Code may
@@ -191,12 +191,12 @@ func TestConversationWorkedOnElsewhere(t *testing.T) {
 	if len(fc.asked) != 0 {
 		t.Fatalf("asked %d", len(fc.asked))
 	}
-	if s := screen(m); !strings.Contains(s, "answering in another gh-triage (pid 42 in /there)") || strings.Contains(s, "interrupted") {
+	if s := screen(m); !strings.Contains(s, "answering in another gh-desk (pid 42 in /there)") || strings.Contains(s, "interrupted") {
 		t.Errorf("not shown as answered elsewhere:\n%s", s)
 	}
 	press(m, "x", "enter")
 	if len(fc.asked) != 0 {
-		t.Fatalf("asked while another gh-triage answers")
+		t.Fatalf("asked while another gh-desk answers")
 	}
 
 	// The other one answers and lets go; the screen reads it again.
@@ -294,7 +294,7 @@ func TestConversationKeptInThePane(t *testing.T) {
 }
 
 // A question asked in a conversation left open reads first what another
-// gh-triage added meanwhile, and writes after it.
+// gh-desk added meanwhile, and writes after it.
 func TestConversationAskedAfterAnotherAdded(t *testing.T) {
 	chats := newFakeChats()
 	m1, fc1 := startKept(t, chats)

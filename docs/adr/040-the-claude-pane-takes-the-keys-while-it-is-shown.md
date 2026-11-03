@@ -12,7 +12,7 @@ ADR-038 put the conversation with Claude in place of the preview pane, with the 
 
 - While the claude pane is shown, it takes the keys; the list takes none. The pane stays on the conversation it was opened on.
 - While nothing is on its way, the text box has the focus. The conversation's own actions are on keys the text box does not type; esc goes back to the preview.
-- While Claude answers, nothing can be sent, so the text box is not shown. esc stops the answer, as in Claude Code; `chat_close` goes back to the preview while Claude goes on. An answer coming in another gh-triage cannot be stopped here, and esc goes back.
+- While Claude answers, nothing can be sent, so the text box is not shown. esc stops the answer, as in Claude Code; `chat_close` goes back to the preview while Claude goes on. An answer coming in another gh-desk cannot be stopped here, and esc goes back.
 - Pointing at the list or the header with the mouse goes back to them.
 - This replaces, in ADR-038, "The claude pane shows the conversation about the pull request under the cursor, as the preview shows that pull request. Moving the cursor changes the conversation shown; moving onto a pull request does not begin a conversation about it", and "its keys are read before the list's, so a key bound in both scopes is the conversation's there. The other keys of the list, moving the cursor among them, work as on the list." Its Consequence on keys the list and the conversation share goes with them.
 - Rejected: keeping the text box while Claude answers, and going back with backspace in an empty box. Whether backspace erases or goes back would depend on what is in the box.

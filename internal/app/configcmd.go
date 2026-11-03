@@ -12,11 +12,11 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/babarot/gh-triage/internal/config"
-	"github.com/babarot/gh-triage/internal/tui/keymap"
+	"github.com/babarot/gh-desk/internal/config"
+	"github.com/babarot/gh-desk/internal/tui/keymap"
 )
 
-const configUsage = `Usage: gh triage config <command>
+const configUsage = `Usage: gh desk config <command>
 
 Commands:
   check [path]    read the config file and print its mistakes and warnings,
@@ -30,10 +30,10 @@ Commands:
   schema          print the JSON Schema of the config file
 
 The config file is the one --config names: by default
-$XDG_CONFIG_HOME/gh-triage/config.toml, or ~/.config/gh-triage/config.toml.
+$XDG_CONFIG_HOME/gh-desk/config.toml, or ~/.config/gh-desk/config.toml.
 `
 
-// configCommand runs gh triage config with args, on the config file at
+// configCommand runs gh desk config with args, on the config file at
 // path. None of it reaches GitHub.
 func configCommand(args []string, path string, debug bool, stdout, stderr io.Writer) int {
 	if len(args) == 0 {
@@ -54,7 +54,7 @@ func configCommand(args []string, path string, debug bool, stdout, stderr io.Wri
 		}
 		return checkConfig(path, debug, stdout)
 	case "show":
-		fl := flag.NewFlagSet("gh triage config show", flag.ContinueOnError)
+		fl := flag.NewFlagSet("gh desk config show", flag.ContinueOnError)
 		fl.SetOutput(stderr)
 		diff := fl.Bool("diff", false, "only the settings that differ from the defaults")
 		if err := fl.Parse(args[1:]); err != nil || fl.NArg() > 0 {
@@ -76,7 +76,7 @@ func configCommand(args []string, path string, debug bool, stdout, stderr io.Wri
 		case errors.Is(err, fs.ErrExist):
 			fmt.Fprintf(stdout, "%s is there already; nothing was written\n", config.TildePath(path))
 		case err != nil:
-			fmt.Fprintf(stderr, "gh-triage: %v\n", err)
+			fmt.Fprintf(stderr, "gh-desk: %v\n", err)
 			return 1
 		default:
 			fmt.Fprintf(stdout, "wrote %s\n", config.TildePath(path))
@@ -96,13 +96,13 @@ func configCommand(args []string, path string, debug bool, stdout, stderr io.Wri
 		stdout.Write(config.Schema())
 		return 0
 	}
-	fmt.Fprintf(stderr, "gh-triage: unknown config command %q\n", args[0])
+	fmt.Fprintf(stderr, "gh-desk: unknown config command %q\n", args[0])
 	fmt.Fprint(stderr, configUsage)
 	return 2
 }
 
 // checkConfig prints the mistakes and warnings of the config file at
-// path, as gh-triage would find them at start, and exits 1 on a mistake.
+// path, as gh-desk would find them at start, and exits 1 on a mistake.
 func checkConfig(path string, debug bool, stdout io.Writer) int {
 	shown := config.TildePath(path)
 	if _, err := os.Stat(path); errors.Is(err, fs.ErrNotExist) {
@@ -128,7 +128,7 @@ func checkConfig(path string, debug bool, stdout io.Writer) int {
 // closed.
 func editConfig(path string, debug bool, stdout, stderr io.Writer) int {
 	if err := config.WriteTemplate(path, KeysTemplate()); err != nil && !errors.Is(err, fs.ErrExist) {
-		fmt.Fprintf(stderr, "gh-triage: %v\n", err)
+		fmt.Fprintf(stderr, "gh-desk: %v\n", err)
 		return 1
 	}
 	// The file may not read as it is; then only the environment names the
@@ -139,13 +139,13 @@ func editConfig(path string, debug bool, stdout, stderr io.Writer) int {
 	}
 	args := strings.Fields(editor(set, os.Getenv))
 	if len(args) == 0 {
-		fmt.Fprintln(stderr, "gh-triage: set review.editor, $VISUAL or $EDITOR to edit the config file")
+		fmt.Fprintln(stderr, "gh-desk: set review.editor, $VISUAL or $EDITOR to edit the config file")
 		return 1
 	}
 	cmd := exec.Command(args[0], append(args[1:], path)...)
 	cmd.Stdin, cmd.Stdout, cmd.Stderr = os.Stdin, stdout, stderr
 	if err := cmd.Run(); err != nil {
-		fmt.Fprintf(stderr, "gh-triage: %s: %v\n", args[0], err)
+		fmt.Fprintf(stderr, "gh-desk: %s: %v\n", args[0], err)
 		return 1
 	}
 	return checkConfig(path, debug, stdout)

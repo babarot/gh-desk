@@ -5,8 +5,8 @@ import (
 
 	"github.com/charmbracelet/x/ansi"
 
-	"github.com/babarot/gh-triage/internal/diff"
-	"github.com/babarot/gh-triage/internal/model"
+	"github.com/babarot/gh-desk/internal/diff"
+	"github.com/babarot/gh-desk/internal/model"
 )
 
 // Text from GitHub (titles, descriptions, comments, diffs, branch names)

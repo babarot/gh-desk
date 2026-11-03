@@ -17,10 +17,10 @@ The pull requests that reach a developer arrive in three ways that do not line u
 
 ## Decision
 
-Write a new gh extension, gh-triage, in Go with Bubble Tea v2 and go-gh v2. Lists come from GitHub search queries; notifications mark the rows they concern and have a tab of their own.
+Write a new gh extension, gh-desk, in Go with Bubble Tea v2 and go-gh v2. Lists come from GitHub search queries; notifications mark the rows they concern and have a tab of their own.
 
 ## Consequences
 
-- gh-triage owns its whole flow (listing, reviewing, bulk merging, Claude), so the parts can be designed together, at the cost of writing what gh-news and gh-dash already have (a list, a preview, key bindings).
+- gh-desk owns its whole flow (listing, reviewing, bulk merging, Claude), so the parts can be designed together, at the cost of writing what gh-news and gh-dash already have (a list, a preview, key bindings).
 - gh-news's useful ideas are taken over deliberately: showing the comment that triggered a notification, and a description view in the preview pane.
 - The patches kept for gh-news are not carried over.

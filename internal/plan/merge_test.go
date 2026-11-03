@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/babarot/gh-triage/internal/model"
+	"github.com/babarot/gh-desk/internal/model"
 )
 
 var set = Settings{

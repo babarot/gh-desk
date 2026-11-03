@@ -1,4 +1,4 @@
-# Tasks for developing gh-triage: mise tasks lists them, mise run <task> runs one.
+# Tasks for developing gh-desk: mise tasks lists them, mise run <task> runs one.
 # Go comes from wherever you have it (go.mod sets the minimum), the other
 # tools from [tools] below.
 
@@ -6,17 +6,17 @@
 golangci-lint = "2.15.0"
 
 [tasks.build]
-description = "Build ./gh-triage"
-run = "go build -trimpath -o gh-triage ."
+description = "Build ./gh-desk"
+run = "go build -trimpath -o gh-desk ."
 
 [tasks.install]
-description = "Install ./gh-triage as a gh extension, from this checkout"
+description = "Install ./gh-desk as a gh extension, from this checkout"
 depends = ["build"]
 run = "gh extension install . --force"
 
 [tasks.clean]
-description = "Remove ./gh-triage and coverage.out"
-run = "rm -f gh-triage coverage.out"
+description = "Remove ./gh-desk and coverage.out"
+run = "rm -f gh-desk coverage.out"
 
 [tasks.test]
 description = "Check formatting, and run the Go tests with the race detector, writing coverage.out"

@@ -9,8 +9,8 @@ import (
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
 
-	"github.com/babarot/gh-triage/internal/plan"
-	"github.com/babarot/gh-triage/internal/tui/keymap"
+	"github.com/babarot/gh-desk/internal/plan"
+	"github.com/babarot/gh-desk/internal/tui/keymap"
 )
 
 // View draws the screen.
@@ -229,7 +229,7 @@ func tabsAfter(to, n int) string {
 
 // headerLead is what the header shows before the tabs.
 func (m *Model) headerLead() string {
-	return m.st.app.Render("triage") + m.st.dim.Render(" // ") + m.st.muted.Render(m.viewerName()) + "   "
+	return m.st.app.Render("desk") + m.st.dim.Render(" // ") + m.st.muted.Render(m.viewerName()) + "   "
 }
 
 // viewerName is the viewer as the header shows it, which a click opens.
@@ -368,7 +368,7 @@ func (m *Model) hints() string {
 		as = append(as, "draft_review", "open_claude")
 	case m.claudeShown():
 		// While Claude answers: esc stops it, and chat_close goes back.
-		// One answering in another gh-triage is not stopped here, and
+		// One answering in another gh-desk is not stopped here, and
 		// esc goes back.
 		as = []keymap.Action{"chat_close", "help"}
 		back = ""

@@ -42,7 +42,7 @@ func TestLoadMissingFileIsDefault(t *testing.T) {
 }
 
 func TestTemplateLoadsAsDefault(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "gh-triage", "config.toml")
+	path := filepath.Join(t.TempDir(), "gh-desk", "config.toml")
 	if err := WriteTemplate(path, "# approve = \"A\"\n"); err != nil {
 		t.Fatal(err)
 	}
@@ -323,11 +323,11 @@ func TestAuthorIsNotASetting(t *testing.T) {
 func TestCacheDir(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
-	cfg, _, err := Load(write(t, "[cache]\ndir = \"~/triage\"\n"))
+	cfg, _, err := Load(write(t, "[cache]\ndir = \"~/desk\"\n"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got, want := cfg.CacheDir(), filepath.Join(home, "triage"); got != want {
+	if got, want := cfg.CacheDir(), filepath.Join(home, "desk"); got != want {
 		t.Errorf("CacheDir() = %q, want %q", got, want)
 	}
 }

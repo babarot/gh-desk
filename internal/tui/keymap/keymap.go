@@ -12,7 +12,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/babarot/gh-triage/internal/near"
+	"github.com/babarot/gh-desk/internal/near"
 )
 
 // Action is something a key does, named as it is under [keys].

@@ -8,8 +8,8 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
 
-	"github.com/babarot/gh-triage/internal/logging"
-	"github.com/babarot/gh-triage/internal/tui/chat"
+	"github.com/babarot/gh-desk/internal/logging"
+	"github.com/babarot/gh-desk/internal/tui/chat"
 )
 
 // helpText is the ? popup's lines, unstyled.
@@ -36,7 +36,7 @@ func TestHelpUnfoldsTheScreenItWasOpenedFrom(t *testing.T) {
 	if n := len(m.renderHelp(make([]string, 34))); n != 34 {
 		t.Errorf("the popup changed the screen to %d lines", n)
 	}
-	if !strings.Contains(screen(m), "triage") {
+	if !strings.Contains(screen(m), "desk // ") {
 		t.Errorf("the ? popup covers the header:\n%s", screen(m))
 	}
 

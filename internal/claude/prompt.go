@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/babarot/gh-triage/internal/model"
+	"github.com/babarot/gh-desk/internal/model"
 )
 
 const reviewInstructions = `You help the user review a GitHub pull request. The working directory is a checkout of the pull request's head; read files there to understand the change in its context. You can only read: you cannot run commands, change files, or reach GitHub.

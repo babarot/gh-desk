@@ -32,4 +32,4 @@ formatters:
   settings:
     goimports:
       local-prefixes:
-        - github.com/babarot/gh-triage
+        - github.com/babarot/gh-desk

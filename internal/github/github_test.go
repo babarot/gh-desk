@@ -11,8 +11,8 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/babarot/gh-triage/internal/logging"
-	"github.com/babarot/gh-triage/internal/model"
+	"github.com/babarot/gh-desk/internal/logging"
+	"github.com/babarot/gh-desk/internal/model"
 )
 
 // fake answers requests with canned bodies, by the first rule whose match

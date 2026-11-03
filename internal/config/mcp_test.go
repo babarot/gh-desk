@@ -9,7 +9,7 @@ import (
 func TestMCPServers(t *testing.T) {
 	cfg, _, err := Load(write(t, `[claude.mcp_servers.recall]
 command = "recall"
-args = ["mcp", "--repo", "${GH_TRIAGE_URL}"]
+args = ["mcp", "--repo", "${GH_DESK_URL}"]
 env = { TOKEN = "s3cret" }
 tools = ["recall_search", "recall_list"]
 `))

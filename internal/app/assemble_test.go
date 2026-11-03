@@ -7,11 +7,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/babarot/gh-triage/internal/config"
-	"github.com/babarot/gh-triage/internal/github"
-	"github.com/babarot/gh-triage/internal/logging"
-	"github.com/babarot/gh-triage/internal/model"
-	"github.com/babarot/gh-triage/internal/state"
+	"github.com/babarot/gh-desk/internal/config"
+	"github.com/babarot/gh-desk/internal/github"
+	"github.com/babarot/gh-desk/internal/logging"
+	"github.com/babarot/gh-desk/internal/model"
+	"github.com/babarot/gh-desk/internal/state"
 )
 
 // assembleIn runs assemble with the state and the cache in temporary
@@ -37,7 +37,7 @@ func assembleIn(t *testing.T, stateDir string, noCache bool) (parts, config.File
 	return p, cfg
 }
 
-// The first gh-triage keeps the record of pending merges and resumes what
+// The first gh-desk keeps the record of pending merges and resumes what
 // it holds.
 func TestAssembleKeepsTheRecord(t *testing.T) {
 	dir := t.TempDir()
@@ -45,7 +45,7 @@ func TestAssembleKeepsTheRecord(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	pending := model.Pending{Key: model.PRKey{Owner: "babarot", Repo: "gh-triage", Number: 1}, ID: "PR_1", Head: "abc123", Author: "me"}
+	pending := model.Pending{Key: model.PRKey{Owner: "babarot", Repo: "gh-desk", Number: 1}, ID: "PR_1", Head: "abc123", Author: "me"}
 	if err := s.Put(pending); err != nil {
 		t.Fatal(err)
 	}
@@ -70,7 +70,7 @@ func TestAssembleKeepsTheRecord(t *testing.T) {
 	}
 }
 
-// Another gh-triage holding the record leaves this one without waiting
+// Another gh-desk holding the record leaves this one without waiting
 // merges, with a lock to take the record over once the other quits.
 func TestAssembleWhileAnotherHoldsTheRecord(t *testing.T) {
 	dir := t.TempDir()

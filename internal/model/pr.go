@@ -22,7 +22,7 @@ const (
 	ReviewPending          ReviewState = "PENDING"
 )
 
-// ReviewEvent is what a review sent from gh-triage does.
+// ReviewEvent is what a review sent from gh-desk does.
 type ReviewEvent string
 
 const (
@@ -245,9 +245,9 @@ type Detail struct {
 	Comments []Comment
 }
 
-// Pending is a merge gh-triage waits for, as recorded to go on at the next
+// Pending is a merge gh-desk waits for, as recorded to go on at the next
 // launch. The times waited are kept, not the times started, so the time
-// gh-triage was not running is not counted against the limits.
+// gh-desk was not running is not counted against the limits.
 type Pending struct {
 	Key         PRKey  `json:"key"`
 	ID          string `json:"id"`
@@ -259,10 +259,10 @@ type Pending struct {
 	// Watching is set once auto-merge is on and it is only followed.
 	Watching bool `json:"watching"`
 	// Approved is set when the user's approval was on it, sent by
-	// gh-triage or there before the merge started; an approval dismissed
+	// gh-desk or there before the merge started; an approval dismissed
 	// meanwhile stops it at the next launch.
 	Approved bool `json:"approved"`
-	// Approving is set while an approval is being sent: if gh-triage
+	// Approving is set while an approval is being sent: if gh-desk
 	// stops then, whether it reached GitHub is not known.
 	Approving     bool          `json:"approving"`
 	ChecksWaited  time.Duration `json:"checks_waited"`
