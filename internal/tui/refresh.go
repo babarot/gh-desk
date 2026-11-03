@@ -72,6 +72,10 @@ func (m *Model) refreshActivity() string {
 	if m.refreshing == nil {
 		return ""
 	}
+	if text, _, _ := m.tabActivity(); text != "" {
+		// The reading of the shown tab says it, with the results cleared.
+		return ""
+	}
 	text := "refreshing…"
 	if n := m.refreshing.cleared; n > 0 {
 		text += fmt.Sprintf(" · %d results cleared", n)

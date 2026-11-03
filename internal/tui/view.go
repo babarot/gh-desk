@@ -243,10 +243,10 @@ func (m *Model) viewerName() string {
 // tabLabel is tab i as the header shows it.
 func (m *Model) tabLabel(i int) string {
 	t := m.tabs[i]
+	// A count read is shown while the rest of the tab is read: the status
+	// line tells how far the reading is (ADR-050).
 	count := "…"
 	switch {
-	case !m.tabDone(t):
-		count = m.spinner()
 	case t.inbox && t.loaded:
 		count = fmt.Sprint(m.unreadShown(t))
 	case t.loaded && t.err == nil:

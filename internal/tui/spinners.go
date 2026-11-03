@@ -82,18 +82,10 @@ func spinner(name string) spinnerStyle {
 	return spinners["dots"]
 }
 
-// spinner is the spinner's frame now, where it stands for a number that
-// is not known yet.
-func (m *Model) spinner() string { return m.spinnerAt(0) }
-
-// spinnerAt is the spinner's frame now in a cell on line i of a table.
-// With Settings.Wave each line is a frame ahead of the one above it.
-func (m *Model) spinnerAt(i int) string {
+// spinner is the spinner's frame now.
+func (m *Model) spinner() string {
 	s := m.spinStyle
-	if !m.set.Wave {
-		i = 0
-	}
-	return s.frames[(int(m.set.Now().UnixMilli()/s.every.Milliseconds())+i)%len(s.frames)]
+	return s.frames[int(m.set.Now().UnixMilli()/s.every.Milliseconds())%len(s.frames)]
 }
 
 // working is text, which says what is going on, drawn in st and led by the

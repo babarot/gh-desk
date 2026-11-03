@@ -67,6 +67,13 @@ type tab struct {
 	// heavyLeft is how many reads of heavy fields of the reading gen are
 	// not back.
 	heavyLeft int
+	// want is how many pull requests the reading gen lists, zero until
+	// its first page is back, and heavyGot how many of them have their
+	// heavy fields back: how far the reading is, for the status line.
+	want, heavyGot int
+	// told is set when the reading gen is said on the status line: the
+	// first one, read while the tab has no rows to show.
+	told bool
 	// kept are the rows a reading again no longer had, kept to show their
 	// results until a refresh.
 	kept map[model.PRKey]bool
@@ -402,6 +409,7 @@ func (m *Model) loadTab(i int) tea.Cmd {
 	t := m.tabs[i]
 	t.loading = true
 	t.gen++
+	t.want, t.heavyGot, t.told = 0, 0, !t.loaded
 	if t.inbox {
 		limit, gen := t.limit, t.gen
 		return func() tea.Msg {
@@ -709,6 +717,7 @@ func (m *Model) tabRead(msg tabMsg) tea.Cmd {
 			delete(m.cache.info, p.Key)
 		}
 	}
+	t.want = min(msg.total, t.limit)
 	prs := safePRs(msg.prs)
 	if t.pend != nil {
 		t.pend.prs = append(t.pend.prs, prs...)

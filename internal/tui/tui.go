@@ -119,9 +119,8 @@ type Settings struct {
 	ThemeDark, ThemeLight string
 	// Spinner is the name of the spinner shown while something is read.
 	Spinner string
-	// Shimmer runs a light over the text that says what is going on, and
-	// Wave puts each line of a table a frame of the spinner ahead.
-	Shimmer, Wave bool
+	// Shimmer runs a light over the text that says what is going on.
+	Shimmer bool
 	// Version is gh-desk's version, told at the foot of the ? popup.
 	Version string
 	// Editor is the command ctrl+e runs to edit a review, with its

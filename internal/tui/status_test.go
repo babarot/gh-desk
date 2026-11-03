@@ -58,7 +58,8 @@ func TestStatusRowResult(t *testing.T) {
 	m := start(t, fixture(), keymap.Default())
 	p, _, _ := m.currentPR()
 	m.progress[p.Key] = progress{text: "– conflicts"}
-	m.tab().loading = true
+	// A reading again, as r starts: not the first, so said only as r's.
+	m.tab().loading, m.tab().told = true, false
 	m.refreshing = &refreshRun{tabs: []int{m.cur}}
 	m.movedOnto()
 	row := p.Key.String() + ": – conflicts"

@@ -83,6 +83,7 @@ func (m *Model) heavyRead(msg heavyMsg) tea.Cmd {
 		return tea.Batch(cmds...)
 	}
 	t.heavyLeft--
+	t.heavyGot += len(msg.job.ids)
 	if msg.err != nil {
 		m.log.Warn("heavy fields", "tab", t.name, "err", msg.err.Error())
 	}

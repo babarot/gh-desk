@@ -63,15 +63,3 @@ func TestWorking(t *testing.T) {
 		t.Errorf("the shimmer did not move:\n%q", a)
 	}
 }
-
-func TestWave(t *testing.T) {
-	m := at(newModel(fixture(), nil), 0)
-	m.spinStyle = spinner("dots")
-	if m.spinnerAt(0) != m.spinnerAt(1) {
-		t.Errorf("lines out of step without wave")
-	}
-	m.set.Wave = true
-	if m.spinnerAt(0) == m.spinnerAt(1) || m.spinnerAt(1) != "⠙" || m.spinner() != "⠋" {
-		t.Errorf("wave: %q %q, count %q", m.spinnerAt(0), m.spinnerAt(1), m.spinner())
-	}
-}
