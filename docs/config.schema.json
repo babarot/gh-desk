@@ -41,7 +41,7 @@
     },
     "claude": {
       "additionalProperties": false,
-      "description": "C and i ask Claude Code (claude -p, with the account you are signed in with). i, or ask claude about it in the menu of enter, reviews the pull request under the cursor in a worktree of its head. C plans what to show and select in the tab shown, with no tools, and answers in the language you ask in; enter applies the plan, and an approve or a merge in it opens the confirm popup. Claude only reads: no settings files are loaded, no MCP servers but those in mcp_servers, its file tools see only the worktree, and it has none that run commands.",
+      "description": "C and i ask Claude Code (claude -p, with the account you are signed in with). i, or ask claude about it in the menu of enter, reviews the pull request under the cursor in a worktree of its head. C plans what to show and select in the tab shown, with no tools, and answers in the language you ask in; enter applies the plan, and an approve or a merge in it opens the confirm popup. Claude's own tools only read: no settings files are loaded, its file tools see only the worktree and the skills of plugins, and it has none that run commands. The conversation also takes the MCP servers of mcp_servers and the skills of plugins, which can do whatever they are made to.",
       "properties": {
         "allowed_tools": {
           "description": "The tools Claude may use, among \"Read\", \"Grep\", \"Glob\" and \"WebFetch\".",
@@ -97,6 +97,13 @@
           "description": "The model Claude Code runs, as claude --model takes it.",
           "pattern": "\\S",
           "type": "string"
+        },
+        "plugins": {
+          "description": "Plugins whose skills the conversation about a pull request takes, as their directories (~ is your home). Only the skills are taken, copied when gh-triage starts, as gh-triage:<name>; the rest of a plugin (hooks, MCP servers, language servers, commands) is not. A skill whose allowed-tools grants a tool outside allowed_tools, Skill and the tools of mcp_servers is a mistake.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
         },
         "release_notes_check": {
           "description": "Let Claude read the release notes of the bot pull requests in the merge popup, and mark those that need care.",

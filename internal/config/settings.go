@@ -343,7 +343,7 @@ var tables = []table{
 	{Name: "review"},
 	{Name: "merge"},
 	{Name: "bulk", Before: selectExamples},
-	{Name: "claude", Doc: "C and i ask Claude Code (claude -p, with the account you are signed in with). i, or ask claude about it in the menu of enter, reviews the pull request under the cursor in a worktree of its head. C plans what to show and select in the tab shown, with no tools, and answers in the language you ask in; enter applies the plan, and an approve or a merge in it opens the confirm popup. Claude only reads: no settings files are loaded, no MCP servers but those in mcp_servers, its file tools see only the worktree, and it has none that run commands."},
+	{Name: "claude", Doc: "C and i ask Claude Code (claude -p, with the account you are signed in with). i, or ask claude about it in the menu of enter, reviews the pull request under the cursor in a worktree of its head. C plans what to show and select in the tab shown, with no tools, and answers in the language you ask in; enter applies the plan, and an approve or a merge in it opens the confirm popup. Claude's own tools only read: no settings files are loaded, its file tools see only the worktree and the skills of plugins, and it has none that run commands. The conversation also takes the MCP servers of mcp_servers and the skills of plugins, which can do whatever they are made to."},
 	{Name: "theme"},
 	{Name: "log"},
 	{Name: "cache"},
@@ -412,6 +412,9 @@ var settings = []setting{
 		Example: `{ recall = { command = "recall", args = ["mcp", "--repo", "${GH_TRIAGE_URL}"], tools = ["recall_search", "recall_list", "recall_export"] } }`,
 		Doc:     "MCP servers for the conversation about a pull request, by name, written as Claude Code configures a server (command, args, env; or type, url, headers), with tools: the server's tools that may run without a prompt. A server started with a command runs in the cache, not in the worktree. ${GH_TRIAGE_OWNER}, ${GH_TRIAGE_REPO}, ${GH_TRIAGE_NUMBER} and ${GH_TRIAGE_URL} (the repository's URL) are the pull request; pass secrets as ${VAR} from your environment. What the pull request says may call these tools: a server that reads private data, together with WebFetch, lets it send the data out."},
 
+	{Key: "claude.plugins", Kind: listKind{}, Value: func(f File) any { return f.Claude.Plugins },
+		Example: `["~/.claude/plugins/cache/<marketplace>/<plugin>/<version>"]`,
+		Doc:     "Plugins whose skills the conversation about a pull request takes, as their directories (~ is your home). Only the skills are taken, copied when gh-triage starts, as gh-triage:<name>; the rest of a plugin (hooks, MCP servers, language servers, commands) is not. A skill whose allowed-tools grants a tool outside allowed_tools, Skill and the tools of mcp_servers is a mistake."},
 	{Key: "theme.dark", Kind: enumKind{Themes}, Value: func(f File) any { return f.Theme.Dark },
 		Doc: `The color scheme on a dark terminal, and on one that does not tell its background.`},
 	{Key: "theme.light", Kind: enumKind{Themes}, Value: func(f File) any { return f.Theme.Light },

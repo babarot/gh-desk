@@ -221,15 +221,17 @@ func assemble(cfg config.File, warns []string, e env, log *slog.Logger) parts {
 	}
 	opt := claude.Options{Bin: cfg.ClaudeCommand(), Model: cfg.Claude.Model, Tools: cfg.Claude.AllowedTools, Language: cfg.Claude.Language, Instructions: cfg.Claude.Instructions, Log: log}
 	release := func() {}
-	if len(cfg.Claude.MCPServers) > 0 {
+	if len(cfg.Claude.MCPServers) > 0 || len(cfg.Claude.Plugins) > 0 {
 		var err error
 		release, err = conversationFiles(cfg, &opt)
 		if err != nil {
-			log.Warn("could not write the MCP servers for Claude", "err", err.Error())
-			set.ConfigWarnings = append(set.ConfigWarnings, "claude.mcp_servers are left out: "+err.Error())
+			log.Warn("could not write the MCP servers and skills for Claude", "err", err.Error())
+			set.ConfigWarnings = append(set.ConfigWarnings, "claude.mcp_servers and claude.plugins are left out: "+err.Error())
+			opt.MCPConfig, opt.MCPTools, opt.PluginDir = "", nil, ""
 			release = func() {}
 		} else {
-			log.Debug("mcp servers", "servers", slices.Sorted(maps.Keys(cfg.Claude.MCPServers)), "tools", opt.MCPTools)
+			log.Debug("given to Claude", "servers", slices.Sorted(maps.Keys(cfg.Claude.MCPServers)), "tools", opt.MCPTools,
+				"plugins", cfg.PluginDirs(), "plugin", opt.PluginDir)
 		}
 	}
 	cl := asker{
@@ -250,12 +252,38 @@ func conversationFiles(cfg config.File, opt *claude.Options) (release func(), er
 	if err != nil {
 		return nil, err
 	}
-	opt.MCPConfig, opt.MCPTools, err = claude.WriteMCPConfig(dir, cfg.CacheDir(), cfg.Claude.MCPServers)
-	if err != nil {
+	if len(cfg.Claude.MCPServers) > 0 {
+		opt.MCPConfig, opt.MCPTools, err = claude.WriteMCPConfig(dir, cfg.CacheDir(), cfg.Claude.MCPServers)
+		if err != nil {
+			release()
+			return nil, err
+		}
+	}
+	// Load checked the plugins; they are read again, as they may have
+	// changed since, and the copy is checked once more.
+	if skills, ps := claude.PluginSkills(cfg.PluginDirs(), skillTools(cfg)); len(ps) > 0 {
 		release()
-		return nil, err
+		return nil, errors.New(ps[0].Message)
+	} else if len(skills) > 0 {
+		opt.PluginDir, err = claude.WritePlugin(dir, skills, skillTools(cfg))
+		if err != nil {
+			release()
+			return nil, err
+		}
 	}
 	return release, nil
+}
+
+// skillTools are the tools a skill may grant in allowed-tools: the
+// built-in ones Claude is given, Skill, and the tools of the MCP servers.
+func skillTools(cfg config.File) []string {
+	tools := append(slices.Clone(cfg.Claude.AllowedTools), "Skill")
+	for _, name := range slices.Sorted(maps.Keys(cfg.Claude.MCPServers)) {
+		for _, t := range config.MCPTools(cfg.Claude.MCPServers[name]) {
+			tools = append(tools, "mcp__"+name+"__"+t)
+		}
+	}
+	return tools
 }
 
 // openLists opens the lists last read by this account on this host. The
@@ -519,6 +547,11 @@ func load(path string, debug bool, level *slog.LevelVar) (config.File, keymap.Ma
 			ps = append(ps, config.Problem{Key: []string{"claude", "allowed_tools"}, Index: i,
 				Message: fmt.Sprintf("claude.allowed_tools[%d] must be one of %q (Claude only reads), got %q", i, claude.Tools, t)})
 		}
+	}
+	_, sps := claude.PluginSkills(cfg.PluginDirs(), skillTools(cfg))
+	for _, p := range sps {
+		ps = append(ps, config.Problem{Key: []string{"claude", "plugins"}, Index: p.Plugin,
+			Message: fmt.Sprintf("claude.plugins[%d]: %s", p.Plugin, p.Message)})
 	}
 	km, kps := applyKeys(cfg.Keys)
 	ps = append(ps, kps...)

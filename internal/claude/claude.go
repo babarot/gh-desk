@@ -6,9 +6,10 @@
 // is signed in with and no API key. Everything in a pull request was written
 // by someone else and may carry instructions for Claude, and its worktree
 // may add Claude Code settings (hooks, permissions, MCP servers). So every
-// run is restricted: no settings files are read, no MCP servers are started,
-// the file tools see only the worktree, and the tools are the read-only ones
-// the config names.
+// run is restricted: no settings files are read, the file tools see only
+// the worktree and the skills given to it, and the built-in tools are the read-only ones the config
+// names. No MCP server is started and no skill is given but those the user
+// configured for the conversation (ADR-033), and no hook runs.
 package claude
 
 import (
@@ -53,7 +54,20 @@ type Options struct {
 	// without a prompt; empty when there are none (ADR-033).
 	MCPConfig string
 	MCPTools  []string
+	// PluginDir is the plugin of the skills of a conversation, as
+	// WritePlugin made it; empty when there are none.
+	PluginDir string
 	Log       *slog.Logger
+}
+
+// conversationTools are the tools of a conversation beside the built-in
+// ones: the MCP servers', and Skill when there are skills.
+func (c *Claude) conversationTools() []string {
+	tools := slices.Clone(c.opt.MCPTools)
+	if c.opt.PluginDir != "" {
+		tools = append(tools, "Skill")
+	}
+	return tools
 }
 
 // Claude runs Claude Code.
@@ -136,17 +150,24 @@ type Request struct {
 // tool Claude uses.
 func (c *Claude) Ask(ctx context.Context, r Request, progress func(Step)) (Answer, error) {
 	args := c.conversation(c.session(r, reviewInstructions+"\n\nAnswer in "+c.opt.Language+".", c.opt.Tools))
-	args = append(args, "--allowedTools", strings.Join(append(slices.Clone(c.opt.Tools), c.opt.MCPTools...), ","))
+	args = append(args, "--allowedTools", strings.Join(append(slices.Clone(c.opt.Tools), c.conversationTools()...), ","))
 	return c.run(ctx, c.opt.Log.With(logging.KeyClaude, r.Session), r.Dir, prEnv(r.PR), args, r.Prompt, progress)
 }
 
 // conversation adds to args, the flags of a conversation or of Claude Code
-// in the terminal, the guard and the user's MCP servers.
+// in the terminal, the guard, the user's MCP servers and the skills.
 func (c *Claude) conversation(args []string) []string {
 	args = append(args, "--settings", guard)
 	if c.opt.MCPConfig != "" {
 		i := slices.Index(args, "--mcp-config")
 		args[i+1] = c.opt.MCPConfig
+	}
+	if d := c.opt.PluginDir; d != "" {
+		i := slices.Index(args, "--tools")
+		args[i+1] = strings.Join(append(slices.Clone(c.opt.Tools), "Skill"), ",")
+		args = slices.DeleteFunc(args, func(a string) bool { return a == "--disable-slash-commands" })
+		// The directory too, so a skill can read its own files.
+		args = append(args, "--plugin-dir", d, "--add-dir", d)
 	}
 	return args
 }

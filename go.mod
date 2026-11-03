@@ -9,6 +9,9 @@ require (
 	github.com/charmbracelet/x/ansi v0.11.9
 	github.com/cli/go-gh/v2 v2.16.2
 	github.com/pelletier/go-toml/v2 v2.4.3
+	golang.org/x/net v0.62.0
+	golang.org/x/text v0.43.0
+	gopkg.in/yaml.v3 v3.0.1
 )
 
 require (
@@ -35,10 +38,7 @@ require (
 	github.com/rivo/uniseg v0.4.7 // indirect
 	github.com/thlib/go-timezone-local v0.0.8 // indirect
 	github.com/xo/terminfo v1.0.0 // indirect
-	golang.org/x/net v0.62.0 // indirect
 	golang.org/x/sync v0.24.0 // indirect
 	golang.org/x/sys v0.49.0 // indirect
 	golang.org/x/term v0.47.0 // indirect
-	golang.org/x/text v0.43.0 // indirect
-	gopkg.in/yaml.v3 v3.0.1 // indirect
 )

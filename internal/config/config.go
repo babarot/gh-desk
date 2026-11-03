@@ -245,6 +245,18 @@ type Claude struct {
 	// request, by name, as Claude Code configures a server, with Tools
 	// (`tools`) added (ADR-033).
 	MCPServers map[string]map[string]any `toml:"mcp_servers"`
+	// Plugins are the directories of plugins whose skills the
+	// conversation takes (ADR-033); ~ is the home directory.
+	Plugins []string `toml:"plugins"`
+}
+
+// PluginDirs are Claude.Plugins with ~ expanded.
+func (f File) PluginDirs() []string {
+	out := make([]string, len(f.Claude.Plugins))
+	for i, p := range f.Claude.Plugins {
+		out[i] = expandHome(p)
+	}
+	return out
 }
 
 // MCPTools are the tools of server that may run without a prompt, as its
