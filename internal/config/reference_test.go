@@ -37,7 +37,7 @@ func Reference() string {
 	b.WriteString(referenceHead)
 
 	b.WriteString("\n## [[tabs]]\n\n")
-	b.WriteString(mdText("The tabs, in the order shown; the keys 1 to 9 go to them. Tabs given replace the default four, and one of them must be the inbox. At most " + fmt.Sprint(MaxTabs) + " tabs.") + "\n\n")
+	b.WriteString(mdText("The tabs, in the order shown; the keys 1 to 9 go to them. Tabs given replace the default four, and one of them must be the inbox. At most "+fmt.Sprint(MaxTabs)+" tabs.") + "\n\n")
 	b.WriteString("```toml\n" + defaultTabs + "```\n")
 	writeElems(&b, "tabs")
 
