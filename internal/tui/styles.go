@@ -128,7 +128,7 @@ func newStyles(p palette) styles {
 		code:      lipgloss.NewStyle().Background(p.surface0).Foreground(p.peach),
 		block:     lipgloss.NewStyle().Background(p.surface0).Foreground(p.subtext1),
 		blockLang: lipgloss.NewStyle().Background(p.surface0).Foreground(p.overlay),
-		band:      lipgloss.NewStyle().Background(mix(p.surface0, p.base, 0.5)),
+		band:      lipgloss.NewStyle().Background(p.surface0),
 	}
 }
 
