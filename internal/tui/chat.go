@@ -575,8 +575,9 @@ func (m *Model) restartChat(c *chatScreen) tea.Cmd {
 }
 
 // The chat is laid out as Claude Code lays out a conversation: a question
-// on a band from the left edge, and Claude's lines after a margin, each
-// answer led by ⏺ with its text under the text after it.
+// on a band from the left edge, as wide as the box to ask in, and Claude's
+// lines after a margin, each answer led by ⏺ with its text under the text
+// after it.
 const (
 	chatMargin = 2
 	chatIndent = 4
@@ -631,7 +632,7 @@ func (m *Model) chatLines(c *chatScreen, width int) []string {
 				head = t.Head
 			}
 			asked = t.At
-			L = append(L, m.questionLines(t.Text, width, textW)...)
+			L = append(L, m.questionLines(t.Text, textW)...)
 			if i == len(turns)-1 && !c.Running() {
 				// A question with no answer is on its way in another
 				// gh-triage, or was cut short when one quit.
@@ -689,8 +690,9 @@ func (m *Model) chatLines(c *chatScreen, width int) []string {
 	return L
 }
 
-// questionLines are a question in full, on a band as wide as the screen.
-func (m *Model) questionLines(text string, width, textW int) []string {
+// questionLines are a question in full, on a band as wide as the text
+// and the box to ask in under it.
+func (m *Model) questionLines(text string, textW int) []string {
 	st := m.st
 	var out []string
 	for i, para := range strings.Split(strings.TrimRight(safe(text), " \t\n"), "\n") {
@@ -699,7 +701,7 @@ func (m *Model) questionLines(text string, width, textW int) []string {
 			if i == 0 && j == 0 {
 				lead = st.dim.Render(">") + " "
 			}
-			out = append(out, onBackground(lead+renderSpans(l), st.band, width))
+			out = append(out, onBackground(lead+renderSpans(l), st.band, textW))
 		}
 	}
 	return out
