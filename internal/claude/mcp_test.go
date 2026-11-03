@@ -40,7 +40,8 @@ func TestWriteMCPConfig(t *testing.T) {
 	if _, ok := recall["tools"]; ok {
 		t.Errorf("tools went to Claude Code: %v", recall)
 	}
-	if recall["command"] != "/bin/sh" || recall["env"].(map[string]any)["TOKEN"] != "${TOKEN}" {
+	env, _ := recall["env"].(map[string]any)
+	if recall["command"] != "/bin/sh" || env["TOKEN"] != "${TOKEN}" {
 		t.Errorf("recall = %v", recall)
 	}
 	if web["url"] != "https://example.com/mcp" || web["command"] != nil {
@@ -48,8 +49,10 @@ func TestWriteMCPConfig(t *testing.T) {
 	}
 	// The wrapped command runs in cwd, its arguments as they are.
 	var args []string
-	for _, a := range recall["args"].([]any) {
-		args = append(args, a.(string))
+	raw, _ := recall["args"].([]any)
+	for _, a := range raw {
+		s, _ := a.(string)
+		args = append(args, s)
 	}
 	args[3], args[4] = mustEval(t, cwd), "sh"
 	args = append(args[:5], "-c", `pwd; printf '%s\n' "$@"`, "x", "a b", "$(echo no)")

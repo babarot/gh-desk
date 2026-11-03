@@ -114,7 +114,7 @@ func CheckSkill(dir string, allowed []string) (string, error) {
 	}
 	var meta map[string]any
 	if err := yaml.Unmarshal(front, &meta); err != nil {
-		return "", fmt.Errorf("its frontmatter does not read: %v", err)
+		return "", fmt.Errorf("its frontmatter does not read: %w", err)
 	}
 	for k, v := range meta {
 		if !strings.EqualFold(strings.ReplaceAll(k, "_", "-"), "allowed-tools") {
@@ -122,7 +122,7 @@ func CheckSkill(dir string, allowed []string) (string, error) {
 		}
 		tools, err := toolList(v)
 		if err != nil {
-			return "", fmt.Errorf("%s: %v", k, err)
+			return "", fmt.Errorf("%s: %w", k, err)
 		}
 		for _, t := range tools {
 			if !slices.Contains(allowed, t) {
@@ -233,7 +233,7 @@ func WritePlugin(dir string, skills []Skill, allowed []string) (string, error) {
 			return "", err
 		}
 		if _, err := CheckSkill(to, allowed); err != nil {
-			return "", fmt.Errorf("%s changed while it was copied: %v", s.Dir, err)
+			return "", fmt.Errorf("%s changed while it was copied: %w", s.Dir, err)
 		}
 	}
 	return root, nil
