@@ -190,6 +190,21 @@ func (m *Model) aboutMany(a keymap.Action, prs []model.PR) (string, bool) {
 		return of("mark ready", n), false
 	case "comment":
 		return fmt.Sprintf("the same comment on each of %d", len(prs)), false
+	case "browse":
+		return fmt.Sprintf("open %d on github.com", len(prs)), false
+	case "hide":
+		ks, _ := m.selectedHere()
+		if len(ks) == 0 {
+			return "none of them is in this tab", true
+		}
+		what := fmt.Sprintf("hide %d from this tab", len(ks))
+		if m.tab().inbox {
+			what = fmt.Sprintf("mark %d done", len(ks))
+		}
+		if skip := len(prs) - len(ks); skip > 0 {
+			what += fmt.Sprintf(", skip %d of other tabs", skip)
+		}
+		return what, false
 	}
 	return "one pull request at a time", true
 }
@@ -283,6 +298,14 @@ func (m *Model) runMenu(it menuItem) tea.Cmd {
 		return m.startBulk(runner.Ready)
 	case "comment":
 		return m.startComment()
+	}
+	if len(m.selected) > 0 {
+		switch it.action {
+		case "browse":
+			return m.browseAll(m.menuTargets())
+		case "hide":
+			return m.hideSelected()
+		}
 	}
 	p, n, ok := m.currentPR()
 	if !ok {

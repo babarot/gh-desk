@@ -101,6 +101,13 @@ func (m *Model) listKey(k string) tea.Cmd {
 	case is("review") && len(m.selected) > 0:
 		m.refuse("review: one pull request at a time")
 		return nil
+	case is("ask_claude") && len(m.selected) > 0:
+		m.refuse("ask claude: one pull request at a time")
+		return nil
+	case is("hide") && len(m.selected) > 0:
+		return m.hideSelected()
+	case is("browse") && len(m.selected) > 0:
+		return m.browseAll(m.menuTargets())
 	case is("fold_bots"):
 		if t.grouped {
 			t.folded[plan.GroupBots] = !t.folded[plan.GroupBots]
@@ -274,18 +281,88 @@ func eraseWord(s string) string {
 }
 
 // hide puts a pull request away: in a section it is hidden here only; in
-// the inbox its notification is marked done on GitHub.
+// the inbox its notification is marked done on GitHub. It leaves the
+// selection, so what is out of sight is not acted on.
 func (m *Model) hide(p model.PR, n *model.Notification) tea.Cmd {
-	t := m.tab()
-	t.hidden[p.Key] = true
-	if !t.inbox || n == nil {
+	cmd, done := m.putAway(p.Key, n)
+	if done {
+		m.say(fmt.Sprintf("marked done: %s", p.Key))
+	} else {
 		m.say(fmt.Sprintf("hidden here: %s (the request on GitHub stays)", p.Key))
-		return m.ensure()
 	}
-	delete(m.unread, p.Key)
+	return tea.Batch(m.ensure(), cmd)
+}
+
+// putAway hides k in the tab shown and takes it out of the selection; in
+// the inbox, with its notification n, it also marks n done, and done says
+// so.
+func (m *Model) putAway(k model.PRKey, n *model.Notification) (cmd tea.Cmd, done bool) {
+	t := m.tab()
+	t.hidden[k] = true
+	delete(m.selected, k)
+	if !t.inbox || n == nil {
+		return nil, false
+	}
+	delete(m.unread, k)
 	note := *n
-	m.say(fmt.Sprintf("marked done: %s", p.Key))
-	return tea.Batch(m.ensure(), func() tea.Msg { return doneMsg{note, m.src.MarkDone(m.ctx, note)} })
+	return func() tea.Msg { return doneMsg{note, m.src.MarkDone(m.ctx, note)} }, true
+}
+
+// selectedHere are the selected pull requests the tab shown has and has
+// not put away, each with its notification in the inbox.
+func (m *Model) selectedHere() ([]model.PRKey, []*model.Notification) {
+	t := m.tab()
+	var ks []model.PRKey
+	var ns []*model.Notification
+	if t.inbox {
+		for i := range t.notifs {
+			n := &t.notifs[i]
+			if m.isSelected(n.Key) && !t.hidden[n.Key] && !slices.Contains(ks, n.Key) {
+				ks, ns = append(ks, n.Key), append(ns, n)
+			}
+		}
+		return ks, ns
+	}
+	for _, p := range m.allOf(t) {
+		if m.isSelected(p.Key) && !t.hidden[p.Key] && !slices.Contains(ks, p.Key) {
+			ks, ns = append(ks, p.Key), append(ns, nil)
+		}
+	}
+	return ks, ns
+}
+
+// hideSelected puts away the selected pull requests of the tab shown, as
+// hide does one; those of other tabs stay selected.
+func (m *Model) hideSelected() tea.Cmd {
+	ks, ns := m.selectedHere()
+	if len(ks) == 0 {
+		m.refuse("hide: none of the selection is in this tab")
+		return nil
+	}
+	cmds := []tea.Cmd{nil}
+	for i, k := range ks {
+		cmd, _ := m.putAway(k, ns[i])
+		cmds = append(cmds, cmd)
+	}
+	what := fmt.Sprintf("hidden here: %d pull requests (the requests on GitHub stay)", len(ks))
+	if m.tab().inbox {
+		what = fmt.Sprintf("marked done: %d pull requests", len(ks))
+	}
+	if left := len(m.selected); left > 0 {
+		what += fmt.Sprintf("; %d selected in other tabs stay", left)
+	}
+	m.say(what)
+	cmds[0] = m.ensure()
+	return tea.Batch(cmds...)
+}
+
+// browseAll opens each of prs in the browser.
+func (m *Model) browseAll(prs []model.PR) tea.Cmd {
+	var cmds []tea.Cmd
+	for _, p := range prs {
+		cmds = append(cmds, m.browse(p))
+	}
+	return tea.Batch(cmds...)
 }
 
 func (m *Model) browse(p model.PR) tea.Cmd { return m.browseURL(p.URL) }
