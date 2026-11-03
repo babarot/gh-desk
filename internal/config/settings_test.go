@@ -9,7 +9,7 @@ import (
 	"testing"
 )
 
-var update = flag.Bool("update", false, "rewrite docs/config.schema.json")
+var update = flag.Bool("update", false, "rewrite docs/config.schema.json and docs/reference/configuration.md")
 
 const schemaPath = "../../docs/config.schema.json"
 
