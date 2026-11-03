@@ -261,7 +261,18 @@ func (m *Model) drawArmed(lines []string) []string {
 	if lipgloss.Width("▸ "+label) <= a.w {
 		label = "▸ " + label
 	}
-	lines[a.y] = place(lines[a.y], m.st.peach.Bold(true).Render(fit(label, a.w)), a.x)
+	// On the background of what it is drawn over, as place leaves none.
+	style := m.st.peach.Bold(true)
+	switch {
+	case a.y == 0:
+		style = style.Background(m.st.header.GetBackground())
+	case a.row >= 0:
+		rs := m.rows(m.tab())
+		if bg, ok := m.rowBackground(rs[a.row].pr.Key, a.row == m.tab().sel); ok {
+			style = style.Background(bg.GetBackground())
+		}
+	}
+	lines[a.y] = place(lines[a.y], style.Render(fit(label, a.w)), a.x)
 	return lines
 }
 

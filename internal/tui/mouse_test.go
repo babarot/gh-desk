@@ -214,6 +214,11 @@ func TestClickOnALinkWaitsForASecond(t *testing.T) {
 	if l := strings.Split(screen(m), "\n")[y]; !strings.Contains(l, "open ") || strings.Contains(l, "alice") {
 		t.Fatalf("the link does not wait for a second click:\n%s", l)
 	}
+	// It keeps the background of the row it is on, the cursor's here.
+	raw, _ := m.render()
+	if want := m.st.peach.Bold(true).Background(m.st.sel.GetBackground()).Render("open "); !strings.Contains(strings.Split(raw, "\n")[y], want) {
+		t.Fatalf("%q is not drawn on the row's background:\n%q", "open", strings.Split(raw, "\n")[y])
+	}
 
 	// The wait ends, and the link is drawn again; a click then waits anew.
 	clock = clock.Add(armedFor)

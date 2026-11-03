@@ -509,21 +509,30 @@ func (m *Model) renderRow(r row, cols []column, sel bool, n int) string {
 		cells = append(cells, fit(m.progressText(prog), steal-2))
 	}
 	line := strings.Join(cells, "  ")
-	switch by := m.selected[r.pr.Key]; {
-	case sel && by == byHand:
-		return onBackground(line, m.st.pickedSel, m.width)
-	case by == byHand:
-		return onBackground(line, m.st.picked, m.width)
-	case sel && by == byClaude:
-		return onBackground(line, m.st.claudeSel, m.width)
-	case by == byClaude:
-		return onBackground(line, m.st.claude, m.width)
-	case sel:
-		return onBackground(line, m.st.sel, m.width)
-	case m.fresh[r.pr.Key].After(m.set.Now()):
-		return onBackground(line, m.st.fresh, m.width)
+	if bg, ok := m.rowBackground(r.pr.Key, sel); ok {
+		return onBackground(line, bg, m.width)
 	}
 	return line
+}
+
+// rowBackground is the background a pull request's row is drawn on;
+// false when it has none.
+func (m *Model) rowBackground(k model.PRKey, sel bool) (lipgloss.Style, bool) {
+	switch by := m.selected[k]; {
+	case sel && by == byHand:
+		return m.st.pickedSel, true
+	case by == byHand:
+		return m.st.picked, true
+	case sel && by == byClaude:
+		return m.st.claudeSel, true
+	case by == byClaude:
+		return m.st.claude, true
+	case sel:
+		return m.st.sel, true
+	case m.fresh[k].After(m.set.Now()):
+		return m.st.fresh, true
+	}
+	return lipgloss.Style{}, false
 }
 
 // progressWidth is the least room a row's progress is written in: as
