@@ -21,6 +21,7 @@ import (
 	"slices"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/babarot/gh-desk/internal/model"
@@ -40,6 +41,14 @@ type World struct {
 	notifs []model.Notification
 	// pause is how long a call takes, so the spinners are seen.
 	pause func(d time.Duration)
+	// hurry makes every call return at once while it is set: a scenario
+	// replayed on its way to a step does not wait for the spinners.
+	hurry atomic.Bool
+	// read are the first reads answered, of what ready waits for: the
+	// tabs' searches by tab, "inbox", and the heavy fields by pull
+	// request ID.
+	read  map[string]bool
+	ready chan struct{}
 }
 
 // pull is a pull request and what GitHub knows about it besides the row.
@@ -81,7 +90,12 @@ type draftReview struct {
 // New returns the world as it is at now(): the pull requests of
 // fixtures, aged from now.
 func New(now func() time.Time) *World {
-	w := &World{now: now, start: now(), pause: func(d time.Duration) { time.Sleep(d) }}
+	w := &World{now: now, start: now(), read: map[string]bool{}, ready: make(chan struct{})}
+	w.pause = func(d time.Duration) {
+		if !w.hurry.Load() {
+			time.Sleep(d)
+		}
+	}
 	for _, f := range fixtures() {
 		w.prs = append(w.prs, f.pull(w.start))
 	}
@@ -89,8 +103,42 @@ func New(now func() time.Time) *World {
 	return w
 }
 
+// Ready is closed once the first screen can be used: every tab searched,
+// the notifications read, and the heavy fields of the first tab's pull
+// requests (its checks, which the rules read) read. A scenario waits for
+// it rather than for a time, which a slow machine could outlast.
+func (w *World) Ready() <-chan struct{} { return w.ready }
+
+// answered notes a read for Ready; w.mu is held.
+func (w *World) answered(what string) {
+	select {
+	case <-w.ready:
+		return
+	default:
+	}
+	if w.read[what] {
+		return
+	}
+	w.read[what] = true
+	for _, t := range []string{"review", "mine", "involved", "inbox"} {
+		if !w.read[t] {
+			return
+		}
+	}
+	for _, p := range w.prs {
+		if p.State == model.StateOpen && slices.Contains(p.in, "review") && !w.read[p.ID] {
+			return
+		}
+	}
+	close(w.ready)
+}
+
 // Instant makes every call return at once, for tests.
 func (w *World) Instant() { w.pause = func(time.Duration) {} }
+
+// Hurry makes every call return at once (true), or take its time again
+// (false).
+func (w *World) Hurry(on bool) { w.hurry.Store(on) }
 
 func (w *World) find(k model.PRKey) *pull {
 	for _, p := range w.prs {
@@ -261,6 +309,9 @@ func (s Source) SearchPage(_ context.Context, query string, first int, after str
 		}
 	}
 	slices.SortStableFunc(out, func(a, b model.PR) int { return b.Updated.Compare(a.Updated) })
+	if tab != "" {
+		s.w.answered(tab)
+	}
 	return out, len(out), "", nil, nil
 }
 
@@ -268,6 +319,7 @@ func (s Source) Notifications(context.Context, int) ([]model.Notification, error
 	s.w.pause(400 * time.Millisecond)
 	s.w.mu.Lock()
 	defer s.w.mu.Unlock()
+	s.w.answered("inbox")
 	return slices.Clone(s.w.notifs), nil
 }
 
@@ -441,6 +493,7 @@ func (s Source) Heavy(_ context.Context, ids []string) (map[string]model.Heavy, 
 		if p := s.w.byID(id); p != nil {
 			s.w.settle(p)
 			out[id] = p.row().Heavy()
+			s.w.answered(id)
 		}
 	}
 	return out, nil
@@ -556,3 +609,12 @@ func (r Runner) CommitInfo(_ context.Context, key model.PRKey, oid string) (runn
 
 // oid is a made-up commit ID for s.
 func oid(s string) string { return fmt.Sprintf("%x", sha1.Sum([]byte(s))) }
+
+// listLines are the lines the first tab of the world takes with its groups
+// as they start, its header included, so the pane can have the rest.
+const listLines = 14
+
+// PaneHeight is the pane's lines on a terminal rows high: what the first
+// tab leaves, since the world's lists are short and the pane is what a
+// visitor reads. The TUI still keeps a third of the lines for the list.
+func PaneHeight(rows int) int { return max(rows-listLines, 0) }
