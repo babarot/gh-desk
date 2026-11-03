@@ -109,10 +109,10 @@ func (m *Model) heavyRead(msg heavyMsg) tea.Cmd {
 func (m *Model) tabDone(t *tab) bool { return !t.loading && t.heavyLeft == 0 }
 
 // reading reports whether anything is going on that a spinner shows: the
-// lists, the bar of a confirm popup, Claude's answers, a comment or a
-// review on its way, or a batch.
+// lists, the pull requests of a confirm popup, Claude's answers, a comment
+// or a review on its way, or a batch.
 func (m *Model) reading() bool {
-	if m.bulk != nil && m.bulk.filling(m.set.Now()) || m.triage != nil && m.triage.asking || m.sending != "" {
+	if m.bulk != nil && m.bulk.loading || m.triage != nil && m.triage.asking || m.sending != "" {
 		return true
 	}
 	for _, bs := range m.batches {
@@ -155,9 +155,6 @@ func (m *Model) spin() tea.Cmd {
 			every = min(every, claudeSpinner.every)
 			break
 		}
-	}
-	if m.bulk != nil && m.bulk.filling(m.set.Now()) && m.set.BarStep > 0 {
-		every = min(every, m.set.BarStep)
 	}
 	return m.after(every, spinMsg{})
 }

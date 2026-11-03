@@ -110,6 +110,15 @@ func (m *Model) working(st lipgloss.Style, text string) string {
 	return m.st.mauve.Render(m.spinner()) + " " + out
 }
 
+// steady is working without the shimmer, for a popup, where a light
+// running over the text would be one more thing moving beside its rows.
+func (m *Model) steady(st lipgloss.Style, text string) string {
+	if m.spinStyle.still {
+		return st.Render(text)
+	}
+	return m.st.mauve.Render(m.spinner()) + " " + st.Render(text)
+}
+
 // shimmerStep is how long the light of a shimmer stays on a character;
 // the screen is drawn this often while something is read, when shimmer
 // is on.
