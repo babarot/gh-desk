@@ -57,6 +57,9 @@ func Run(args []string, stdout, stderr io.Writer) int {
 	configPath := flags.String("config", config.FilePath(), "the config file")
 	debug := flags.Bool("debug", false, "log at debug level")
 	noCache := flags.Bool("no-cache", false, "neither show nor keep the lists last read")
+	// The same as the version command, for what expects a CLI to take
+	// --version, such as the check of babarot/nur-packages
+	showVersion := flags.Bool("version", false, "print the version")
 	flags.Usage = func() {
 		fmt.Fprint(stderr, usage)
 		flags.PrintDefaults()
@@ -66,6 +69,10 @@ func Run(args []string, stdout, stderr io.Writer) int {
 			return 0
 		}
 		return 2
+	}
+	if *showVersion {
+		fmt.Fprintln(stdout, version.String())
+		return 0
 	}
 	switch flags.Arg(0) {
 	case "", "gc":

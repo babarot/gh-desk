@@ -139,6 +139,10 @@ func TestRunSubcommands(t *testing.T) {
 		t.Errorf("version: code %d, out %q", code, out.String())
 	}
 	out.Reset()
+	if code := Run([]string{"--version"}, &out, &errb); code != 0 || strings.TrimSpace(out.String()) != version.String() {
+		t.Errorf("--version: code %d, out %q", code, out.String())
+	}
+	out.Reset()
 	t.Setenv("XDG_STATE_HOME", "/tmp/state")
 	if code := Run([]string{"log"}, &out, &errb); code != 0 || strings.TrimSpace(out.String()) != "/tmp/state/gh-desk/logs/gh-desk.log" {
 		t.Errorf("log: code %d, out %q", code, out.String())
