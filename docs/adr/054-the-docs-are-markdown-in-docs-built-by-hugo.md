@@ -1,4 +1,4 @@
-# ADR-053: The docs are Markdown in docs/, built into a site by Hugo
+# ADR-054: The docs are Markdown in docs/, built into a site by Hugo
 
 ## Status
 

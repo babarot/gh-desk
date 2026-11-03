@@ -35,7 +35,7 @@
 
 ## Docs
 
-- The pages of the docs site are the Markdown files in `docs/`, outside `docs/adr` and `docs/site`, written to read on GitHub as they are: a `# title` first, no front matter, links to other pages by their `.md` file. See [ADR-053](docs/adr/053-the-docs-are-markdown-in-docs-built-by-hugo.md)
+- The pages of the docs site are the Markdown files in `docs/`, outside `docs/adr` and `docs/site`, written to read on GitHub as they are: a `# title` first, no front matter, links to other pages by their `.md` file. See [ADR-054](docs/adr/054-the-docs-are-markdown-in-docs-built-by-hugo.md)
 - Never edit the pages in `docs/reference` by hand, but its `README.md`; the tests write them from the code (ADR-051)
 - A directory's `README.md` is the page of its section on the site, as GitHub shows it with the directory
 - Never name a page `claude.md`: on a filesystem that ignores case, Claude Code reads it as its instructions
