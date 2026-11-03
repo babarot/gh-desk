@@ -145,3 +145,25 @@ func TestConversationTakesSkills(t *testing.T) {
 		t.Errorf("triage = %q", got)
 	}
 }
+
+func TestStepArgOfSkillsAndServers(t *testing.T) {
+	for in, want := range map[string]string{
+		`{"skill":"gh-triage:review-checklist"}`: "gh-triage:review-checklist",
+		`{"query":"retry policy","limit":5}`:     "retry policy",
+		`{"file_path":"/a/b.go"}`:                "/a/b.go",
+	} {
+		if got := stepArg([]byte(in)); got != want {
+			t.Errorf("stepArg(%s) = %q, want %q", in, got, want)
+		}
+	}
+	c := New(Options{PluginDir: "/cache/runs/run-1/plugin", Log: logging.Discard()})
+	for p, want := range map[string]string{
+		"/cache/runs/run-1/plugin/skills/review/references/how.md": "gh-triage:review/references/how.md",
+		"/cache/runs/run-1/plugin/.claude-plugin/plugin.json":      "/cache/runs/run-1/plugin/.claude-plugin/plugin.json",
+		"/work/tree/main.go": "/work/tree/main.go",
+	} {
+		if got := c.skillPath(p); got != want {
+			t.Errorf("skillPath(%s) = %q, want %q", p, got, want)
+		}
+	}
+}

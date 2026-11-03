@@ -24,6 +24,7 @@ import (
 	"log/slog"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"slices"
 	"strconv"
 	"strings"
@@ -151,7 +152,23 @@ type Request struct {
 func (c *Claude) Ask(ctx context.Context, r Request, progress func(Step)) (Answer, error) {
 	args := c.conversation(c.session(r, reviewInstructions+"\n\nAnswer in "+c.opt.Language+".", c.opt.Tools))
 	args = append(args, "--allowedTools", strings.Join(append(slices.Clone(c.opt.Tools), c.conversationTools()...), ","))
-	return c.run(ctx, c.opt.Log.With(logging.KeyClaude, r.Session), r.Dir, prEnv(r.PR), args, r.Prompt, progress)
+	return c.run(ctx, c.opt.Log.With(logging.KeyClaude, r.Session), r.Dir, prEnv(r.PR), args, r.Prompt, func(s Step) {
+		s.Arg = c.skillPath(s.Arg)
+		progress(s)
+	})
+}
+
+// skillPath is p, when it is in a skill given to Claude, as the skill's
+// name and the path in it rather than where gh-triage copied it.
+func (c *Claude) skillPath(p string) string {
+	if c.opt.PluginDir == "" {
+		return p
+	}
+	rel, ok := strings.CutPrefix(p, filepath.Join(c.opt.PluginDir, "skills")+string(filepath.Separator))
+	if !ok {
+		return p
+	}
+	return PluginName + ":" + filepath.ToSlash(rel)
 }
 
 // conversation adds to args, the flags of a conversation or of Claude Code
@@ -361,11 +378,12 @@ func readStream(r io.Reader, progress func(Step)) (Answer, error) {
 	}
 }
 
-// stepArg is what a tool was used on: a path, a pattern, a URL.
+// stepArg is what a tool was used on: a path, a pattern, a URL, a skill,
+// or what an MCP server was asked.
 func stepArg(input json.RawMessage) string {
 	var in map[string]any
 	_ = json.Unmarshal(input, &in)
-	for _, k := range []string{"file_path", "pattern", "url", "path"} {
+	for _, k := range []string{"file_path", "pattern", "url", "path", "skill", "query"} {
 		if s, ok := in[k].(string); ok && s != "" {
 			return s
 		}
