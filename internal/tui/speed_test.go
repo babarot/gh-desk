@@ -194,7 +194,7 @@ func TestPopupFillsInAsItReads(t *testing.T) {
 	if len(parts) != 2 {
 		t.Fatalf("%d reads, want 2 of 5 and 2", len(parts))
 	}
-	if s := screen(m); !strings.Contains(s, "Add retries to the client") || !strings.Contains(s, "reading…") || !strings.Contains(s, "again… 0 of 7 read") {
+	if s := screen(m); !strings.Contains(s, "Add retries to the client") || !strings.Contains(s, "reading…") || !strings.Contains(s, "▱▱▱▱▱▱▱ 0 of 7 read") {
 		t.Errorf("rows are not listed before they are read:\n%s", s)
 	}
 	m.Update(parts[0]())
@@ -208,6 +208,39 @@ func TestPopupFillsInAsItReads(t *testing.T) {
 	m.Update(parts[1]())
 	if m.bulk.loading || !strings.Contains(screen(m), "? y yes") {
 		t.Errorf("not ready after the last read:\n%s", screen(m))
+	}
+}
+
+// A read that brings back several pull requests at once fills the bar a
+// cell at a time, and the popup asks only once it has been full a moment.
+func TestPopupBarFillsCellByCell(t *testing.T) {
+	m, r := startWith(t, fixture(), keymap.Default())
+	m.set.BarStep = BarStep
+	clock := now
+	m.set.Now = func() time.Time { return clock }
+	prs := m.tabs[0].prs[:3]
+	parts := flatten(m.startBulkFor(runner.Merge, runner.ReviewText{}, prs))
+	if len(parts) != 1 {
+		t.Fatalf("%d reads, want 1", len(parts))
+	}
+	m.Update(parts[0]())
+	for i, want := range []string{"▰▱▱ 1 of 3 read", "▰▰▱ 2 of 3 read", "▰▰▰ 3 of 3 read"} {
+		clock = now.Add(time.Duration(i) * BarStep)
+		if s := screen(m); !strings.Contains(s, want) {
+			t.Errorf("after %d steps, no %q:\n%s", i, want, s)
+		}
+	}
+	press(m, "y")
+	if len(r.items) != 0 {
+		t.Fatalf("y went through while the bar was filling: %v", r.items)
+	}
+	clock = now.Add((2 + barHold) * BarStep)
+	if s := screen(m); !strings.Contains(s, "? y yes") {
+		t.Errorf("not asking once the bar was shown full:\n%s", s)
+	}
+	press(m, "y")
+	if len(r.items) != 1 {
+		t.Errorf("batches = %v", r.items)
 	}
 }
 

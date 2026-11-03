@@ -122,6 +122,10 @@ type Settings struct {
 	// Shimmer runs a light over the text that says what is going on, and
 	// Wave puts each line of a table a frame of the spinner ahead.
 	Shimmer, Wave bool
+	// BarStep is how long the bar of a confirm popup's reads takes to
+	// fill each cell, so a read that brings back many at once is seen
+	// coming in; zero fills them at once, and the popup asks at once.
+	BarStep time.Duration
 	// Version is gh-desk's version, told at the foot of the ? popup.
 	Version string
 	// Editor is the command ctrl+e runs to edit a review, with its

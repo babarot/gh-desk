@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"slices"
 	"strings"
+	"time"
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
@@ -29,7 +30,13 @@ type bulk struct {
 	// loading is set until every read is back; left counts them.
 	loading bool
 	left    int
-	err     error
+	// cellAt is when each cell of the bar of the reads is filled. The
+	// reads come back a few pull requests at a time, so the cells a read
+	// fills are filled one after another, never before it is back; the
+	// popup asks only once the bar has been full for a moment, at doneAt.
+	cellAt []time.Time
+	doneAt time.Time
+	err    error
 	// offset is the first line of the popup's body shown.
 	offset         int
 	includeFailing bool
@@ -77,6 +84,61 @@ func (it bulkItem) goes() bool {
 		return false
 	}
 	return it.d.Step != plan.StepSkip
+}
+
+// filling reports whether the popup is still reading its pull requests
+// again, or showing its bar fill.
+func (b *bulk) filling(now time.Time) bool { return b.loading || now.Before(b.doneAt) }
+
+// BarStep is Settings.BarStep in gh-desk: twelve cells, the most a bar
+// has, fill in less than a second.
+const BarStep = 70 * time.Millisecond
+
+// barHold is how many steps the bar is shown full before the popup asks.
+const barHold = 4
+
+// fill queues the cells of the bar the reads back by now fill, step apart.
+// A popup of one pull request has no bar.
+func (b *bulk) fill(now time.Time, step time.Duration) {
+	n := len(b.items)
+	if n < 2 {
+		return
+	}
+	read := 0
+	for _, it := range b.items {
+		if it.read {
+			read++
+		}
+	}
+	cells := min(n, readBarMax)
+	for len(b.cellAt) < read*cells/n {
+		at := now
+		if k := len(b.cellAt); k > 0 {
+			at = later(at, b.cellAt[k-1].Add(step))
+		}
+		b.cellAt = append(b.cellAt, at)
+	}
+	if !b.loading && len(b.cellAt) > 0 {
+		b.doneAt = b.cellAt[len(b.cellAt)-1].Add(barHold * step)
+	}
+}
+
+// shown is how many cells of the bar are filled at now.
+func (b *bulk) shown(now time.Time) int {
+	n := 0
+	for _, at := range b.cellAt {
+		if !at.After(now) {
+			n++
+		}
+	}
+	return n
+}
+
+func later(a, b time.Time) time.Time {
+	if a.After(b) {
+		return a
+	}
+	return b
 }
 
 // approves reports whether the popup sends approvals.
@@ -210,6 +272,7 @@ func (m *Model) startBulkFor(kind runner.Kind, rv runner.ReviewText, prs []model
 		for i := range b.items {
 			b.items[i].read = true
 		}
+		b.fill(m.set.Now(), m.set.BarStep)
 	}
 	return tea.Batch(cmds...)
 }
@@ -276,6 +339,7 @@ func (m *Model) bulkInfo(msg bulkInfoMsg) tea.Cmd {
 		}
 	}
 	if b.loading {
+		b.fill(m.set.Now(), m.set.BarStep)
 		m.decideBulk()
 		return nil
 	}
@@ -283,6 +347,7 @@ func (m *Model) bulkInfo(msg bulkInfoMsg) tea.Cmd {
 	for i := range b.items {
 		b.items[i].read = true
 	}
+	b.fill(m.set.Now(), m.set.BarStep)
 	m.decideBulk()
 	return m.readNotes(b)
 }
@@ -395,10 +460,10 @@ func (m *Model) bulkKey(k string) tea.Cmd {
 		b.offset++
 	case is("up"):
 		b.offset = max(b.offset-1, 0)
-	case is("include_failing") && b.approves() && !b.loading:
+	case is("include_failing") && b.approves() && !b.filling(m.set.Now()):
 		b.includeFailing = !b.includeFailing
 		m.decideBulk()
-	case is("confirm") && !b.loading:
+	case is("confirm") && !b.filling(m.set.Now()):
 		return m.runBulk()
 	}
 	return nil
@@ -462,6 +527,7 @@ func (m *Model) runBulk() tea.Cmd {
 func (m *Model) renderBulk() []string {
 	b, st := m.bulk, m.st
 	w := min(max(m.width-6, 40), 130)
+	filling := b.filling(m.set.Now())
 	verb := b.verb()
 	if b.kind == runner.Merge {
 		ready, approve := false, false
@@ -509,13 +575,14 @@ func (m *Model) renderBulk() []string {
 		}
 	}
 	rows := make([]bulkRow, 0, len(b.items))
-	for i, it := range b.items {
+	for _, it := range b.items {
 		mark, title := st.dim.Render("·"), st.dim.Render(it.pr.Title)
 		var what string
 		switch {
 		case !it.read:
-			// Shown from the list until it is read again.
-			mark, title, what = st.dim.Render(m.spinnerAt(i)), st.muted.Render(it.pr.Title), st.dim.Render("reading…")
+			// Shown from the list until it is read again. Nothing on it
+			// moves: the bar under the rows tells how far the reads are.
+			mark, title, what = st.dim.Render("·"), st.muted.Render(it.pr.Title), st.dim.Render("reading…")
 		case it.goes():
 			mark, title = st.mauve.Render("✓"), st.sub1.Render(it.pr.Title)
 			switch b.kind {
@@ -581,7 +648,7 @@ func (m *Model) renderBulk() []string {
 	if auto {
 		prose(st.dim, "Auto-merge also merges commits pushed after it is on, as GitHub does.")
 	}
-	if b.approves() && failing > 0 && !b.loading {
+	if b.approves() && failing > 0 && !filling {
 		state := "left out"
 		if b.includeFailing {
 			state = "included"
@@ -589,7 +656,7 @@ func (m *Model) renderBulk() []string {
 		prose(st.dim, fmt.Sprintf("%d with failing checks are %s · %s to change", failing, state, m.firstKey("include_failing")))
 	}
 	switch {
-	case b.loading:
+	case filling:
 	case b.kind == runner.Ready:
 		prose(st.dim, "Its reviewers are asked for a review once it is ready. Each acts only on the head shown when it was read.")
 	case b.kind == runner.Review && !b.approves():
@@ -611,24 +678,18 @@ func (m *Model) renderBulk() []string {
 	if goes == 0 {
 		hint = "nothing to do "
 	}
-	if b.loading {
-		// Nothing can be confirmed until every pull request is read again.
-		read := 0
-		for _, it := range b.items {
-			if it.read {
-				read++
-			}
+	if filling {
+		// Nothing can be confirmed until every pull request is read again
+		// and the bar has shown it.
+		what := st.muted.Render("reading the pull request again…")
+		title := verb
+		if n := len(b.items); n > 1 {
+			cells := min(n, readBarMax)
+			shown := b.shown(m.set.Now())
+			what = readBar(st, shown, cells) + " " + st.muted.Render(fmt.Sprintf("%d of %d read", shown*n/cells, n))
+			title = fmt.Sprintf("%s %d", verb, n)
 		}
-		what := "reading the pull request again…"
-		if len(b.items) > 1 {
-			what = fmt.Sprintf("reading %d pull requests again… %d of %d read", len(b.items), read, len(b.items))
-		}
-		foot := []string{m.working(st.muted, what) +
-			st.dim.Render(" · ") + st.key.Render(keymap.Back) + " " + st.muted.Render("cancel")}
-		title := verb + " " + m.spinner()
-		if len(b.items) > 1 {
-			title = fmt.Sprintf("%s %s of %d", verb, m.spinner(), len(b.items))
-		}
+		foot := []string{what + st.dim.Render(" · ") + st.key.Render(keymap.Back) + " " + st.muted.Render("cancel")}
 		out, top := scrollBox(st, title, lines, foot, w, m.popupHeight(), b.offset, keepLines{}, m.scrollKeys())
 		b.offset = top
 		return out
@@ -642,6 +703,16 @@ func (m *Model) renderBulk() []string {
 	out, top := scrollBox(st, title, lines, foot, w, m.popupHeight(), b.offset, keepLines{}, m.scrollKeys())
 	b.offset = top
 	return out
+}
+
+// readBarMax is the most cells the bar of the popup's reads takes.
+const readBarMax = 12
+
+// readBar is a bar of cells, full of them filled: one cell for each pull
+// request the popup reads again, or readBarMax for more. ▰ and ▱ are one
+// cell wide on any terminal, as a spinner's frames are.
+func readBar(st styles, full, cells int) string {
+	return st.mauve.Render(strings.Repeat("▰", full)) + st.border.Render(strings.Repeat("▱", cells-full))
 }
 
 // bulkRow is a pull request in the confirm popup, styled: what is done
