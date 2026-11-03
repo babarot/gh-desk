@@ -174,10 +174,7 @@ func (m *Model) ask(c *chatScreen, shown, prompt string, draft bool) tea.Cmd {
 	if draft {
 		schema = claude.DraftSchema
 	}
-	asking := m.chatState.Asking()
-	asking.Add(1)
-	go func() {
-		defer asking.Done()
+	m.chatState.Asking().Go(func() {
 		defer close(ch)
 		defer cancel()
 		send := func(msg tea.Msg) {
@@ -234,7 +231,7 @@ func (m *Model) ask(c *chatScreen, shown, prompt string, draft bool) tea.Cmd {
 		a, err := m.claude.Ask(ctx, claude.Request{Dir: dir, Session: session, First: first, Prompt: prompt, Schema: schema},
 			func(s claude.Step) { send(chatStepMsg{key: key, step: s, ch: ch}) })
 		send(chatAnswerMsg{key: key, answer: a, err: err, draft: draft})
-	}()
+	})
 	return listenChat(ch)
 }
 
