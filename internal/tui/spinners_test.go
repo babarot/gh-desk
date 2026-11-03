@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"maps"
 	"testing"
 	"time"
 
@@ -13,7 +14,9 @@ import (
 // terminal: a frame in a column that took two would move the columns
 // after it.
 func TestSpinnerFramesTakeOneCell(t *testing.T) {
-	for name, s := range spinners {
+	all := maps.Clone(spinners)
+	all["claude's own"] = claudeSpinner
+	for name, s := range all {
 		if len(s.frames) == 0 || s.every <= 0 {
 			t.Errorf("%s has no frames or no interval", name)
 		}

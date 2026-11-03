@@ -52,6 +52,24 @@ var spinners = map[string]spinnerStyle{
 	"off": {frames: []string{"⋯"}, every: time.Second, still: true},
 }
 
+// claudeSpinner is Claude's own spinner, turned where Claude is answering
+// about a pull request, which ends in ✦ when the answer comes. Not one of
+// spinners: it is not chosen in the config file (ADR-041).
+var claudeSpinner = spinnerStyle{frames: strings.Split("⋅✢✳✶✻✶✳✢", ""), every: 120 * time.Millisecond}
+
+// claudeStill is claudeSpinner's frame when the spinner chosen does not
+// move.
+const claudeStill = "✻"
+
+// claudeFrame is claudeSpinner's frame now.
+func (m *Model) claudeFrame() string {
+	if m.spinStyle.still {
+		return claudeStill
+	}
+	s := claudeSpinner
+	return s.frames[int(m.set.Now().UnixMilli()/s.every.Milliseconds())%len(s.frames)]
+}
+
 // SpinnerNames are the names of the spinners, sorted.
 func SpinnerNames() []string { return slices.Sorted(maps.Keys(spinners)) }
 
@@ -101,8 +119,27 @@ const shimmerStep = 45 * time.Millisecond
 // on one character, and mauve on those beside it. The light runs from
 // before the text to past its end, then starts again.
 func (m *Model) shimmer(st lipgloss.Style, text string) string {
+	return m.shimmerParts(styled{text, st})
+}
+
+// styled is text and the style it is drawn in.
+type styled struct {
+	text string
+	st   lipgloss.Style
+}
+
+// shimmerParts is parts drawn each in its style, with one light running
+// over all of them as shimmer runs it over one text.
+func (m *Model) shimmerParts(parts ...styled) string {
 	const before, after = 4, 8
-	rs := []rune(text)
+	var rs []rune
+	var base []lipgloss.Style
+	for _, p := range parts {
+		for _, r := range p.text {
+			rs = append(rs, r)
+			base = append(base, p.st)
+		}
+	}
 	at := int(m.set.Now().UnixMilli()/shimmerStep.Milliseconds())%(len(rs)+before+after) - before
 	styleOf := func(i int) lipgloss.Style {
 		switch d := max(i-at, at-i); {
@@ -111,7 +148,7 @@ func (m *Model) shimmer(st lipgloss.Style, text string) string {
 		case d <= 2:
 			return m.st.mauve
 		}
-		return st
+		return base[i]
 	}
 	var b strings.Builder
 	for i := 0; i < len(rs); {

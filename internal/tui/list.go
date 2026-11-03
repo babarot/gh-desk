@@ -460,6 +460,69 @@ func (m *Model) renderList(b *strings.Builder, height int) {
 	}
 }
 
+// answering reports whether Claude is answering here about the pull
+// request k.
+func (m *Model) answering(k model.PRKey) bool {
+	c, ok := m.chats[k]
+	return ok && c.Running()
+}
+
+// shownPR is the pull request k as a row of t would show it, when one
+// would: in t, not hidden, and through the filter and the rules. ok is
+// false otherwise.
+func (m *Model) shownPR(t *tab, k model.PRKey) (p model.PR, ok bool) {
+	now := m.set.Now()
+	for _, p := range t.prs {
+		if p.Key == k && !t.hidden[k] && m.passes(p, m.filter, t.ruleFilter, now) {
+			return p, true
+		}
+	}
+	return model.PR{}, false
+}
+
+// claudeIn reports whether Claude is answering about a pull request in
+// group g of the tab shown, and whether an answer came in it unseen.
+func (m *Model) claudeIn(g plan.Group) (answering, unseen bool) {
+	t := m.tab()
+	for k, c := range m.chats {
+		if !c.Running() && !c.unseen {
+			continue
+		}
+		if p, ok := m.shownPR(t, k); ok && plan.GroupOf(p, m.viewer) == g {
+			answering = answering || c.Running()
+			unseen = unseen || !c.Running() && c.unseen
+		}
+	}
+	return answering, unseen
+}
+
+// onScreen reports whether the pull request k is on the screen: its row
+// in the part of the list renderList draws, or the head of its folded
+// group there.
+func (m *Model) onScreen(k model.PRKey) bool {
+	t := m.tab()
+	if !t.loaded && t.loading {
+		return false
+	}
+	h := m.layout().list
+	if t.err != nil {
+		// renderList gives the error a line before the rows.
+		h--
+	}
+	rs := m.rows(t)
+	for i := t.offset; i < len(rs) && i < t.offset+h; i++ {
+		switch r := rs[i]; {
+		case r.kind == rowPR && r.pr.Key == k:
+			return true
+		case r.kind == rowGroup && t.folded[r.group]:
+			if p, ok := m.shownPR(t, k); ok && plan.GroupOf(p, m.viewer) == r.group {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 // renderRow is r drawn on line n of the list.
 func (m *Model) renderRow(r row, cols []column, sel bool, n int) string {
 	if r.kind == rowGroup {
@@ -471,7 +534,21 @@ func (m *Model) renderRow(r row, cols []column, sel bool, n int) string {
 		if m.tab().folded[r.group] {
 			arrow = "▸"
 		}
-		line := cursor + " " + arrow + " " + m.st.group.Render(groupLabel[r.group]) + " " + m.st.dim.Render(fmt.Sprint(r.count))
+		label := m.st.group.Render(groupLabel[r.group])
+		var tail string
+		if m.tab().folded[r.group] {
+			// A folded group tells what its rows would.
+			switch answering, unseen := m.claudeIn(r.group); {
+			case answering:
+				if m.set.Shimmer {
+					label = m.shimmer(m.st.group, groupLabel[r.group])
+				}
+				tail = " " + m.st.mauve.Render(m.claudeFrame())
+			case unseen:
+				tail = " " + m.st.mauve.Render("✦")
+			}
+		}
+		line := cursor + " " + arrow + " " + label + " " + m.st.dim.Render(fmt.Sprint(r.count)) + tail
 		if sel {
 			return onBackground(line, m.st.sel, m.width)
 		}
@@ -611,6 +688,8 @@ func (m *Model) cell(id string, r row, sel bool, n int) string {
 			mark = st.mauve.Render("✓")
 		case m.selected[p.Key] == byClaude:
 			mark = st.teal.Render("✓")
+		case m.answering(p.Key):
+			mark = st.mauve.Render(m.claudeFrame())
 		case m.chats[p.Key] != nil && m.chats[p.Key].unseen:
 			mark = st.mauve.Render("✦")
 		case func() bool { _, ok := m.unread[p.Key]; return ok }():
@@ -621,7 +700,11 @@ func (m *Model) cell(id string, r row, sel bool, n int) string {
 		if p.Draft {
 			name, num = st.dim, st.dim
 		}
-		return cursor + " " + mark + " " + name.Render(repo) + num.Render(fmt.Sprintf("#%d", p.Key.Number))
+		number := fmt.Sprintf("#%d", p.Key.Number)
+		if m.answering(p.Key) && m.set.Shimmer {
+			return cursor + " " + mark + " " + m.shimmerParts(styled{repo, name}, styled{number, num})
+		}
+		return cursor + " " + mark + " " + name.Render(repo) + num.Render(number)
 	case "title":
 		if m.merged[p.Key] {
 			return st.dim.Render(p.Title)

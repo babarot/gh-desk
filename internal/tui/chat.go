@@ -796,12 +796,13 @@ func elapsed(d time.Duration) string {
 	return fmt.Sprintf("%dm%02ds", s/60, s%60)
 }
 
-// claudeActivity is Claude answering about a pull request whose
-// conversation is not shown.
+// claudeActivity is Claude answering about a pull request that nothing
+// else on the screen shows: not its conversation, its row, or the head of
+// its folded group (ADR-041).
 func (m *Model) claudeActivity() string {
 	var away []model.PRKey
 	for k, c := range m.chats {
-		if c.Running() && !m.showsChat(k) {
+		if c.Running() && !m.showsChat(k) && !m.onScreen(k) {
 			away = append(away, k)
 		}
 	}

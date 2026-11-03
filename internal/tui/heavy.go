@@ -149,6 +149,13 @@ func (m *Model) spin() tea.Cmd {
 	if m.set.Shimmer {
 		every = min(every, shimmerStep)
 	}
+	for _, c := range m.chats {
+		if c.Running() && !m.spinStyle.still {
+			// Claude's own spinner turns at its own pace.
+			every = min(every, claudeSpinner.every)
+			break
+		}
+	}
 	return m.after(every, spinMsg{})
 }
 

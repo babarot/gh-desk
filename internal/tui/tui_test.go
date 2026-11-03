@@ -1585,6 +1585,46 @@ func TestClaudeWaitingTakesTheKeys(t *testing.T) {
 	}
 }
 
+// A pull request is on the screen when its row is in the part of the list
+// drawn: not scrolled out, nor filtered out.
+func TestOnScreen(t *testing.T) {
+	m, _ := startWith(t, fixture(), keymap.Default())
+	press(m, "b")
+	m.pane.on = false
+	// Three lines of rows: the head of the first group, api#12, the head
+	// of the second.
+	m.Update(tea.WindowSizeMsg{Width: 130, Height: 7})
+	api12, api30 := key("acme", "api", 12), key("acme", "api", 30)
+	screen(m)
+	if !m.onScreen(api12) || m.onScreen(api30) {
+		t.Errorf("at the top: api#12 %v, api#30 %v", m.onScreen(api12), m.onScreen(api30))
+	}
+	press(m, "G")
+	screen(m)
+	if m.onScreen(api12) || !m.onScreen(api30) {
+		t.Errorf("at the bottom: api#12 %v, api#30 %v", m.onScreen(api12), m.onScreen(api30))
+	}
+	m.filter = "retries"
+	screen(m)
+	if !m.onScreen(api12) || m.onScreen(api30) {
+		t.Errorf("filtered: api#12 %v, api#30 %v", m.onScreen(api12), m.onScreen(api30))
+	}
+}
+
+// A pull request selected keeps its ✓ while Claude answers about it; its
+// name still shows that Claude does.
+func TestClaudeAnsweringOnASelectedRow(t *testing.T) {
+	m, _ := startWith(t, fixture(), keymap.Default())
+	press(m, "i")
+	c := m.chat()
+	chat.NewState(nil, logging.Discard(), func() time.Time { return now }, noStatus{}).Begin(c.Conversation, "And then?")
+	// space selects, and moves the cursor down.
+	press(m, "esc", "space")
+	if s := screen(m); !strings.Contains(s, "  ✓ api#12") {
+		t.Errorf("the selection's mark gave way:\n%s", s)
+	}
+}
+
 // esc stops what Claude is answering and leaves the pane open; with
 // nothing on its way it goes back to the preview, as backspace does.
 func TestClaudeStoppedByEsc(t *testing.T) {
@@ -1655,12 +1695,29 @@ func TestClaudeAnsweringElsewhere(t *testing.T) {
 		t.Error("the spinner does not turn while Claude answers")
 	}
 
+	// Back on the list, the row tells, and the status line does not.
 	press(m, "esc")
-	if s := screen(m); !strings.Contains(s, "Claude is answering on "+k.String()+"…") {
-		t.Errorf("the list does not say Claude is answering:\n%s", s)
+	frame := m.claudeFrame()
+	if s := screen(m); !strings.Contains(s, "▎ "+frame+" api#12") || strings.Contains(s, "Claude is answering") {
+		t.Errorf("the row does not tell Claude is answering, or the status line does too:\n%s", s)
 	}
+	// Folded, the head of its group tells.
+	m.tab().folded[plan.GroupYou] = true
+	if s := screen(m); !strings.Contains(s, "requested from you 1 "+frame) || strings.Contains(s, "Claude is answering") {
+		t.Errorf("the folded group does not tell:\n%s", s)
+	}
+	// On a tab without it, only the status line can.
+	press(m, "3")
+	if s := screen(m); !strings.Contains(s, "Claude is answering on "+k.String()+"…") {
+		t.Errorf("the status line does not tell:\n%s", s)
+	}
+	press(m, "1")
 	m.Update(chatAnswerMsg{key: k, answer: claude.Answer{Text: "Later answer."}})
-	if !c.unseen || strings.Count(screen(m), "✦") != 1 {
+	if s := screen(m); !c.unseen || !strings.Contains(s, "requested from you 1 ✦") {
+		t.Errorf("the answer that came elsewhere is not marked on the folded group:\n%s", s)
+	}
+	m.tab().folded[plan.GroupYou] = false
+	if strings.Count(screen(m), "✦") != 1 {
 		t.Errorf("the answer that came elsewhere is not marked:\n%s", screen(m))
 	}
 	press(m, "i")
