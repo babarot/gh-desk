@@ -65,6 +65,17 @@ gh desk config edit         # open it in $EDITOR, then check it
 
 Claude Code runs on a worktree of the pull request at the head you saw, made from gh-desk's own clone in `~/.cache/gh-desk`; your clones are not touched. It runs in restricted mode with only the tools that read (`Read`, `Grep`, `Glob`, and `WebFetch` if you allow it), with no hooks, settings, MCP servers or slash commands of the pull request's repository. A review it drafts goes into the review popup, for you to read and send.
 
+MCP servers of your own can be given to the conversation in `claude.mcp_servers`. With [claude-recall](https://github.com/babarot/claude-recall), Claude searches your past Claude Code sessions while it reviews, held to the pull request's repository:
+
+```toml
+[claude.mcp_servers.recall]
+command = "recall"
+args    = ["mcp", "--repo", "${GH_DESK_URL}"]  # the pull request's repository
+tools   = ["recall_search", "recall_list", "recall_export"]
+```
+
+The tools under `tools` run without a prompt, on whatever the pull request's text asks. Do not allow `WebFetch` together with a server that reads your own data.
+
 `gh desk gc` removes the worktrees of pull requests that are merged or closed.
 
 ## Files

@@ -39,3 +39,19 @@ run = "go run golang.org/x/vuln/cmd/govulncheck@v1.8.0 ./..."
 [tasks.demo]
 description = "Record the demo with VHS in Docker into docs/demo.gif: mise run demo [TAPE ...]"
 file = "docs/tapes/record.sh"
+
+[tasks."site:build"]
+description = "Build the demo on the site (gh-desk compiled to WebAssembly) into site/web"
+run = "site/build.sh"
+
+[tasks."site:serve"]
+description = "Build the site and serve it on http://127.0.0.1:8080"
+depends = ["site:build"]
+run = "python3 -m http.server 8080 --bind 127.0.0.1 --directory site/web"
+
+[tasks."site:test"]
+description = "Check that the site builds: gh-desk compiled to WebAssembly against internal/demo/playground"
+run = '''
+test -z "$(gofmt -l site)" || { gofmt -l site; echo "gofmt: the files above are not formatted"; exit 1; }
+site/build.sh
+'''

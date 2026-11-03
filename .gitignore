@@ -5,3 +5,5 @@ coverage.out
 /docs/tapes/.gh-desk-demo
 /docs/tapes/*.mp4
 /docs/tapes/*.gif
+/site/web/gh-desk.wasm
+/site/web/wasm_exec.js

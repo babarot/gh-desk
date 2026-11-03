@@ -21,6 +21,7 @@ gh-desk is split into packages by layer. A package imports only packages of lowe
 | 3 | `internal/runner` | Bulk approve and merge, auto-merge watching, resuming | `model`, `logging`, `plan` | - |
 | 3 | `internal/tui/chat` | The conversations with Claude about pull requests: what each holds, keeping them and their locks | `model`, `logging`, `claude` | - |
 | 4 | `internal/tui` | The terminal UI | `model`, `logging`, `plan`, `diff`, `tui/keymap`, `runner`, `claude`, `listcache`, `tui/statusline`, `tui/chat` | `charm.land/bubbletea/v2`, `charm.land/bubbles/v2`, `charm.land/lipgloss/v2`, `github.com/charmbracelet/x/ansi`, `golang.org/x/net/html` |
+| 4 | `internal/demo/playground` | A made-up GitHub and Claude that the playground on the site runs against; never built into gh-desk | `model`, `claude`, `runner` | - |
 | 5 | `internal/app` | Putting it together: flags, config, log, and starting the TUI | `model`, `logging`, `config`, `tui/keymap`, `plan`, `github`, `state`, `claude`, `listcache`, `runner`, `tui`, `tui/chat`, `version` | - |
 | 6 | `main` | Calls app.Run | `app` | - |
 | 6 | `internal/demo` | A made-up GitHub and Claude that the TUI runs against for the recordings in the README | `model`, `logging`, `config`, `tui/keymap`, `runner`, `claude`, `tui`, `app`, `version` | - |
@@ -32,7 +33,7 @@ Standard library packages that reach outside the process:
 |---|---|
 | `net` | `internal/github` |
 | `net/http` | `internal/github` |
-| `os/exec` | `internal/app`, `internal/claude`, `internal/demo`, `internal/github`, `internal/tui` |
+| `os/exec` | `internal/app`, `internal/claude`, `internal/demo`, `internal/demo/playground`, `internal/github`, `internal/tui` |
 | `syscall` | `internal/state` |
 <!-- layers:end -->
 

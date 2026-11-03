@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>gh-desk - Review and merge the pull requests that reach you, from the terminal</title>
+<meta name="description" content="gh-desk is a gh extension: the pull requests waiting for your review, yours, and your notifications, in one terminal screen. Approve and merge many at once, and ask Claude about one. Try it here, in the browser.">
+<meta property="og:type" content="website">
+<meta property="og:title" content="gh-desk">
+<meta property="og:description" content="Review and merge the pull requests that reach you, from the terminal. Try it in the browser.">
+<script>
+try { const t = localStorage.getItem('gh-desk-theme'); if (t) document.documentElement.dataset.theme = t; } catch (e) {}
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Inter:wght@400;600;800&display=swap">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/css/xterm.min.css">
+<link rel="stylesheet" href="site.css">
+</head>
+<body>
+<header class="wrap top">
+  <a class="brand" href="#"><span class="prompt">$</span> gh desk</a>
+  <nav>
+    <a href="#try">Try it</a>
+    <a href="#install">Install</a>
+    <a href="https://github.com/babarot/gh-desk">GitHub</a>
+    <button class="theme" id="theme" type="button" aria-label="Switch color theme">dark</button>
+  </nav>
+</header>
+
+<main>
+  <section class="wrap hero">
+    <h1>The pull requests that reach you, <em>at one desk.</em></h1>
+    <p class="lede">gh-desk is a <code>gh</code> extension. The pull requests waiting for your review, your own, and your notifications sit in one terminal screen. Read the diff, approve and merge a dozen at once, and ask Claude about the one you are unsure of.</p>
+    <p class="hint">Below is gh-desk itself, compiled to WebAssembly and running in your browser against a made-up GitHub. Nothing you do here leaves the page.</p>
+  </section>
+
+  <section class="wrap" id="try">
+    <div class="term">
+      <div class="term-bar">
+        <div class="dots"><i></i><i></i><i></i></div>
+        <span class="title">~ — gh desk</span>
+        <button id="restart" type="button">Restart</button>
+      </div>
+      <div class="screen" id="screen" aria-label="Terminal running gh-desk. Click it and type."></div>
+      <div class="loading" id="loading">Loading gh-desk…</div>
+    </div>
+
+    <div class="keys" id="keys">
+      <button data-k="j">↓ j</button><button data-k="k">↑ k</button>
+      <button data-k="\t">tab</button><button data-k="\r">enter</button>
+      <button data-k=" ">space</button><button data-k="p">p</button><button data-k="v">v</button>
+      <button data-k="i">i</button><button data-k="C">C</button><button data-k="M">M</button>
+      <button data-k="?">?</button><button data-k="\x1b">esc</button>
+      <span>or click the terminal and type</span>
+    </div>
+  </section>
+
+  <section class="wrap tours">
+    <h2>Things to try</h2>
+    <div class="cards">
+      <article>
+        <h3>Look before you merge</h3>
+        <p><kbd>p</kbd> opens the pane under the list: the description beside the checks and reviews. <kbd>v</kbd> switches it to the diff, <kbd>]</kbd> and <kbd>[</kbd> move between files, and <kbd>J</kbd> <kbd>K</kbd> scroll it.</p>
+      </article>
+      <article>
+        <h3>Merge the bots in one go</h3>
+        <p>Move to the bots and press <kbd>b</kbd> to unfold them, <kbd>S</kbd> to pick the rule <em>dependency bots</em>, then <kbd>M</kbd>. The popup says how each will be merged, and Claude reads the release notes for the ones that need care.</p>
+      </article>
+      <article>
+        <h3>Ask Claude about one</h3>
+        <p><kbd>i</kbd> on a pull request asks Claude to review it, in a worktree of its head. <kbd>ctrl+r</kbd> then drafts the review to post. Here the answers are written in advance.</p>
+      </article>
+      <article>
+        <h3>Or tell Claude what you want</h3>
+        <p><kbd>C</kbd> and type <em>merge the bots with passing checks</em>. Claude plans what to show and select; <kbd>enter</kbd> applies it, and nothing is sent until you confirm.</p>
+      </article>
+      <article>
+        <h3>Your notifications</h3>
+        <p><kbd>4</kbd> or <kbd>tab</kbd> goes to the inbox: the pull requests in your notifications, with why each is there. <kbd>d</kbd> marks one done.</p>
+      </article>
+      <article>
+        <h3>Every key</h3>
+        <p><kbd>?</kbd> lists the keys of the screen you are on. They are bound by action name, and each can be changed in the config file.</p>
+      </article>
+    </div>
+  </section>
+
+  <section class="sec" id="config">
+    <div class="wrap">
+      <h2>Make it yours</h2>
+      <p class="sub">Everything lives in one file, <code>~/.config/gh-desk/config.toml</code>. The first run writes it with every setting described and commented out, so you change a line, not a blank page. A mistake is reported at its line, with what was likely meant.</p>
+
+      <div class="conf">
+        <div class="conf-text">
+          <h3>Tabs are searches</h3>
+          <p>Each tab is a GitHub search, split into groups by whom a review is asked of: you, a team of yours, or neither, with the bots apart. Add a tab for the repository you own, fold the groups you look at last.</p>
+        </div>
+<pre class="code"><span class="t">[[tabs]]</span>
+<span class="k">name</span>   = <span class="s">"review"</span>
+<span class="k">query</span>  = <span class="s">"is:open is:pr review-requested:@me archived:false"</span>
+<span class="k">groups</span> = [<span class="s">"you"</span>, <span class="s">"team"</span>, <span class="s">"bots"</span>]
+<span class="k">folded</span> = [<span class="s">"bots"</span>]
+
+<span class="t">[[tabs]]</span>
+<span class="k">name</span>  = <span class="s">"infra"</span>
+<span class="k">query</span> = <span class="s">"is:open is:pr repo:acme/infra archived:false"</span>
+
+<span class="t">[[tabs]]</span>
+<span class="k">kind</span> = <span class="s">"inbox"</span>
+<span class="k">name</span> = <span class="s">"inbox"</span></pre>
+      </div>
+
+      <div class="conf">
+        <div class="conf-text">
+          <h3>Rules pick what is safe to merge</h3>
+          <p><kbd>S</kbd> offers your rules. A rule can name the bots, the packages a bump may touch (read from its description), the size, the age, and whether the checks pass. Pick one, look at what it caught, merge.</p>
+        </div>
+<pre class="code"><span class="t">[[select]]</span>
+<span class="k">name</span>      = <span class="s">"safe bumps"</span>
+<span class="k">authors</span>   = [<span class="s">"renovate"</span>]
+<span class="k">packages</span>  = [<span class="s">"golang.org/x/net"</span>, <span class="s">"actions/checkout"</span>]
+<span class="k">checks</span>    = <span class="s">"passing"</span>
+<span class="k">max_lines</span> = <span class="n">50</span>
+
+<span class="t">[merge]</span>
+<span class="c"># the first the repository allows is used</span>
+<span class="k">methods</span>       = [<span class="s">"squash"</span>, <span class="s">"merge"</span>]
+<span class="k">update_branch</span> = <span class="s">"humans"</span></pre>
+      </div>
+
+      <div class="conf">
+        <div class="conf-text">
+          <h3>Claude, on your terms</h3>
+          <p>Claude Code answers in your language and follows instructions of your own in every review. It runs with read-only tools in a worktree of the pull request; MCP servers and the skills of your plugins can be given to it too, as below.</p>
+        </div>
+<pre class="code"><span class="t">[claude]</span>
+<span class="k">model</span>        = <span class="s">"opus"</span>
+<span class="k">language</span>     = <span class="s">"Japanese"</span>
+<span class="k">instructions</span> = <span class="s">"Point out changes that have no tests."</span></pre>
+      </div>
+
+      <div class="conf">
+        <div class="conf-text">
+          <h3>Claude remembers how you got here</h3>
+          <p>Give the conversation <a href="https://github.com/babarot/claude-recall">claude-recall</a> as an MCP server, and Claude searches your past Claude Code sessions while it reviews: why the code was written this way, what was tried and dropped. <code>--repo</code> holds the search to the pull request's repository, so a review never reads the sessions of another. The tools under <code>tools</code> run without a prompt; keep <code>WebFetch</code> off with a server that reads your own data.</p>
+        </div>
+<pre class="code"><span class="t">[claude.mcp_servers.recall]</span>
+<span class="k">command</span> = <span class="s">"recall"</span>
+<span class="c"># GH_DESK_URL is the pull request's repository</span>
+<span class="k">args</span>    = [<span class="s">"mcp"</span>, <span class="s">"--repo"</span>, <span class="s">"${GH_DESK_URL}"</span>]
+<span class="k">tools</span>   = [<span class="s">"recall_search"</span>, <span class="s">"recall_list"</span>, <span class="s">"recall_export"</span>]</pre>
+      </div>
+
+      <div class="conf">
+        <div class="conf-text">
+          <h3>Your keys, your colors</h3>
+          <p>Every key is bound to an action by name, and the hints and the <kbd>?</kbd> list follow what you bind. Nine themes, one for a dark terminal and one for a light one, picked by the terminal's background.</p>
+        </div>
+<pre class="code"><span class="t">[keys]</span>
+<span class="k">merge</span>   = <span class="s">"m"</span>
+<span class="k">approve</span> = [<span class="s">"A"</span>, <span class="s">"ctrl+a"</span>]
+
+<span class="t">[theme]</span>
+<span class="k">dark</span>  = <span class="s">"tokyonight"</span>
+<span class="k">light</span> = <span class="s">"github-light"</span></pre>
+      </div>
+
+      <p class="sub cmds"><code>gh desk config check</code> finds the mistakes without starting, <code>gh desk config show --diff</code> prints what you changed from the defaults, and <code>gh desk config edit</code> opens the file and checks it when you close it.</p>
+    </div>
+  </section>
+
+  <section class="sec" id="safety">
+    <div class="wrap">
+      <h2>It asks before it writes</h2>
+      <p class="sub">An approval or a merge cannot be taken back on GitHub, so gh-desk is careful where it counts.</p>
+      <div class="facts">
+        <div>
+          <h3>A popup lists every pull request</h3>
+          <p>Approve, merge and review go through a confirm popup that says what will happen to each one, and marks the ones that change workflows or whose release notes call for care.</p>
+        </div>
+        <div>
+          <h3>Only the head you saw</h3>
+          <p>Each write is for the commit shown when you confirmed. A push in between stops it, rather than merging code you have not looked at.</p>
+        </div>
+        <div>
+          <h3>Claude only reads</h3>
+          <p>Claude reads a worktree of the head, with no tool that runs a command or changes a file. What it proposes, you apply; what it drafts, you send.</p>
+        </div>
+        <div>
+          <h3>Waiting survives quitting</h3>
+          <p>A merge waiting for checks or for auto-merge is recorded, and goes on at the next launch. No process is left running behind your back.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="sec" id="install">
+    <div class="wrap">
+      <h2>Install</h2>
+      <ol class="steps">
+        <li>
+          <span class="num">1</span>
+          <div>
+            <h3>Install the extension</h3>
+            <p>gh-desk runs on the <a href="https://cli.github.com">GitHub CLI</a> and its login; there is no token to set up.</p>
+            <div class="install">
+              <pre id="cmd">gh extension install babarot/gh-desk</pre>
+              <button class="copy" id="copy" type="button">Copy</button>
+            </div>
+          </div>
+        </li>
+        <li>
+          <span class="num">2</span>
+          <div>
+            <h3>Run it</h3>
+            <p>The first run writes the config file, then opens the pull requests waiting for you.</p>
+            <div class="install"><pre>gh desk</pre></div>
+          </div>
+        </li>
+        <li>
+          <span class="num">3</span>
+          <div>
+            <h3>Optionally, Claude</h3>
+            <p>With <a href="https://docs.claude.com/en/docs/claude-code/overview">Claude Code</a> installed and signed in, <kbd>i</kbd> and <kbd>C</kbd> work. Without it, everything else does.</p>
+          </div>
+        </li>
+      </ol>
+    </div>
+  </section>
+</main>
+
+<footer class="wrap">
+  <span>gh-desk, made by <a href="https://github.com/babarot">babarot</a>. The repositories, people and pull requests in the demo are made up.</span>
+  <a href="https://github.com/babarot/gh-desk">github.com/babarot/gh-desk</a>
+</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/lib/xterm.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@xterm/addon-fit@0.10.0/lib/addon-fit.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@xterm/addon-unicode11@0.8.0/lib/addon-unicode11.min.js"></script>
+<script src="wasm_exec.js"></script>
+<script src="site.js"></script>
+</body>
+</html>

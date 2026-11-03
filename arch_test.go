@@ -40,6 +40,7 @@ var layers = []layer{
 	{"internal/tui/chat", 3, []string{"model", "logging", "claude"}, nil, "The conversations with Claude about pull requests: what each holds, keeping them and their locks"},
 	{"internal/tui", 4, []string{"model", "logging", "plan", "diff", "tui/keymap", "runner", "claude", "listcache", "tui/statusline", "tui/chat"},
 		[]string{"charm.land/bubbletea/v2", "charm.land/bubbles/v2", "charm.land/lipgloss/v2", "github.com/charmbracelet/x/ansi", "golang.org/x/net/html"}, "The terminal UI"},
+	{"internal/demo/playground", 4, []string{"model", "claude", "runner"}, nil, "A made-up GitHub and Claude that the playground on the site runs against; never built into gh-desk"},
 	{"internal/app", 5, []string{"model", "logging", "config", "tui/keymap", "plan", "github", "state", "claude", "listcache", "runner", "tui", "tui/chat", "version"}, nil, "Putting it together: flags, config, log, and starting the TUI"},
 	{"", 6, []string{"app"}, nil, "Calls app.Run"},
 	{"internal/demo", 6, []string{"model", "logging", "config", "tui/keymap", "runner", "claude", "tui", "app", "version"}, nil, "A made-up GitHub and Claude that the TUI runs against for the recordings in the README"},
@@ -61,7 +62,7 @@ type layer struct {
 var reach = map[string][]string{
 	"net":      {"internal/github"},
 	"net/http": {"internal/github"},
-	"os/exec":  {"internal/app", "internal/claude", "internal/demo", "internal/github", "internal/tui"},
+	"os/exec":  {"internal/app", "internal/claude", "internal/demo", "internal/demo/playground", "internal/github", "internal/tui"},
 	"syscall":  {"internal/state"},
 }
 
