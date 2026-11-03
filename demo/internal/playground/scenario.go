@@ -98,15 +98,20 @@ func Scenarios() []Scenario {
 			{Action: "filter_by_rule", Hold: time.Second},
 			{Action: "down", Hold: time.Second},
 		}},
-		// The rules are those of the config file a first launch writes:
-		// "dependency bots" is the third.
-		{Name: "merge", Title: "The dependency updates selected by a rule, about to be merged", Steps: []Step{
-			{Action: "fold_bots"},
-			{Action: "select_rule"},
+		// The bots' dependency updates, from the rule that selects them to
+		// the merges done: the confirm popup, then the runner approving and
+		// merging each, and the list read again without them. The rules are
+		// those of the config file a first launch writes: "dependency bots"
+		// is the third.
+		{Name: "merge", Title: "The dependency updates selected by a rule, approved and merged", Steps: []Step{
+			{Action: "fold_bots", Hold: time.Second},
+			{Action: "select_rule", Hold: time.Second},
 			{Action: "down"},
-			{Action: "down"},
-			{Action: "choose"},
-			{Action: "merge", Wait: time.Second},
+			{Action: "down", Wait: -scroll, Hold: time.Second},
+			{Action: "choose", Hold: time.Second},
+			{Action: "merge", Hold: time.Second},
+			{Action: "confirm", Wait: 2 * time.Second, Hold: time.Second},
+			{Action: "refresh", Wait: 3 * time.Second},
 		}},
 		// i opens the conversation suggesting a review, which tab fills in.
 		{Name: "claude", Title: "Claude's review of a pull request", Steps: []Step{

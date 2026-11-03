@@ -184,7 +184,7 @@ func TestScenariosReachTheirScreen(t *testing.T) {
 		"tour":   {"acme/api#479", "Drop support for Go 1.22"},
 		"diff":   {"acme/api#482", "PRIMARY KEY (subscription_id, event_id, attempt)"},
 		"rules":  {"rule: dependency bots + recent · 5 PRs", "#486 fix(deps): update module golang.org/x/net to v0.33.0"},
-		"merge":  {"approve and merge 5 of 5", "dependency bots: selected 5"},
+		"merge":  {"1 review (6)", "▸ requested from a team 2"},
 		"claude": {"claude on acme/api#482", "Neither blocks a merge"},
 		"triage": {"you  merge the bots with passing checks", "enter apply"},
 		"inbox":  {"acme/mobile#342", "mention"},
