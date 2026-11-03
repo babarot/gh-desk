@@ -507,6 +507,12 @@ func Load(path string) (File, Problems, error) {
 		}
 		return File{}, nil, fmt.Errorf("read %s: %w", path, err)
 	}
+	return Parse(path, src)
+}
+
+// Parse reads src, the config file at path, as Load does. path only names
+// the file in the problems reported.
+func Parse(path string, src []byte) (File, Problems, error) {
 	cfg := Default()
 	d := doc{Claude: cfg.Claude, Theme: cfg.Theme, Log: cfg.Log, Cache: cfg.Cache}
 	if err := toml.NewDecoder(bytes.NewReader(src)).DisallowUnknownFields().Decode(&d); err != nil {

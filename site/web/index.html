@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>gh-desk - Review and merge the pull requests that reach you, from the terminal</title>
+<meta name="description" content="gh-desk is a gh extension: the pull requests waiting for your review, yours, and your notifications, in one terminal screen. Approve and merge many at once, and ask Claude about one. Try it here, in the browser.">
+<meta property="og:type" content="website">
+<meta property="og:title" content="gh-desk">
+<meta property="og:description" content="Review and merge the pull requests that reach you, from the terminal. Try it in the browser.">
+<script>
+try { const t = localStorage.getItem('gh-desk-theme'); if (t) document.documentElement.dataset.theme = t; } catch (e) {}
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Inter:wght@400;600;800&display=swap">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/css/xterm.min.css">
+<link rel="stylesheet" href="site.css">
+</head>
+<body>
+<header class="wrap top">
+  <a class="brand" href="#"><span class="prompt">$</span> gh desk</a>
+  <nav>
+    <a href="#try">Try it</a>
+    <a href="#install">Install</a>
+    <a href="https://github.com/babarot/gh-desk">GitHub</a>
+    <button class="theme" id="theme" type="button" aria-label="Switch color theme">dark</button>
+  </nav>
+</header>
+
+<main>
+  <section class="wrap hero">
+    <h1>The pull requests that reach you, <em>at one desk.</em></h1>
+    <p class="lede">gh-desk is a <code>gh</code> extension. The pull requests waiting for your review, your own, and your notifications sit in one terminal screen. Read the diff, approve and merge a dozen at once, and ask Claude about the one you are unsure of.</p>
+    <p class="hint">Below is gh-desk itself, compiled to WebAssembly and running in your browser against a made-up GitHub. Nothing you do here leaves the page.</p>
+  </section>
+
+  <section class="wrap" id="try">
+    <div class="term">
+      <div class="term-bar">
+        <div class="dots"><i></i><i></i><i></i></div>
+        <span class="title">~ — gh desk</span>
+        <button id="restart" type="button">Restart</button>
+      </div>
+      <div class="screen" id="screen" aria-label="Terminal running gh-desk. Click it and type."></div>
+      <div class="loading" id="loading">Loading gh-desk…</div>
+    </div>
+
+    <div class="keys" id="keys">
+      <button data-k="j">↓ j</button><button data-k="k">↑ k</button>
+      <button data-k="\t">tab</button><button data-k="\r">enter</button>
+      <button data-k=" ">space</button><button data-k="p">p</button><button data-k="v">v</button>
+      <button data-k="i">i</button><button data-k="C">C</button><button data-k="M">M</button>
+      <button data-k="?">?</button><button data-k="\x1b">esc</button>
+      <span>or click the terminal and type</span>
+    </div>
+  </section>
+
+  <section class="wrap tours">
+    <h2>Things to try</h2>
+    <div class="cards">
+      <article>
+        <h3>Look before you merge</h3>
+        <p><kbd>p</kbd> opens the pane under the list: the description beside the checks and reviews. <kbd>v</kbd> switches it to the diff, <kbd>]</kbd> and <kbd>[</kbd> move between files, and <kbd>J</kbd> <kbd>K</kbd> scroll it.</p>
+      </article>
+      <article>
+        <h3>Merge the bots in one go</h3>
+        <p>Move to the bots and press <kbd>b</kbd> to unfold them, <kbd>S</kbd> to pick the rule <em>dependency bots</em>, then <kbd>M</kbd>. The popup says how each will be merged, and Claude reads the release notes for the ones that need care.</p>
+      </article>
+      <article>
+        <h3>Ask Claude about one</h3>
+        <p><kbd>i</kbd> on a pull request asks Claude to review it, in a worktree of its head. <kbd>ctrl+r</kbd> then drafts the review to post. Here the answers are written in advance.</p>
+      </article>
+      <article>
+        <h3>Or tell Claude what you want</h3>
+        <p><kbd>C</kbd> and type <em>merge the bots with passing checks</em>. Claude plans what to show and select; <kbd>enter</kbd> applies it, and nothing is sent until you confirm.</p>
+      </article>
+      <article>
+        <h3>Your notifications</h3>
+        <p><kbd>4</kbd> or <kbd>tab</kbd> goes to the inbox: the pull requests in your notifications, with why each is there. <kbd>d</kbd> marks one done.</p>
+      </article>
+      <article>
+        <h3>Every key</h3>
+        <p><kbd>?</kbd> lists the keys of the screen you are on. They are bound by action name, and each can be changed in the config file.</p>
+      </article>
+    </div>
+  </section>
+
+  <section class="wrap" id="install">
+    <h2>Install</h2>
+    <p>gh-desk runs on the GitHub CLI and its login. Claude is optional: install <a href="https://docs.claude.com/en/docs/claude-code/overview">Claude Code</a> for <kbd>i</kbd> and <kbd>C</kbd>.</p>
+    <div class="install">
+      <pre id="cmd">gh extension install babarot/gh-desk</pre>
+      <button class="copy" id="copy" type="button">Copy</button>
+    </div>
+    <p class="then">Then run <code>gh desk</code>. The first run writes <code>~/.config/gh-desk/config.toml</code>, with every setting described and commented out.</p>
+  </section>
+</main>
+
+<footer class="wrap">
+  <span>gh-desk, made by <a href="https://github.com/babarot">babarot</a>. The repositories, people and pull requests in the demo are made up.</span>
+  <a href="https://github.com/babarot/gh-desk">github.com/babarot/gh-desk</a>
+</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/lib/xterm.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@xterm/addon-fit@0.10.0/lib/addon-fit.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@xterm/addon-unicode11@0.8.0/lib/addon-unicode11.min.js"></script>
+<script src="wasm_exec.js"></script>
+<script src="site.js"></script>
+</body>
+</html>
