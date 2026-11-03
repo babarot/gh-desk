@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# Builds the demo on the site into site/web: gh-desk.wasm, and the
+# Builds the demo on the site into demo/site/web: gh-desk.wasm, and the
 # wasm_exec.js of the Go that built it.
 #
 # Bubble Tea and atotto/clipboard have no files for js, so each is copied
-# out of the module cache with the file in site/patch added, and the build
-# takes the copies through a go.mod of its own; site/go.mod is left as it
-# is.
+# out of the module cache with the file in demo/site/patch added, and the build
+# takes the copies through a go.mod of its own; demo/site/go.mod is left
+# as it is.
 set -euo pipefail
 
 site=$(cd "$(dirname "$0")" && pwd)

@@ -3,7 +3,7 @@
 // against them, with nothing sent anywhere. Every repository, person and
 // pull request in it is invented.
 //
-// It is apart from internal/demo, which is the world of the recordings:
+// It is apart from demo/internal/recording, which is the world of the recordings:
 // a recording follows a script, while visitors to the site go anywhere,
 // so every pull request here has its diff and Claude's answers, and the
 // triage works (ADR-047).

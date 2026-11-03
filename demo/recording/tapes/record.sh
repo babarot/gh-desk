@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-# Build the demo for Linux, record the tapes with docs/tapes/vhs.sh, and
+# Build the demo for Linux, record the tapes with vhs.sh beside it, and
 # copy the GIFs next to the README's images in docs.
 #
 # Usage: record.sh [NAME ...]
 set -euo pipefail
 
-root="$(cd "$(dirname "$0")/../.." && pwd)"
-dir="$root/docs/tapes"
+root="$(cd "$(dirname "$0")/../../.." && pwd)"
+dir="$root/demo/recording/tapes"
 
 if ! docker info > /dev/null 2>&1; then
   echo "Docker is not running; start it and try again." >&2
@@ -15,7 +15,7 @@ fi
 
 arch="$(docker version --format '{{.Server.Arch}}')"
 echo "Building the demo for linux/$arch ..."
-CGO_ENABLED=0 GOOS=linux GOARCH="$arch" go build -trimpath -o "$dir/.gh-desk-demo" "$root/hack/demo"
+CGO_ENABLED=0 GOOS=linux GOARCH="$arch" go build -trimpath -o "$dir/.gh-desk-demo" "$root/demo/recording"
 trap 'rm -f "$dir/.gh-desk-demo"' EXIT
 
 "$dir/vhs.sh" "$@"

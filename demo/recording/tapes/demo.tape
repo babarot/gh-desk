@@ -2,7 +2,7 @@
 # Claude about one, and merge the dependency updates together.
 #
 # Run with: mise run demo
-# gh-desk runs for real against a made-up GitHub and Claude (internal/demo).
+# gh-desk runs for real against a made-up GitHub and Claude (demo/internal/recording).
 
 Output demo.mp4
 

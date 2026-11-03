@@ -28,31 +28,32 @@ var layers = []layer{
 	{"internal/version", 0, nil, nil, "The release version, which tagpr updates"},
 	{"internal/near", 0, nil, nil, "The closest of a few names to one mistyped, for a did-you-mean"},
 	{"internal/tui/statusline", 0, nil, nil, "What the status line shows: events for a moment, work in progress, the row's result"},
-	{"internal/config", 1, []string{"near"}, []string{"github.com/pelletier/go-toml/v2"}, "Reading the config file and reporting its mistakes"},
-	{"internal/tui/keymap", 1, []string{"near"}, nil, "Keys bound to actions by name"},
-	{"internal/plan", 1, []string{"model"}, nil, "Deciding how to merge each pull request; selection rules"},
+	{"internal/config", 1, []string{"internal/near"}, []string{"github.com/pelletier/go-toml/v2"}, "Reading the config file and reporting its mistakes"},
+	{"internal/tui/keymap", 1, []string{"internal/near"}, nil, "Keys bound to actions by name"},
+	{"internal/plan", 1, []string{"internal/model"}, nil, "Deciding how to merge each pull request; selection rules"},
 	{"internal/diff", 1, nil, nil, "Reading patches and the words that changed"},
-	{"internal/github", 2, []string{"model", "logging"}, []string{"github.com/cli/go-gh/v2"}, "GitHub's GraphQL and REST APIs"},
-	{"internal/state", 2, []string{"model"}, nil, "The pending-merge record and its lock; the conversations with Claude and their locks; the directories of the running gh-desk; the screen layout kept between launches"},
-	{"internal/claude", 2, []string{"model", "logging"}, []string{"gopkg.in/yaml.v3"}, "Running claude -p and the pull request worktrees, and the skills of the plugins given to it"},
-	{"internal/listcache", 2, []string{"model"}, nil, "The lists last read, kept on disk for the next launch"},
-	{"internal/runner", 3, []string{"model", "logging", "plan"}, nil, "Bulk approve and merge, auto-merge watching, resuming"},
-	{"internal/tui/chat", 3, []string{"model", "logging", "claude"}, nil, "The conversations with Claude about pull requests: what each holds, keeping them and their locks"},
-	{"internal/tui", 4, []string{"model", "logging", "plan", "diff", "tui/keymap", "runner", "claude", "listcache", "tui/statusline", "tui/chat"},
+	{"internal/github", 2, []string{"internal/model", "internal/logging"}, []string{"github.com/cli/go-gh/v2"}, "GitHub's GraphQL and REST APIs"},
+	{"internal/state", 2, []string{"internal/model"}, nil, "The pending-merge record and its lock; the conversations with Claude and their locks; the directories of the running gh-desk; the screen layout kept between launches"},
+	{"internal/claude", 2, []string{"internal/model", "internal/logging"}, []string{"gopkg.in/yaml.v3"}, "Running claude -p and the pull request worktrees, and the skills of the plugins given to it"},
+	{"internal/listcache", 2, []string{"internal/model"}, nil, "The lists last read, kept on disk for the next launch"},
+	{"internal/runner", 3, []string{"internal/model", "internal/logging", "internal/plan"}, nil, "Bulk approve and merge, auto-merge watching, resuming"},
+	{"internal/tui/chat", 3, []string{"internal/model", "internal/logging", "internal/claude"}, nil, "The conversations with Claude about pull requests: what each holds, keeping them and their locks"},
+	{"internal/tui", 4, []string{"internal/model", "internal/logging", "internal/plan", "internal/diff", "internal/tui/keymap", "internal/runner", "internal/claude", "internal/listcache", "internal/tui/statusline", "internal/tui/chat"},
 		[]string{"charm.land/bubbletea/v2", "charm.land/bubbles/v2", "charm.land/lipgloss/v2", "github.com/charmbracelet/x/ansi", "golang.org/x/net/html"}, "The terminal UI"},
-	{"internal/demo/playground", 4, []string{"model", "claude", "runner"}, nil, "A made-up GitHub and Claude that the playground on the site runs against; never built into gh-desk"},
-	{"internal/app", 5, []string{"model", "logging", "config", "tui/keymap", "plan", "github", "state", "claude", "listcache", "runner", "tui", "tui/chat", "version"}, nil, "Putting it together: flags, config, log, and starting the TUI"},
-	{"", 6, []string{"app"}, nil, "Calls app.Run"},
-	{"internal/demo", 6, []string{"model", "logging", "config", "tui/keymap", "runner", "claude", "tui", "app", "version"}, nil, "A made-up GitHub and Claude that the TUI runs against for the recordings in the README"},
-	{"hack/demo", 7, []string{"demo"}, nil, "Runs the demo; never built into gh-desk"},
+	{"demo/internal/playground", 4, []string{"internal/model", "internal/claude", "internal/runner"}, nil, "A made-up GitHub and Claude that the playground on the site runs against; never built into gh-desk"},
+	{"internal/app", 5, []string{"internal/model", "internal/logging", "internal/config", "internal/tui/keymap", "internal/plan", "internal/github", "internal/state", "internal/claude", "internal/listcache", "internal/runner", "internal/tui", "internal/tui/chat", "internal/version"}, nil, "Putting it together: flags, config, log, and starting the TUI"},
+	{"", 6, []string{"internal/app"}, nil, "Calls app.Run"},
+	{"demo/internal/recording", 6, []string{"internal/model", "internal/logging", "internal/config", "internal/tui/keymap", "internal/runner", "internal/claude", "internal/tui", "internal/app", "internal/version"}, nil, "A made-up GitHub and Claude that the TUI runs against for the recordings in the README"},
+	{"demo/recording", 7, []string{"demo/internal/recording"}, nil, "Runs the recordings' made-up world for VHS to record; never built into gh-desk"},
 }
 
-// layer is a package's place: its layer, the internal packages (named
-// without internal/) and outside modules it may import, and what it does.
+// layer is a package's place: its layer, the packages of this module
+// (named by their path in it) and outside modules it may import, and what
+// it does.
 type layer struct {
 	pkg      string
 	layer    int
-	internal []string
+	local    []string
 	external []string
 	does     string
 }
@@ -62,7 +63,7 @@ type layer struct {
 var reach = map[string][]string{
 	"net":      {"internal/github"},
 	"net/http": {"internal/github"},
-	"os/exec":  {"internal/app", "internal/claude", "internal/demo", "internal/demo/playground", "internal/github", "internal/tui"},
+	"os/exec":  {"demo/internal/playground", "demo/internal/recording", "internal/app", "internal/claude", "internal/github", "internal/tui"},
 	"syscall":  {"internal/state"},
 }
 
@@ -105,8 +106,8 @@ func TestArchitecture(t *testing.T) {
 		for _, imp := range p.Imports {
 			switch {
 			case strings.HasPrefix(imp, module+"/"):
-				dep := strings.TrimPrefix(imp, module+"/internal/")
-				if !slices.Contains(l.internal, dep) {
+				dep := strings.TrimPrefix(imp, module+"/")
+				if !slices.Contains(l.local, dep) {
 					t.Errorf("%s imports %s, which is not in its allowed imports", p.ImportPath, imp)
 				}
 			case strings.Contains(strings.SplitN(imp, "/", 2)[0], "."):
@@ -127,10 +128,10 @@ func TestArchitecture(t *testing.T) {
 func TestLayersGoDownward(t *testing.T) {
 	layerOf := map[string]int{}
 	for _, l := range layers {
-		layerOf[strings.TrimPrefix(l.pkg, "internal/")] = l.layer
+		layerOf[l.pkg] = l.layer
 	}
 	for _, l := range layers {
-		for _, dep := range l.internal {
+		for _, dep := range l.local {
 			dl, ok := layerOf[dep]
 			if !ok || dl >= l.layer {
 				t.Errorf("%s (layer %d) may import %s (layer %d, known %v)", l.pkg, l.layer, dep, dl, ok)
@@ -157,8 +158,8 @@ func TestNoUnusedImportAllowed(t *testing.T) {
 			t.Errorf("%s is in the table but is not a package", pkgName(l.pkg))
 			continue
 		}
-		for _, dep := range l.internal {
-			if !slices.Contains(imps, module+"/internal/"+dep) {
+		for _, dep := range l.local {
+			if !slices.Contains(imps, module+"/"+dep) {
 				t.Errorf("%s may import %s but does not; remove it from the table", pkgName(l.pkg), dep)
 			}
 		}
@@ -205,7 +206,7 @@ func docTable() string {
 			}
 			return strings.Join(q, ", ")
 		}
-		fmt.Fprintf(&b, "| %d | %s | %s | %s | %s |\n", l.layer, name, l.does, join(l.internal), join(l.external))
+		fmt.Fprintf(&b, "| %d | %s | %s | %s | %s |\n", l.layer, name, l.does, join(l.local), join(l.external))
 	}
 	b.WriteString("\nStandard library packages that reach outside the process:\n\n| Package | Only in |\n|---|---|\n")
 	names := make([]string, 0, len(reach))
