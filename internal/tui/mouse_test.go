@@ -3,6 +3,7 @@ package tui
 import (
 	"strings"
 	"testing"
+	"time"
 
 	tea "charm.land/bubbletea/v2"
 
@@ -12,6 +13,12 @@ import (
 func mouseAt(m *Model, msg tea.Msg) {
 	_, cmd := m.Update(msg)
 	run(m, cmd)
+}
+
+// clickTwice clicks at x, y twice, as a link wants to open its page.
+func clickTwice(m *Model, x, y int) {
+	mouseAt(m, tea.MouseClickMsg{X: x, Y: y, Button: tea.MouseLeft})
+	mouseAt(m, tea.MouseClickMsg{X: x, Y: y, Button: tea.MouseLeft})
 }
 
 // lineOf is the first line of the screen that has s, and where s starts
@@ -172,7 +179,7 @@ func TestClickOpensInTheBrowser(t *testing.T) {
 	click := func(s string) {
 		t.Helper()
 		x, y := lineOf(t, m, s)
-		mouseAt(m, tea.MouseClickMsg{X: x + 1, Y: y, Button: tea.MouseLeft})
+		clickTwice(m, x+1, y)
 	}
 	click("@me")
 	press(m, "b") // unfold the bots
@@ -185,5 +192,62 @@ func TestClickOpensInTheBrowser(t *testing.T) {
 	}
 	if m.view != viewList {
 		t.Fatal("a click on a link opened the pull request")
+	}
+}
+
+func TestClickOnALinkWaitsForASecond(t *testing.T) {
+	f := fixture()
+	m := start(t, f, keymap.Default())
+	clock := m.set.Now()
+	m.set.Now = func() time.Time { return clock }
+	x, y := lineOf(t, m, "alice")
+	click := func(x, y int) {
+		t.Helper()
+		mouseAt(m, tea.MouseClickMsg{X: x, Y: y, Button: tea.MouseLeft})
+	}
+
+	// One click shows "open" over the link and opens nothing.
+	click(x+1, y)
+	if len(f.browsed) != 0 {
+		t.Fatalf("one click opened %q", f.browsed)
+	}
+	if l := strings.Split(screen(m), "\n")[y]; !strings.Contains(l, "open ") || strings.Contains(l, "alice") {
+		t.Fatalf("the link does not wait for a second click:\n%s", l)
+	}
+
+	// The wait ends, and the link is drawn again; a click then waits anew.
+	clock = clock.Add(armedFor)
+	mouseAt(m, disarmMsg{})
+	if l := strings.Split(screen(m), "\n")[y]; !strings.Contains(l, "alice") {
+		t.Fatalf("the link is not back after the wait:\n%s", l)
+	}
+	click(x+1, y)
+	if len(f.browsed) != 0 {
+		t.Fatalf("a click after the wait opened %q", f.browsed)
+	}
+
+	// A key press lets go of the link too.
+	press(m, "j", "k")
+	click(x+1, y)
+	if len(f.browsed) != 0 {
+		t.Fatalf("a click after a key opened %q", f.browsed)
+	}
+
+	// So does a click elsewhere: the title of the row is no link.
+	tx, ty := lineOf(t, m, "Add retries")
+	click(tx, ty)
+	click(x+1, y)
+	if len(f.browsed) != 0 {
+		t.Fatalf("a click after one elsewhere opened %q", f.browsed)
+	}
+
+	// A second click in time opens the page, anywhere on the link.
+	clock = clock.Add(armedFor - time.Millisecond)
+	click(x+3, y)
+	if want := "https://github.com/alice"; strings.Join(f.browsed, " ") != want {
+		t.Fatalf("browsed %q, want %q", f.browsed, want)
+	}
+	if m.armed != nil {
+		t.Fatal("the link still waits after it opened")
 	}
 }

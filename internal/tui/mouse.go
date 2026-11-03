@@ -12,9 +12,10 @@ import (
 )
 
 // The mouse points: it picks a tab or a row, folds a group with a click,
-// opens a pull request with a double click, opens a profile or a pull request in the browser, scrolls, and
-// resizes the preview pane by its top edge. Nothing that writes to GitHub
-// is done with it. See ADR-012.
+// opens a pull request with a double click, opens a page in the browser
+// with a second click on its link, scrolls, and resizes the preview pane
+// by its top edge. Nothing that writes to GitHub is done with it. See
+// ADR-012 and ADR-035.
 
 const (
 	// minPaneHeight is the fewest lines the pane is shown with.
@@ -23,7 +24,28 @@ const (
 	doubleClick = 500 * time.Millisecond
 	// wheelLines is how far a turn of the wheel scrolls.
 	wheelLines = 3
+	// armedFor is how long a link clicked once waits for the click that
+	// opens it.
+	armedFor = 3 * time.Second
 )
+
+// spot is a link on the screen: the page it opens, and the cells x to
+// x+w of line y it is drawn in. row is the row of the list it is on, -1
+// off the list.
+type spot struct {
+	url     string
+	x, y, w int
+	row     int
+}
+
+// armed is a link clicked once, which a click on it before until opens.
+type armed struct {
+	spot
+	until time.Time
+}
+
+// disarmMsg comes when a link clicked once may have stopped waiting.
+type disarmMsg struct{}
 
 // click is a left click on a row of the list.
 type click struct {
@@ -50,6 +72,10 @@ func (m *Model) mouse(msg tea.MouseMsg) tea.Cmd {
 		}
 		return nil
 	}
+	// Anything but a click on the link waiting for its second click
+	// leaves it.
+	prev := m.armed
+	m.armed = nil
 	if m.bulk != nil || m.notesAt != nil || m.picker != nil || m.menu != nil || m.confirm != nil || m.triage != nil && m.triage.open || m.filtering || m.compose != nil {
 		return nil
 	}
@@ -77,7 +103,7 @@ func (m *Model) mouse(msg tea.MouseMsg) tea.Cmd {
 			return nil
 		}
 		if m.view == viewList {
-			return m.listClick(msg.X, msg.Y)
+			return m.listClick(msg.X, msg.Y, prev)
 		}
 	}
 	return nil
@@ -121,12 +147,18 @@ func (m *Model) wheel(msg tea.MouseWheelMsg) tea.Cmd {
 // paneTop is the line of the pane's top border.
 func (m *Model) paneTop(l layout) int { return m.top() + 1 + l.list }
 
-func (m *Model) listClick(x, y int) tea.Cmd {
-	if y == 0 {
-		lead := lipgloss.Width(m.st.app.Render("triage") + m.st.dim.Render(" // "))
-		if name := m.viewerName(); name != "" && spanAt([]int{lipgloss.Width(name)}, 0, x-lead) == 0 {
-			return m.browseURL(m.webURL(m.viewer))
+// listClick is a click on the list screen. One on a link waits for a
+// second there to open its page; see clickLink.
+func (m *Model) listClick(x, y int, prev *armed) tea.Cmd {
+	if s, ok := m.linkUnder(x, y); ok {
+		m.lastClick = click{}
+		var cmd tea.Cmd
+		if s.row >= 0 {
+			cmd = m.moveTo(s.row)
 		}
+		return tea.Batch(cmd, m.clickLink(s, prev))
+	}
+	if y == 0 {
 		from, to := m.shownTabs()
 		var ws []int
 		for i := from; i < to; i++ {
@@ -154,23 +186,14 @@ func (m *Model) listClick(x, y int) tea.Cmd {
 		m.dragging = true
 		return nil
 	}
-	// A click on a fact of the overview opens its page, one on a file tab
-	// of the diff shows it, and one on the header of a part, or of a file
-	// of the diff, folds it.
+	// A click on a file tab of the diff shows it, and one on the header
+	// of a part, or of a file of the diff, folds it.
 	if top := m.paneTop(l); l.pane > 0 && y > top {
 		r := y - top - 1
 		if m.pane.mode == paneDiff && r == m.pane.tabRow {
 			// The pane's border and a space come before its lines.
 			m.clickFileTab(x - 2)
 			return nil
-		}
-		if r < len(m.pane.links) {
-			for _, k := range m.pane.links[r] {
-				// The pane's border and a space come before its lines.
-				if spanAt([]int{k.w}, 0, x-2-k.x) == 0 {
-					return m.browseURL(k.url)
-				}
-			}
 		}
 		if r < len(m.pane.heads) && m.pane.heads[r] != "" {
 			if m.pane.mode == paneOverview {
@@ -184,10 +207,6 @@ func (m *Model) listClick(x, y int) tea.Cmd {
 	i, ok := m.rowAt(y, l)
 	if !ok {
 		return nil
-	}
-	if url := m.linkAt(i, x); url != "" {
-		m.lastClick = click{}
-		return tea.Batch(m.moveTo(i), m.browseURL(url))
 	}
 	// A click on a group folds or unfolds it, as one on a header of the
 	// pane does.
@@ -209,13 +228,86 @@ func (m *Model) listClick(x, y int) tea.Cmd {
 	return cmd
 }
 
-// linkAt is the web page of what row i shows at x: its pull request's name
-// or its author, as the PR and AUTHOR columns draw them; empty elsewhere.
-func (m *Model) linkAt(i, x int) string {
+// clickLink opens the page of the link s when it is the one prev waits
+// on, and otherwise makes s wait for a second click, so that a stray
+// click does not throw the user out to the browser.
+func (m *Model) clickLink(s spot, prev *armed) tea.Cmd {
+	now := m.set.Now()
+	if prev != nil && prev.spot == s && now.Before(prev.until) {
+		return m.browseURL(s.url)
+	}
+	m.armed = &armed{spot: s, until: now.Add(armedFor)}
+	return m.after(armedFor, disarmMsg{})
+}
+
+// disarm lets go of a link whose wait is over.
+func (m *Model) disarm() {
+	if m.armed != nil && !m.set.Now().Before(m.armed.until) {
+		m.armed = nil
+	}
+}
+
+// drawArmed draws "open" over the link waiting for its second click, while
+// the same link is still where it was clicked.
+func (m *Model) drawArmed(lines []string) []string {
+	a := m.armed
+	if a == nil || m.view != viewList || !m.set.Now().Before(a.until) || a.y >= len(lines) {
+		return lines
+	}
+	if s, ok := m.linkUnder(a.x, a.y); !ok || s != a.spot {
+		return lines
+	}
+	label := "open"
+	if lipgloss.Width("▸ "+label) <= a.w {
+		label = "▸ " + label
+	}
+	lines[a.y] = place(lines[a.y], m.st.peach.Bold(true).Render(fit(label, a.w)), a.x)
+	return lines
+}
+
+// linkUnder is the link drawn at x, y of the list screen: the viewer in
+// the header, a link of the pane, or a pull request's name or author in
+// the list.
+func (m *Model) linkUnder(x, y int) (spot, bool) {
+	if y == 0 {
+		lead := lipgloss.Width(m.st.app.Render("triage") + m.st.dim.Render(" // "))
+		if name := m.viewerName(); name != "" && spanAt([]int{lipgloss.Width(name)}, 0, x-lead) == 0 {
+			return spot{url: m.webURL(m.viewer), x: lead, y: y, w: lipgloss.Width(name), row: -1}, true
+		}
+		return spot{}, false
+	}
+	l := m.layout()
+	if top := m.paneTop(l); l.pane > 0 && y >= top {
+		r := y - top - 1
+		if y == top || m.pane.mode == paneDiff && r == m.pane.tabRow || r >= len(m.pane.links) {
+			return spot{}, false
+		}
+		for _, k := range m.pane.links[r] {
+			// The pane's border and a space come before its lines.
+			if spanAt([]int{k.w}, 0, x-2-k.x) == 0 {
+				return spot{url: k.url, x: 2 + k.x, y: y, w: k.w, row: -1}, true
+			}
+		}
+		return spot{}, false
+	}
+	i, ok := m.rowAt(y, l)
+	if !ok {
+		return spot{}, false
+	}
+	if s, ok := m.linkAt(i, x); ok {
+		s.y, s.row = y, i
+		return s, true
+	}
+	return spot{}, false
+}
+
+// linkAt is the link of row i at x: its pull request's name or its
+// author, as the PR and AUTHOR columns draw them.
+func (m *Model) linkAt(i, x int) (spot, bool) {
 	t := m.tab()
 	rs := m.rows(t)
 	if i >= len(rs) || rs[i].kind != rowPR {
-		return ""
+		return spot{}, false
 	}
 	p := rs[i].pr
 	at := 0
@@ -224,21 +316,23 @@ func (m *Model) linkAt(i, x int) string {
 		case "pr":
 			// The cursor and the mark come before the name.
 			name := fmt.Sprintf("%s#%d", m.repoName(p), p.Key.Number)
-			if spanAt([]int{min(lipgloss.Width(name), c.width-4)}, 0, x-at-4) == 0 {
-				return m.prURL(p)
+			w := min(lipgloss.Width(name), c.width-4)
+			if spanAt([]int{w}, 0, x-at-4) == 0 {
+				return spot{url: m.prURL(p), x: at + 4, w: w}, true
 			}
 		case "author":
 			a := m.author(p)
 			if a.url == "" {
-				return ""
+				return spot{}, false
 			}
-			if spanAt([]int{min(lipgloss.Width(a.text), c.width)}, 0, x-at) == 0 {
-				return a.url
+			w := min(lipgloss.Width(a.text), c.width)
+			if spanAt([]int{w}, 0, x-at) == 0 {
+				return spot{url: a.url, x: at, w: w}, true
 			}
 		}
 		at += c.width + 2
 	}
-	return ""
+	return spot{}, false
 }
 
 // prURL is a pull request's web page.

@@ -59,7 +59,7 @@ func (m *Model) render() (string, *tea.Cursor) {
 	}
 	b.WriteString(fit(m.statusText(), m.width) + "\n")
 	b.WriteString(fit(m.hints(), m.width))
-	lines := strings.Split(b.String(), "\n")
+	lines := m.drawArmed(strings.Split(b.String(), "\n"))
 	if m.compose != nil {
 		// Under the confirm popup when a review is posted.
 		popup, at := m.renderCompose()

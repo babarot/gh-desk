@@ -108,7 +108,7 @@ func (m *Model) helpSections() []helpSection {
 	return append(out, helpSection{"mouse", [][2]string{
 		{"click", "tab, row, pane tab"},
 		{"double click", "actions"},
-		{"click", "@you, an author, a PR: browser"},
+		{"click twice", "@you, an author, a PR: browser"},
 		{"wheel", "scroll"},
 		{"drag", "the pane's top edge: resize"},
 	}, true})

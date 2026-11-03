@@ -215,9 +215,12 @@ type Model struct {
 	filter    string
 
 	// dragging is set while the pane's top edge is held with the mouse,
-	// and lastClick is the row clicked last, to tell a double click.
+	// lastClick is the row clicked last, to tell a double click, and
+	// armed is the link clicked once, waiting for the click that opens
+	// it; nil when none is.
 	dragging  bool
 	lastClick click
+	armed     *armed
 
 	pane  pane
 	cache cache
@@ -358,6 +361,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		before, _, had := m.currentPR()
 		if _, ok := msg.(tea.KeyPressMsg); ok {
 			m.line.KeyPressed()
+			m.armed = nil
 		}
 		_, cmd := m.update(msg)
 		m.followCursor(before.Key, had)
@@ -404,6 +408,9 @@ func (m *Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case statusTickMsg:
 		m.statusTickAt = time.Time{}
+		return m, nil
+	case disarmMsg:
+		m.disarm()
 		return m, nil
 	case freshMsg:
 		if msg.gen == m.freshGen {
