@@ -113,6 +113,8 @@ h1 em {
 /* content-box: the fit addon takes the computed width and height as the
    room for the cells, so the padding must not be in them */
 .screen { box-sizing: content-box; height: min(70vh, 620px); min-height: 400px; padding: 10px 12px 6px; overflow: hidden; }
+/* narrower than the terminal's least columns (site.js): scroll sideways */
+.screen { overflow-x: auto; }
 .screen .xterm-viewport { background: transparent !important; overflow-y: hidden !important; }
 .loading {
   position: absolute; inset: 36px 0 0; display: grid; place-items: center;
@@ -185,16 +187,19 @@ h3 { letter-spacing: -.01em; }
 .steps p { margin: 0 0 14px; color: var(--mid); }
 .install {
   display: flex; align-items: center; gap: 12px; background: var(--term-bg); border: 1px solid var(--line);
-  border-radius: 10px; padding: 14px 16px; overflow-x: auto;
+  border-radius: 10px; padding: 14px 16px;
 }
-.install pre { margin: 0; flex: 1; font-size: 15px; }
+/* the command scrolls, so the copy button stays in sight on a phone */
+.install pre { margin: 0; flex: 1; min-width: 0; overflow-x: auto; font-size: 15px; }
+.copy { flex: none; }
 .install pre::before { content: "$ "; color: var(--accent-2); }
 .copy {
   font: 600 13px Inter, sans-serif; color: #fff; background: var(--accent); border: 0;
   border-radius: 6px; padding: 6px 14px; cursor: pointer;
 }
 
-footer {
+/* footer.wrap: .wrap sets the padding too, and a class outweighs an element */
+footer.wrap {
   display: flex; flex-wrap: wrap; gap: 12px; justify-content: space-between;
   padding-top: 40px; padding-bottom: 56px; border-top: 1px solid var(--line);
   color: var(--mid); font-size: 14px;
