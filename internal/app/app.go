@@ -178,7 +178,7 @@ type parts struct {
 // reads and writes only under e.stateDir and the cache directory; nothing
 // is sent to GitHub.
 func assemble(cfg config.File, warns []string, e env, log *slog.Logger) parts {
-	set := settings(cfg)
+	set := Settings(cfg)
 	set.ConfigWarnings = warns
 	set.Viewer = e.viewer
 	set.Version = version.String()
@@ -455,8 +455,8 @@ func (g runnerGitHub) CommitInfo(ctx context.Context, key model.PRKey, oid strin
 	return runner.Commit(c), err
 }
 
-// settings are the config values the TUI uses.
-func settings(cfg config.File) tui.Settings {
+// Settings are the config values the TUI uses. The demo takes them too.
+func Settings(cfg config.File) tui.Settings {
 	set := tui.Settings{
 		MarkDone: cfg.Review.MarkDone, HomeOwners: cfg.List.HomeOwners, Columns: cfg.List.Columns, Menu: cfg.Menu.Actions, PreviewHeight: cfg.Preview.Height,
 		DefaultPaneHeight: config.DefaultPreviewHeight,

@@ -42,6 +42,8 @@ var layers = []layer{
 		[]string{"charm.land/bubbletea/v2", "charm.land/bubbles/v2", "charm.land/lipgloss/v2", "github.com/charmbracelet/x/ansi", "golang.org/x/net/html"}, "The terminal UI"},
 	{"internal/app", 5, []string{"model", "logging", "config", "tui/keymap", "plan", "github", "state", "claude", "listcache", "runner", "tui", "tui/chat", "version"}, nil, "Putting it together: flags, config, log, and starting the TUI"},
 	{"", 6, []string{"app"}, nil, "Calls app.Run"},
+	{"internal/demo", 6, []string{"model", "logging", "config", "tui/keymap", "runner", "claude", "tui", "app", "version"}, nil, "A made-up GitHub and Claude that the TUI runs against for the recordings in the README"},
+	{"hack/demo", 7, []string{"demo"}, nil, "Runs the demo; never built into gh-desk"},
 }
 
 // layer is a package's place: its layer, the internal packages (named
@@ -59,7 +61,7 @@ type layer struct {
 var reach = map[string][]string{
 	"net":      {"internal/github"},
 	"net/http": {"internal/github"},
-	"os/exec":  {"internal/app", "internal/claude", "internal/github", "internal/tui"},
+	"os/exec":  {"internal/app", "internal/claude", "internal/demo", "internal/github", "internal/tui"},
 	"syscall":  {"internal/state"},
 }
 

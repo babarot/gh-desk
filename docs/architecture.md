@@ -23,6 +23,8 @@ gh-desk is split into packages by layer. A package imports only packages of lowe
 | 4 | `internal/tui` | The terminal UI | `model`, `logging`, `plan`, `diff`, `tui/keymap`, `runner`, `claude`, `listcache`, `tui/statusline`, `tui/chat` | `charm.land/bubbletea/v2`, `charm.land/bubbles/v2`, `charm.land/lipgloss/v2`, `github.com/charmbracelet/x/ansi`, `golang.org/x/net/html` |
 | 5 | `internal/app` | Putting it together: flags, config, log, and starting the TUI | `model`, `logging`, `config`, `tui/keymap`, `plan`, `github`, `state`, `claude`, `listcache`, `runner`, `tui`, `tui/chat`, `version` | - |
 | 6 | `main` | Calls app.Run | `app` | - |
+| 6 | `internal/demo` | A made-up GitHub and Claude that the TUI runs against for the recordings in the README | `model`, `logging`, `config`, `tui/keymap`, `runner`, `claude`, `tui`, `app`, `version` | - |
+| 7 | `hack/demo` | Runs the demo; never built into gh-desk | `demo` | - |
 
 Standard library packages that reach outside the process:
 
@@ -30,7 +32,7 @@ Standard library packages that reach outside the process:
 |---|---|
 | `net` | `internal/github` |
 | `net/http` | `internal/github` |
-| `os/exec` | `internal/app`, `internal/claude`, `internal/github`, `internal/tui` |
+| `os/exec` | `internal/app`, `internal/claude`, `internal/demo`, `internal/github`, `internal/tui` |
 | `syscall` | `internal/state` |
 <!-- layers:end -->
 

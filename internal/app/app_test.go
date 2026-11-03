@@ -81,7 +81,7 @@ func TestEditorPrecedence(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := settings(cfg).Editor; got != "code --wait" {
+	if got := Settings(cfg).Editor; got != "code --wait" {
 		t.Errorf("Settings.Editor = %q", got)
 	}
 }

@@ -2,3 +2,6 @@
 /.claude/worktrees/
 /dist/
 coverage.out
+/docs/tapes/.gh-desk-demo
+/docs/tapes/*.mp4
+/docs/tapes/*.gif
