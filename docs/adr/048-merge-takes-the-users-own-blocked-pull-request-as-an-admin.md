@@ -1,4 +1,4 @@
-# ADR-047: Merge takes the user's own blocked pull request as an admin
+# ADR-048: Merge takes the user's own blocked pull request as an admin
 
 ## Status
 
