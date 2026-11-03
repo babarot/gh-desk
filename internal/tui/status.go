@@ -2,6 +2,7 @@ package tui
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 
@@ -61,13 +62,39 @@ func (m *Model) statusText() string {
 	case statusline.Refusal:
 		return m.st.peach.Render(text)
 	case statusline.Activity:
-		return m.working(m.st.muted, text)
+		return m.activityText()
 	}
 	return m.st.muted.Render(text)
 }
 
-// activities is the work in progress, writes to GitHub first.
+// activityText is the work in progress as drawn: led by the spinner, but
+// for the reading of the shown tab, which is drawn last with a bar of how
+// far it is when it has one.
+func (m *Model) activityText() string {
+	text, full, cells := m.tabActivity()
+	if cells == 0 {
+		return m.working(m.st.muted, strings.Join(m.activities(), " · "))
+	}
+	out := readBar(m.st, full, cells) + " " + m.st.muted.Render(text)
+	if work := m.workActivities(); len(work) > 0 {
+		out = m.working(m.st.muted, strings.Join(work, " · ")) + m.st.dim.Render(" · ") + out
+	}
+	return out
+}
+
+// activities is the work in progress, writes to GitHub first and the
+// reading of the shown tab last.
 func (m *Model) activities() []string {
+	out := m.workActivities()
+	if text, _, _ := m.tabActivity(); text != "" {
+		out = append(out, text)
+	}
+	return out
+}
+
+// workActivities is the work in progress but the reading of the shown
+// tab.
+func (m *Model) workActivities() []string {
 	var out []string
 	for _, f := range []func() string{m.postingActivity, m.batchActivity, m.claudeActivity, m.refreshActivity} {
 		if s := f(); s != "" {
@@ -75,6 +102,79 @@ func (m *Model) activities() []string {
 		}
 	}
 	return out
+}
+
+// tabActivity is the reading of the shown tab, while it is the first one
+// or r's, and empty otherwise: the clock's reading says nothing, nor one
+// of a tab shown from the cache. A tab
+// that lists more pull requests than one read of heavy fields takes has a
+// bar of cells, full of them filled: a pull request counts once when it is
+// listed and once when its heavy fields are back, so that the bar moves
+// while the pages of the search come too. A tab whose count is not known
+// yet, a small one and the inbox have none (cells is zero), and are said
+// with the spinner.
+func (m *Model) tabActivity() (text string, full, cells int) {
+	t := m.tab()
+	r := m.refreshing
+	byR := r != nil && slices.Contains(r.tabs, m.cur)
+	if m.tabDone(t) || !t.told && !byR {
+		return "", 0, 0
+	}
+	text = "reading " + t.name
+	if byR {
+		text = "refreshing"
+	}
+	if t.inbox || t.want <= heavyBatch {
+		text += "…"
+	} else {
+		listed := len(t.prs)
+		if t.pend != nil {
+			listed = len(t.pend.prs)
+		} else if !t.loaded {
+			listed = 0
+		}
+		done := min(listed, t.want) + min(t.heavyGot, t.want)
+		cells = min(t.want, readBarMax)
+		full = done * cells / (2 * t.want)
+	}
+	if byR && r.cleared > 0 {
+		text += fmt.Sprintf(" · %d results cleared", r.cleared)
+	}
+	return text, full, cells
+}
+
+// telling is r's reading of the shown tab, told on the status line: of
+// which tab.
+type telling struct{ tab int }
+
+// endTabReading says, for a moment, that r's reading of the shown tab is
+// over. The first reading ends without a word, as its rows say it; a
+// reading that failed has said so, and one of a tab no longer shown says
+// nothing.
+func (m *Model) endTabReading() {
+	if text, _, _ := m.tabActivity(); text != "" {
+		m.telling = nil
+		if m.refreshing != nil {
+			m.telling = &telling{tab: m.cur}
+		}
+		return
+	}
+	tl := m.telling
+	m.telling = nil
+	t := m.tab()
+	if tl == nil || tl.tab != m.cur || !m.tabDone(t) || t.err != nil || !t.asOf.IsZero() {
+		return
+	}
+	m.say("refreshed")
+}
+
+// readBarMax is the most cells a bar of how far a reading is takes.
+const readBarMax = 12
+
+// readBar is a bar of cells, full of them filled. ▰ and ▱ are one cell
+// wide on any terminal, as a spinner's frames are (ADR-030).
+func readBar(st styles, full, cells int) string {
+	return st.mauve.Render(strings.Repeat("▰", full)) + st.border.Render(strings.Repeat("▱", cells-full))
 }
 
 // rowResult is the full result of the row under the cursor, where the row

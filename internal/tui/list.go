@@ -499,7 +499,7 @@ func (m *Model) renderList(b *strings.Builder, height int) {
 	case !t.loaded && t.loading:
 		// No group heads yet: their counts are not known, and a 0 there
 		// looks like the list stopped.
-		b.WriteString("  " + m.working(m.st.muted, "reading "+t.name+"… GitHub's search takes a few seconds") + "\n")
+		b.WriteString("  " + m.st.muted.Render("reading "+t.name+"… GitHub's search takes a few seconds") + "\n")
 		for lines = 1; lines < height; lines++ {
 			b.WriteString("\n")
 		}
@@ -791,7 +791,10 @@ func (m *Model) cell(id string, r row, sel bool, n int) string {
 		return m.author(p).text
 	case "ci", "review", "size":
 		if !p.HeavyRead() {
-			return st.dim.Render(m.spinnerAt(n))
+			// Nothing in a cell moves: the status line tells how far the
+			// reading is (ADR-050). ⋅, not ·, which is East Asian
+			// Ambiguous and would move the columns after it.
+			return st.dim.Render("⋅")
 		}
 	}
 	switch id {

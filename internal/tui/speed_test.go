@@ -13,6 +13,7 @@ import (
 	"github.com/babarot/gh-desk/internal/plan"
 	"github.com/babarot/gh-desk/internal/runner"
 	"github.com/babarot/gh-desk/internal/tui/keymap"
+	"github.com/babarot/gh-desk/internal/tui/statusline"
 )
 
 // fakeLists is a cache in memory.
@@ -111,29 +112,74 @@ func TestStaleHeavyIsDropped(t *testing.T) {
 	}
 }
 
-// Until heavy fields are read, a row shows a spinner where they go, and a
+// Until heavy fields are read, a row shows a still ⋅ where they go, and a
 // rule on the size or the checks does not pick it.
 func TestUnreadHeavyFields(t *testing.T) {
 	f := fixture()
 	f.noHeavy = true
 	m := newModel(f, nil)
 	run(m, m.Init())
-	if !strings.Contains(screen(m), "alice           "+m.spinner()) {
-		t.Errorf("no spinner in the heavy columns:\n%s", screen(m))
+	if !strings.Contains(screen(m), "alice           ⋅   ⋅") {
+		t.Errorf("no ⋅ in the heavy columns:\n%s", screen(m))
 	}
 	for _, r := range []plan.Rule{{Name: "few files", MaxFiles: 2}, {Name: "few lines", MaxLines: 500}} {
 		if got := m.ruleMatches(r); len(got) != 0 {
 			t.Errorf("%s picked unread pull requests: %v", r.Name, got)
 		}
 	}
-	// While heavy reads are on their way, the tab spins and S waits.
+	// While heavy reads are on their way, the tab keeps its count, the
+	// status line says it is read, and S waits.
 	m.tabs[0].heavyLeft = 1
-	if !strings.Contains(screen(m), "1 review ("+m.spinner()+")") {
-		t.Errorf("no spinner on the tab:\n%s", screen(m))
+	if s := screen(m); !strings.Contains(s, "1 review (3)") || !strings.Contains(status(m), "reading review…") {
+		t.Errorf("the tab is not shown as being read:\n%s", s)
 	}
 	m.picker = &pick{}
 	if m.pickReady() {
 		t.Error("S is ready before the heavy fields")
+	}
+}
+
+// A tab that lists more than one read of heavy fields takes shows how far
+// its reading is as a bar on the status line: a pull request counts once
+// listed and once with its heavy fields.
+func TestTabReadingBar(t *testing.T) {
+	m := newModel(fixture(), nil)
+	run(m, m.Init())
+	tb := m.tabs[0]
+	tb.loaded, tb.told, tb.want, tb.heavyLeft, tb.heavyGot = false, true, 24, 1, 9
+	// Nothing listed yet and 9 with heavy fields: 9 of 48.
+	if got := status(m); got != "▰▰▱▱▱▱▱▱▱▱▱▱ reading review" {
+		t.Errorf("status = %q", got)
+	}
+	// The clock's reading again says nothing.
+	tb.loaded, tb.told, tb.heavyGot = true, false, 0
+	tb.pend = &pending{prs: make([]model.PR, 24)}
+	if got := status(m); got != "" {
+		t.Errorf("status of the clock's reading = %q", got)
+	}
+	// r's does, the pages in so far counting.
+	m.refreshing = &refreshRun{tabs: []int{0}, cleared: 2}
+	if got := status(m); got != "▰▰▰▰▰▰▱▱▱▱▱▱ refreshing · 2 results cleared" {
+		t.Errorf("status of r = %q", got)
+	}
+}
+
+// The end of r's reading is said for a moment; the first reading and the
+// clock's say nothing.
+func TestTabReadingEnd(t *testing.T) {
+	m, _ := startWith(t, fixture(), keymap.Default())
+	if got := status(m); got != "" {
+		t.Errorf("status after the first reading = %q", got)
+	}
+	_, cmd := m.Update(keyMsg("r"))
+	run(m, cmd)
+	if got := status(m); got != "refreshed" {
+		t.Errorf("status after r = %q", got)
+	}
+	clockAt(m, statusline.InfoFor)
+	run(m, m.autoRefresh())
+	if got := status(m); got != "" {
+		t.Errorf("status after the clock's reading = %q", got)
 	}
 }
 
@@ -194,11 +240,11 @@ func TestPopupFillsInAsItReads(t *testing.T) {
 	if len(parts) != 2 {
 		t.Fatalf("%d reads, want 2 of 5 and 2", len(parts))
 	}
-	if s := screen(m); !strings.Contains(s, "Add retries to the client") || !strings.Contains(s, "reading…") || !strings.Contains(s, "again… 0 of 7 read") {
+	if s := screen(m); !strings.Contains(s, "Add retries to the client") || !strings.Contains(s, "reading…") || !strings.Contains(s, "reading 0 of 7…") {
 		t.Errorf("rows are not listed before they are read:\n%s", s)
 	}
 	m.Update(parts[0]())
-	if s := screen(m); !strings.Contains(s, "5 of 7 read") || !strings.Contains(s, "merge now") {
+	if s := screen(m); !strings.Contains(s, "reading 5 of 7…") || !strings.Contains(s, "merge now") {
 		t.Errorf("the first five did not fill in:\n%s", s)
 	}
 	press(m, "y")

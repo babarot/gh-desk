@@ -517,10 +517,6 @@
             "off"
           ],
           "type": "string"
-        },
-        "wave": {
-          "description": "Put each line of a table a frame of the spinner ahead of the one above it, so that a wave runs down a column being read.",
-          "type": "boolean"
         }
       },
       "type": "object"

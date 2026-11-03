@@ -119,9 +119,8 @@ type Settings struct {
 	ThemeDark, ThemeLight string
 	// Spinner is the name of the spinner shown while something is read.
 	Spinner string
-	// Shimmer runs a light over the text that says what is going on, and
-	// Wave puts each line of a table a frame of the spinner ahead.
-	Shimmer, Wave bool
+	// Shimmer runs a light over the text that says what is going on.
+	Shimmer bool
 	// Version is gh-desk's version, told at the foot of the ? popup.
 	Version string
 	// Editor is the command ctrl+e runs to edit a review, with its
@@ -248,8 +247,11 @@ type Model struct {
 	refreshed map[int]time.Time
 	// refreshing is the reading r started, while it lasts.
 	refreshing *refreshRun
-	compose    *compose
-	confirm    *confirm
+	// telling is r's reading of the shown tab, while it lasts, so that
+	// its end is said.
+	telling *telling
+	compose *compose
+	confirm *confirm
 	// chats are the conversations with Claude, by pull request; chatState
 	// keeps them and takes their locks. claudeOpen puts the claude pane in
 	// place of the preview.
@@ -363,10 +365,12 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		_, cmd := m.update(msg)
 		m.followCursor(before.Key, had)
+		m.endTabReading()
 		m.endRefresh()
 		return m, tea.Batch(cmd, m.spin(), m.statusTick())
 	}
 	_, cmd := m.update(msg)
+	m.endTabReading()
 	m.endRefresh()
 	return m, tea.Batch(cmd, m.spin(), m.statusTick())
 }
