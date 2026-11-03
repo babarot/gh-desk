@@ -53,6 +53,6 @@ nix:
       name: nur-packages
       token: "{{ .Env.NUR_GITHUB_TOKEN }}"
     homepage: https://github.com/babarot/gh-desk
-    description: Review and merge the pull requests that reach you, from the terminal
+    description: A desk in your terminal for the pull requests waiting on you
     license: mit
     main_program: gh-desk
