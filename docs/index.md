@@ -11,7 +11,8 @@ gh-desk is a [gh](https://cli.github.com/) extension. It opens the pull requests
 ## Where to go
 
 - [Getting started](getting-started.md): install it, run it, and the screen you see first
-- Concepts: [tabs and groups](concepts/tabs.md), [reading a pull request](concepts/reading.md), [selecting by rules](concepts/selecting.md), [approving and merging](concepts/approve-and-merge.md), and [Claude](concepts/ask-claude.md)
-- Reference: [commands](reference/commands.md), [configuration](reference/configuration.md) and [keys](reference/keys.md), written from the code, so they say what the version on main does
+- [Concepts](concepts/README.md): what gh-desk aims for, the [principles](concepts/principles.md) it keeps, and [how it differs from other tools](concepts/compared.md)
+- [Guides](guides/README.md): how to use it, from [tabs and groups](guides/tabs.md) to [approving and merging](guides/approve-and-merge.md), [Claude](guides/ask-claude.md) and [the config file](guides/configuration.md)
+- [Reference](reference/README.md): every [command](reference/commands.md), [setting](reference/configuration.md) and [key](reference/keys.md), written from the code, so they say what the version on main does
 
 The decisions behind the design are kept as [ADRs](adr/) in the repository.

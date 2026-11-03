@@ -2,8 +2,9 @@
 A link in docs/ is written to work on GitHub, and taken here to where it
 leads on the site:
 
-- to another page (foo.md) - that page; a link that leads to no page stops
-  the build
+- to another page (foo.md), or to a directory or its README.md - that
+  page, or the page of the section; a link that leads to no page stops the
+  build
 - to the rest of the repository (an ADR, the code) - that file on GitHub
 - to the playground (params.playground) - the playground next to the docs,
   on the whole window; one titled "playground" is embedded instead, a card
@@ -30,8 +31,16 @@ leads on the site:
   {{- $dir := path.Dir .Page.File.Path -}}
   {{- $target := path.Clean (path.Join $dir $u.Path) -}}
   {{- $page := "" -}}
-  {{- if and (strings.HasSuffix $u.Path ".md") (not (strings.HasPrefix $target "../")) -}}
-    {{- $page = site.GetPage $target -}}
+  {{- if not (strings.HasPrefix $target "../") -}}
+    {{- /* A README.md, or its directory as GitHub shows it, is the page of
+           its section. */ -}}
+    {{- if strings.HasSuffix $target "/README.md" -}}
+      {{- $page = site.GetPage (path.Dir $target) -}}
+    {{- else if strings.HasSuffix $u.Path ".md" -}}
+      {{- $page = site.GetPage $target -}}
+    {{- else if $u.Path -}}
+      {{- with site.GetPage $target }}{{ if .IsSection }}{{ $page = . }}{{ end }}{{ end -}}
+    {{- end -}}
   {{- end -}}
   {{- if $page -}}
     {{- $href = $page.RelPermalink -}}

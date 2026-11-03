@@ -62,6 +62,7 @@ Nothing is written to GitHub without a confirm popup that lists what will be don
 
 ## Next
 
-- [Tabs and groups](concepts/tabs.md), to make the tabs your own
-- [Approving and merging](concepts/approve-and-merge.md), to know what the popup will do
-- [Configuration](reference/configuration.md), every setting
+- [Tabs and groups](guides/tabs.md), to make the tabs your own
+- [Approving and merging](guides/approve-and-merge.md), to know what the popup will do
+- [Configuration](guides/configuration.md), to change the rest
+- [Concepts](concepts/README.md), for what gh-desk aims for and why it works the way it does
