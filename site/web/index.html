@@ -132,12 +132,24 @@ try { const t = localStorage.getItem('gh-desk-theme'); if (t) document.documentE
       <div class="conf">
         <div class="conf-text">
           <h3>Claude, on your terms</h3>
-          <p>Claude Code answers in your language and follows instructions of your own in every review. It runs with read-only tools in a worktree of the pull request; MCP servers and the skills of your plugins can be given to it too.</p>
+          <p>Claude Code answers in your language and follows instructions of your own in every review. It runs with read-only tools in a worktree of the pull request; MCP servers and the skills of your plugins can be given to it too, as below.</p>
         </div>
 <pre class="code"><span class="t">[claude]</span>
 <span class="k">model</span>        = <span class="s">"opus"</span>
 <span class="k">language</span>     = <span class="s">"Japanese"</span>
 <span class="k">instructions</span> = <span class="s">"Point out changes that have no tests."</span></pre>
+      </div>
+
+      <div class="conf">
+        <div class="conf-text">
+          <h3>Claude remembers how you got here</h3>
+          <p>Give the conversation <a href="https://github.com/babarot/claude-recall">claude-recall</a> as an MCP server, and Claude searches your past Claude Code sessions while it reviews: why the code was written this way, what was tried and dropped. <code>--repo</code> holds the search to the pull request's repository, so a review never reads the sessions of another. The tools under <code>tools</code> run without a prompt; keep <code>WebFetch</code> off with a server that reads your own data.</p>
+        </div>
+<pre class="code"><span class="t">[claude.mcp_servers.recall]</span>
+<span class="k">command</span> = <span class="s">"recall"</span>
+<span class="c"># GH_DESK_URL is the pull request's repository</span>
+<span class="k">args</span>    = [<span class="s">"mcp"</span>, <span class="s">"--repo"</span>, <span class="s">"${GH_DESK_URL}"</span>]
+<span class="k">tools</span>   = [<span class="s">"recall_search"</span>, <span class="s">"recall_list"</span>, <span class="s">"recall_export"</span>]</pre>
       </div>
 
       <div class="conf">
