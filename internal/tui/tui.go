@@ -399,6 +399,11 @@ func (m *Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.width, m.height = msg.Width, msg.Height
+		if m.logInPane() && m.layout().pane == 0 {
+			// No room left for the log viewer; it would take the keys
+			// unseen.
+			m.closeLog()
+		}
 		if m.compose != nil {
 			m.compose.resize(m.width, m.height)
 		}

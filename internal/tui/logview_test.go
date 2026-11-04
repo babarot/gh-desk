@@ -85,6 +85,14 @@ func TestLogInThePanesPlace(t *testing.T) {
 		t.Errorf("closing the log left a pane with the preview off")
 	}
 
+	// Made too short for it while open, it closes rather than take the
+	// keys unseen.
+	press(m, "L")
+	m.Update(tea.WindowSizeMsg{Width: 100, Height: 12})
+	if m.logv != nil {
+		t.Errorf("the log stayed open with no room for it")
+	}
+
 	short, _ := startLogged(t, 100, 12, 4)
 	press(short, "L")
 	if short.logv != nil || !strings.Contains(screen(short), "no room for the log") {
@@ -139,5 +147,17 @@ func TestLogHelp(t *testing.T) {
 	press(m, "L", "?")
 	if s := helpText(m); !strings.HasPrefix(s, "▾ the log · works here") {
 		t.Errorf("the log's section is not first:\n%s", s)
+	}
+}
+
+// A line too narrow for even one wide character ends: the rest is
+// dropped, not wrapped onto empty lines forever.
+func TestLogWrapEndsOnANarrowScreen(t *testing.T) {
+	m, _ := startLogged(t, 130, 34, 0)
+	for width := 15; width <= 24; width++ {
+		lines := wrapWords("12:00:00 INFO  ", 15, []logWord{{m.st.text, "msg"}, {m.st.dim, " k="}, {m.st.muted, "日本語の値"}}, width)
+		if len(lines) > 20 {
+			t.Errorf("width %d wrapped into %d lines", width, len(lines))
+		}
 	}
 }

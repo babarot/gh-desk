@@ -316,6 +316,13 @@ func wrapWords(lead string, leadW int, words []logWord, width int) []string {
 				cut = cut[:i]
 			}
 			if cut == "" {
+				if used == 0 {
+					// Not even its next character fits a line of its
+					// own, as a wide one on a screen this narrow; drop
+					// the rest rather than add empty lines forever.
+					text = ""
+					break
+				}
 				lines = append(lines, line)
 				line, used, room = indent, 0, width-leadW-2
 				continue
