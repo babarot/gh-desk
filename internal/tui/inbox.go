@@ -1,6 +1,8 @@
 package tui
 
 import (
+	"maps"
+	"slices"
 	"time"
 
 	tea "charm.land/bubbletea/v2"
@@ -79,5 +81,5 @@ func (m *Model) inboxFirstRead(msg inboxFirstMsg) tea.Cmd {
 	for k, p := range msg.prs {
 		t.inboxPRs[k] = safePR(p)
 	}
-	return m.ensure()
+	return tea.Batch(m.ensure(), m.ensureChecks(slices.Collect(maps.Values(t.inboxPRs))))
 }

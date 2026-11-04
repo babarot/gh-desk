@@ -139,23 +139,25 @@ func (m *Model) ruleMatches(rs ...plan.Rule) []model.PR {
 
 // ruleFacts are what a rule may need beyond p: its body, if read, whether
 // only approval checks are pending, and now, the time its days count back
-// from, taken once for every pull request matched at once.
+// from, taken once for every pull request matched at once. With no
+// approval checks set, whether only those are pending is known at once:
+// none ever is, and nothing reads it.
 func (m *Model) ruleFacts(p model.PR, now time.Time) plan.Facts {
 	body, known := m.body(p.Key)
-	f := plan.Facts{Body: body, BodyKnown: known, Now: now}
+	f := plan.Facts{Body: body, BodyKnown: known, Now: now, ApprovalKnown: len(m.set.Plan.ApprovalChecks) == 0}
 	if mi, ok := m.cache.info[p.Key]; ok {
 		f.AwaitingApproval = plan.AwaitingApproval(mi.Checks, m.set.Plan.ApprovalChecks)
+		f.ApprovalKnown = true
 	}
 	return f
 }
 
-// matchesAll reports whether every rule picks p. A rule on the size or the
-// checks does not pick a pull request whose heavy fields are not read for
-// its head: unread, they look like an empty pull request with no checks,
-// which would pass.
+// matchesAll reports whether S selects p by every rule (plan.Rule.Match):
+// a rule that cannot tell yet, its heavy fields or body unread, does not
+// select it.
 func matchesAll(rs []plan.Rule, p model.PR, viewer string, f plan.Facts) bool {
 	for _, r := range rs {
-		if r.NeedsHeavy() && !p.HeavyRead() || !r.Match(p, viewer, f) {
+		if !r.Match(p, viewer, f) {
 			return false
 		}
 	}
@@ -363,8 +365,20 @@ func ruleWords(r plan.Rule) string {
 	if r.ApprovedByMe {
 		parts = append(parts, "approved by you")
 	}
+	if r.ReviewedByMe {
+		parts = append(parts, "reviewed by you")
+	}
+	if r.Mine {
+		parts = append(parts, "yours")
+	}
 	if r.Bot {
 		parts = append(parts, "bots")
+	}
+	if len(r.Repos) > 0 {
+		parts = append(parts, strings.Join(r.Repos, ", "))
+	}
+	if len(r.Requested) > 0 {
+		parts = append(parts, "asked of "+strings.Join(r.Requested, ", "))
 	}
 	if len(r.Authors) > 0 {
 		parts = append(parts, strings.Join(r.Authors, ", "))
@@ -391,8 +405,26 @@ func ruleWords(r plan.Rule) string {
 	if r.CreatedWithinDays > 0 {
 		parts = append(parts, fmt.Sprintf("created ≤%dd ago", r.CreatedWithinDays))
 	}
-	if r.ChecksPassing {
-		parts = append(parts, "checks passing")
+	if r.MinFiles > 0 {
+		parts = append(parts, fmt.Sprintf("≥%d files", r.MinFiles))
+	}
+	if r.MinLines > 0 {
+		parts = append(parts, fmt.Sprintf("≥%d lines", r.MinLines))
+	}
+	if r.UpdatedBeforeDays > 0 {
+		parts = append(parts, fmt.Sprintf("updated ≥%dd ago", r.UpdatedBeforeDays))
+	}
+	if r.CreatedBeforeDays > 0 {
+		parts = append(parts, fmt.Sprintf("created ≥%dd ago", r.CreatedBeforeDays))
+	}
+	if r.Checks != "" {
+		parts = append(parts, "checks "+string(r.Checks))
+	}
+	if r.Decision != "" {
+		parts = append(parts, strings.ToLower(strings.ReplaceAll(string(r.Decision), "_", " ")))
+	}
+	if len(r.Labels) > 0 {
+		parts = append(parts, "labels "+strings.Join(r.Labels, ", "))
 	}
 	var s strings.Builder
 	for i, p := range parts {

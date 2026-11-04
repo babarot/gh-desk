@@ -6,7 +6,7 @@ Approve, merge, review, hide and done act on the selection when there is one, an
 
 ## Rules
 
-A rule picks pull requests by facts gh-desk reads: who opened them, what a dependency update bumps, their size and age, and whether their checks pass. Rules are written in `[[select]]` of the config file, and a pull request matches a rule when it meets every key the rule gives:
+A rule picks pull requests by facts gh-desk reads: who opened them and in which repository, what a dependency update bumps, their size, age and labels, how they are reviewed, and how their checks are. Rules are written in `[[select]]` of the config file, and a pull request matches a rule when it meets every key the rule gives:
 
 ```toml
 [[select]]

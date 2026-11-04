@@ -306,13 +306,78 @@ created_within_days = 36501
 `,
 		`config.toml:3:8: select[0].name "approved by me" is used twice`,
 		`config.toml:4:9: select[0].title is not a regular expression`,
-		`config.toml:5:10: select[0].checks must be "passing"`,
+		`config.toml:5:10: select[0].checks must be one of "passing", "failing", "pending", got "green"`,
 		`config.toml:6:13: select[0].max_files must be 1 or more, got 0`,
 		`config.toml:7:13: select[0].max_lines must be 1 or more, got 0`,
 		`config.toml:9:3: select[1]: "all" matches every pull request`,
 		`config.toml:22:1: select[4].authors must name at least one login`,
 		`select[5].updated_within_days must be between 1 and 36500, got 0`,
 		`select[5].created_within_days must be between 1 and 36500, got 36501`,
+	)
+}
+
+func TestSelectConditions(t *testing.T) {
+	cfg, _, err := Load(write(t, `
+[[select]]
+name = "old team upgrades"
+repos = ["acme/*", "babarot/gh-desk"]
+labels = ["dependencies"]
+requested = ["me", "@platform"]
+decision = "changes_requested"
+checks = "failing"
+min_files = 2
+min_lines = 10
+updated_before_days = 30
+created_before_days = 60
+mine = true
+reviewed_by_me = true
+`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := Conditions{Repos: []string{"acme/*", "babarot/gh-desk"}, Labels: []string{"dependencies"}, Requested: []string{"me", "@platform"},
+		Decision: "changes_requested", Checks: "failing", MinFiles: 2, MinLines: 10, UpdatedBeforeDays: 30, CreatedBeforeDays: 60, Mine: true, ReviewedByMe: true}
+	if len(cfg.Select) != 1 || !reflect.DeepEqual(cfg.Select[0].Conditions, want) {
+		t.Fatalf("cfg.Select = %+v", cfg.Select)
+	}
+	// Show writes them back as the file takes them.
+	again, _, err := Load(write(t, Show(cfg, true)))
+	if err != nil || !reflect.DeepEqual(again.Select, cfg.Select) {
+		t.Fatalf("Show then Load = %+v, %v\n%s", again.Select, err, Show(cfg, true))
+	}
+	wantErrs(t, `
+[[select]]
+name = "bad"
+repos = ["acme", "a/b/c"]
+requested = ["alice", "@"]
+decision = "lgtm"
+min_lines = 0
+updated_before_days = 36501
+labels = []
+
+[[select]]
+name = "drafts"
+draft = true
+
+[[select]]
+name = "mentions"
+reasons = ["mention"]
+
+[[select]]
+name = "no packages"
+packages = []
+`,
+		`config.toml:4:10: select[0].repos[0] "acme" must be owner/repo`,
+		`config.toml:4:18: select[0].repos[1] "a/b/c" must be owner/repo`,
+		`select[0].requested[0] "alice" must be "me" or a team`,
+		`select[0].requested[1] "@" must be "me" or a team`,
+		`select[0].decision must be one of "approved", "changes_requested", "review_required", got "lgtm"`,
+		`select[0].min_lines must be 1 or more, got 0`,
+		`select[0].updated_before_days must be between 1 and 36500, got 36501`,
+		`select[0].labels must name at least one label`,
+		`select[1].draft S never selects a draft`,
+		`select[2].reasons is read only by [[exclude]]`,
+		`select[3]: "no packages" matches every pull request`,
 	)
 }
 
