@@ -241,24 +241,27 @@ type Conditions struct {
 	CreatedWithinDays int
 	UpdatedBeforeDays int
 	CreatedBeforeDays int
-	Bot               bool
-	// Mine requires your own pull request; Draft a draft.
-	Mine  bool
-	Draft bool
+	// Bot asks for a bot's pull request, Mine for yours and Draft for a
+	// draft; each set to false asks for the opposite, and nil does not
+	// ask.
+	Bot   *bool
+	Mine  *bool
+	Draft *bool
 	// States are "open", "merged" or "closed", one of which it must be in.
 	States []string
-	// Checks is "passing", "failing" or "pending", or "".
-	Checks string
-	// Decision is "approved", "changes_requested" or "review_required",
-	// or "".
-	Decision string
+	// Checks are "passing", "failing" or "pending", one of which its
+	// checks must be in.
+	Checks []string
+	// Decision are "approved", "changes_requested", "review_required" or
+	// "none", one of which its review decision must be.
+	Decision []string
 	// Labels are labels one of which it must have.
 	Labels []string
 	// ApprovedByMe requires the viewer's latest review to approve it, a
 	// person's pull request or a bot's; ReviewedByMe a latest review of
 	// any state.
-	ApprovedByMe bool
-	ReviewedByMe bool
+	ApprovedByMe *bool
+	ReviewedByMe *bool
 	// Requested are whom a review must be asked of: "me", or a team as
 	// "@slug".
 	Requested []string
@@ -273,8 +276,9 @@ var States = []string{"open", "merged", "closed"}
 // CheckStates are the values of checks.
 var CheckStates = []string{"passing", "failing", "pending"}
 
-// Decisions are the values of decision.
-var Decisions = []string{"approved", "changes_requested", "review_required"}
+// Decisions are the values of decision; "none" is no review decision, as
+// in a repository that requires no review.
+var Decisions = []string{"approved", "changes_requested", "review_required", "none"}
 
 // Reasons are the reasons GitHub gives a notification, the values of
 // reasons.
@@ -549,15 +553,15 @@ type (
 		CreatedIn     *int     `toml:"created_within_days"`
 		UpdatedBefore *int     `toml:"updated_before_days"`
 		CreatedBefore *int     `toml:"created_before_days"`
-		Bot           bool     `toml:"bot"`
-		Mine          bool     `toml:"mine"`
-		Draft         bool     `toml:"draft"`
+		Bot           *bool    `toml:"bot"`
+		Mine          *bool    `toml:"mine"`
+		Draft         *bool    `toml:"draft"`
 		States        []string `toml:"state"`
-		Checks        *string  `toml:"checks"`
-		Decision      *string  `toml:"decision"`
+		Checks        []string `toml:"checks"`
+		Decision      []string `toml:"decision"`
 		Labels        []string `toml:"labels"`
-		ApprovedByMe  bool     `toml:"approved_by_me"`
-		ReviewedByMe  bool     `toml:"reviewed_by_me"`
+		ApprovedByMe  *bool    `toml:"approved_by_me"`
+		ReviewedByMe  *bool    `toml:"reviewed_by_me"`
 		Requested     []string `toml:"requested"`
 		Reasons       []string `toml:"reasons"`
 	}
@@ -815,7 +819,7 @@ func selectFrom(ds []selectDoc) ([]Select, Problems) {
 		c := conditionsFrom(d.conditionDoc, d.Packages, d.Name, r)
 		// S selects open pull requests that are not drafts, and matches a
 		// pull request alone, without a notification.
-		if c.Draft {
+		if c.Draft != nil && *c.Draft {
 			at("draft", "S never selects a draft, so the rule would select nothing")
 		}
 		if d.Reasons != nil {
@@ -890,13 +894,14 @@ func (r elemReporter) item(key string, j int, format string, args ...any) {
 // is wrong at at.
 func conditionsFrom(d conditionDoc, packages []string, name string, r elemReporter) Conditions {
 	at := r.at
-	c := Conditions{Repos: d.Repos, Authors: d.Authors, Packages: packages, Labels: d.Labels, Requested: d.Requested, Reasons: d.Reasons, States: d.States,
+	c := Conditions{Repos: d.Repos, Authors: d.Authors, Packages: packages, Labels: d.Labels, Requested: d.Requested, Reasons: d.Reasons, States: d.States, Checks: d.Checks, Decision: d.Decision,
 		Bot: d.Bot, Mine: d.Mine, Draft: d.Draft, ApprovedByMe: d.ApprovedByMe, ReviewedByMe: d.ReviewedByMe}
 	for _, l := range []struct {
 		key  string
 		v    []string
 		noun string
-	}{{"repos", d.Repos, "repository"}, {"authors", d.Authors, "login"}, {"labels", d.Labels, "label"}, {"requested", d.Requested, "reviewer"}, {"reasons", d.Reasons, "reason"}, {"state", d.States, "state"}} {
+	}{{"repos", d.Repos, "repository"}, {"authors", d.Authors, "login"}, {"labels", d.Labels, "label"}, {"requested", d.Requested, "reviewer"}, {"reasons", d.Reasons, "reason"}, {"state", d.States, "state"},
+		{"checks", d.Checks, "state of checks"}, {"decision", d.Decision, "review decision"}} {
 		if l.v != nil && len(l.v) == 0 {
 			at(l.key, "must name at least one %s", l.noun)
 		}
@@ -952,23 +957,21 @@ func conditionsFrom(d conditionDoc, packages []string, name string, r elemReport
 	}
 	for _, e := range []struct {
 		key    string
-		v      *string
-		dst    *string
+		v      []string
 		values []string
-	}{{"checks", d.Checks, &c.Checks, CheckStates}, {"decision", d.Decision, &c.Decision, Decisions}} {
-		if e.v == nil {
-			continue
+	}{{"checks", d.Checks, CheckStates}, {"decision", d.Decision, Decisions}} {
+		for j, v := range e.v {
+			if !slices.Contains(e.values, v) {
+				r.item(e.key, j, "must be one of %s, got %q", quoted(e.values), v)
+			}
 		}
-		if !slices.Contains(e.values, *e.v) {
-			at(e.key, "must be one of %s, got %q", quoted(e.values), *e.v)
-		}
-		*e.dst = *e.v
 	}
 	// A list left empty sets no condition: the rule reads it as none.
-	if len(d.Repos) == 0 && len(d.Authors) == 0 && len(packages) == 0 && len(d.Labels) == 0 && len(d.Requested) == 0 && len(d.Reasons) == 0 && len(d.States) == 0 && d.Title == nil &&
+	if len(d.Repos) == 0 && len(d.Authors) == 0 && len(packages) == 0 && len(d.Labels) == 0 && len(d.Requested) == 0 && len(d.Reasons) == 0 && len(d.States) == 0 &&
+		len(d.Checks) == 0 && len(d.Decision) == 0 && d.Title == nil &&
 		d.MaxFiles == nil && d.MaxLines == nil && d.MinFiles == nil && d.MinLines == nil &&
 		d.UpdatedIn == nil && d.CreatedIn == nil && d.UpdatedBefore == nil && d.CreatedBefore == nil &&
-		!d.Bot && !d.Mine && !d.Draft && d.Checks == nil && d.Decision == nil && !d.ApprovedByMe && !d.ReviewedByMe {
+		d.Bot == nil && d.Mine == nil && d.Draft == nil && d.ApprovedByMe == nil && d.ReviewedByMe == nil {
 		what := "the rule"
 		if name != "" {
 			what = fmt.Sprintf("%q", name)

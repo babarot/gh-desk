@@ -13,7 +13,7 @@ A rule picks pull requests by facts gh-desk reads: who opened them and in which 
 name      = "safe bumps"
 authors   = ["renovate"]
 packages  = ["golang.org/x/net", "actions/checkout"]
-checks    = "passing"
+checks    = ["passing"]
 max_lines = 50
 ```
 

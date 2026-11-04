@@ -41,7 +41,7 @@ One tab is the inbox (`kind = "inbox"`): the pull requests in your notifications
 
 ## Leaving pull requests out
 
-Rules in `[[exclude]]` leave the pull requests they match out of every tab, the inbox too. They take the keys of `[[select]]` but `packages`, and a pull request is left out when it meets every key of one of them. `name` may be left out; a rule without one is called by its conditions:
+Rules in `[[exclude]]` leave the pull requests they match out of every tab, the inbox too. They take the keys of `[[select]]` but `packages`, and a pull request is left out when it meets every key of one of them. `name` may be left out; a rule without one is called by its conditions. There is no `not`: a key that takes a list matches one of its values, so `checks = ["failing", "pending"]` is checks not passing, and a key that is `true` or `false` asks for the one or the other, so `bot = false` is a person's pull request:
 
 ```toml
 [[exclude]]

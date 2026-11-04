@@ -465,15 +465,15 @@ var conditionElems = []elem{
 	{Key: "created_within_days", Kind: intKind{Min: 1, Max: MaxWithinDays}, Doc: "The most days, of 24 hours, since it was created."},
 	{Key: "updated_before_days", Kind: intKind{Min: 1, Max: MaxWithinDays}, Doc: "The least days, of 24 hours, since it was last updated, as AGE counts them in a search tab."},
 	{Key: "created_before_days", Kind: intKind{Min: 1, Max: MaxWithinDays}, Doc: "The least days, of 24 hours, since it was created."},
-	{Key: "bot", Kind: boolKind{}, Doc: "The author must be a bot."},
-	{Key: "mine", Kind: boolKind{}, Doc: "It must be your own pull request."},
-	{Key: "draft", Kind: boolKind{}, Doc: "It must be a draft; S never selects one, so [[select]] does not take it."},
+	{Key: "bot", Kind: boolKind{}, Doc: "true: the author must be a bot; false: a person."},
+	{Key: "mine", Kind: boolKind{}, Doc: "true: it must be your own pull request; false: someone else's."},
+	{Key: "draft", Kind: boolKind{}, Doc: "true: it must be a draft, which S never selects, so [[select]] does not take true; false: ready for review."},
 	{Key: "state", Kind: listKind{Values: States, NonEmpty: true}, Doc: `The states it must be in one of: "open", "merged" or "closed"; S selects open ones only, so [[select]] takes "open" alone.`},
-	{Key: "checks", Kind: enumKind{CheckStates}, Doc: `"passing": passed, or only checks.approval pending; "failing": failed; "pending": still running.`},
-	{Key: "decision", Kind: enumKind{Decisions}, Doc: "The review decision REVIEW shows."},
+	{Key: "checks", Kind: listKind{Values: CheckStates, NonEmpty: true}, Doc: `The states its checks must be in one of: "passing" (passed, none at all, or only checks.approval pending), "failing" or "pending" (still running).`},
+	{Key: "decision", Kind: listKind{Values: Decisions, NonEmpty: true}, Doc: `The review decisions REVIEW shows, one of which it must have; "none" is none, as in a repository that requires no review.`},
 	{Key: "labels", Kind: listKind{NonEmpty: true}, Doc: "Labels one of which it must have."},
-	{Key: "approved_by_me", Kind: boolKind{}, Doc: "Your latest review must approve it; a person's pull request matches too, unlike the built-in \"approved by me\"."},
-	{Key: "reviewed_by_me", Kind: boolKind{}, Doc: "You must have reviewed it, whatever the review said."},
+	{Key: "approved_by_me", Kind: boolKind{}, Doc: "true: your latest review must approve it, a person's pull request too, unlike the built-in \"approved by me\"; false: none of yours does."},
+	{Key: "reviewed_by_me", Kind: boolKind{}, Doc: "true: you must have reviewed it, whatever the review said; false: you have not."},
 	{Key: "requested", Kind: listKind{NonEmpty: true}, Doc: `Whom a review must be asked of, one of them: "me", or a team as "@slug".`},
 	{Key: "reasons", Kind: listKind{Values: Reasons, NonEmpty: true}, Doc: "Reasons of a notification, one of which the row's must have; S has no notification, so [[select]] does not take it."},
 }
@@ -536,13 +536,14 @@ const selectExamples = `# Rules S offers to select pull requests, besides "appro
 # updated_before_days and created_before_days (the least days), min_files and
 # min_lines (the least), repos (owner/repo globs), labels (one of them),
 # requested ("me" or a team as "@slug"), state ("open", "merged" or
-# "closed", one of them), decision ("approved",
-# "changes_requested" or "review_required"), a bot as the
-# author with bot = true, your own pull request with mine = true, checks =
-# "passing" (passed, or only checks.approval pending), "failing" or
-# "pending", a review of yours that approves it with approved_by_me = true (a
-# person's pull request matches too), and any review of yours with the key
-# reviewed_by_me set to true.
+# "closed"), checks ("passing": passed, or only checks.approval pending;
+# "failing"; "pending"), and decision ("approved", "changes_requested",
+# "review_required", or "none" in a repository that requires no review).
+# The keys that take a list match one of its values, which is how to say
+# "not": the states of checks but "passing" are ["failing", "pending"].
+# The keys bot, mine (your own), draft, approved_by_me (a review of yours
+# approves it; a person's pull request matches too) and reviewed_by_me (any
+# review of yours) are true to ask for that, and false for the opposite.
 #
 # The rules below are written to start with, not commented out: S offers
 # only the rules in this file, so delete or comment out one you do not want.
@@ -554,7 +555,7 @@ max_lines = 300
 [[select]]
 name = "dependency bots"
 authors = ["renovate", "dependabot"]
-checks = "passing"
+checks = ["passing"]
 
 [[select]]
 name = "approved"
@@ -575,12 +576,13 @@ title = "(?i)lock file maintenance"
 # name = "safe renovate"
 # authors = ["renovate"]
 # packages = ["actions/checkout", "songmu/tagpr"]
-# checks = "passing"
+# checks = ["passing"]
 
 # Rules that leave pull requests out of every tab, until a shows them. They
 # take the keys of [[select]] but packages, and name may be left out; a pull
-# request is left out when it meets every key of one of them. The inbox leaves out its notifications
-# on merged or closed pull requests too, unless show_settled = true.
+# request is left out when it meets every key of one of them. The inbox
+# leaves out its notifications on merged or closed pull requests too, unless
+# its show_settled is true.
 #
 # [[exclude]]
 # name = "old upgrades"
@@ -801,17 +803,25 @@ func writeConditions(b *strings.Builder, c Conditions) {
 			fmt.Fprintf(b, "%s = %d\n", n.key, n.v)
 		}
 	}
-	for _, f := range []struct {
+	// A flag is written when it is set, true or false.
+	type flag struct {
 		key string
-		v   bool
-	}{{"bot", c.Bot}, {"mine", c.Mine}, {"draft", c.Draft}} {
-		if f.v {
-			b.WriteString(f.key + " = true\n")
+		v   *bool
+	}
+	flags := func(fs ...flag) {
+		for _, f := range fs {
+			if f.v != nil {
+				fmt.Fprintf(b, "%s = %v\n", f.key, *f.v)
+			}
 		}
 	}
-	for _, e := range []struct{ key, v string }{{"checks", c.Checks}, {"decision", c.Decision}} {
-		if e.v != "" {
-			fmt.Fprintf(b, "%s = %q\n", e.key, e.v)
+	flags(flag{"bot", c.Bot}, flag{"mine", c.Mine}, flag{"draft", c.Draft})
+	for _, l := range []struct {
+		key string
+		v   []string
+	}{{"checks", c.Checks}, {"decision", c.Decision}} {
+		if len(l.v) > 0 {
+			b.WriteString(l.key + " = " + tomlList(l.v) + "\n")
 		}
 	}
 	if len(c.Labels) > 0 {
@@ -820,14 +830,7 @@ func writeConditions(b *strings.Builder, c Conditions) {
 	if len(c.States) > 0 {
 		b.WriteString("state = " + tomlList(c.States) + "\n")
 	}
-	for _, f := range []struct {
-		key string
-		v   bool
-	}{{"approved_by_me", c.ApprovedByMe}, {"reviewed_by_me", c.ReviewedByMe}} {
-		if f.v {
-			b.WriteString(f.key + " = true\n")
-		}
-	}
+	flags(flag{"approved_by_me", c.ApprovedByMe}, flag{"reviewed_by_me", c.ReviewedByMe})
 	for _, l := range []struct {
 		key string
 		v   []string

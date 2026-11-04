@@ -378,18 +378,20 @@ func (m *Model) renderPick() []string {
 // ruleWords says what a rule asks for.
 func ruleWords(r plan.Rule) string {
 	var parts []string
-	if r.ApprovedByMe {
-		parts = append(parts, "approved by you")
+	// A flag says what it asks for, or its opposite when set to false.
+	flag := func(f *bool, yes, no string) {
+		switch {
+		case f == nil:
+		case *f:
+			parts = append(parts, yes)
+		default:
+			parts = append(parts, no)
+		}
 	}
-	if r.ReviewedByMe {
-		parts = append(parts, "reviewed by you")
-	}
-	if r.Mine {
-		parts = append(parts, "yours")
-	}
-	if r.Draft {
-		parts = append(parts, "drafts")
-	}
+	flag(r.ApprovedByMe, "approved by you", "not approved by you")
+	flag(r.ReviewedByMe, "reviewed by you", "not reviewed by you")
+	flag(r.Mine, "yours", "not yours")
+	flag(r.Draft, "drafts", "not drafts")
 	if len(r.States) > 0 {
 		var ss []string
 		for _, s := range r.States {
@@ -397,9 +399,7 @@ func ruleWords(r plan.Rule) string {
 		}
 		parts = append(parts, "state "+strings.Join(ss, " or "))
 	}
-	if r.Bot {
-		parts = append(parts, "bots")
-	}
+	flag(r.Bot, "bots", "people")
 	if len(r.Repos) > 0 {
 		parts = append(parts, strings.Join(r.Repos, ", "))
 	}
@@ -443,11 +443,19 @@ func ruleWords(r plan.Rule) string {
 	if r.CreatedBeforeDays > 0 {
 		parts = append(parts, fmt.Sprintf("created ≥%dd ago", r.CreatedBeforeDays))
 	}
-	if r.Checks != "" {
-		parts = append(parts, "checks "+string(r.Checks))
+	if len(r.Checks) > 0 {
+		var ss []string
+		for _, c := range r.Checks {
+			ss = append(ss, string(c))
+		}
+		parts = append(parts, "checks "+strings.Join(ss, " or "))
 	}
-	if r.Decision != "" {
-		parts = append(parts, strings.ToLower(strings.ReplaceAll(string(r.Decision), "_", " ")))
+	if len(r.Decisions) > 0 {
+		var ss []string
+		for _, d := range r.Decisions {
+			ss = append(ss, strings.ToLower(strings.ReplaceAll(string(d), "_", " ")))
+		}
+		parts = append(parts, "review "+strings.Join(ss, " or "))
 	}
 	if len(r.Labels) > 0 {
 		parts = append(parts, "labels "+strings.Join(r.Labels, ", "))

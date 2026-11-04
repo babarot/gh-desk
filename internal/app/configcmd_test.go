@@ -74,7 +74,7 @@ groups = ["bots"]
 name = "lock files"
 authors = ["renovate"]
 title = "(?i)lock file"
-checks = "passing"
+checks = ["passing"]
 
 [list]
 refresh = "off"
