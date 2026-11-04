@@ -4,8 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/http"
+	"net/url"
 	"slices"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/cli/go-gh/v2/pkg/api"
@@ -124,12 +127,14 @@ func (n infoNode) toModel() model.MergeInfo {
 					switch c.Typename {
 					case "CheckRun":
 						st := model.CheckState(c.Conclusion)
-						if c.Status != "COMPLETED" {
+						if c.Status != string(model.RunCompleted) {
 							st = model.CheckPending
 						}
-						mi.Checks = append(mi.Checks, model.Check{Name: c.Name, State: st, Required: c.IsRequired})
+						mi.Checks = append(mi.Checks, model.Check{Name: c.Name, State: st, Required: c.IsRequired,
+							Kind: model.KindCheckRun, Run: model.RunStatus(c.Status)})
 					case "StatusContext":
-						mi.Checks = append(mi.Checks, model.Check{Name: c.Context, State: model.CheckState(c.State), Required: c.IsRequired})
+						mi.Checks = append(mi.Checks, model.Check{Name: c.Context, State: model.CheckState(c.State), Required: c.IsRequired,
+							Kind: model.KindStatus})
 					}
 				}
 			}
@@ -146,8 +151,9 @@ func (n infoNode) toModel() model.MergeInfo {
 
 // MergeInfo reads what merging needs about the pull requests with the given
 // node IDs, in one query. With details it also reads each one's checks
-// (with whether they are required) and its changed files, which makes a
-// larger query. Deciding a merge needs them, so a merge that waits reads
+// (with whether they are required), its changed files and the workflow
+// runs of its head, which makes a larger query and a request for each
+// pull request. Deciding a merge needs them, so a merge that waits reads
 // them at every poll; watching auto-merge, and reading a pull request
 // again to tell what happened to it, leave them out. A pull request that
 // cannot be read is left out of the result.
@@ -207,7 +213,87 @@ func (c *Client) MergeInfo(ctx context.Context, ids []string, details bool) (map
 	if err != nil && !errors.As(err, &gqlErr) {
 		return out, err
 	}
+	if details {
+		c.readRuns(ctx, out)
+	}
 	return out, nil
+}
+
+// runsAtOnce is how many pull requests' workflow runs are read at once.
+const runsAtOnce = 8
+
+// readRuns reads the workflow runs of each pull request's head into it.
+// One that cannot be read is left with RunsRead false: a repository with
+// Actions turned off, or a token that may not read them, still merges, and
+// the caller decides what not knowing them means.
+func (c *Client) readRuns(ctx context.Context, infos map[string]model.MergeInfo) {
+	type read struct {
+		id      string
+		runs    []model.WorkflowRun
+		partial bool
+		ok      bool
+	}
+	var reads []*read
+	for id, mi := range infos {
+		if mi.State == model.StateOpen {
+			reads = append(reads, &read{id: id})
+		}
+	}
+	var wg sync.WaitGroup
+	slots := make(chan struct{}, runsAtOnce)
+	for _, r := range reads {
+		mi := infos[r.id]
+		wg.Go(func() {
+			slots <- struct{}{}
+			defer func() { <-slots }()
+			runs, partial, err := c.WorkflowRuns(ctx, mi.Key, mi.HeadOID)
+			if err != nil {
+				c.log.Debug("could not read the workflow runs", logging.KeyPR, mi.Key.String(), "err", err.Error())
+				return
+			}
+			r.runs, r.partial, r.ok = runs, partial, true
+		})
+	}
+	wg.Wait()
+	for _, r := range reads {
+		if r.ok {
+			mi := infos[r.id]
+			mi.Runs, mi.RunsRead, mi.RunsPartial = r.runs, true, r.partial
+			infos[r.id] = mi
+		}
+	}
+}
+
+// runsPerPage is the most workflow runs GitHub gives in one page.
+const runsPerPage = 100
+
+// WorkflowRuns reads the workflow runs of a commit of the pull request's
+// repository: the first page, and whether there were more.
+func (c *Client) WorkflowRuns(ctx context.Context, key model.PRKey, sha string) ([]model.WorkflowRun, bool, error) {
+	var resp struct {
+		TotalCount   int `json:"total_count"`
+		WorkflowRuns []struct {
+			Name       string
+			Status     string
+			Conclusion *string
+		} `json:"workflow_runs"`
+	}
+	path := fmt.Sprintf("repos/%s/%s/actions/runs?head_sha=%s&per_page=%d",
+		url.PathEscape(key.Owner), url.PathEscape(key.Repo), url.QueryEscape(sha), runsPerPage)
+	if err := c.rest.DoWithContext(ctx, http.MethodGet, path, nil, &resp); err != nil {
+		return nil, false, err
+	}
+	runs := make([]model.WorkflowRun, 0, len(resp.WorkflowRuns))
+	for _, r := range resp.WorkflowRuns {
+		// REST spells them in lower case, GraphQL in upper case.
+		run := model.WorkflowRun{Name: r.Name, Status: model.RunStatus(strings.ToUpper(r.Status))}
+		if r.Conclusion != nil {
+			run.Conclusion = model.CheckState(strings.ToUpper(*r.Conclusion))
+		}
+		runs = append(runs, run)
+	}
+	c.log.Debug("workflow runs", logging.KeyPR, key.String(), "runs", len(runs), "total", resp.TotalCount)
+	return runs, resp.TotalCount > len(runs), nil
 }
 
 // ErrCleanStatus is what enabling auto-merge returns when the pull request
