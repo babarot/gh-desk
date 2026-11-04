@@ -13,8 +13,10 @@ import (
 	"github.com/babarot/gh-desk/internal/tui/statusline"
 )
 
-// batchWords names what a batch does while it runs.
-var batchWords = map[runner.Kind]string{runner.Merge: "approving and merging", runner.Ready: "marking ready"}
+// batchWords names what a batch does while it runs. A merge is named by
+// its goal: whether it marks a pull request ready or approves it first
+// differs between pull requests and is shown on their lanes.
+var batchWords = map[runner.Kind]string{runner.Merge: "merging", runner.Ready: "marking ready"}
 
 // reviewingWords say what a batch of reviews of each kind is doing.
 var reviewingWords = map[model.ReviewEvent]string{model.EventApprove: "approving", model.EventComment: "sending review comments",

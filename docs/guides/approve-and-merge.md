@@ -12,9 +12,11 @@ The popup reads each pull request again and lists what will be done to it, and w
 
 Each write is for the commit shown when you confirmed. If someone pushes in between, the pull request stops with "head changed · confirm again" rather than merging code you have not looked at. The only new head gh-desk takes is one it made itself by updating the branch.
 
+Marking a draft ready is the one write GitHub takes no commit for: gh-desk reads the pull request just before and stops if the head moved, but a push in the moment between is not caught.
+
 ## How each is merged
 
-For each pull request, gh-desk decides the next step from what is true when it acts, and decides again before every write:
+For each pull request, gh-desk decides the steps from what is true when it acts. Marking a draft ready and approving go first, one after the other; then it reads the pull request again and decides the rest, and decides again after each write that follows:
 
 - approve first, when your approval is needed
 - merge now, when nothing blocks it
