@@ -153,14 +153,22 @@ func (m *Model) rowsOf(t *tab, filter string, rules []plan.Rule, folded map[plan
 			ex[p.Key] = x
 		}
 	}
+	// A row showing a result sorts where it was when its batch started.
+	sortKey := func(p model.PR) heldSort {
+		if h, ok := m.held[p.Key]; ok {
+			return h
+		}
+		return heldSort{draft: p.Draft, updated: p.Updated}
+	}
 	slices.SortStableFunc(prs, func(a, b model.PR) int {
-		if t.draftsLast && a.Draft != b.Draft {
-			if a.Draft {
+		ka, kb := sortKey(a), sortKey(b)
+		if t.draftsLast && ka.draft != kb.draft {
+			if ka.draft {
 				return 1
 			}
 			return -1
 		}
-		return b.Updated.Compare(a.Updated)
+		return kb.updated.Compare(ka.updated)
 	})
 	if !t.grouped {
 		out := make([]row, len(prs))

@@ -259,6 +259,8 @@ type Model struct {
 	notesAt    *notesView
 	toast      *note
 	merged     map[model.PRKey]bool
+	// held is where each row showing a result sorts while it shows it.
+	held map[model.PRKey]heldSort
 	// refreshed is when each tab was last read.
 	refreshed map[int]time.Time
 	// refreshing is the reading r started, while it lasts.
@@ -314,7 +316,7 @@ func New(src Source, run Runner, cl Claude, km keymap.Map, log *slog.Logger, set
 	}
 	m := &Model{src: src, run: run, claude: cl, cautions: map[string]string{}, fresh: map[model.PRKey]time.Time{}, keys: km, log: log, set: set, ctx: context.Background(), unread: map[model.PRKey]model.Notification{},
 		selected: map[model.PRKey]selection{}, progress: map[model.PRKey]progress{}, batches: map[string]*batchState{},
-		merged: map[model.PRKey]bool{}, refreshed: map[int]time.Time{}}
+		merged: map[model.PRKey]bool{}, held: map[model.PRKey]heldSort{}, refreshed: map[int]time.Time{}}
 	m.chats = map[model.PRKey]*chatScreen{}
 	m.chatState = chat.NewState(set.Chats, log, set.Now, chatStatus{m})
 	m.st = newStyles(theme(set.ThemeDark))
