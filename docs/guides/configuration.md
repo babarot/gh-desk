@@ -60,7 +60,7 @@ The rules `S` offers are `[[select]]` entries. A pull request matches a rule whe
 name      = "safe bumps"
 authors   = ["renovate"]
 packages  = ["golang.org/x/net", "actions/checkout"]
-checks    = "passing"
+checks    = ["passing"]
 max_lines = 50
 ```
 

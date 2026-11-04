@@ -47,17 +47,17 @@ func TestRuleMatch(t *testing.T) {
 		{"package listed", Rule{Packages: []string{"actions/checkout"}}, bot, Facts{Body: body, BodyKnown: true}, true},
 		{"package not listed", Rule{Packages: []string{"songmu/tagpr"}}, bot, Facts{Body: body, BodyKnown: true}, false},
 		{"body not read", Rule{Packages: []string{"actions/checkout"}}, bot, Facts{}, false},
-		{"checks failing", Rule{Checks: ChecksPassing}, failing, Facts{}, false},
-		{"approval check pending", Rule{Checks: ChecksPassing}, pending, Facts{AwaitingApproval: true, ApprovalKnown: true}, true},
-		{"approval not known yet", Rule{Checks: ChecksPassing}, pending, Facts{AwaitingApproval: true}, false},
-		{"checks running", Rule{Checks: ChecksPassing}, pending, Facts{}, false},
+		{"checks failing", Rule{Checks: []Checks{ChecksPassing}}, failing, Facts{}, false},
+		{"approval check pending", Rule{Checks: []Checks{ChecksPassing}}, pending, Facts{AwaitingApproval: true, ApprovalKnown: true}, true},
+		{"approval not known yet", Rule{Checks: []Checks{ChecksPassing}}, pending, Facts{AwaitingApproval: true}, false},
+		{"checks running", Rule{Checks: []Checks{ChecksPassing}}, pending, Facts{}, false},
 		{"approved by me", ApprovedByMe, approved, Facts{}, true},
 		{"not approved", ApprovedByMe, bot, Facts{}, false},
 		{"a person's", ApprovedByMe, person, Facts{}, false},
-		{"a person's, by a key", Rule{ApprovedByMe: true}, person, Facts{}, true},
-		{"not approved, by a key", Rule{ApprovedByMe: true}, bot, Facts{}, false},
+		{"a person's, by a key", Rule{ApprovedByMe: new(true)}, person, Facts{}, true},
+		{"not approved, by a key", Rule{ApprovedByMe: new(true)}, bot, Facts{}, false},
 		{"draft", Rule{}, model.PR{Draft: true}, Facts{}, false},
-		{"merged", Rule{Bot: true}, model.PR{AuthorIsBot: true, State: model.StateMerged}, Facts{}, false},
+		{"merged", Rule{Bot: new(true)}, model.PR{AuthorIsBot: true, State: model.StateMerged}, Facts{}, false},
 	}
 	for _, tt := range tests {
 		if got := tt.rule.Match(tt.pr, "me", tt.f); got != tt.want {
@@ -81,6 +81,8 @@ func TestRuleJudge(t *testing.T) {
 	pending.Checks = model.CheckPending
 	mine := read
 	mine.Author = "me"
+	passing := read
+	passing.Checks, passing.Decision = model.CheckSuccess, ""
 	now := Facts{Now: day0, ApprovalKnown: true}
 	tests := []struct {
 		name string
@@ -91,21 +93,21 @@ func TestRuleJudge(t *testing.T) {
 	}{
 		{"repo glob", Rule{Repos: []string{"ACME/*"}}, read, now, Yes},
 		{"other repo", Rule{Repos: []string{"acme/api", "babarot/*"}}, read, now, No},
-		{"mine", Rule{Mine: true}, read, now, No},
-		{"mine, by the author", Rule{Mine: true}, mine, now, Yes},
-		{"draft", Rule{Draft: true}, draft, now, Yes},
-		{"not a draft", Rule{Draft: true}, read, now, No},
+		{"mine", Rule{Mine: new(true)}, read, now, No},
+		{"mine, by the author", Rule{Mine: new(true)}, mine, now, Yes},
+		{"draft", Rule{Draft: new(true)}, draft, now, Yes},
+		{"not a draft", Rule{Draft: new(true)}, read, now, No},
 		{"merged is judged as any other", Rule{Title: regexp.MustCompile(`^Upgrade`)}, draft, now, Yes},
 		{"merged or closed", Rule{States: []model.PRState{model.StateMerged, model.StateClosed}}, draft, now, Yes},
 		{"open is not merged or closed", Rule{States: []model.PRState{model.StateMerged, model.StateClosed}}, read, now, No},
 		{"state not read is open", Rule{States: []model.PRState{model.StateOpen}}, model.PR{}, now, Yes},
-		{"approved, passing and not open", Rule{Decision: model.DecisionChangesRequested, Checks: ChecksFailing, States: []model.PRState{model.StateMerged}}, draft, now, Yes},
+		{"approved, passing and not open", Rule{Decisions: []model.ReviewDecision{model.DecisionChangesRequested}, Checks: []Checks{ChecksFailing}, States: []model.PRState{model.StateMerged}}, draft, now, Yes},
 		{"updated before", Rule{UpdatedBeforeDays: 40}, read, now, Yes},
 		{"updated a day too late", Rule{UpdatedBeforeDays: 41}, read, now, No},
 		{"updated time not read", Rule{UpdatedBeforeDays: 1}, model.PR{}, now, No},
 		{"created before", Rule{CreatedBeforeDays: 60}, read, now, Yes},
-		{"reviewed by me", Rule{ReviewedByMe: true}, read, now, Yes},
-		{"approved by me, only commented", Rule{ApprovedByMe: true}, read, now, No},
+		{"reviewed by me", Rule{ReviewedByMe: new(true)}, read, now, Yes},
+		{"approved by me, only commented", Rule{ApprovedByMe: new(true)}, read, now, No},
 		{"requested from me", Rule{Requested: []string{"me"}}, read, now, Yes},
 		{"requested from the team", Rule{Requested: []string{"@Platform"}}, read, now, Yes},
 		{"requested from another team", Rule{Requested: []string{"@core"}}, read, now, No},
@@ -113,20 +115,33 @@ func TestRuleJudge(t *testing.T) {
 		{"no notification", Rule{Reasons: []string{"subscribed"}}, read, now, No},
 		{"labels", Rule{Labels: []string{"do-not-merge", "wip"}}, read, now, Yes},
 		{"no such label", Rule{Labels: []string{"do-not-merge"}}, read, now, No},
-		{"decision", Rule{Decision: model.DecisionChangesRequested}, read, now, Yes},
+		{"decision", Rule{Decisions: []model.ReviewDecision{model.DecisionChangesRequested}}, read, now, Yes},
 		{"min lines", Rule{MinLines: 600}, read, now, Yes},
 		{"too few lines", Rule{MinLines: 601}, read, now, No},
 		{"min files", Rule{MinFiles: 13}, read, now, No},
-		{"failing", Rule{Checks: ChecksFailing}, read, now, Yes},
-		{"pending", Rule{Checks: ChecksPending}, pending, now, Yes},
-		{"pending only for an approval", Rule{Checks: ChecksPending}, pending, Facts{Now: day0, ApprovalKnown: true, AwaitingApproval: true}, No},
-		{"pending, approval not known", Rule{Checks: ChecksPending}, pending, Facts{Now: day0}, Pending},
-		{"failing, approval not known", Rule{Checks: ChecksFailing}, read, Facts{Now: day0}, Yes},
-		{"failing asked of pending checks, approval not known", Rule{Checks: ChecksFailing}, pending, Facts{Now: day0}, No},
+		{"failing", Rule{Checks: []Checks{ChecksFailing}}, read, now, Yes},
+		{"pending", Rule{Checks: []Checks{ChecksPending}}, pending, now, Yes},
+		{"pending only for an approval", Rule{Checks: []Checks{ChecksPending}}, pending, Facts{Now: day0, ApprovalKnown: true, AwaitingApproval: true}, No},
+		{"pending, approval not known", Rule{Checks: []Checks{ChecksPending}}, pending, Facts{Now: day0}, Pending},
+		{"failing, approval not known", Rule{Checks: []Checks{ChecksFailing}}, read, Facts{Now: day0}, Yes},
+		{"failing asked of pending checks, approval not known", Rule{Checks: []Checks{ChecksFailing}}, pending, Facts{Now: day0}, No},
 		{"heavy not read", Rule{Labels: []string{"wip"}}, unread, now, Pending},
 		{"light says no before heavy is read", Rule{Labels: []string{"wip"}, Title: regexp.MustCompile(`^Fix`)}, unread, now, No},
 		{"light only, heavy not read", Rule{Title: regexp.MustCompile(`^Upgrade`)}, unread, now, Yes},
 		{"body not read", Rule{Packages: []string{"x"}}, read, now, Pending},
+		// "Not" is said by the values: false for a flag, a list of the rest.
+		{"a person's", Rule{Bot: new(false)}, read, now, Yes},
+		{"not someone else's", Rule{Mine: new(false)}, mine, now, No},
+		{"someone else's", Rule{Mine: new(false)}, read, now, Yes},
+		{"ready for review", Rule{Draft: new(false)}, read, now, Yes},
+		{"not ready for review", Rule{Draft: new(false)}, draft, now, No},
+		{"not approved by me", Rule{ApprovedByMe: new(false)}, read, now, Yes},
+		{"not reviewed by me", Rule{ReviewedByMe: new(false)}, read, now, No},
+		{"checks not passing", Rule{Checks: []Checks{ChecksFailing, ChecksPending}}, read, now, Yes},
+		{"checks not passing, but passing", Rule{Checks: []Checks{ChecksFailing, ChecksPending}}, passing, now, No},
+		{"not approved", Rule{Decisions: []model.ReviewDecision{model.DecisionChangesRequested, model.DecisionReviewRequired, NoDecision}}, read, now, Yes},
+		{"no review decision", Rule{Decisions: []model.ReviewDecision{NoDecision}}, passing, now, Yes},
+		{"no review decision, but one", Rule{Decisions: []model.ReviewDecision{NoDecision}}, read, now, No},
 	}
 	for _, tt := range tests {
 		if got := tt.rule.Judge(tt.pr, "me", tt.f); got != tt.want {
@@ -134,7 +149,10 @@ func TestRuleJudge(t *testing.T) {
 		}
 	}
 	// Before the viewer is known, no pull request is the viewer's.
-	if got := (Rule{Mine: true}).Judge(mine, "", now); got != No {
+	if got := (Rule{Mine: new(true)}).Judge(mine, "", now); got != No {
 		t.Errorf("mine, viewer unknown: Judge = %v, want No", got)
+	}
+	if got := (Rule{Mine: new(false)}).Judge(read, "", now); got != No {
+		t.Errorf("someone else's, viewer unknown: Judge = %v, want No", got)
 	}
 }

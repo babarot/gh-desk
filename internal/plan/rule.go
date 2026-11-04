@@ -11,7 +11,10 @@ import (
 )
 
 // Rule is a set of conditions on a pull request, every one of which must
-// hold. S selects the pull requests a rule matches (Match).
+// hold. S selects the pull requests a rule matches (Match). A condition
+// says "not" by its values, never by an operator: a list asks for one of
+// the values in it, and a flag set to false asks for its opposite. A
+// condition left out (nil, empty) does not ask.
 type Rule struct {
 	Name string
 	// Repos are owner/repo globs, as path.Match reads them, the
@@ -38,25 +41,29 @@ type Rule struct {
 	CreatedWithinDays int
 	UpdatedBeforeDays int
 	CreatedBeforeDays int
-	// Bot requires a bot's pull request.
-	Bot bool
-	// Mine requires the viewer's own pull request.
-	Mine bool
-	// Draft requires a draft.
-	Draft bool
+	// Bot asks for a bot's pull request, or with false a person's.
+	Bot *bool
+	// Mine asks for the viewer's own pull request, or with false one of
+	// someone else.
+	Mine *bool
+	// Draft asks for a draft, or with false one ready for review.
+	Draft *bool
 	// States are the states it must be in one of; a state not read is
 	// open, as the list reads only open pull requests unless asked.
 	States []model.PRState
-	// Checks is the state its checks must be in; "" does not ask.
-	Checks Checks
-	// Decision is the review decision it must have; "" does not ask.
-	Decision model.ReviewDecision
+	// Checks are the states its checks must be in one of.
+	Checks []Checks
+	// Decisions are the review decisions it must have one of; NoDecision
+	// for none.
+	Decisions []model.ReviewDecision
 	// Labels are labels one of which it must have.
 	Labels []string
-	// ApprovedByMe requires the viewer's latest review to approve it.
-	ApprovedByMe bool
-	// ReviewedByMe requires a latest review of the viewer's, of any state.
-	ReviewedByMe bool
+	// ApprovedByMe asks for the viewer's latest review to approve it, or
+	// with false for none that does.
+	ApprovedByMe *bool
+	// ReviewedByMe asks for a latest review of the viewer's, of any state,
+	// or with false for none.
+	ReviewedByMe *bool
 	// Requested are whom a review must be asked of, one of them: "me" for
 	// the viewer, or a team as "@slug".
 	Requested []string
@@ -64,6 +71,10 @@ type Rule struct {
 	// must have (Facts.Reason); a row with no notification has none.
 	Reasons []string
 }
+
+// NoDecision is the review decision of a pull request that has none, as
+// in a repository that requires no review.
+const NoDecision model.ReviewDecision = "NONE"
 
 // Checks is a state of a pull request's checks a rule asks for.
 type Checks string
@@ -82,7 +93,7 @@ const (
 // ApprovedByMe is the rule S always offers first: bot pull requests the
 // viewer has approved and that are still open. A person's pull request is
 // left to its author to merge.
-var ApprovedByMe = Rule{Name: "approved by me", Bot: true, ApprovedByMe: true}
+var ApprovedByMe = Rule{Name: "approved by me", Bot: new(true), ApprovedByMe: new(true)}
 
 // Facts are what a rule may need beyond the pull request: its body (for
 // the packages it updates), whether only approval checks are pending, and
@@ -125,7 +136,7 @@ func (r Rule) NeedsBody() bool { return len(r.Packages) > 0 }
 // pass, so a pull request whose heavy fields are not read for its head is
 // never judged on them.
 func (r Rule) NeedsHeavy() bool {
-	return r.MaxFiles > 0 || r.MaxLines > 0 || r.MinFiles > 0 || r.MinLines > 0 || r.Checks != "" || r.Decision != "" || len(r.Labels) > 0
+	return r.MaxFiles > 0 || r.MaxLines > 0 || r.MinFiles > 0 || r.MinLines > 0 || len(r.Checks) > 0 || len(r.Decisions) > 0 || len(r.Labels) > 0
 }
 
 // Match reports whether S selects pr by the rule for viewer: an open pull
@@ -152,7 +163,8 @@ func (r Rule) Judge(pr model.PR, viewer string, f Facts) Verdict {
 	}
 	// Whether pending checks only wait for an approval changes passing and
 	// pending, not failing.
-	if (r.Checks == ChecksPassing || r.Checks == ChecksPending) && (pr.Checks == model.CheckPending || pr.Checks == model.CheckExpected) && !f.ApprovalKnown {
+	if (slices.Contains(r.Checks, ChecksPassing) || slices.Contains(r.Checks, ChecksPending)) &&
+		(pr.Checks == model.CheckPending || pr.Checks == model.CheckExpected) && !f.ApprovalKnown {
 		return Pending
 	}
 	if !r.heavy(pr, f) || !r.packages(f) {
@@ -174,11 +186,15 @@ func (r Rule) light(pr model.PR, viewer string, f Facts) bool {
 		return strings.EqualFold(strings.TrimPrefix(pr.Author, "app/"), strings.TrimPrefix(a, "app/"))
 	}):
 		return false
-	case r.Bot && !pr.AuthorIsBot:
+	case !holds(r.Bot, pr.AuthorIsBot):
 		return false
-	case r.Mine && (viewer == "" || pr.Author != viewer):
+	case !holds(r.Draft, pr.Draft):
 		return false
-	case r.Draft && !pr.Draft:
+	// What is the viewer's is not told before the viewer is known, either
+	// way.
+	case (r.Mine != nil || r.ApprovedByMe != nil || r.ReviewedByMe != nil) && viewer == "":
+		return false
+	case !holds(r.Mine, pr.Author == viewer):
 		return false
 	case len(r.States) > 0 && !slices.Contains(r.States, stateOf(pr)):
 		return false
@@ -197,19 +213,13 @@ func (r Rule) light(pr model.PR, viewer string, f Facts) bool {
 	case len(r.Requested) > 0 && !slices.ContainsFunc(r.Requested, func(s string) bool { return requested(pr, viewer, s) }):
 		return false
 	}
-	if r.ApprovedByMe {
-		rv, ok := pr.ReviewBy(viewer)
-		if !ok || rv.State != model.ReviewApproved {
-			return false
-		}
-	}
-	if r.ReviewedByMe {
-		if _, ok := pr.ReviewBy(viewer); !ok {
-			return false
-		}
-	}
-	return true
+	rv, reviewed := pr.ReviewBy(viewer)
+	return holds(r.ApprovedByMe, reviewed && rv.State == model.ReviewApproved) && holds(r.ReviewedByMe, reviewed)
 }
+
+// holds reports whether a flag asking for want holds of a pull request
+// that is or is not so: a flag not set always does.
+func holds(want *bool, is bool) bool { return want == nil || *want == is }
 
 // heavy reports whether the conditions on the heavy fields hold; they are
 // read for the head shown.
@@ -223,14 +233,19 @@ func (r Rule) heavy(pr model.PR, f Facts) bool {
 		return false
 	case r.MinLines > 0 && pr.Additions+pr.Deletions < r.MinLines:
 		return false
-	case r.Decision != "" && pr.Decision != r.Decision:
+	case len(r.Decisions) > 0 && !slices.Contains(r.Decisions, decisionOf(pr)):
 		return false
 	case len(r.Labels) > 0 && !slices.ContainsFunc(r.Labels, func(l string) bool {
 		return slices.ContainsFunc(pr.Labels, func(have string) bool { return strings.EqualFold(have, l) })
 	}):
 		return false
 	}
-	switch r.Checks {
+	return len(r.Checks) == 0 || slices.ContainsFunc(r.Checks, func(c Checks) bool { return checksAre(c, pr, f) })
+}
+
+// checksAre reports whether pr's checks are in the state c.
+func checksAre(c Checks, pr model.PR, f Facts) bool {
+	switch c {
 	case ChecksPassing:
 		return ChecksPass(pr, f.AwaitingApproval)
 	case ChecksFailing:
@@ -238,7 +253,15 @@ func (r Rule) heavy(pr model.PR, f Facts) bool {
 	case ChecksPending:
 		return (pr.Checks == model.CheckPending || pr.Checks == model.CheckExpected) && !f.AwaitingApproval
 	}
-	return true
+	return false
+}
+
+// decisionOf is pr's review decision, NoDecision when it has none.
+func decisionOf(pr model.PR) model.ReviewDecision {
+	if pr.Decision == "" {
+		return NoDecision
+	}
+	return pr.Decision
 }
 
 // packages reports whether every dependency the body says the pull request

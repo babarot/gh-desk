@@ -266,13 +266,13 @@ name = "safe renovate"
 authors = ["renovate", "dependabot"]
 packages = ["actions/checkout"]
 title = "(?i)bump"
-checks = "passing"
+checks = ["passing"]
 max_lines = 500
 approved_by_me = true
 updated_within_days = 90
 created_within_days = 30
 `))
-	if err != nil || len(cfg.Select) != 1 || cfg.Select[0].Packages[0] != "actions/checkout" || !cfg.Select[0].Title.MatchString("Bump x") || cfg.Select[0].MaxLines != 500 || !cfg.Select[0].ApprovedByMe || len(cfg.Select[0].Authors) != 2 ||
+	if err != nil || len(cfg.Select) != 1 || cfg.Select[0].Packages[0] != "actions/checkout" || !cfg.Select[0].Title.MatchString("Bump x") || cfg.Select[0].MaxLines != 500 || cfg.Select[0].ApprovedByMe == nil || !*cfg.Select[0].ApprovedByMe || len(cfg.Select[0].Authors) != 2 ||
 		cfg.Select[0].UpdatedWithinDays != 90 || cfg.Select[0].CreatedWithinDays != 30 {
 		t.Fatalf("cfg.Select = %+v, %v", cfg.Select, err)
 	}
@@ -280,7 +280,7 @@ created_within_days = 30
 [[select]]
 name = "approved by me"
 title = "("
-checks = "green"
+checks = ["green"]
 max_files = 0
 max_lines = 0
 
@@ -306,7 +306,7 @@ created_within_days = 36501
 `,
 		`config.toml:3:8: select[0].name "approved by me" is used twice`,
 		`config.toml:4:9: select[0].title is not a regular expression`,
-		`config.toml:5:10: select[0].checks must be one of "passing", "failing", "pending", got "green"`,
+		`config.toml:5:11: select[0].checks[0] must be one of "passing", "failing", "pending", got "green"`,
 		`config.toml:6:13: select[0].max_files must be 1 or more, got 0`,
 		`config.toml:7:13: select[0].max_lines must be 1 or more, got 0`,
 		`config.toml:9:3: select[1]: "all" matches every pull request`,
@@ -323,20 +323,22 @@ name = "old team upgrades"
 repos = ["acme/*", "babarot/gh-desk"]
 labels = ["dependencies"]
 requested = ["me", "@platform"]
-decision = "changes_requested"
-checks = "failing"
+decision = ["changes_requested", "none"]
+checks = ["failing", "pending"]
 min_files = 2
 min_lines = 10
 updated_before_days = 30
 created_before_days = 60
 mine = true
 reviewed_by_me = true
+bot = false
 `))
 	if err != nil {
 		t.Fatal(err)
 	}
 	want := Conditions{Repos: []string{"acme/*", "babarot/gh-desk"}, Labels: []string{"dependencies"}, Requested: []string{"me", "@platform"},
-		Decision: "changes_requested", Checks: "failing", MinFiles: 2, MinLines: 10, UpdatedBeforeDays: 30, CreatedBeforeDays: 60, Mine: true, ReviewedByMe: true}
+		Decision: []string{"changes_requested", "none"}, Checks: []string{"failing", "pending"}, MinFiles: 2, MinLines: 10, UpdatedBeforeDays: 30, CreatedBeforeDays: 60,
+		Mine: new(true), ReviewedByMe: new(true), Bot: new(false)}
 	if len(cfg.Select) != 1 || !reflect.DeepEqual(cfg.Select[0].Conditions, want) {
 		t.Fatalf("cfg.Select = %+v", cfg.Select)
 	}
@@ -350,7 +352,7 @@ reviewed_by_me = true
 name = "bad"
 repos = ["acme", "a/b/c"]
 requested = ["alice", "@"]
-decision = "lgtm"
+decision = ["lgtm"]
 min_lines = 0
 updated_before_days = 36501
 labels = []
@@ -375,7 +377,7 @@ state = ["open", "merged", "shipped"]
 		`config.toml:4:18: select[0].repos[1] "a/b/c" must be owner/repo`,
 		`select[0].requested[0] "alice" must be "me" or a team`,
 		`select[0].requested[1] "@" must be "me" or a team`,
-		`select[0].decision must be one of "approved", "changes_requested", "review_required", got "lgtm"`,
+		`select[0].decision[0] must be one of "approved", "changes_requested", "review_required", "none", got "lgtm"`,
 		`select[0].min_lines must be 1 or more, got 0`,
 		`select[0].updated_before_days must be between 1 and 36500, got 36501`,
 		`select[0].labels must name at least one label`,
@@ -400,13 +402,13 @@ reasons = ["mention"]
 draft = true
 
 [[exclude]]
-decision = "approved"
-checks = "passing"
+decision = ["approved"]
+checks = ["passing"]
 state = ["merged", "closed"]
 `))
 	if err != nil || len(cfg.Exclude) != 3 || !slices.Equal(cfg.Exclude[2].States, []string{"merged", "closed"}) ||
 		!cfg.Exclude[0].Title.MatchString("Upgrade x") || cfg.Exclude[0].UpdatedBeforeDays != 30 ||
-		cfg.Exclude[1].Reasons[0] != "mention" || !cfg.Exclude[1].Draft {
+		cfg.Exclude[1].Reasons[0] != "mention" || cfg.Exclude[1].Draft == nil || !*cfg.Exclude[1].Draft {
 		t.Fatalf("cfg.Exclude = %+v, %v", cfg.Exclude, err)
 	}
 	again, _, err := Load(write(t, Show(cfg, true)))
@@ -429,7 +431,7 @@ labels = ["wip"]
 	)
 	// A rule needs no name, nor do two of them differ by one.
 	cfg, _, err = Load(write(t, "[[exclude]]\nlabels = [\"wip\"]\n\n[[exclude]]\nname = \"  \"\nmine = true\n"))
-	if err != nil || len(cfg.Exclude) != 2 || cfg.Exclude[0].Name != "" || cfg.Exclude[1].Name != "" || !cfg.Exclude[1].Mine {
+	if err != nil || len(cfg.Exclude) != 2 || cfg.Exclude[0].Name != "" || cfg.Exclude[1].Name != "" || cfg.Exclude[1].Mine == nil || !*cfg.Exclude[1].Mine {
 		t.Fatalf("unnamed rules: %+v, %v", cfg.Exclude, err)
 	}
 	// The bodies are read for S alone.

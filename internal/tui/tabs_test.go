@@ -119,7 +119,7 @@ func TestGroupLeftOutIsNotSelected(t *testing.T) {
 	// A rule that picks bots' pull requests: with bots left out of the
 	// tab's groups, renovate's is neither shown nor picked.
 	set := testSettings()
-	set.Rules = []plan.Rule{{Name: "bots", Bot: true}}
+	set.Rules = []plan.Rule{{Name: "bots", Bot: new(true)}}
 	set.Tabs[0].Groups = []plan.Group{plan.GroupYou, plan.GroupTeam}
 	m := startSet(t, set, 130)
 	for _, r := range m.rules() {

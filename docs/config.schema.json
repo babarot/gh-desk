@@ -144,7 +144,7 @@
         "additionalProperties": false,
         "properties": {
           "approved_by_me": {
-            "description": "Your latest review must approve it; a person's pull request matches too, unlike the built-in \"approved by me\".",
+            "description": "true: your latest review must approve it, a person's pull request too, unlike the built-in \"approved by me\"; false: none of yours does.",
             "type": "boolean"
           },
           "authors": {
@@ -156,17 +156,21 @@
             "type": "array"
           },
           "bot": {
-            "description": "The author must be a bot.",
+            "description": "true: the author must be a bot; false: a person.",
             "type": "boolean"
           },
           "checks": {
-            "description": "\"passing\": passed, or only checks.approval pending; \"failing\": failed; \"pending\": still running.",
-            "enum": [
-              "passing",
-              "failing",
-              "pending"
-            ],
-            "type": "string"
+            "description": "The states its checks must be in one of: \"passing\" (passed, none at all, or only checks.approval pending), \"failing\" or \"pending\" (still running).",
+            "items": {
+              "enum": [
+                "passing",
+                "failing",
+                "pending"
+              ],
+              "type": "string"
+            },
+            "minItems": 1,
+            "type": "array"
           },
           "created_before_days": {
             "description": "The least days, of 24 hours, since it was created.",
@@ -181,16 +185,21 @@
             "type": "integer"
           },
           "decision": {
-            "description": "The review decision REVIEW shows.",
-            "enum": [
-              "approved",
-              "changes_requested",
-              "review_required"
-            ],
-            "type": "string"
+            "description": "The review decisions REVIEW shows, one of which it must have; \"none\" is none, as in a repository that requires no review.",
+            "items": {
+              "enum": [
+                "approved",
+                "changes_requested",
+                "review_required",
+                "none"
+              ],
+              "type": "string"
+            },
+            "minItems": 1,
+            "type": "array"
           },
           "draft": {
-            "description": "It must be a draft; S never selects one, so [[select]] does not take it.",
+            "description": "true: it must be a draft, which S never selects, so [[select]] does not take true; false: ready for review.",
             "type": "boolean"
           },
           "labels": {
@@ -222,7 +231,7 @@
             "type": "integer"
           },
           "mine": {
-            "description": "It must be your own pull request.",
+            "description": "true: it must be your own pull request; false: someone else's.",
             "type": "boolean"
           },
           "name": {
@@ -271,7 +280,7 @@
             "type": "array"
           },
           "reviewed_by_me": {
-            "description": "You must have reviewed it, whatever the review said.",
+            "description": "true: you must have reviewed it, whatever the review said; false: you have not.",
             "type": "boolean"
           },
           "state": {
@@ -494,7 +503,7 @@
         "additionalProperties": false,
         "properties": {
           "approved_by_me": {
-            "description": "Your latest review must approve it; a person's pull request matches too, unlike the built-in \"approved by me\".",
+            "description": "true: your latest review must approve it, a person's pull request too, unlike the built-in \"approved by me\"; false: none of yours does.",
             "type": "boolean"
           },
           "authors": {
@@ -506,17 +515,21 @@
             "type": "array"
           },
           "bot": {
-            "description": "The author must be a bot.",
+            "description": "true: the author must be a bot; false: a person.",
             "type": "boolean"
           },
           "checks": {
-            "description": "\"passing\": passed, or only checks.approval pending; \"failing\": failed; \"pending\": still running.",
-            "enum": [
-              "passing",
-              "failing",
-              "pending"
-            ],
-            "type": "string"
+            "description": "The states its checks must be in one of: \"passing\" (passed, none at all, or only checks.approval pending), \"failing\" or \"pending\" (still running).",
+            "items": {
+              "enum": [
+                "passing",
+                "failing",
+                "pending"
+              ],
+              "type": "string"
+            },
+            "minItems": 1,
+            "type": "array"
           },
           "created_before_days": {
             "description": "The least days, of 24 hours, since it was created.",
@@ -531,16 +544,21 @@
             "type": "integer"
           },
           "decision": {
-            "description": "The review decision REVIEW shows.",
-            "enum": [
-              "approved",
-              "changes_requested",
-              "review_required"
-            ],
-            "type": "string"
+            "description": "The review decisions REVIEW shows, one of which it must have; \"none\" is none, as in a repository that requires no review.",
+            "items": {
+              "enum": [
+                "approved",
+                "changes_requested",
+                "review_required",
+                "none"
+              ],
+              "type": "string"
+            },
+            "minItems": 1,
+            "type": "array"
           },
           "draft": {
-            "description": "It must be a draft; S never selects one, so [[select]] does not take it.",
+            "description": "true: it must be a draft, which S never selects, so [[select]] does not take true; false: ready for review.",
             "type": "boolean"
           },
           "labels": {
@@ -572,7 +590,7 @@
             "type": "integer"
           },
           "mine": {
-            "description": "It must be your own pull request.",
+            "description": "true: it must be your own pull request; false: someone else's.",
             "type": "boolean"
           },
           "name": {
@@ -629,7 +647,7 @@
             "type": "array"
           },
           "reviewed_by_me": {
-            "description": "You must have reviewed it, whatever the review said.",
+            "description": "true: you must have reviewed it, whatever the review said; false: you have not.",
             "type": "boolean"
           },
           "state": {

@@ -62,7 +62,7 @@ max_lines = 300
 [[select]]
 name = "dependency bots"
 authors = ["renovate", "dependabot"]
-checks = "passing"
+checks = ["passing"]
 
 [[select]]
 name = "approved"
@@ -93,15 +93,15 @@ title = "(?i)lock file maintenance"
 | `created_within_days` | integer, 1 to 36500 | The most days, of 24 hours, since it was created. |
 | `updated_before_days` | integer, 1 to 36500 | The least days, of 24 hours, since it was last updated, as AGE counts them in a search tab. |
 | `created_before_days` | integer, 1 to 36500 | The least days, of 24 hours, since it was created. |
-| `bot` | boolean | The author must be a bot. |
-| `mine` | boolean | It must be your own pull request. |
-| `draft` | boolean | It must be a draft; S never selects one, so [[select]] does not take it. |
+| `bot` | boolean | true: the author must be a bot; false: a person. |
+| `mine` | boolean | true: it must be your own pull request; false: someone else's. |
+| `draft` | boolean | true: it must be a draft, which S never selects, so [[select]] does not take true; false: ready for review. |
 | `state` | list of `open`, `merged`, `closed` | The states it must be in one of: "open", "merged" or "closed"; S selects open ones only, so [[select]] takes "open" alone. |
-| `checks` | one of `passing`, `failing`, `pending` | "passing": passed, or only checks.approval pending; "failing": failed; "pending": still running. |
-| `decision` | one of `approved`, `changes_requested`, `review_required` | The review decision REVIEW shows. |
+| `checks` | list of `passing`, `failing`, `pending` | The states its checks must be in one of: "passing" (passed, none at all, or only checks.approval pending), "failing" or "pending" (still running). |
+| `decision` | list of `approved`, `changes_requested`, `review_required`, `none` | The review decisions REVIEW shows, one of which it must have; "none" is none, as in a repository that requires no review. |
 | `labels` | list of strings | Labels one of which it must have. |
-| `approved_by_me` | boolean | Your latest review must approve it; a person's pull request matches too, unlike the built-in "approved by me". |
-| `reviewed_by_me` | boolean | You must have reviewed it, whatever the review said. |
+| `approved_by_me` | boolean | true: your latest review must approve it, a person's pull request too, unlike the built-in "approved by me"; false: none of yours does. |
+| `reviewed_by_me` | boolean | true: you must have reviewed it, whatever the review said; false: you have not. |
 | `requested` | list of strings | Whom a review must be asked of, one of them: "me", or a team as "@slug". |
 | `reasons` | list of `approval_requested`, `assign`, `author`, `ci_activity`, `comment`, `invitation`, `manual`, `member_feature_requested`, `mention`, `review_requested`, `security_advisory_credit`, `security_alert`, `state_change`, `subscribed`, `team_mention` | Reasons of a notification, one of which the row's must have; S has no notification, so [[select]] does not take it. |
 

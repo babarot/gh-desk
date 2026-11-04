@@ -617,7 +617,7 @@ func rule(name string, c config.Conditions) plan.Rule {
 		MaxFiles: c.MaxFiles, MaxLines: c.MaxLines, MinFiles: c.MinFiles, MinLines: c.MinLines,
 		UpdatedWithinDays: c.UpdatedWithinDays, CreatedWithinDays: c.CreatedWithinDays,
 		UpdatedBeforeDays: c.UpdatedBeforeDays, CreatedBeforeDays: c.CreatedBeforeDays,
-		Bot: c.Bot, Mine: c.Mine, Draft: c.Draft, Checks: plan.Checks(c.Checks), Decision: model.ReviewDecision(strings.ToUpper(c.Decision)),
+		Bot: c.Bot, Mine: c.Mine, Draft: c.Draft, Checks: checks(c.Checks), Decisions: decisions(c.Decision),
 		Labels: c.Labels, States: states(c.States), ApprovedByMe: c.ApprovedByMe, ReviewedByMe: c.ReviewedByMe, Requested: c.Requested, Reasons: c.Reasons}
 }
 
@@ -626,6 +626,25 @@ func states(ss []string) []model.PRState {
 	var out []model.PRState
 	for _, s := range ss {
 		out = append(out, model.PRState(strings.ToUpper(s)))
+	}
+	return out
+}
+
+// checks are the states of checks the config file names.
+func checks(ss []string) []plan.Checks {
+	var out []plan.Checks
+	for _, s := range ss {
+		out = append(out, plan.Checks(s))
+	}
+	return out
+}
+
+// decisions are the review decisions the config file names, as the model
+// has them; "none" is plan.NoDecision.
+func decisions(ss []string) []model.ReviewDecision {
+	var out []model.ReviewDecision
+	for _, s := range ss {
+		out = append(out, model.ReviewDecision(strings.ToUpper(s)))
 	}
 	return out
 }

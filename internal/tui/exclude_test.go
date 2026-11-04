@@ -185,7 +185,7 @@ func TestExcludeByReason(t *testing.T) {
 // A group the tab does not show has no rows to show with a, so what it
 // would exclude is not counted.
 func TestExcludedOfAGroupNotShownAreNotCounted(t *testing.T) {
-	set := excluding(plan.Rule{Name: "bots", Bot: true})
+	set := excluding(plan.Rule{Name: "bots", Bot: new(true)})
 	set.Tabs[0].Groups = []plan.Group{plan.GroupYou, plan.GroupTeam}
 	m := startSource(t, fixture(), set)
 	if strings.Contains(screen(m), "excluded") {

@@ -1169,7 +1169,7 @@ func TestSelectByRule(t *testing.T) {
 // checked, the rule under the cursor does.
 func TestSelectByRulesTogether(t *testing.T) {
 	set := testSettings()
-	set.Rules = []plan.Rule{{Name: "small", MaxLines: 100}, {Name: "bots", Bot: true}}
+	set.Rules = []plan.Rule{{Name: "small", MaxLines: 100}, {Name: "bots", Bot: new(true)}}
 	m := startSet(t, set, 130)
 	press(m, "S", "j", "space", "j", "space")
 	if !strings.Contains(screen(m), "matches · small + bots · 1 PRs") {
@@ -1201,7 +1201,7 @@ func TestSelectByRulesTogether(t *testing.T) {
 // together and then added make (A AND B) OR C.
 func TestAddByRule(t *testing.T) {
 	set := testSettings()
-	set.Rules = []plan.Rule{{Name: "small", MaxLines: 100}, {Name: "bots", Bot: true}, {Name: "alice", Authors: []string{"alice"}}}
+	set.Rules = []plan.Rule{{Name: "small", MaxLines: 100}, {Name: "bots", Bot: new(true)}, {Name: "alice", Authors: []string{"alice"}}}
 	m := startSet(t, set, 130)
 	press(m, "S", "j", "space", "j", "space", "enter")
 	if len(m.selected) != 1 || !m.isSelected(key("acme", "api", 30)) {
@@ -1244,7 +1244,7 @@ func TestFilterByRule(t *testing.T) {
 	big.ID, big.Key, big.Additions, big.Deletions = "9", key("acme", "api", 31), 800, 200
 	f.searches["review"] = append(f.searches["review"], big)
 	m := start(t, f, keymap.Default())
-	m.set.Rules = []plan.Rule{{Name: "small", MaxLines: 100}, {Name: "bots", Bot: true}}
+	m.set.Rules = []plan.Rule{{Name: "small", MaxLines: 100}, {Name: "bots", Bot: new(true)}}
 	m.selected[key("acme", "api", 12)] = byHand
 	press(m, "S", "j", "space", "j", "space", "f")
 	if got := shownKeys(m); len(got) != 1 || got[0] != key("acme", "api", 30) {
