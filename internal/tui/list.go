@@ -796,6 +796,10 @@ func (m *Model) cell(id string, r row, sel bool, n int) string {
 		case r.ex.excluded():
 			// Shown with a, as a row the exclusion leaves out.
 			mark = st.dim.Render("⊘")
+		case r.ex.pending && !m.set.Shimmer:
+			// An exclusion rule cannot tell yet; with shimmer, the light
+			// over the pull request says so instead.
+			mark = st.yellow.Render("?")
 		case func() bool { _, ok := m.unread[p.Key]; return ok }():
 			mark = st.blue.Render("●")
 		}
@@ -805,7 +809,9 @@ func (m *Model) cell(id string, r row, sel bool, n int) string {
 			name, num = st.dim, st.dim
 		}
 		number := fmt.Sprintf("#%d", p.Key.Number)
-		if m.answering(p.Key) && m.set.Shimmer {
+		// A row an exclusion rule cannot tell yet may leave once what the
+		// rule waits for is read.
+		if (m.answering(p.Key) || r.ex.pending) && m.set.Shimmer {
 			return cursor + " " + mark + " " + m.shimmerParts(styled{repo, name}, styled{number, num})
 		}
 		return cursor + " " + mark + " " + name.Render(repo) + num.Render(number)

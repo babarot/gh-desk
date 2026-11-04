@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"slices"
 	"time"
 
 	tea "charm.land/bubbletea/v2"
@@ -137,12 +138,23 @@ func (m *Model) reading() bool {
 	return false
 }
 
+// pendingShown reports whether the tab shown has a row an exclusion rule
+// cannot tell yet.
+func (m *Model) pendingShown() bool {
+	return slices.ContainsFunc(m.rows(m.tab()), func(r row) bool { return r.ex.pending })
+}
+
+// shimmering reports whether a row shimmers as an exclusion rule waits to
+// tell it.
+func (m *Model) shimmering() bool { return m.set.Shimmer && m.pendingShown() }
+
 // spinMsg turns the spinner of what is being read.
 type spinMsg struct{}
 
-// spin keeps the screen drawn while something is read, and only then.
+// spin keeps the screen drawn while something is read, and while a row
+// shimmers as an exclusion rule waits to tell it, and only then.
 func (m *Model) spin() tea.Cmd {
-	if m.spinning || !m.reading() {
+	if m.spinning || !m.reading() && !m.shimmering() {
 		return nil
 	}
 	m.spinning = true
