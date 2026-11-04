@@ -25,6 +25,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"sync"
 	"syscall/js"
 	"time"
@@ -328,7 +329,11 @@ func (t *terminal) run(out output, sc *playground.Scenario, pl play) error {
 	t.mu.Lock()
 	set.PaneHeight = playground.PaneHeight(t.rows)
 	t.mu.Unlock()
-	log := logging.Discard()
+	// There is no log file in the browser; the records are kept in memory,
+	// for the TUI's log viewer.
+	recs := logging.NewRecords(0, nil)
+	log := logging.Memory(recs, slog.LevelInfo)
+	set.LogRecords = recs
 	// The world moves in seconds, so the runner looks often.
 	rn := runner.New(w.Runner(), log, runner.Options{Settings: set.Plan, Viewer: playground.Viewer, CanWait: true,
 		ChecksTimeout: cfg.Merge.ChecksTimeout.D, BlockedTimeout: cfg.Merge.BlockedTimeout.D,

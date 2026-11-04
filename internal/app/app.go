@@ -58,7 +58,9 @@ func Run(args []string, stdout, stderr io.Writer) int {
 // TUI, or with gcOnly gh desk gc, and returns the exit code.
 func start(o *options, gcOnly bool, stdout, stderr io.Writer) int {
 	level := new(slog.LevelVar)
-	log, closeLog, err := logging.Open(logging.Options{Level: level})
+	// What goes to the log file is kept in memory too, for the TUI to show.
+	recs := logging.NewRecords(0, nil)
+	log, closeLog, err := logging.Open(logging.Options{Level: level, Records: recs})
 	if err != nil {
 		fmt.Fprintf(stderr, "gh-desk: open the log file: %v\n", err)
 		return 1
@@ -102,6 +104,7 @@ func start(o *options, gcOnly bool, stdout, stderr io.Writer) int {
 	}
 	p := assemble(cfg, warns, env{gh: gh, host: github.DefaultHost(), viewer: viewer, stateDir: state.DefaultDir(),
 		borrow: claude.GhqRoots(ctx), noCache: o.noCache}, log)
+	p.set.LogRecords = recs
 	start := time.Now()
 	err = tui.Run(ctx, source{gh}, p.rn, p.cl, km, log, p.set)
 	// Stop the batches and wait for them to stop writing the record before

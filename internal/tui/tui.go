@@ -168,6 +168,18 @@ type Settings struct {
 	Now func() time.Time
 	// Tick asks for msg after d, for tests; nil is tea.Tick.
 	Tick func(d time.Duration, msg tea.Msg) tea.Cmd
+	// LogRecords are the records written to the log while gh-desk runs;
+	// nil has none.
+	LogRecords LogRecords
+}
+
+// LogRecords are the latest records of the log, the same the log file has,
+// and a way to wait for the next one.
+type LogRecords interface {
+	// All is the records kept, oldest first.
+	All() []logging.Record
+	// Changed is closed when the next record is added.
+	Changed() <-chan struct{}
 }
 
 // Model is the TUI's state.

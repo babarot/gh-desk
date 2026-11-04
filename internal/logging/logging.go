@@ -80,6 +80,9 @@ type Options struct {
 	// MaxSize and Keep control rotation at startup; the defaults when zero.
 	MaxSize int64
 	Keep    int
+	// Records, when set, keeps what is written to the file in memory too,
+	// at the same level.
+	Records *Records
 }
 
 // Open rotates the log file if it has grown past MaxSize, opens it for
@@ -105,13 +108,26 @@ func Open(o Options) (*slog.Logger, io.Closer, error) {
 	if err != nil {
 		return nil, nil, err
 	}
+	if o.Records != nil {
+		return slog.New(slog.NewMultiHandler(jsonHandler(f, o.Level), o.Records.Handler(o.Level))), f, nil
+	}
 	return New(f, o.Level), f, nil
 }
 
 // New returns a logger writing JSON lines to w at level and above. Tests
 // pass a buffer.
 func New(w io.Writer, level slog.Leveler) *slog.Logger {
-	return slog.New(slog.NewJSONHandler(w, &slog.HandlerOptions{Level: level}))
+	return slog.New(jsonHandler(w, level))
+}
+
+// Memory returns a logger that keeps its records in r and writes no file,
+// for gh-desk run where there is none, such as the playground.
+func Memory(r *Records, level slog.Leveler) *slog.Logger {
+	return slog.New(r.Handler(level))
+}
+
+func jsonHandler(w io.Writer, level slog.Leveler) slog.Handler {
+	return slog.NewJSONHandler(w, &slog.HandlerOptions{Level: level})
 }
 
 // Discard is a logger that writes nothing, for code run without one.
