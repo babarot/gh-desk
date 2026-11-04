@@ -10,11 +10,11 @@ desk // @me    1 review (3)   2 mine (1)   3 involved (0)   4 inbox (1)         
                        │   approve               A      send an approving review                          │
                        │   merge                 M      merge it, as the next popup decides               │
                        │   ready for review      D      not a draft                                       │
+                       │   close                        close it, as the next popup says                  │
                        │   hide / done           d      hide it from this tab                             │
                        │                                                                                  │
                        │ enter run · or the action's key · esc close                                      │
                        ╰──────────────────────────────────────────────────────────────────────────────────╯
-
 
 
 

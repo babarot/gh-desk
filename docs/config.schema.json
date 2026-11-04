@@ -413,6 +413,7 @@
               "approve",
               "merge",
               "ready_for_review",
+              "close",
               "hide"
             ],
             "type": "string"

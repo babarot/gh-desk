@@ -82,6 +82,9 @@ var Defaults = []Def{
 	{"approve", ScopeList, []string{"A"}, "approve"},
 	{"merge", ScopeList, []string{"M"}, "merge"},
 	{"ready_for_review", ScopeList, []string{"D"}, "ready for review"},
+	// No key of its own: one stray key press would start closing pull
+	// requests. It is reached from the menu (ADR-066).
+	{"close", ScopeList, nil, "close"},
 	{"comment", ScopeList, []string{"c"}, "comment"},
 	{"review", ScopeList, []string{"R"}, "review"},
 	{"triage", ScopeList, []string{"C"}, "triage with claude"},
@@ -113,6 +116,8 @@ var Defaults = []Def{
 	// A confirm popup reads no choose, so enter answers it too.
 	{"confirm", ScopeConfirm, []string{"y", "enter"}, "yes"},
 	{"include_failing", ScopeConfirm, []string{"f"}, "include failing"},
+	{"delete_branch", ScopeConfirm, []string{"x"}, "delete branches"},
+	{"write_comment", ScopeConfirm, []string{"i"}, "write a comment"},
 
 	{"log_this_pr", ScopeLog, []string{"f"}, "this PR only"},
 

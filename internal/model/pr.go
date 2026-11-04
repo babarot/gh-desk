@@ -234,6 +234,28 @@ type MergeInfo struct {
 	Repo          RepoMerge
 	// Reviews are the latest review of each reviewer.
 	Reviews []Review
+	// CanClose is whether the viewer may close it.
+	CanClose bool
+	// Locked is whether its conversation is locked.
+	Locked bool
+	// Head is its head branch; its ID is empty when the branch is gone.
+	Head Branch
+	// HeadRefID is the node ID of the head branch, empty when it is gone.
+	HeadRefID string
+	// HeadInFork is whether the head branch is in another repository.
+	HeadInFork bool
+	// CanWrite is whether the viewer can push to the repository, which
+	// deleting a branch of it takes.
+	CanWrite bool
+	// CanDeleteHead is whether GitHub offers the viewer to delete the head
+	// branch. It does only once the pull request is closed or merged, so
+	// it says nothing of an open one.
+	CanDeleteHead bool
+}
+
+// Branch is a branch of a repository.
+type Branch struct {
+	Owner, Repo, Name string
 }
 
 // Comment is a comment on a pull request.

@@ -43,6 +43,9 @@ type bulk struct {
 	// tookOver is set when this gh-desk took the record of pending
 	// merges over while the popup was open.
 	tookOver bool
+	// close is the comment and the branch of a close popup; nil for
+	// another kind.
+	close *closeForm
 }
 
 type notesState int
@@ -69,6 +72,8 @@ type bulkItem struct {
 	// noWait is set when the merge would wait while another gh-desk
 	// holds the record of pending merges.
 	noWait bool
+	// closing is what a close popup would do to it.
+	closing plan.Close
 }
 
 // goes reports whether the item is acted on.
@@ -284,6 +289,9 @@ func (m *Model) bulkInfo(msg bulkInfoMsg) tea.Cmd {
 		b.items[i].read = true
 	}
 	m.decideBulk()
+	if b.kind == runner.Close {
+		return m.readBasedOn(b)
+	}
 	return m.readNotes(b)
 }
 
@@ -372,6 +380,12 @@ func (m *Model) decideBulk() {
 			it.d = plan.ForReview(it.mi, it.pr, m.viewer, b.review.Event, b.includeFailing, m.set.Plan)
 		case runner.Ready:
 			it.d = plan.ForReady(it.mi)
+		case runner.Close:
+			it.closing = b.close.decide(it.mi)
+			it.d = plan.Decision{Reason: it.closing.Reason, Notes: it.closing.Notes}
+			if it.closing.Skip {
+				it.d.Step = plan.StepSkip
+			}
 		default:
 			it.d = plan.ForMerge(it.mi, it.pr, m.viewer, m.set.Plan)
 			switch it.d.Step {
@@ -388,6 +402,9 @@ func (m *Model) bulkKey(k string) tea.Cmd {
 	switch {
 	case k == keymap.Back:
 		// A review being written is under the popup, and comes back.
+		if b.close != nil {
+			m.unsentClose = b.close.ta.Value()
+		}
 		m.bulk = nil
 		m.say("canceled")
 	case is("down"):
@@ -398,6 +415,11 @@ func (m *Model) bulkKey(k string) tea.Cmd {
 	case is("include_failing") && b.approves() && !b.loading:
 		b.includeFailing = !b.includeFailing
 		m.decideBulk()
+	case is("delete_branch") && b.close != nil:
+		b.close.del = !b.close.del
+		m.decideBulk()
+	case is("write_comment") && b.close != nil:
+		return b.close.focus()
 	case is("confirm") && !b.loading:
 		return m.runBulk()
 	}
@@ -431,6 +453,10 @@ func (m *Model) runBulk() tea.Cmd {
 		bs.skipped = append(bs.skipped, noteItem{key: it.pr.Key, text: "skipped: " + why, result: runner.Skipped})
 	}
 	m.bulk = nil
+	if len(items) == 0 && b.close != nil {
+		// Nothing was sent, so the comment is kept as on esc.
+		m.unsentClose = b.close.ta.Value()
+	}
 	if len(items) == 0 {
 		if m.rowResult() != "" {
 			m.movedOnto()
@@ -448,10 +474,16 @@ func (m *Model) runBulk() tea.Cmd {
 	}
 	var id string
 	var ch <-chan runner.Event
-	if b.kind == runner.Review {
+	switch {
+	case b.kind == runner.Review:
 		m.compose = nil
 		id, ch = m.run.StartReview(m.ctx, b.review, items)
-	} else {
+	case b.close != nil:
+		ct := b.close.text()
+		bs.comment = ct.Body
+		m.unsentClose = ""
+		id, ch = m.run.StartClose(m.ctx, ct, items)
+	default:
 		id, ch = m.run.Start(m.ctx, b.kind, items)
 	}
 	m.addBatch(id, bs)
@@ -522,6 +554,8 @@ func (m *Model) renderBulk() []string {
 			switch b.kind {
 			case runner.Review, runner.Ready:
 				what = st.green.Render(it.d.Reason)
+			case runner.Close:
+				what = m.closeWhat(it.closing)
 			default:
 				if it.d.Ready {
 					what = st.green.Render("ready") + st.dim.Render(" → ")
@@ -595,6 +629,8 @@ func (m *Model) renderBulk() []string {
 	case b.loading:
 	case b.kind == runner.Ready:
 		prose(st.dim, "Its reviewers are asked for a review once it is ready. Each acts only on the head shown when it was read.")
+	case b.close != nil:
+		prose(st.dim, m.closeProse())
 	case b.kind == runner.Review && !b.approves():
 		prose(st.dim, "GitHub cannot take a review back. Each is sent on the head shown when it was read.")
 	default:
@@ -628,19 +664,51 @@ func (m *Model) renderBulk() []string {
 		}
 		foot := []string{m.steady(st.muted, what) +
 			st.dim.Render(" · ") + st.key.Render(keymap.Back) + " " + st.muted.Render("cancel")}
+		foot, inputAt := m.withCloseFoot(foot, inner)
 		out, top := scrollBox(st, title, lines, foot, w, m.popupHeight(), b.offset, keepLines{}, m.scrollKeys())
 		b.offset = top
+		m.placeCloseInput(out, foot, inputAt)
 		return out
 	}
-	foot := []string{"", st.sub0.Render(hint) + st.key.Render(m.firstKey("confirm")) + " " + st.muted.Render("yes") +
-		st.dim.Render(" · ") + st.key.Render(keymap.Back) + " " + st.muted.Render("no")}
+	ask := st.sub0.Render(hint) + st.key.Render(m.firstKey("confirm")) + " " + st.muted.Render("yes")
+	if b.close != nil {
+		for _, a := range []keymap.Action{"delete_branch", "write_comment"} {
+			ask += st.dim.Render(" · ") + st.key.Render(m.firstKey(a)) + " " + st.muted.Render(m.keys.Help(a))
+		}
+	}
+	ask += st.dim.Render(" · ") + st.key.Render(keymap.Back) + " " + st.muted.Render("no")
+	if b.close != nil && b.close.editing {
+		ask = st.key.Render(keymap.Back) + " " + st.muted.Render("done writing")
+	}
+	foot, inputAt := m.withCloseFoot([]string{"", ask}, inner)
 	title := verb
 	if len(b.items) > 1 {
 		title = fmt.Sprintf("%s %d of %d", verb, goes, len(b.items))
 	}
 	out, top := scrollBox(st, title, lines, foot, w, m.popupHeight(), b.offset, keepLines{}, m.scrollKeys())
 	b.offset = top
+	m.placeCloseInput(out, foot, inputAt)
 	return out
+}
+
+// withCloseFoot puts the check and the text box of a close above foot,
+// and says the line of foot the text box starts on; -1 for another kind.
+func (m *Model) withCloseFoot(foot []string, inner int) ([]string, int) {
+	if m.bulk.close == nil {
+		return foot, -1
+	}
+	pre, at := m.closeFoot(inner)
+	return append(pre, foot...), at
+}
+
+// placeCloseInput keeps the line of the popup the text box starts on, for
+// the cursor: the foot is drawn last, above the bottom edge.
+func (m *Model) placeCloseInput(out, foot []string, inputAt int) {
+	if inputAt >= 0 {
+		f := m.bulk.close
+		base := len(out) - 1 - len(foot)
+		f.at, f.checkAt = base+inputAt, base+1
+	}
 }
 
 // bulkRow is a pull request in the confirm popup, styled: what is done
@@ -724,7 +792,7 @@ func (m *Model) bulkName(pr model.PR, w int) string {
 func bulkNumber(pr model.PR) string { return fmt.Sprintf("#%d", pr.Key.Number) }
 
 // bulkVerbs name what a popup of each kind does, in its title and question.
-var bulkVerbs = map[runner.Kind]string{runner.Merge: "merge", runner.Ready: "mark ready"}
+var bulkVerbs = map[runner.Kind]string{runner.Merge: "merge", runner.Ready: "mark ready", runner.Close: "close"}
 
 func (m *Model) stepStyle(s plan.Step) styleFn {
 	switch s {

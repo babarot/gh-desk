@@ -1,0 +1,34 @@
+desk // @me    1 review (3)   2 mine (1)   3 involved (0)   4 inbox (1)                           1 to you · 1 to a team · 1 bots 
+    PR                        TITLE                                  AUTHOR          CI  REVIEW   WHY         SIZE          AGE
+  ▾╭ close ───────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+▎ ●│ ✓ acme/api#12 Add retries to the client                                                                                  │   
+  ▸│   └ close                                                                                                                │
+  ▸│                                                                                                                          │
+   │ A closed pull request can be reopened. Each acts only on the head shown when it was read.                                │
+   │                                                                                                                          │
+   │ [ ] delete the head branches  1 of 1 can be deleted                                                                      │
+   │                                                                                                                          │
+   │ comment (optional)                                                                                                       │
+   │ ┃   1 Leave a comment (markdown)                                                                                         │
+   │ ┃ ~                                                                                                                      │
+   │ ┃ ~                                                                                                                      │
+   │ ┃ ~                                                                                                                      │
+   │                                                                                                                          │
+   │ close this pull request? y yes · x delete branches · i write a comment · esc no                                          │
+   ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+
+
+╭  overview   diff (2)  ────────────────────────────────────────────────────────────────────────────────── acme/api#12 · J/K · v ╮
+│ #12 Add retries to the client                                                       alice │ status    open                     │
+│ ▾ description ─────────────────────────────────────────────────────────────────────────── │ merge     merge now (merge commit) │
+│ │ What                                                                                    │ requested me @core                 │
+│ │ Retry failed requests.                                                                  │ checks    ✓1                       │
+│ ╵                                                                                         │ size      +40 −3 · 2 files         │
+│                                                                                           │ branch    retries                  │
+│ ▾ checks (1)  ✓1 ──────────────────────────────────────────────────────────────────────── │           → main                   │
+│ │ ✓ test                                                                                  │ updated   3h ago                   │
+│ ╵                                                                                         │                                    │
+│                                                                                           │                                    │
+╰────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+                                                                                                                                  
+y yes · x delete branches · i write a comment · esc back                                                                          

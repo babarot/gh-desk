@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 
@@ -16,7 +17,8 @@ import (
 const infoFields = `
   id number state isDraft headRefOid baseRefOid mergeStateStatus reviewDecision
   viewerCanMergeAsAdmin autoMergeRequest { enabledAt }
-  repository { nameWithOwner mergeCommitAllowed squashMergeAllowed rebaseMergeAllowed autoMergeAllowed }
+  viewerCanClose locked headRefName headRef { id } isCrossRepository viewerCanDeleteHeadRef
+  repository { nameWithOwner mergeCommitAllowed squashMergeAllowed rebaseMergeAllowed autoMergeAllowed viewerPermission }
   latestReviews(first: 20) { nodes { author { login } state } }
   commits(last: 1) { nodes { commit { statusCheckRollup { state } } } }`
 
@@ -57,12 +59,21 @@ type infoNode struct {
 	// branch's rules.
 	ViewerCanMergeAsAdmin bool
 	AutoMergeRequest      *struct{ EnabledAt time.Time }
-	Repository            struct {
+	ViewerCanClose        bool
+	Locked                bool
+	HeadRefName           string
+	HeadRef               *struct{ ID string }
+	IsCrossRepository     bool
+	// ViewerCanDeleteHeadRef is whether the viewer can delete the head
+	// branch.
+	ViewerCanDeleteHeadRef bool
+	Repository             struct {
 		NameWithOwner      string
 		MergeCommitAllowed bool
 		SquashMergeAllowed bool
 		RebaseMergeAllowed bool
 		AutoMergeAllowed   bool
+		ViewerPermission   string
 	}
 	LatestReviews struct {
 		Nodes []struct {
@@ -82,6 +93,12 @@ func (n infoNode) toModel() model.MergeInfo {
 		Decision: model.ReviewDecision(n.ReviewDecision), AutoMerge: n.AutoMergeRequest != nil,
 		AdminMerge: n.ViewerCanMergeAsAdmin,
 		Repo:       model.RepoMerge{AutoMerge: n.Repository.AutoMergeAllowed},
+		CanClose:   n.ViewerCanClose, Locked: n.Locked, HeadInFork: n.IsCrossRepository, CanDeleteHead: n.ViewerCanDeleteHeadRef,
+		Head:     model.Branch{Owner: owner, Repo: repo, Name: n.HeadRefName},
+		CanWrite: slices.Contains([]string{"WRITE", "MAINTAIN", "ADMIN"}, n.Repository.ViewerPermission),
+	}
+	if n.HeadRef != nil {
+		mi.HeadRefID = n.HeadRef.ID
 	}
 	if n.Repository.MergeCommitAllowed {
 		mi.Repo.Methods = append(mi.Repo.Methods, model.MethodMerge)
@@ -241,6 +258,64 @@ func (c *Client) MarkReady(ctx context.Context, key model.PRKey, id, head string
 		`mutation($id: ID!) {
   markPullRequestReadyForReview(input: {pullRequestId: $id}) { clientMutationId }
 }`, map[string]any{"id": id})
+}
+
+// Close closes the pull request. GitHub takes no expected head for it;
+// head is logged only, the runner having checked it just before.
+func (c *Client) Close(ctx context.Context, key model.PRKey, id, head string) error {
+	return c.write(ctx, "close", key, head,
+		`mutation($id: ID!) {
+  closePullRequest(input: {pullRequestId: $id}) { clientMutationId }
+}`, map[string]any{"id": id})
+}
+
+// DeleteBranch deletes the pull request's head branch by its ref's node
+// ID. GitHub takes no expected head for it either; the runner checked it
+// just before.
+func (c *Client) DeleteBranch(ctx context.Context, key model.PRKey, refID, head string) error {
+	return c.write(ctx, "delete-branch", key, head,
+		`mutation($id: ID!) {
+  deleteRef(input: {refId: $id}) { clientMutationId }
+}`, map[string]any{"id": refID})
+}
+
+// BasedOn reads, for each branch, the numbers of the open pull requests
+// whose base it is, in one query. A branch none is based on is left out.
+func (c *Client) BasedOn(ctx context.Context, branches []model.Branch) (map[model.Branch][]int, error) {
+	out := map[model.Branch][]int{}
+	if len(branches) == 0 {
+		return out, nil
+	}
+	var q strings.Builder
+	var decl []string
+	vars := map[string]any{}
+	q.WriteString("{\n")
+	for i, b := range branches {
+		decl = append(decl, fmt.Sprintf("$o%d: String!, $r%d: String!, $b%d: String!", i, i, i))
+		vars[fmt.Sprintf("o%d", i)], vars[fmt.Sprintf("r%d", i)], vars[fmt.Sprintf("b%d", i)] = b.Owner, b.Repo, b.Name
+		fmt.Fprintf(&q, "  b%d: repository(owner: $o%d, name: $r%d) { pullRequests(baseRefName: $b%d, states: OPEN, first: 5) { nodes { number } } }\n", i, i, i, i)
+	}
+	q.WriteString("}")
+	query := "query(" + strings.Join(decl, ", ") + ") " + q.String()
+	var resp map[string]*struct {
+		PullRequests struct {
+			Nodes []struct{ Number int }
+		}
+	}
+	if err := c.gql.DoWithContext(ctx, query, vars, &resp); err != nil {
+		return nil, err
+	}
+	for i, b := range branches {
+		r := resp[fmt.Sprintf("b%d", i)]
+		if r == nil {
+			continue
+		}
+		for _, n := range r.PullRequests.Nodes {
+			out[b] = append(out[b], n.Number)
+		}
+	}
+	c.log.Debug("based on read", "branches", len(branches), "stacked", len(out))
+	return out, nil
 }
 
 // UpdateBranch merges the base branch into the pull request's branch, only
