@@ -1,5 +1,16 @@
 # Changelog
 
+## [v0.4.0](https://github.com/babarot/gh-desk/compare/v0.3.0...v0.4.0) - 2026-11-04
+### New Features
+- Judge rules in three ways and give them more conditions by @babarot in https://github.com/babarot/gh-desk/pull/35
+- Leave pull requests out of every tab by exclusion rules by @babarot in https://github.com/babarot/gh-desk/pull/37
+- Tell the rows an exclusion rule waits on, and keep the cursor on them by @babarot in https://github.com/babarot/gh-desk/pull/38
+- Let a rule ask for the state of a pull request by @babarot in https://github.com/babarot/gh-desk/pull/41
+- Say "not" in a rule by its values by @babarot in https://github.com/babarot/gh-desk/pull/42
+### Improvements
+- Keep the excluded count in sight, leave it out of the tab's count, and let a rule go unnamed by @babarot in https://github.com/babarot/gh-desk/pull/39
+- Keep a row where it was while it shows a result by @babarot in https://github.com/babarot/gh-desk/pull/40
+
 ## [v0.3.0](https://github.com/babarot/gh-desk/compare/v0.2.0...v0.3.0) - 2026-11-04
 ### New Features
 - Show the log while gh-desk runs by @babarot in https://github.com/babarot/gh-desk/pull/33
