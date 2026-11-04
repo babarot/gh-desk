@@ -35,9 +35,26 @@ The groups are shown in the order you write them. A group left out is not shown,
 
 ## The inbox
 
-One tab is the inbox (`kind = "inbox"`): the pull requests in your notifications, with the reason each is there. Your notifications also put an unread mark (●) on the rows of every tab. The inbox hides the notifications whose pull request is merged or closed until `a` shows them. `d` marks one done.
+One tab is the inbox (`kind = "inbox"`): the pull requests in your notifications, with the reason each is there. Your notifications also put an unread mark (●) on the rows of every tab. The inbox leaves out the notifications whose pull request is merged or closed, as it leaves out what your exclusion rules match, until `a` shows them; `show_settled = true` keeps them as rows. `d` marks one done.
 
 [The inbox](https://babarot.me/gh-desk/?scenario=inbox "playground")
+
+## Leaving pull requests out
+
+Rules in `[[exclude]]` leave the pull requests they match out of every tab, the inbox too. They take the keys of `[[select]]` but `packages`, and a pull request is left out when it meets every key of one of them:
+
+```toml
+[[exclude]]
+name                = "old upgrades"
+title               = "^Upgrade"
+updated_before_days = 30
+
+[[exclude]]
+name   = "wip"
+labels = ["wip", "do-not-merge"]
+```
+
+A tab says how many it leaves out under its rows. `a` shows them, dimmed and marked ⊘, and hides them again; the status line and the pane say which rule leaves out the row under the cursor. What is left out is never selected, by a group's header or by `S`, nor put away by `d`. A rule is matched again at every draw, so a pull request leaves or comes back as it changes, and one whose CI, size, review or labels are not read yet stays until they are.
 
 ## Narrowing a tab
 

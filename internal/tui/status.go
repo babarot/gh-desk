@@ -178,14 +178,21 @@ func readBar(st styles, full, cells int) string {
 }
 
 // rowResult is the full result of the row under the cursor, where the row
-// has room for a few words only.
+// has room for a few words only, or what excludes the row when it has
+// none.
 func (m *Model) rowResult() string {
-	p, _, ok := m.currentPR()
-	if !ok {
+	r, ok := m.current()
+	if !ok || r.kind != rowPR {
 		return ""
 	}
+	p := r.pr
 	pg, ok := m.progress[p.Key]
 	if !ok {
+		// A row shown with a, which the exclusion leaves out, says by
+		// what.
+		if r.ex.excluded() {
+			return "excluded by " + strings.Join(r.ex.by, ", ")
+		}
 		return ""
 	}
 	if pg.detail != "" {

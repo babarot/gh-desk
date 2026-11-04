@@ -381,6 +381,46 @@ packages = []
 	)
 }
 
+func TestExcludeRules(t *testing.T) {
+	cfg, _, err := Load(write(t, `
+[[exclude]]
+name = "old upgrades"
+title = "^Upgrade"
+updated_before_days = 30
+
+[[exclude]]
+name = "mentions"
+reasons = ["mention"]
+draft = true
+`))
+	if err != nil || len(cfg.Exclude) != 2 || !cfg.Exclude[0].Title.MatchString("Upgrade x") || cfg.Exclude[0].UpdatedBeforeDays != 30 ||
+		cfg.Exclude[1].Reasons[0] != "mention" || !cfg.Exclude[1].Draft {
+		t.Fatalf("cfg.Exclude = %+v, %v", cfg.Exclude, err)
+	}
+	again, _, err := Load(write(t, Show(cfg, true)))
+	if err != nil || !reflect.DeepEqual(again.Exclude, cfg.Exclude) {
+		t.Fatalf("Show then Load = %+v, %v\n%s", again.Exclude, err, Show(cfg, true))
+	}
+	wantErrs(t, `
+[[exclude]]
+name = "everything"
+
+[[exclude]]
+name = "everything"
+labels = ["wip"]
+
+[[exclude]]
+name = ""
+mine = true
+`,
+		`exclude[0]: "everything" matches every pull request`,
+		`exclude[1].name "everything" is used twice`,
+		`exclude[2].name must not be empty`,
+	)
+	// The bodies are read for S alone.
+	wantErrs(t, "[[exclude]]\nname = \"bumps\"\npackages = [\"x\"]\n", `"exclude.packages" is not a setting`)
+}
+
 func TestAuthorIsNotASetting(t *testing.T) {
 	wantErrs(t, "[[select]]\nname = \"bots\"\nauthor = \"renovate\"\n", `did you mean "select.authors"?`)
 }

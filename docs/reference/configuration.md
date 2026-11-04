@@ -48,7 +48,7 @@ show_settled = false
 | `folded` | list of `you`, `team`, `other`, `bots` | The groups folded at start, among groups. |
 | `sort` | one of `updated`, `drafts_last` | "updated" (default) or "drafts_last". |
 | `limit` | integer, 1 or more | How many pull requests, or notifications, to read (at most 1000; 100 by default). |
-| `show_settled` | boolean | The inbox shows notifications whose pull request is merged or closed from the start. |
+| `show_settled` | boolean | The inbox shows the notifications whose pull request is merged or closed, rather than leave them out with the excluded until a shows them. |
 
 ## [[select]]
 

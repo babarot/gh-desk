@@ -24,9 +24,14 @@ type tab struct {
 	limit      int
 
 	// groups are the groups the rows are split into, in the order shown.
-	groups      []plan.Group
-	inbox       bool
-	showSettled bool
+	groups []plan.Group
+	inbox  bool
+	// keepSettled has the inbox show the notifications on merged or
+	// closed pull requests rather than exclude them (show_settled).
+	keepSettled bool
+	// showExcluded shows the rows the exclusion leaves out, dimmed; a
+	// toggles it.
+	showExcluded bool
 
 	loading  bool
 	loaded   bool
@@ -88,7 +93,7 @@ type pending struct {
 
 func newTab(s Tab) *tab {
 	t := &tab{name: s.Name, query: s.Query, grouped: len(s.Groups) > 0, groups: s.Groups, draftsLast: s.DraftsLast, limit: s.Limit,
-		inbox: s.Inbox, showSettled: s.ShowSettled, folded: map[plan.Group]bool{}, hidden: map[model.PRKey]bool{}}
+		inbox: s.Inbox, keepSettled: s.ShowSettled, folded: map[plan.Group]bool{}, hidden: map[model.PRKey]bool{}}
 	for _, g := range s.Folded {
 		t.folded[g] = true
 	}
@@ -113,6 +118,9 @@ type row struct {
 	count int
 	pr    model.PR
 	notif *model.Notification
+	// ex is why the row is excluded, shown only while the tab shows the
+	// excluded, and whether an exclusion rule waits to tell.
+	ex exclusion
 }
 
 // rows are the lines of t as shown: filtered, sorted, grouped and folded.
@@ -134,14 +142,15 @@ func (m *Model) listed(t *tab) []row {
 // folded folded.
 func (m *Model) rowsOf(t *tab, filter string, rules []plan.Rule, folded map[plan.Group]bool) []row {
 	if t.inbox {
-		rs, _ := m.inboxRows(t, filter, rules)
-		return rs
+		return m.inboxRows(t, filter, rules)
 	}
 	var prs []model.PR
+	ex := map[model.PRKey]exclusion{}
 	now := m.set.Now()
 	for _, p := range t.prs {
-		if !t.hidden[p.Key] && m.passes(p, filter, rules, now) {
+		if x, ok := m.shows(t, p, nil, filter, rules, now); ok {
 			prs = append(prs, p)
+			ex[p.Key] = x
 		}
 	}
 	slices.SortStableFunc(prs, func(a, b model.PR) int {
@@ -156,7 +165,7 @@ func (m *Model) rowsOf(t *tab, filter string, rules []plan.Rule, folded map[plan
 	if !t.grouped {
 		out := make([]row, len(prs))
 		for i, p := range prs {
-			out[i] = row{kind: rowPR, pr: p}
+			out[i] = row{kind: rowPR, pr: p, ex: ex[p.Key]}
 		}
 		return out
 	}
@@ -175,41 +184,39 @@ func (m *Model) rowsOf(t *tab, filter string, rules []plan.Rule, folded map[plan
 		out = append(out, row{kind: rowGroup, group: g, count: len(in)})
 		if !folded[g] {
 			for _, p := range in {
-				out = append(out, row{kind: rowPR, pr: p})
+				out = append(out, row{kind: rowPR, pr: p, ex: ex[p.Key]})
 			}
 		}
 	}
 	return out
 }
 
-// inboxRows are the inbox's lines under filter and rules, and how many
-// notifications on merged or closed pull requests they leave out.
-func (m *Model) inboxRows(t *tab, filter string, rules []plan.Rule) ([]row, int) {
+// inboxRows are the inbox's lines under filter and rules.
+func (m *Model) inboxRows(t *tab, filter string, rules []plan.Rule) []row {
 	now := m.set.Now()
 	var out []row
-	closed := 0
 	for i := range t.notifs {
 		n := &t.notifs[i]
-		if t.hidden[n.Key] {
-			continue
-		}
-		p, ok := m.knownPR(n.Key)
+		p := m.notifPR(n)
+		x, ok := m.shows(t, p, n, filter, rules, now)
 		if !ok {
-			p = model.PR{Key: n.Key, Title: n.Title, State: model.StateOpen}
-		}
-		if settled(p) {
-			closed++
-			if !t.showSettled {
-				continue
-			}
-		}
-		if !m.passes(p, filter, rules, now) {
 			continue
 		}
+		// The row shows the notification's time; the rules matched the
+		// pull request's own.
 		p.Updated = n.Updated
-		out = append(out, row{kind: rowPR, pr: p, notif: n})
+		out = append(out, row{kind: rowPR, pr: p, notif: n, ex: x})
 	}
-	return out, closed
+	return out
+}
+
+// notifPR is the pull request of the notification n, as far as it is
+// read.
+func (m *Model) notifPR(n *model.Notification) model.PR {
+	if p, ok := m.knownPR(n.Key); ok {
+		return p
+	}
+	return model.PR{Key: n.Key, Title: n.Title, State: model.StateOpen}
 }
 
 // settled reports whether p is merged or closed.
@@ -217,20 +224,115 @@ func settled(p model.PR) bool {
 	return p.State != model.StateOpen && p.State != ""
 }
 
+// settledName is what the inbox says excludes a notification on a merged
+// or closed pull request.
+const settledName = "merged or closed"
+
+// exclusion is why a pull request is left out of a tab: the names of what
+// excludes it (the exclusion rules that say Yes of it, and settledName in
+// the inbox), and, when none does, whether a rule cannot tell yet.
+type exclusion struct {
+	by      []string
+	pending bool
+}
+
+func (x exclusion) excluded() bool { return len(x.by) > 0 }
+
+// exclusionOf is why t leaves out p, the pull request of the notification
+// n in the inbox (nil elsewhere): its rules are matched again each time,
+// as the rules a tab is narrowed to are (ADR-027).
+func (m *Model) exclusionOf(t *tab, p model.PR, n *model.Notification, now time.Time) exclusion {
+	var x exclusion
+	if t.inbox && !t.keepSettled && settled(p) {
+		x.by = append(x.by, settledName)
+	}
+	if len(m.set.Exclude) == 0 {
+		return x
+	}
+	f := m.ruleFacts(p, now)
+	if n != nil {
+		f.Reason = n.Reason
+	}
+	for _, r := range m.set.Exclude {
+		switch r.Judge(p, m.viewer, f) {
+		case plan.Yes:
+			x.by = append(x.by, r.Name)
+		case plan.Pending:
+			x.pending = true
+		}
+	}
+	if x.excluded() {
+		x.pending = false
+	}
+	return x
+}
+
+// shows reports whether a row of t shows p, the pull request of the
+// notification n in the inbox: not put away, not excluded unless the tab
+// shows the excluded, and through filter and rules. Every place that asks
+// whether a row is shown asks this, so that nothing out of sight is acted
+// on (ADR-027). x is why it is excluded, when it is shown.
+func (m *Model) shows(t *tab, p model.PR, n *model.Notification, filter string, rules []plan.Rule, now time.Time) (x exclusion, ok bool) {
+	if t.hidden[p.Key] {
+		return exclusion{}, false
+	}
+	x = m.exclusionOf(t, p, n, now)
+	if x.excluded() && !t.showExcluded {
+		return x, false
+	}
+	return x, m.passes(p, filter, rules, now)
+}
+
+// excludedCount is how many of t's pull requests, or the inbox's
+// notifications, are excluded, of them how many as merged or closed and
+// how many unread, put away ones left out. The filter is left out, as it
+// only looks for rows for a moment.
+type excludedCount struct {
+	n, settled, unread int
+}
+
+func (m *Model) excludedOf(t *tab) excludedCount {
+	var c excludedCount
+	now := m.set.Now()
+	add := func(p model.PR, n *model.Notification) {
+		x := m.exclusionOf(t, p, n, now)
+		if t.hidden[p.Key] || !x.excluded() {
+			return
+		}
+		c.n++
+		if x.by[0] == settledName {
+			c.settled++
+		}
+		if _, ok := m.unread[p.Key]; ok {
+			c.unread++
+		}
+	}
+	if t.inbox {
+		for i := range t.notifs {
+			add(m.notifPR(&t.notifs[i]), &t.notifs[i])
+		}
+		return c
+	}
+	// A group the tab does not show has no rows, excluded or not.
+	for _, p := range m.allOf(t) {
+		add(p, nil)
+	}
+	return c
+}
+
 // unreadShown is how many unread notifications the inbox t shows: those
-// on merged or closed pull requests count only while they are shown, so
-// that the tab's count is what its rows hold. The filter is left out, as
-// it only looks for rows for a moment.
+// it excludes count only while they are shown, so that the tab's count is
+// what its rows hold. The filter is left out, as it only looks for rows
+// for a moment.
 func (m *Model) unreadShown(t *tab) int {
-	if t.showSettled {
+	if t.showExcluded {
 		return len(m.unread)
 	}
-	n := 0
-	for k := range m.unread {
-		if p, ok := m.knownPR(k); ok && settled(p) {
-			continue
+	n, now := 0, m.set.Now()
+	for _, nt := range m.unread {
+		if !m.exclusionOf(t, m.notifPR(&nt), &nt, now).excluded() {
+			n++
 		}
-		n++
 	}
 	return n
 }

@@ -75,8 +75,8 @@ type Tab struct {
 	DraftsLast bool
 	// Limit is how many pull requests, or notifications, to read.
 	Limit int
-	// ShowSettled shows the inbox's notifications whose pull request is
-	// merged or closed from the start.
+	// ShowSettled has the inbox show the notifications whose pull request
+	// is merged or closed, rather than leave them out with the excluded.
 	ShowSettled bool
 }
 
@@ -135,6 +135,10 @@ type Settings struct {
 	ReleaseNotes bool
 	// Rules are what S offers besides "approved by me".
 	Rules []plan.Rule
+	// Exclude are the rules that leave pull requests out of every tab
+	// until they are shown with a key; a pull request one of them says Yes
+	// of is left out.
+	Exclude []plan.Rule
 	// Resume are the merges an earlier run was waiting for.
 	Resume []model.Pending
 	// CanWait is whether this gh-desk holds the lock on the record of

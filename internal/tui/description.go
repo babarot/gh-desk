@@ -434,6 +434,10 @@ func (m *Model) facts(p model.PR, d *entry[model.Detail], width int) []line {
 		}
 		add("claude", plain(st.sub0.Render(asked)+st.muted.Render(at))...)
 	}
+	// A row shown with a, which the exclusion leaves out, says by what.
+	if r, ok := m.current(); ok && r.kind == rowPR && r.pr.Key == p.Key && r.ex.excluded() {
+		add("excluded", plain(st.sub0.Render(strings.Join(r.ex.by, ", ")))...)
+	}
 	return out
 }
 

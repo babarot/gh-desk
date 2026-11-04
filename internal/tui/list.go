@@ -9,6 +9,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
+	"github.com/charmbracelet/x/ansi"
 
 	"github.com/babarot/gh-desk/internal/model"
 	"github.com/babarot/gh-desk/internal/plan"
@@ -111,11 +112,10 @@ func (m *Model) listKey(k string) tea.Cmd {
 		if t.grouped {
 			t.folded[plan.GroupBots] = !t.folded[plan.GroupBots]
 		}
-	case is("show_settled"):
-		if t.inbox {
-			t.showSettled = !t.showSettled
-			t.sel = 0
-		}
+	case is("show_excluded"):
+		back := m.holdCursor(t)
+		t.showExcluded = !t.showExcluded
+		back()
 	case is("log"):
 		return m.openLog()
 	case is("preview"):
@@ -157,7 +157,7 @@ func (m *Model) listKey(k string) tea.Cmd {
 			var in []model.PRKey
 			now := m.set.Now()
 			for _, p := range t.prs {
-				if !t.hidden[p.Key] && m.passes(p, m.filter, t.ruleFilter, now) && plan.GroupOf(p, m.viewer) == r.group {
+				if _, ok := m.shows(t, p, nil, m.filter, t.ruleFilter, now); ok && plan.GroupOf(p, m.viewer) == r.group {
 					in = append(in, p.Key)
 				}
 			}
@@ -522,14 +522,9 @@ func (m *Model) renderList(b *strings.Builder, height int) {
 		b.WriteString(m.renderRow(rs[i], cols, i == t.sel, i) + "\n")
 		lines++
 	}
-	if t.inbox && !t.showSettled && lines < height {
-		if _, closed := m.inboxRows(t, m.filter, t.ruleFilter); closed > 0 && len(rs) < height {
-			noun := "notifications"
-			if closed == 1 {
-				noun = "notification"
-			}
-			b.WriteString(m.st.dim.Render(fmt.Sprintf("  %d %s on merged or closed pull requests hidden · %s to show",
-				closed, noun, m.firstKey("show_settled"))) + "\n")
+	if !t.showExcluded && lines < height && len(rs) < height {
+		if c := m.excludedOf(t); c.n > 0 {
+			b.WriteString(m.st.dim.Render("  "+excludedLine(c)+" · "+m.firstKey("show_excluded")+" to show") + "\n")
 			lines++
 		}
 	}
@@ -546,16 +541,39 @@ func (m *Model) answering(k model.PRKey) bool {
 }
 
 // shownPR is the pull request k as a row of t would show it, when one
-// would: in t, not hidden, and through the filter and the rules. ok is
-// false otherwise.
+// would (shows). ok is false otherwise.
 func (m *Model) shownPR(t *tab, k model.PRKey) (p model.PR, ok bool) {
 	now := m.set.Now()
 	for _, p := range t.prs {
-		if p.Key == k && !t.hidden[k] && m.passes(p, m.filter, t.ruleFilter, now) {
+		if p.Key != k {
+			continue
+		}
+		if _, ok := m.shows(t, p, nil, m.filter, t.ruleFilter, now); ok {
 			return p, true
 		}
 	}
 	return model.PR{}, false
+}
+
+// excludedLine says how many c are excluded, and of them how many as
+// merged or closed and how many unread.
+func excludedLine(c excludedCount) string {
+	noun := "pull requests"
+	if c.n == 1 {
+		noun = "pull request"
+	}
+	s := fmt.Sprintf("%d %s excluded", c.n, noun)
+	var parts []string
+	if c.settled > 0 {
+		parts = append(parts, fmt.Sprintf("%d %s", c.settled, settledName))
+	}
+	if c.unread > 0 {
+		parts = append(parts, fmt.Sprintf("%d unread", c.unread))
+	}
+	if len(parts) > 0 {
+		s += " (" + strings.Join(parts, ", ") + ")"
+	}
+	return s
 }
 
 // claudeIn reports whether Claude is answering about a pull request in
@@ -650,6 +668,11 @@ func (m *Model) renderRow(r row, cols []column, sel bool, n int) string {
 			continue
 		}
 		s := m.cell(c.id, r, sel, n)
+		if r.ex.excluded() && c.id != "pr" {
+			// A row the exclusion leaves out, shown with a, is drawn dim
+			// past its cursor and mark.
+			s = m.st.dim.Render(ansi.Strip(s))
+		}
 		width := c.width
 		if running && c.id == "title" {
 			width -= steal
@@ -770,12 +793,15 @@ func (m *Model) cell(id string, r row, sel bool, n int) string {
 			mark = st.mauve.Render(m.claudeFrame())
 		case m.chats[p.Key] != nil && m.chats[p.Key].unseen:
 			mark = st.mauve.Render("✦")
+		case r.ex.excluded():
+			// Shown with a, as a row the exclusion leaves out.
+			mark = st.dim.Render("⊘")
 		case func() bool { _, ok := m.unread[p.Key]; return ok }():
 			mark = st.blue.Render("●")
 		}
 		repo := m.repoName(p)
 		name, num := st.sub1, st.muted
-		if p.Draft {
+		if p.Draft || r.ex.excluded() {
 			name, num = st.dim, st.dim
 		}
 		number := fmt.Sprintf("#%d", p.Key.Number)

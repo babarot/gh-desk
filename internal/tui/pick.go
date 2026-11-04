@@ -130,11 +130,27 @@ func (m *Model) ruleMatches(rs ...plan.Rule) []model.PR {
 	var out []model.PR
 	now := m.set.Now()
 	for _, p := range m.allOf(t) {
-		if !t.hidden[p.Key] && matchesAll(rs, p, m.viewer, m.ruleFacts(p, now)) {
+		// S picks among what the tab would show, the filter typed aside
+		// (ADR-026): nothing excluded out of sight (ADR-027).
+		if _, ok := m.shows(t, p, m.notifOf(t, p.Key), "", nil, now); ok && matchesAll(rs, p, m.viewer, m.ruleFacts(p, now)) {
 			out = append(out, p)
 		}
 	}
 	return out
+}
+
+// notifOf is the notification of the pull request k in the inbox t, or
+// nil elsewhere.
+func (m *Model) notifOf(t *tab, k model.PRKey) *model.Notification {
+	if !t.inbox {
+		return nil
+	}
+	for i := range t.notifs {
+		if t.notifs[i].Key == k {
+			return &t.notifs[i]
+		}
+	}
+	return nil
 }
 
 // ruleFacts are what a rule may need beyond p: its body, if read, whether

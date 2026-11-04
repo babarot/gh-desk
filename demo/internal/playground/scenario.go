@@ -141,13 +141,12 @@ func Scenarios() []Scenario {
 			{Action: "refresh", Wait: 5 * time.Second},
 		}},
 		// The inbox: each notification read in the pane, with the comment
-		// that brought it; the settled ones shown, which takes the cursor to
-		// the top; the one there marked done.
+		// that brought it; back at the top, the one there marked done.
 		{Name: "inbox", Title: "The pull requests in your notifications, read and marked done", Steps: []Step{
 			{Action: "tab_4", Hold: time.Second},
 			{Action: "down", Hold: time.Second},
 			{Action: "down", Hold: 2 * time.Second},
-			{Action: "show_settled", Hold: 2 * time.Second},
+			{Action: "top", Hold: 2 * time.Second},
 			{Action: "hide", Hold: time.Second},
 		}},
 		// The keys: the list's own first, then down the popup to another

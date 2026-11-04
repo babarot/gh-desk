@@ -89,7 +89,9 @@ var Defaults = []Def{
 	{"browse", ScopeList, []string{"o"}, "browser"},
 	{"hide", ScopeList, []string{"d"}, "hide / done"},
 	{"fold_bots", ScopeList, []string{"b"}, "fold bots"},
-	{"show_settled", ScopeList, []string{"a"}, "settled"},
+	// Shows the rows the exclusion leaves out, the inbox's merged or
+	// closed ones among them, and hides them again.
+	{"show_excluded", ScopeList, []string{"a"}, "excluded"},
 	{"filter", ScopeList, []string{"/"}, "filter"},
 	{"preview_down", ScopeList, []string{"J"}, "scroll pane down"},
 	{"preview_up", ScopeList, []string{"K"}, "scroll pane up"},
@@ -145,6 +147,7 @@ var renamed = map[string]Action{
 	"unfold":        "fold",
 	"toggle_bots":   "fold_bots",
 	"toggle_pane":   "preview",
+	"show_settled":  "show_excluded",
 	"pane_tab":      "preview_tab",
 	"pane_grow":     "preview_grow",
 	"pane_shrink":   "preview_shrink",

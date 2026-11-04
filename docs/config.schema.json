@@ -139,6 +139,163 @@
       },
       "type": "object"
     },
+    "exclude": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "approved_by_me": {
+            "description": "Your latest review must approve it; a person's pull request matches too, unlike the built-in \"approved by me\".",
+            "type": "boolean"
+          },
+          "authors": {
+            "description": "The logins the author must be one of; bots without app/.",
+            "items": {
+              "type": "string"
+            },
+            "minItems": 1,
+            "type": "array"
+          },
+          "bot": {
+            "description": "The author must be a bot.",
+            "type": "boolean"
+          },
+          "checks": {
+            "description": "\"passing\": passed, or only checks.approval pending; \"failing\": failed; \"pending\": still running.",
+            "enum": [
+              "passing",
+              "failing",
+              "pending"
+            ],
+            "type": "string"
+          },
+          "created_before_days": {
+            "description": "The least days, of 24 hours, since it was created.",
+            "maximum": 36500,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "created_within_days": {
+            "description": "The most days, of 24 hours, since it was created.",
+            "maximum": 36500,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "decision": {
+            "description": "The review decision REVIEW shows.",
+            "enum": [
+              "approved",
+              "changes_requested",
+              "review_required"
+            ],
+            "type": "string"
+          },
+          "draft": {
+            "description": "It must be a draft; S never selects one, so [[select]] does not take it.",
+            "type": "boolean"
+          },
+          "labels": {
+            "description": "Labels one of which it must have.",
+            "items": {
+              "type": "string"
+            },
+            "minItems": 1,
+            "type": "array"
+          },
+          "max_files": {
+            "description": "The most files it may change.",
+            "minimum": 1,
+            "type": "integer"
+          },
+          "max_lines": {
+            "description": "The most lines it may add and delete together: the sum of the two numbers SIZE shows.",
+            "minimum": 1,
+            "type": "integer"
+          },
+          "min_files": {
+            "description": "The least files it may change.",
+            "minimum": 1,
+            "type": "integer"
+          },
+          "min_lines": {
+            "description": "The least lines it may add and delete together.",
+            "minimum": 1,
+            "type": "integer"
+          },
+          "mine": {
+            "description": "It must be your own pull request.",
+            "type": "boolean"
+          },
+          "name": {
+            "description": "The rule's name, as a row it leaves out says.",
+            "pattern": "\\S",
+            "type": "string"
+          },
+          "reasons": {
+            "description": "Reasons of a notification, one of which the row's must have; S has no notification, so [[select]] does not take it.",
+            "items": {
+              "enum": [
+                "approval_requested",
+                "assign",
+                "author",
+                "ci_activity",
+                "comment",
+                "invitation",
+                "manual",
+                "member_feature_requested",
+                "mention",
+                "review_requested",
+                "security_advisory_credit",
+                "security_alert",
+                "state_change",
+                "subscribed",
+                "team_mention"
+              ],
+              "type": "string"
+            },
+            "minItems": 1,
+            "type": "array"
+          },
+          "repos": {
+            "description": "owner/repo globs the repository must match one of; * matches any part of the owner or the name.",
+            "items": {
+              "type": "string"
+            },
+            "minItems": 1,
+            "type": "array"
+          },
+          "requested": {
+            "description": "Whom a review must be asked of, one of them: \"me\", or a team as \"@slug\".",
+            "items": {
+              "type": "string"
+            },
+            "minItems": 1,
+            "type": "array"
+          },
+          "reviewed_by_me": {
+            "description": "You must have reviewed it, whatever the review said.",
+            "type": "boolean"
+          },
+          "title": {
+            "description": "A regular expression the title must match.",
+            "type": "string"
+          },
+          "updated_before_days": {
+            "description": "The least days, of 24 hours, since it was last updated, as AGE counts them in a search tab.",
+            "maximum": 36500,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "updated_within_days": {
+            "description": "The most days, of 24 hours, since it was last updated: a label or a bot's comment updates it too. An old pull request updated lately matches.",
+            "maximum": 36500,
+            "minimum": 1,
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "type": "array"
+    },
     "keys": {
       "additionalProperties": {
         "anyOf": [
@@ -539,7 +696,7 @@
             "type": "string"
           },
           "show_settled": {
-            "description": "The inbox shows notifications whose pull request is merged or closed from the start.",
+            "description": "The inbox shows the notifications whose pull request is merged or closed, rather than leave them out with the excluded until a shows them.",
             "type": "boolean"
           },
           "sort": {
