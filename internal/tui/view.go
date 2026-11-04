@@ -44,6 +44,10 @@ func (m *Model) render() (string, *tea.Cursor) {
 	l := m.layout()
 	m.renderList(&b, l.list)
 	switch {
+	case l.pane > 0 && m.logInPane():
+		for _, s := range m.renderLog(m.width, l.pane) {
+			b.WriteString(s + "\n")
+		}
 	case l.pane > 0 && m.claudeOpen:
 		if c := m.renderClaude(&b, l.pane); c != nil {
 			cur = c
@@ -54,6 +58,14 @@ func (m *Model) render() (string, *tea.Cursor) {
 	b.WriteString(fit(m.statusText(), m.width) + "\n")
 	b.WriteString(fit(m.hints(), m.width))
 	lines := m.drawArmed(strings.Split(b.String(), "\n"))
+	if m.logv != nil && !m.logInPane() {
+		// Over the list's right side, from under the header to above the
+		// status line; what is under it is not dimmed, as it is no popup.
+		w, _ := m.logWidth()
+		for i, s := range m.renderLog(w, len(lines)-3) {
+			lines[1+i] = place(lines[1+i], s, m.width-w)
+		}
+	}
 	if m.compose != nil {
 		// Under the confirm popup when a review is posted.
 		popup, at := m.renderCompose()
@@ -334,6 +346,7 @@ var ready = map[keymap.Action]bool{
 	"fold_bots": true, "show_settled": true, "filter": true,
 	"preview_down": true, "preview_up": true, "preview_grow": true, "preview_shrink": true, "next_file": true, "prev_file": true, "preview_tab": true, "fold": true, "preview": true,
 	"confirm": true, "next_kind": true, "post": true, "editor": true, "accept": true, "erase": true, "erase_word": true,
+	"log": true, "log_this_pr": true,
 	"triage": true, "triage_apply": true, "triage_more": true, "ask_claude": true, "fill_suggestion": true, "draft_review": true, "open_claude": true, "chat_close": true,
 }
 
@@ -377,6 +390,9 @@ func (m *Model) hints() string {
 			as = append(as, "fill_suggestion")
 		}
 		as = append(as, "draft_review", "open_claude")
+	case m.logv != nil:
+		as = []keymap.Action{"log_this_pr", "bottom", "log", "help"}
+		back = "close"
 	case m.claudeShown():
 		// While Claude answers: esc stops it, and chat_close goes back.
 		// One answering in another gh-desk is not stopped here, and
@@ -390,7 +406,7 @@ func (m *Model) hints() string {
 		as = []keymap.Action{"menu", "select", "select_shown", "clear_selection", "help"}
 		back = "clear"
 	default:
-		as = []keymap.Action{"menu", "select", "select_rule", "triage"}
+		as = []keymap.Action{"menu", "select", "select_rule", "triage", "log"}
 		if m.tab().inbox {
 			as = append(as, "hide", "show_settled")
 		}

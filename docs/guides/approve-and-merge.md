@@ -26,6 +26,12 @@ The method is the first of `merge.methods` the repository allows, and the popup 
 
 After an approve, the approved pull requests stay selected, so `M` merges the same set next.
 
+## Following a batch
+
+While a batch goes on, each pull request's row says what it is doing now. `L` opens the log beside the list, as it is written: when each wait started and ended and why, every write with its request ID, and why a pull request was skipped. While it is open it takes the keys: `j`/`k` and the page keys scroll it, the bottom follows the newest again, `f` keeps only the pull request the cursor was on, and `L` or `esc` closes it. On a narrow screen it takes the place of the preview.
+
+It shows what the log file has, and no more; `--debug` adds every read.
+
 ## Waiting survives quitting
 
 There is no background process. What a merge is waiting for is recorded, and the next launch goes on with it, reading each pull request again first. Only the time gh-desk runs counts against the timeouts. A second gh-desk started meanwhile skips merges that would wait.

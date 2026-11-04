@@ -78,6 +78,7 @@ browse = []
 | `p` | `preview` | preview pane |
 | `+` | `preview_grow` | taller pane |
 | `-` | `preview_shrink` | shorter pane |
+| `L` | `log` | log |
 
 ## A menu or a list popup
 
@@ -101,6 +102,12 @@ browse = []
 |---|---|---|
 | `enter` | `triage_apply` | apply |
 | `i` | `triage_more` | ask more |
+
+## The log
+
+| Key | Action | Does |
+|---|---|---|
+| `f` | `log_this_pr` | this PR only |
 
 ## Claude on a pull request
 
