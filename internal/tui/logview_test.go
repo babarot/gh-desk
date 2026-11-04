@@ -5,10 +5,13 @@ import (
 	"log/slog"
 	"strings"
 	"testing"
+	"time"
 
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/babarot/gh-desk/internal/logging"
+	"github.com/babarot/gh-desk/internal/model"
+	"github.com/babarot/gh-desk/internal/runner"
 )
 
 // startLogged starts the TUI width wide and height high with a log of n
@@ -159,5 +162,85 @@ func TestLogWrapEndsOnANarrowScreen(t *testing.T) {
 		if len(lines) > 20 {
 			t.Errorf("width %d wrapped into %d lines", width, len(lines))
 		}
+	}
+}
+
+// startBatch starts a batch of two pull requests in m, as the runner's
+// events would leave it after a while: one waiting for its checks after
+// approving, one merged. It returns a function that feeds more events.
+func startBatch(t *testing.T, m *Model, id string) (func(time.Duration, runner.Event), model.PRKey, model.PRKey) {
+	t.Helper()
+	a, b := key("acme", "api", 12), key("acme", "web", 7)
+	clock := now
+	m.set.Now = func() time.Time { return clock }
+	bs := &batchState{kind: runner.Merge, goes: map[model.PRKey]bool{a: true, b: true}, order: []model.PRKey{a, b}, done: map[model.PRKey]progress{}}
+	m.addBatch(id, bs)
+	ch := make(chan runner.Event)
+	feed := func(after time.Duration, ev runner.Event) {
+		clock = clock.Add(after)
+		m.event(eventMsg{batch: id, ev: ev, ok: true, ch: ch})
+	}
+	feed(0, runner.Event{Key: a, Forecast: true, Plan: []runner.Step{runner.StepApprove, runner.StepWait, runner.StepMerge}})
+	feed(0, runner.Event{Key: b, Forecast: true, Plan: []runner.Step{runner.StepApprove, runner.StepMerge}})
+	feed(0, runner.Event{Key: a, Step: runner.StepApprove, Text: "approving"})
+	feed(0, runner.Event{Key: b, Step: runner.StepApprove, Text: "approving"})
+	feed(time.Second, runner.Event{Key: b, Step: runner.StepMerge, Text: "merging"})
+	feed(time.Second, runner.Event{Key: b, Result: runner.Merged, Text: "merged", Method: model.MethodSquash})
+	feed(0, runner.Event{Key: a, Forecast: true, Plan: []runner.Step{runner.StepWait, runner.StepMerge}})
+	feed(0, runner.Event{Key: a, Step: runner.StepWaitChecks, Text: "waiting for checks", Checks: []string{"build", "lint"}})
+	feed(0, runner.Event{Key: a, Forecast: true, Plan: []runner.Step{runner.StepMerge}})
+	feed(5*time.Second, runner.Event{Key: a, Step: runner.StepWaitChecks, Text: "waiting for checks", Checks: []string{"build"}})
+	return feed, a, b
+}
+
+// While a batch runs, the log viewer shows a line for each pull request
+// above the log: its steps as dots, then what it does now, a wait with
+// what it is for; and the status line counts how they stand.
+func TestProgressOverTheList(t *testing.T) {
+	m, _ := startLogged(t, 130, 34, 2)
+	startBatch(t, m, "b1")
+	press(m, "L")
+	s := screen(m)
+	for _, want := range []string{"╭ progress ", "approving and merging · 1/2 · 7s", "api#12", "●◐○", "checks 5s · build running", "web#7", "●●", "✓ merged (squash)", "╭ log "} {
+		if !strings.Contains(s, want) {
+			t.Errorf("no %q in the progress pane:\n%s", want, s)
+		}
+	}
+	if !strings.Contains(s, "approving and merging… 1/2 · 1 done · 1 waiting") {
+		t.Errorf("the status line does not count how they stand:\n%s", s)
+	}
+}
+
+// In the bottom pane's place the steps are side by side, with their
+// times.
+func TestProgressInThePanesPlace(t *testing.T) {
+	m, _ := startLogged(t, 100, 34, 2)
+	startBatch(t, m, "b1")
+	press(m, "L")
+	if s := screen(m); !strings.Contains(s, "✓ approve 2s ─ ") || !strings.Contains(s, "· merge") {
+		t.Errorf("the steps are not side by side:\n%s", s)
+	}
+}
+
+// A batch that ends while the viewer is open stays, done; one started
+// while it is open joins; reopening shows only those running.
+func TestProgressStaysUntilClosed(t *testing.T) {
+	m, _ := startLogged(t, 130, 34, 2)
+	press(m, "L")
+	if strings.Contains(screen(m), "╭ progress") {
+		t.Fatalf("a progress pane with no batch running:\n%s", screen(m))
+	}
+	feed, a, _ := startBatch(t, m, "b1")
+	if !strings.Contains(screen(m), "╭ progress ") {
+		t.Fatalf("a batch started while open did not join:\n%s", screen(m))
+	}
+	feed(time.Second, runner.Event{Key: a, Step: runner.StepMerge, Text: "merging"})
+	feed(time.Second, runner.Event{Key: a, Result: runner.Merged, Text: "merged", Method: model.MethodMerge})
+	if s := screen(m); !strings.Contains(s, "progress ✓") || !strings.Contains(s, "done in 9s") {
+		t.Errorf("the batch that ended did not stay, done:\n%s", s)
+	}
+	press(m, "L", "L")
+	if strings.Contains(screen(m), "╭ progress") {
+		t.Errorf("reopening showed a batch that had ended:\n%s", screen(m))
 	}
 }

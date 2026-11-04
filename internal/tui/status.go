@@ -224,14 +224,38 @@ func (m *Model) batchActivity() string {
 		if bs == nil || bs.noted {
 			continue
 		}
-		verb := batchWords[bs.kind]
-		if bs.kind == runner.Review {
-			verb = reviewingWords[bs.review.Event]
-		}
-		if bs.resumed {
-			verb = "going on with merges"
-		}
-		parts = append(parts, fmt.Sprintf("%s… %d/%d", verb, len(bs.done), len(bs.goes)))
+		parts = append(parts, fmt.Sprintf("%s… %d/%d", m.batchVerb(bs), len(bs.done), len(bs.goes))+batchCounts(bs))
 	}
 	return strings.Join(parts, " · ")
+}
+
+// batchCounts is how a batch's pull requests stand, those that are none
+// left out: done, waiting, skipped, stopped.
+func batchCounts(bs *batchState) string {
+	var done, waiting, skipped, stopped int
+	for _, p := range bs.done {
+		switch p.result {
+		case runner.Skipped:
+			skipped++
+		case runner.Stopped, runner.Failed:
+			stopped++
+		default:
+			done++
+		}
+	}
+	for k, l := range bs.lanes {
+		if _, ended := bs.done[k]; !ended && l.cur != nil && l.cur.step.Waits() {
+			waiting++
+		}
+	}
+	var out strings.Builder
+	for _, c := range []struct {
+		n    int
+		word string
+	}{{done, "done"}, {waiting, "waiting"}, {skipped, "skipped"}, {stopped, "stopped"}} {
+		if c.n > 0 {
+			fmt.Fprintf(&out, " · %d %s", c.n, c.word)
+		}
+	}
+	return out.String()
 }
