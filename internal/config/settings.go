@@ -447,7 +447,7 @@ var elems = map[string][]elem{
 		{Key: "name", Kind: stringKind{NonEmpty: true}, Doc: "The rule's name, as S lists it."},
 	}, conditionElems...),
 	"exclude": append([]elem{
-		{Key: "name", Kind: stringKind{NonEmpty: true}, Doc: "The rule's name, as a row it leaves out says."},
+		{Key: "name", Kind: stringKind{}, Doc: "The rule's name, which a row it leaves out says; without one, the row says the rule's conditions."},
 	}, slices.DeleteFunc(slices.Clone(conditionElems), func(e elem) bool { return e.Key == "packages" })...),
 }
 
@@ -576,8 +576,8 @@ title = "(?i)lock file maintenance"
 # checks = "passing"
 
 # Rules that leave pull requests out of every tab, until a shows them. They
-# take the keys of [[select]] but packages; a pull request is left out when
-# it meets every key of one of them. The inbox leaves out its notifications
+# take the keys of [[select]] but packages, and name may be left out; a pull
+# request is left out when it meets every key of one of them. The inbox leaves out its notifications
 # on merged or closed pull requests too, unless show_settled = true.
 #
 # [[exclude]]
@@ -586,7 +586,6 @@ title = "(?i)lock file maintenance"
 # updated_before_days = 30
 #
 # [[exclude]]
-# name = "wip"
 # labels = ["wip", "do-not-merge"]
 `
 

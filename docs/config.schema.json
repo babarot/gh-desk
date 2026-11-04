@@ -226,8 +226,7 @@
             "type": "boolean"
           },
           "name": {
-            "description": "The rule's name, as a row it leaves out says.",
-            "pattern": "\\S",
+            "description": "The rule's name, which a row it leaves out says; without one, the row says the rule's conditions.",
             "type": "string"
           },
           "reasons": {

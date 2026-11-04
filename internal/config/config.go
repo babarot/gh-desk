@@ -210,6 +210,8 @@ type Select struct {
 // Exclude is a rule that leaves the pull requests meeting every condition
 // given out of every tab, until they are shown with a key.
 type Exclude struct {
+	// Name is the rule's name, "" when it has none and is named by its
+	// conditions.
 	Name string
 	Conditions
 }
@@ -826,13 +828,16 @@ func excludeFrom(ds []excludeDoc) ([]Exclude, Problems) {
 	seen := map[string]bool{}
 	for i, d := range ds {
 		r := elemReporter{&ps, "exclude", i}
-		switch {
-		case strings.TrimSpace(d.Name) == "":
-			r.at("name", "must not be empty")
-		case seen[d.Name]:
+		// A rule with no name is named by its conditions where it is
+		// shown; many rules are easier to write without one. A name of
+		// spaces is none.
+		d.Name = strings.TrimSpace(d.Name)
+		if d.Name != "" && seen[d.Name] {
 			r.at("name", "%q is used twice", d.Name)
 		}
-		seen[d.Name] = true
+		if d.Name != "" {
+			seen[d.Name] = true
+		}
 		// packages is not a key here: the bodies are read only for S, of
 		// the bot pull requests of the tab shown, and leaving pull
 		// requests out by them would read every body in every tab.
@@ -947,7 +952,11 @@ func conditionsFrom(d conditionDoc, packages []string, name string, r elemReport
 		d.MaxFiles == nil && d.MaxLines == nil && d.MinFiles == nil && d.MinLines == nil &&
 		d.UpdatedIn == nil && d.CreatedIn == nil && d.UpdatedBefore == nil && d.CreatedBefore == nil &&
 		!d.Bot && !d.Mine && !d.Draft && d.Checks == nil && d.Decision == nil && !d.ApprovedByMe && !d.ReviewedByMe {
-		at("", "%q matches every pull request; give it at least one condition", name)
+		what := "the rule"
+		if name != "" {
+			what = fmt.Sprintf("%q", name)
+		}
+		at("", "%s matches every pull request; give it at least one condition", what)
 	}
 	return c
 }

@@ -410,13 +410,16 @@ name = "everything"
 labels = ["wip"]
 
 [[exclude]]
-name = ""
-mine = true
 `,
 		`exclude[0]: "everything" matches every pull request`,
 		`exclude[1].name "everything" is used twice`,
-		`exclude[2].name must not be empty`,
+		`exclude[2]: the rule matches every pull request`,
 	)
+	// A rule needs no name, nor do two of them differ by one.
+	cfg, _, err = Load(write(t, "[[exclude]]\nlabels = [\"wip\"]\n\n[[exclude]]\nname = \"  \"\nmine = true\n"))
+	if err != nil || len(cfg.Exclude) != 2 || cfg.Exclude[0].Name != "" || cfg.Exclude[1].Name != "" || !cfg.Exclude[1].Mine {
+		t.Fatalf("unnamed rules: %+v, %v", cfg.Exclude, err)
+	}
 	// The bodies are read for S alone.
 	wantErrs(t, "[[exclude]]\nname = \"bumps\"\npackages = [\"x\"]\n", `"exclude.packages" is not a setting`)
 }

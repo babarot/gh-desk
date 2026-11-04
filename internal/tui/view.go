@@ -264,6 +264,16 @@ func (m *Model) viewerName() string {
 }
 
 // tabLabel is tab i as the header shows it.
+// searchCount is how many pull requests a search tab found, GitHub's
+// count, less those it leaves out while it does not show them, as the
+// inbox's unread count leaves out what it excludes (D31).
+func (m *Model) searchCount(t *tab) int {
+	if t.showExcluded {
+		return t.total
+	}
+	return max(t.total-m.excludedOf(t).n, 0)
+}
+
 func (m *Model) tabLabel(i int) string {
 	t := m.tabs[i]
 	// A count read is shown while the rest of the tab is read: the status
@@ -273,7 +283,7 @@ func (m *Model) tabLabel(i int) string {
 	case t.inbox && t.loaded:
 		count = fmt.Sprint(m.unreadShown(t))
 	case t.loaded && t.err == nil:
-		count = fmt.Sprint(t.total)
+		count = fmt.Sprint(m.searchCount(t))
 	case t.err != nil:
 		count = "!"
 	}

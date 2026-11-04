@@ -273,3 +273,50 @@ func TestInboxReadAgainKeepsTheCursor(t *testing.T) {
 		t.Errorf("the cursor left acme/api#12 when a notification came in above it: on %v", r.pr.Key)
 	}
 }
+
+// The line that says how many the tab leaves out stays when the rows fill
+// the list, and the rows scroll above it.
+func TestExcludedLineStaysUnderAFullList(t *testing.T) {
+	set := excluding(plan.Rule{Name: "carol's", Authors: []string{"carol"}})
+	set.Tabs[0].Folded = nil
+	m := startSource(t, withCarol(), set)
+	m.Update(tea.WindowSizeMsg{Width: 130, Height: 18})
+	if got := len(m.rows(m.tab())); got <= m.layout().list-1 {
+		t.Fatalf("the rows (%d) do not fill the list (%d lines)", got, m.layout().list)
+	}
+	if !strings.Contains(screen(m), "1 pull request excluded · a to show") {
+		t.Errorf("the count goes when the rows fill the list:\n%s", screen(m))
+	}
+	for range 10 {
+		press(m, "j")
+	}
+	// The screen is drawn after each key, which scrolls the rows.
+	shown := screen(m)
+	r, _ := m.current()
+	if !m.onScreen(r.pr.Key) || !strings.Contains(shown, "excluded · a to show") {
+		t.Errorf("the cursor's row or the count is off the screen at the bottom:\n%s", screen(m))
+	}
+}
+
+// A search tab's count leaves out what it excludes, while it does not show
+// them.
+func TestSearchCountLeavesOutTheExcluded(t *testing.T) {
+	m := startSource(t, withCarol(), excluding(plan.Rule{Name: "carol's", Authors: []string{"carol"}}))
+	if !strings.Contains(headerLine(m), "1 review (3)") {
+		t.Errorf("the count has the excluded: %q", headerLine(m))
+	}
+	press(m, "a")
+	if !strings.Contains(headerLine(m), "1 review (4)") {
+		t.Errorf("the count leaves out what a shows: %q", headerLine(m))
+	}
+}
+
+// A rule with no name is called by what it asks for.
+func TestUnnamedRuleIsCalledByItsConditions(t *testing.T) {
+	m := startSource(t, withCarol(), excluding(plan.Rule{Authors: []string{"carol"}}))
+	press(m, "a")
+	cursorTo(t, m, key("acme", "api", 13))
+	if got := status(m); got != "excluded by carol" {
+		t.Errorf("status = %q, want the rule's condition", got)
+	}
+}

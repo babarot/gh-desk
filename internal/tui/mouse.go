@@ -355,7 +355,7 @@ func (m *Model) rowAt(y int, l layout) (int, bool) {
 	if t.err != nil {
 		first++
 	}
-	if !t.loaded && t.loading || y < first || y >= m.top()+1+l.list {
+	if !t.loaded && t.loading || y < first || y >= m.top()+1+m.rowLines(t, l.list) {
 		return 0, false
 	}
 	i := t.offset + y - first
