@@ -122,3 +122,32 @@ func TestMergeWaitsForJobsStartedByReady(t *testing.T) {
 		t.Errorf("merged %d reads after ready, before the job it started ended", n)
 	}
 }
+
+// A merge resumed at launch waits the quiet time even when the head has
+// runs: gh-desk may have marked it ready just before it quit, and the
+// workflows that starts may not show yet.
+func TestResumeWaitsForJobsNotShownYet(t *testing.T) {
+	mi, _ := pr("1", "api", 1, "me")
+	f := newFake(mi)
+	f.onRead = func(_ string, mi *model.MergeInfo, n int) {
+		// Read 1 resumes and read 2 decides; the job shows after.
+		switch n {
+		case 3, 4:
+			mi.Checks = []model.Check{checkRun("test", "QUEUED", "")}
+		case 5:
+			mi.Checks = []model.Check{checkRun("test", model.RunCompleted, model.CheckSuccess)}
+		}
+	}
+	st := newStore()
+	p := model.Pending{Key: mi.Key, ID: "1", Head: "h-1", Author: "me", Readied: true}
+	if err := st.Put(p); err != nil {
+		t.Fatal(err)
+	}
+	_, ch := newRunner(f, st).Resume(t.Context(), []model.Pending{p})
+	if e := last(drain(t, ch)); e.Result != Merged {
+		t.Fatalf("last event = %+v (calls %v)", e, f.calls)
+	}
+	if f.reads["1"] < 5 {
+		t.Errorf("merged after %d reads, before the job not shown at first ended", f.reads["1"])
+	}
+}

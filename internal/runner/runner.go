@@ -396,8 +396,12 @@ func (r *Runner) run(ctx context.Context, kind Kind, items []Item, resume map[mo
 				store, canWait := r.waiting()
 				j := &job{r: r, ctx: ctx, log: log.With(logging.KeyPR, it.PR.Key.String()), it: it, head: it.Head, emit: emit, wg: &wg,
 					store: store, canWait: canWait, record: kind == Merge && store != nil}
-				if resume == nil {
-					j.trigger = plan.Trigger{At: confirmed, For: r.opt.Quiet}
+				j.trigger = plan.Trigger{At: confirmed, For: r.opt.Quiet}
+				if resume != nil {
+					// What gh-desk wrote before it quit (marking ready,
+					// updating the branch) may have started workflows not
+					// shown yet; when, is not recorded.
+					j.trigger.Always = true
 				}
 				if !r.claim(it.PR.Key) {
 					// Its record belongs to the job already on it.
@@ -1052,10 +1056,13 @@ func (w *waitLog) start(what string) {
 
 // waitedForChecks adds the time since last to the time waited for checks
 // and records it; it reports false, having stopped the job, once that
-// passes WaitTimeout.
-func (j *job) waitedForChecks(last *time.Time, w *waitLog) bool {
+// passes WaitTimeout. Checks at work start the wait for other rules over;
+// the quiet time alone, with nothing seen at work, does not.
+func (j *job) waitedForChecks(mi model.MergeInfo, last *time.Time, w *waitLog) bool {
 	now := time.Now()
-	j.pend.BlockedWaited = 0
+	if len(plan.RunningJobs(mi)) > 0 || plan.ChecksRunning(mi, j.r.opt.Settings.ApprovalChecks) {
+		j.pend.BlockedWaited = 0
+	}
 	j.pend.ChecksWaited += now.Sub(*last)
 	*last = now
 	j.save()
@@ -1101,7 +1108,7 @@ func (j *job) jobsEnd() (model.MergeInfo, plan.Decision, bool) {
 			j.locked("locked by another gh-desk")
 			return mi, d, false
 		}
-		if !j.waitedForChecks(&last, w) {
+		if !j.waitedForChecks(mi, &last, w) {
 			return mi, d, false
 		}
 		w.start("jobs")
@@ -1153,7 +1160,7 @@ func (j *job) wait() {
 		}
 		switch {
 		case jobs || plan.ChecksRunning(mi, j.r.opt.Settings.ApprovalChecks):
-			if !j.waitedForChecks(&last, w) {
+			if !j.waitedForChecks(mi, &last, w) {
 				return
 			}
 			w.start("checks")
