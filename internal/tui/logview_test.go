@@ -201,12 +201,12 @@ func TestProgressOverTheList(t *testing.T) {
 	startBatch(t, m, "b1")
 	press(m, "L")
 	s := screen(m)
-	for _, want := range []string{"╭ progress ", "approving and merging · 1/2 · 7s", "api#12", "●◐○", "checks 5s · build running", "web#7", "●●", "✓ merged (squash)", "╭ log "} {
+	for _, want := range []string{"╭ progress ", "merging · 1/2 · 7s", "api#12", "●◐○", "checks 5s · build running", "web#7", "●●", "✓ merged (squash)", "╭ log "} {
 		if !strings.Contains(s, want) {
 			t.Errorf("no %q in the progress pane:\n%s", want, s)
 		}
 	}
-	if !strings.Contains(s, "approving and merging… 1/2 · 1 done · 1 waiting") {
+	if !strings.Contains(s, "merging… 1/2 · 1 done · 1 waiting") {
 		t.Errorf("the status line does not count how they stand:\n%s", s)
 	}
 }
