@@ -223,6 +223,7 @@ func (m *Model) openEditor() tea.Cmd {
 	}
 	f, err := os.CreateTemp("", "gh-desk-review-*.md")
 	if err != nil {
+		m.log.Warn("could not make a file for the editor", "err", err.Error())
 		m.fail("could not make a file for the editor: " + err.Error())
 		return nil
 	}
@@ -231,6 +232,7 @@ func (m *Model) openEditor() tea.Cmd {
 	f.Close()
 	if err != nil {
 		os.Remove(path)
+		m.log.Warn("could not write the review for the editor", "err", err.Error())
 		m.fail("could not write the review for the editor: " + err.Error())
 		return nil
 	}
@@ -241,11 +243,13 @@ func (m *Model) openEditor() tea.Cmd {
 func (m *Model) edited(msg editedMsg) tea.Cmd {
 	defer os.Remove(msg.path)
 	if msg.err != nil {
+		m.log.Warn("the editor failed", "err", msg.err.Error())
 		m.fail("the editor failed: " + msg.err.Error())
 		return nil
 	}
 	b, err := os.ReadFile(msg.path)
 	if err != nil {
+		m.log.Warn("could not read the review back", "err", err.Error())
 		m.fail("could not read the review back: " + err.Error())
 		return nil
 	}

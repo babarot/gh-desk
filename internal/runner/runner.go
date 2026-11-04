@@ -865,16 +865,37 @@ func (j *job) wait() {
 	// The times waited carry on from a record, so time gh-desk was not
 	// running is not counted.
 	last := time.Now()
+	// What it waits on and since when, for the log: a wait is logged when
+	// it starts, when what it waits on changes, and when it ends.
+	var on string
+	var since time.Time
+	end := func(result string) {
+		if on != "" {
+			j.log.Info("wait end", logging.KeyStep, on, "result", result, logging.KeyDurationMS, time.Since(since).Milliseconds())
+			on = ""
+		}
+	}
+	waitOn := func(what string) {
+		if what == on {
+			return
+		}
+		end("changed")
+		on, since = what, time.Now()
+		j.log.Info("wait start", logging.KeyStep, what)
+	}
 	for {
 		mi, d, ok := j.decide()
 		if !ok {
+			end("stopped")
 			return
 		}
 		switch d.Step {
 		case plan.StepMerge:
+			end("ready")
 			j.mergeDecided(d)
 			return
 		case plan.StepSkip:
+			end("skipped")
 			j.say(Skipped, d.Reason)
 			return
 		case plan.StepAutoMerge:
@@ -891,21 +912,25 @@ func (j *job) wait() {
 			j.pend.ChecksWaited += dt
 			j.save()
 			if j.pend.ChecksWaited > j.r.opt.ChecksTimeout {
+				end("timed-out")
 				j.say(Stopped, "checks still running after "+j.r.opt.ChecksTimeout.String())
 				return
 			}
+			waitOn("checks")
 			j.say(Running, "waiting for checks")
 		default:
 			j.pend.BlockedWaited += dt
 			j.save()
 			if j.pend.BlockedWaited > j.r.opt.BlockedTimeout {
+				end("timed-out")
 				j.say(Stopped, "blocked by another rule")
 				return
 			}
-			text := "waiting"
+			what, text := "blocked", "waiting"
 			if plan.AwaitingApproval(mi.Checks, j.r.opt.Settings.ApprovalChecks) {
-				text = "waiting for approval checks"
+				what, text = "approval-checks", "waiting for approval checks"
 			}
+			waitOn(what)
 			j.say(Running, text)
 		}
 		every := j.r.opt.PollFast
@@ -913,6 +938,7 @@ func (j *job) wait() {
 			every = j.r.opt.PollSlow
 		}
 		if !j.sleep(every) {
+			end("canceled")
 			return
 		}
 	}

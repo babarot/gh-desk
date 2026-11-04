@@ -1,9 +1,12 @@
 package tui
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"flag"
 	"fmt"
+	"log/slog"
 	"maps"
 	"os"
 	"os/exec"
@@ -2000,6 +2003,34 @@ func TestRefreshStatus(t *testing.T) {
 		t.Errorf("the clock's reading said refreshing:\n%s", screen(m))
 	}
 	run(m, cmd)
+}
+
+// Reading the lists again is logged once it ends, by r and by the clock,
+// with how long it took, so the log tells what the list was as of.
+func TestRefreshIsLogged(t *testing.T) {
+	m, _ := startWith(t, fixture(), keymap.Default())
+	var buf bytes.Buffer
+	m.log = logging.New(&buf, slog.LevelInfo)
+	clock := now
+	m.set.Now = func() time.Time { return clock }
+	_, cmd := m.Update(keyMsg("r"))
+	clock = clock.Add(2 * time.Second)
+	run(m, cmd)
+	_, cmd = m.Update(tickMsg{})
+	run(m, cmd)
+	var got []string
+	for line := range strings.Lines(buf.String()) {
+		var rec map[string]any
+		if err := json.Unmarshal([]byte(line), &rec); err != nil {
+			t.Fatal(err)
+		}
+		if rec["msg"] == "refresh" {
+			got = append(got, fmt.Sprint(rec[logging.KeyOp], " by ", rec["by"], " ", rec[logging.KeyDurationMS], "ms"))
+		}
+	}
+	if want := []string{"refresh by r 2000ms", "refresh by clock 0ms"}; !slices.Equal(got, want) {
+		t.Errorf("refreshes logged = %q, want %q", got, want)
+	}
 }
 
 // esc at the top of the list does not quit; it says q does.

@@ -383,6 +383,7 @@ func (s *State) stopKeeping(c *Conversation, err error) {
 		return
 	}
 	c.persist = false
+	s.log.Warn("could not keep a conversation", logging.KeyPR, c.pr.Key.String(), "err", err.Error())
 	s.status.Fail(fmt.Sprintf("could not keep the conversation of %s: %v", c.pr.Key, err))
 }
 

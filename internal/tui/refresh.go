@@ -2,9 +2,11 @@ package tui
 
 import (
 	"fmt"
+	"time"
 
 	tea "charm.land/bubbletea/v2"
 
+	"github.com/babarot/gh-desk/internal/logging"
 	"github.com/babarot/gh-desk/internal/model"
 )
 
@@ -25,7 +27,27 @@ func (m *Model) autoRefresh() tea.Cmd {
 	if m.bulk != nil || m.confirm != nil || m.compose != nil || m.notesAt != nil || m.picker != nil || m.menu != nil || m.typingChat() || m.viewer == "" {
 		return m.tick()
 	}
+	if m.rereading == nil {
+		m.rereading = &rereading{by: "clock", start: m.set.Now(), tabs: m.reloadTabs()}
+	}
 	return tea.Batch(m.reload(), m.tick())
+}
+
+// rereading is a reading of the lists again, by r or by the clock, kept
+// until it ends so that it is logged once with how long it took.
+type rereading struct {
+	by    string
+	start time.Time
+	tabs  []int
+}
+
+// reloadTabs are the tabs reload reads: the shown one and the inbox.
+func (m *Model) reloadTabs() []int {
+	tabs := []int{m.cur}
+	if m.cur != m.inbox {
+		tabs = append(tabs, m.inbox)
+	}
+	return tabs
 }
 
 // refreshRun is a reading r started: the tabs it reads, and how many
@@ -45,17 +67,17 @@ func (m *Model) refresh() tea.Cmd {
 	clear(m.cache.details)
 	clear(m.cache.comments)
 	n := m.clearResults()
-	tabs := []int{m.cur}
-	if m.cur != m.inbox {
-		tabs = append(tabs, m.inbox)
-	}
+	tabs := m.reloadTabs()
 	m.refreshing = &refreshRun{tabs: tabs, cleared: n}
+	m.rereading = &rereading{by: "r", start: m.set.Now(), tabs: tabs}
 	return m.reload()
 }
 
 // endRefresh forgets the reading r started once each tab it reads is
-// done, heavy fields included, as the tabs' spinners are.
+// done, heavy fields included, as the tabs' spinners are, and logs a
+// reading again, by r or the clock, when it ends.
 func (m *Model) endRefresh() {
+	m.endRereading()
 	if m.refreshing == nil {
 		return
 	}
@@ -65,6 +87,29 @@ func (m *Model) endRefresh() {
 		}
 	}
 	m.refreshing = nil
+}
+
+// endRereading logs a reading of the lists again once each tab it reads is
+// done: who started it, what it read and how long it took.
+func (m *Model) endRereading() {
+	r := m.rereading
+	if r == nil {
+		return
+	}
+	prs, failed := 0, 0
+	for _, i := range r.tabs {
+		t := m.tabs[i]
+		if !m.tabDone(t) {
+			return
+		}
+		prs += len(m.allOf(t))
+		if t.failing || t.err != nil {
+			failed++
+		}
+	}
+	m.rereading = nil
+	m.log.Info("refresh", logging.KeyOp, "refresh", "by", r.by, "tabs", len(r.tabs), "prs", prs, "failed", failed,
+		logging.KeyDurationMS, m.set.Now().Sub(r.start).Milliseconds())
 }
 
 // refreshActivity is the reading r started, while it lasts.
