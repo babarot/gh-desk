@@ -213,3 +213,63 @@ func TestTriageIsGivenTheExcludedOnlyWhenShown(t *testing.T) {
 		t.Errorf("the excluded row shown with a is given %v, marked %v; want given, marked", ok, ex)
 	}
 }
+
+// A row an exclusion rule cannot tell yet is shown, marked ? when the
+// shimmer is off and shimmering when it is on; it leaves once the rule
+// can tell, and the cursor stays on its pull request meanwhile.
+func TestPendingRowsAreShownUntilTold(t *testing.T) {
+	f := withCarol()
+	carol := &f.searches["review"][len(f.searches["review"])-1]
+	carol.Labels = []string{"wip"}
+	f.noHeavy = true
+	m := startSource(t, f, excluding(plan.Rule{Name: "wip", Labels: []string{"wip"}}))
+	if !strings.Contains(screen(m), "? api#13") || !strings.Contains(screen(m), "? api#12") {
+		t.Fatalf("the rows the rule cannot tell are not marked:\n%s", screen(m))
+	}
+	cursorTo(t, m, key("acme", "api", 12))
+
+	// The heavy fields arrive: carol's has the label, alice's does not.
+	f.noHeavy = false
+	ids := []string{"1", "5"}
+	got, _ := f.Heavy(t.Context(), ids)
+	_, cmd := m.Update(heavyMsg{job: heavyJob{tab: 0, gen: m.tabs[0].gen, ids: ids}, got: got})
+	run(m, cmd)
+	if strings.Contains(screen(m), "api#13") {
+		t.Errorf("the row the rule now matches is still shown:\n%s", screen(m))
+	}
+	if strings.Contains(screen(m), "? api#12") {
+		t.Errorf("the row the rule now tells is still marked:\n%s", screen(m))
+	}
+	if r, ok := m.current(); !ok || r.kind != rowPR || r.pr.Key != key("acme", "api", 12) {
+		t.Errorf("the cursor left acme/api#12 when the row above it went: on %+v", r)
+	}
+
+	set := excluding(plan.Rule{Name: "wip", Labels: []string{"wip"}})
+	set.Shimmer = true
+	f.noHeavy = true
+	m = startSource(t, f, set)
+	if strings.Contains(screen(m), "? api#12") || !strings.Contains(screen(m), "api#12") {
+		t.Errorf("with the shimmer on, the row is marked ? or not shown:\n%s", screen(m))
+	}
+	if !m.pendingShown() {
+		t.Error("pendingShown is false with rows waiting")
+	}
+}
+
+// The inbox read again keeps the cursor on its pull request when a new
+// notification comes in above it.
+func TestInboxReadAgainKeepsTheCursor(t *testing.T) {
+	f := fixture()
+	m := startSource(t, f, testSettings())
+	press(m, "4")
+	cursorTo(t, m, key("acme", "api", 12))
+	f.notifs = append([]model.Notification{{ThreadID: "n3", Key: key("acme", "api", 30), Title: "Update dependency octo/app to v0.13.2",
+		Reason: "review_requested", Unread: true, Updated: now.Add(-time.Minute)}}, f.notifs...)
+	press(m, "r")
+	if !strings.Contains(screen(m), "api#30") {
+		t.Fatalf("the new notification is not read:\n%s", screen(m))
+	}
+	if r, ok := m.current(); !ok || r.kind != rowPR || r.pr.Key != key("acme", "api", 12) {
+		t.Errorf("the cursor left acme/api#12 when a notification came in above it: on %v", r.pr.Key)
+	}
+}

@@ -391,7 +391,18 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.endRefresh()
 		return m, tea.Batch(cmd, m.spin(), m.statusTick())
 	}
+	// What is read may make rows come and go under an exclusion rule;
+	// the cursor stays on its pull request, so that the next key does not
+	// act on another one it was moved onto unseen.
+	var back func()
+	switch msg.(type) {
+	case heavyMsg, checksMsg, bodiesMsg, notifsMsg, inboxFirstMsg, inboxPRsMsg:
+		back = m.holdCursor(m.tab())
+	}
 	_, cmd := m.update(msg)
+	if back != nil {
+		back()
+	}
 	m.endTabReading()
 	m.endRefresh()
 	return m, tea.Batch(cmd, m.spin(), m.statusTick())

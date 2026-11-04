@@ -54,7 +54,7 @@ name   = "wip"
 labels = ["wip", "do-not-merge"]
 ```
 
-A tab says how many it leaves out under its rows. `a` shows them, dimmed and marked ⊘, and hides them again; the status line and the pane say which rule leaves out the row under the cursor. What is left out is never selected, by a group's header or by `S`, nor put away by `d`. A rule is matched again at every draw, so a pull request leaves or comes back as it changes, and one whose CI, size, review or labels are not read yet stays until they are.
+A tab says how many it leaves out under its rows. `a` shows them, dimmed and marked ⊘, and hides them again; the status line and the pane say which rule leaves out the row under the cursor. What is left out is never selected, by a group's header or by `S`, nor put away by `d`. A rule is matched again at every draw, so a pull request leaves or comes back as it changes. One whose CI, size, review or labels are not read yet stays until they are, its PR column shimmering, or marked `?` with `theme.shimmer = false`, and the cursor stays on its pull request when rows above it leave.
 
 ## Narrowing a tab
 
