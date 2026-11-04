@@ -1,5 +1,15 @@
 # Changelog
 
+## [v0.3.0](https://github.com/babarot/gh-desk/compare/v0.2.0...v0.3.0) - 2026-11-04
+### New Features
+- Show the log while gh-desk runs by @babarot in https://github.com/babarot/gh-desk/pull/33
+- Show each pull request's progress above the log by @babarot in https://github.com/babarot/gh-desk/pull/34
+### Improvements
+- Build the commands with cobra by @babarot in https://github.com/babarot/gh-desk/pull/28
+- Log waits, readings of the lists, and failures shown by @babarot in https://github.com/babarot/gh-desk/pull/30
+- Keep the log in memory as it is written by @babarot in https://github.com/babarot/gh-desk/pull/31
+- Say the runner's steps and a forecast of those ahead by @babarot in https://github.com/babarot/gh-desk/pull/32
+
 ## [v0.2.0](https://github.com/babarot/gh-desk/compare/v0.1.1...v0.2.0) - 2026-11-03
 ### New Features
 - Write the reference pages of the docs from the code by @babarot in https://github.com/babarot/gh-desk/pull/22
