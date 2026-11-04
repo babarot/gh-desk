@@ -235,7 +235,7 @@ func (m *Model) snapshot() (claude.Snapshot, map[model.PRKey]model.PR) {
 			own = r.pr
 		}
 		row := claude.SnapshotRow{PR: p, Why: m.why(r), Selected: m.isSelected(p.Key),
-			Narrowed: t.ruleFilter != nil && !m.passes(own, "", t.ruleFilter, s.Now)}
+			Narrowed: t.ruleFilter != nil && !m.passes(own, "", t.ruleFilter, s.Now), Excluded: r.ex.excluded()}
 		if t.grouped {
 			row.Group = string(plan.GroupOf(p, m.viewer))
 		}

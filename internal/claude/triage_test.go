@@ -85,6 +85,23 @@ func TestTriagePrompt(t *testing.T) {
 	}
 }
 
+// A row the exclusion leaves out, shown since the user asked to see the
+// excluded, is marked, and the prompt says what the mark means.
+func TestTriagePromptExcluded(t *testing.T) {
+	now := time.Date(2026, 10, 30, 12, 0, 0, 0, time.UTC)
+	p := model.PR{Key: model.PRKey{Owner: "acme", Repo: "web", Number: 7}, Title: "Bump vite", Author: "renovate", AuthorIsBot: true,
+		HeadOID: "cccccccdddd", Updated: now.Add(-40 * 24 * time.Hour)}
+	got := TriagePrompt(Snapshot{Now: now, Pane: "off", Tab: "review", Rows: []SnapshotRow{{PR: p, Excluded: true}}}, "go")
+	for _, want := range []string{"updated=40d ago excluded\n", "the rows marked excluded are ones the user's exclusion rules leave out"} {
+		if !strings.Contains(got, want) {
+			t.Errorf("missing %q in\n%s", want, got)
+		}
+	}
+	if got := TriagePrompt(Snapshot{Now: now, Pane: "off", Tab: "review", Rows: []SnapshotRow{{PR: p}}}, "go"); strings.Contains(got, "excluded") {
+		t.Errorf("a prompt with no excluded row tells of them:\n%s", got)
+	}
+}
+
 func TestTriagePromptCutsLongLists(t *testing.T) {
 	var rows []SnapshotRow
 	for i := range maxTriageRows + 5 {

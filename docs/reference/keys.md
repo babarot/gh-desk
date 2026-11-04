@@ -67,7 +67,7 @@ browse = []
 | `o` | `browse` | browser |
 | `d` | `hide` | hide / done |
 | `b` | `fold_bots` | fold bots |
-| `a` | `show_settled` | settled |
+| `a` | `show_excluded` | excluded |
 | `/` | `filter` | filter |
 | `J` | `preview_down` | scroll pane down |
 | `K` | `preview_up` | scroll pane up |

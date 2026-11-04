@@ -449,6 +449,9 @@ func Settings(cfg config.File) tui.Settings {
 	for _, s := range cfg.Select {
 		set.Rules = append(set.Rules, rule(s.Name, s.Conditions))
 	}
+	for _, e := range cfg.Exclude {
+		set.Exclude = append(set.Exclude, rule(e.Name, e.Conditions))
+	}
 	for _, m := range cfg.Merge.Methods {
 		set.Plan.Methods = append(set.Plan.Methods, model.MergeMethod(strings.ToUpper(m)))
 	}

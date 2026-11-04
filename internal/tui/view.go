@@ -343,7 +343,7 @@ var ready = map[keymap.Action]bool{
 	"menu": true, "expand": true, "collapse": true, "approve": true, "comment": true, "review": true, "browse": true, "hide": true,
 	"events": true, "select": true, "select_shown": true, "clear_selection": true, "merge": true, "ready_for_review": true,
 	"include_failing": true, "choose": true, "select_rule": true, "toggle_rule": true, "add_to_selection": true, "filter_by_rule": true,
-	"fold_bots": true, "show_settled": true, "filter": true,
+	"fold_bots": true, "show_excluded": true, "filter": true,
 	"preview_down": true, "preview_up": true, "preview_grow": true, "preview_shrink": true, "next_file": true, "prev_file": true, "preview_tab": true, "fold": true, "preview": true,
 	"confirm": true, "next_kind": true, "post": true, "editor": true, "accept": true, "erase": true, "erase_word": true,
 	"log": true, "log_this_pr": true,
@@ -408,7 +408,11 @@ func (m *Model) hints() string {
 	default:
 		as = []keymap.Action{"menu", "select", "select_rule", "triage", "log"}
 		if m.tab().inbox {
-			as = append(as, "hide", "show_settled")
+			as = append(as, "hide")
+		}
+		// a is told where it has something to show or hide.
+		if t := m.tab(); t.showExcluded || m.excludedOf(t).n > 0 {
+			as = append(as, "show_excluded")
 		}
 		as = append(as, "filter", "help")
 		back = ""

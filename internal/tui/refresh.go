@@ -143,6 +143,26 @@ func (m *Model) reload() tea.Cmd {
 	return tea.Batch(cmds...)
 }
 
+// holdCursor notes the pull request under t's cursor. The func it returns
+// puts the cursor back on that pull request when a row still shows it, and
+// leaves it at its line otherwise, so that rows coming and going above it
+// do not move it onto another pull request.
+func (m *Model) holdCursor(t *tab) func() {
+	rs := m.rows(t)
+	if t.sel < 0 || t.sel >= len(rs) || rs[t.sel].kind != rowPR {
+		return func() {}
+	}
+	k := rs[t.sel].pr.Key
+	return func() {
+		for i, r := range m.rows(t) {
+			if r.kind == rowPR && r.pr.Key == k {
+				t.sel = i
+				return
+			}
+		}
+	}
+}
+
 // restoreCursor puts the cursor back on the pull request it was on before
 // a reading, or on the row it was at when that one is gone.
 func (m *Model) restoreCursor(t *tab) {

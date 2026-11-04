@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 
@@ -74,6 +75,10 @@ type SnapshotRow struct {
 	// Narrowed is set when the rules the tab is narrowed to leave the row
 	// out of the screen.
 	Narrowed bool
+	// Excluded is set when the user's exclusion rules leave the row out,
+	// and the screen shows it dimmed only because the user asked to see
+	// the excluded; rows they leave out unseen are not given at all.
+	Excluded bool
 }
 
 // maxTriageRows is how many rows of the tab go into a triage prompt.
@@ -109,6 +114,9 @@ func TriagePrompt(s Snapshot, request string) string {
 	fmt.Fprintf(&b, "filter: %s\n", filter)
 	if s.RuleFilter != "" {
 		fmt.Fprintf(&b, "narrowed to the rules: %s (the screen does not show the rows marked hidden_by_rules; clearing the filter does not show them)\n", data(s.RuleFilter))
+	}
+	if slices.ContainsFunc(s.Rows, func(r SnapshotRow) bool { return r.Excluded }) {
+		b.WriteString("the rows marked excluded are ones the user's exclusion rules leave out, shown dimmed since the user asked to see them; leave them out unless the request names them\n")
 	}
 	fmt.Fprintf(&b, "cursor: %s\npane: %s\n</list>\n\n", cursor, s.Pane)
 	fmt.Fprintf(&b, "<request>\n%s\n</request>\n", strings.TrimSpace(request))
@@ -155,6 +163,9 @@ func triageRow(r SnapshotRow, now time.Time) string {
 	}
 	if r.Narrowed {
 		f = append(f, "hidden_by_rules")
+	}
+	if r.Excluded {
+		f = append(f, "excluded")
 	}
 	return strings.Join(f, " ")
 }

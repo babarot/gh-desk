@@ -75,10 +75,13 @@ type File struct {
 	Bulk        Bulk
 	// Select are the rules S offers besides "approved by me".
 	Select []Select
-	Claude Claude
-	Theme  Theme
-	Log    Log
-	Cache  Cache
+	// Exclude are the rules that leave pull requests out of every tab, one
+	// of which a pull request must match to be left out.
+	Exclude []Exclude
+	Claude  Claude
+	Theme   Theme
+	Log     Log
+	Cache   Cache
 	// Keys is [keys] as written; the keymap package checks it.
 	Keys Keys
 }
@@ -98,8 +101,8 @@ type Tab struct {
 	Sort string
 	// Limit is how many pull requests, or notifications, to read.
 	Limit int
-	// ShowSettled shows the inbox's notifications whose pull request is
-	// merged or closed from the start.
+	// ShowSettled has the inbox show the notifications whose pull request
+	// is merged or closed, rather than leave them out with the excluded.
 	ShowSettled bool
 }
 
@@ -200,6 +203,13 @@ const MaxWithinDays = 36500
 // Select is a rule S offers: a pull request matches when it meets every
 // condition given.
 type Select struct {
+	Name string
+	Conditions
+}
+
+// Exclude is a rule that leaves the pull requests meeting every condition
+// given out of every tab, until they are shown with a key.
+type Exclude struct {
 	Name string
 	Conditions
 }
@@ -458,6 +468,7 @@ type (
 		Merge       mergeDoc       `toml:"merge"`
 		Bulk        bulkDoc        `toml:"bulk"`
 		Select      []selectDoc    `toml:"select"`
+		Exclude     []excludeDoc   `toml:"exclude"`
 		Claude      Claude         `toml:"claude"`
 		Theme       Theme          `toml:"theme"`
 		Log         Log            `toml:"log"`
@@ -511,13 +522,17 @@ type (
 		AttentionPaths *[]Glob `toml:"attention_paths"`
 	}
 	selectDoc struct {
+		Name     string   `toml:"name"`
+		Packages []string `toml:"packages"`
+		conditionDoc
+	}
+	excludeDoc struct {
 		Name string `toml:"name"`
 		conditionDoc
 	}
 	conditionDoc struct {
 		Repos         []string `toml:"repos"`
 		Authors       []string `toml:"authors"`
-		Packages      []string `toml:"packages"`
 		Title         *Regexp  `toml:"title"`
 		MaxFiles      *int     `toml:"max_files"`
 		MaxLines      *int     `toml:"max_lines"`
@@ -600,6 +615,8 @@ func Parse(path string, src []byte) (File, Problems, error) {
 	cfg.Keys = keysFrom(d.Keys)
 	var sps Problems
 	cfg.Select, sps = selectFrom(d.Select)
+	ps = append(ps, sps...)
+	cfg.Exclude, sps = excludeFrom(d.Exclude)
 	ps = append(ps, sps...)
 
 	ps = append(ps, checkSettings(cfg)...)
@@ -787,7 +804,7 @@ func selectFrom(ds []selectDoc) ([]Select, Problems) {
 			at("name", "%q is used twice (approved by me is taken)", d.Name)
 		}
 		seen[d.Name] = true
-		c := conditionsFrom(d.conditionDoc, d.Name, r)
+		c := conditionsFrom(d.conditionDoc, d.Packages, d.Name, r)
 		// S selects open pull requests that are not drafts, and matches a
 		// pull request alone, without a notification.
 		if c.Draft {
@@ -797,6 +814,30 @@ func selectFrom(ds []selectDoc) ([]Select, Problems) {
 			at("reasons", "is read only by [[exclude]]: S selects pull requests, which have no notification")
 		}
 		out = append(out, Select{Name: d.Name, Conditions: c})
+	}
+	return out, ps
+}
+
+// excludeFrom reads the rules that leave pull requests out and reports
+// what is wrong with them.
+func excludeFrom(ds []excludeDoc) ([]Exclude, Problems) {
+	var ps Problems
+	var out []Exclude
+	seen := map[string]bool{}
+	for i, d := range ds {
+		r := elemReporter{&ps, "exclude", i}
+		switch {
+		case strings.TrimSpace(d.Name) == "":
+			r.at("name", "must not be empty")
+		case seen[d.Name]:
+			r.at("name", "%q is used twice", d.Name)
+		}
+		seen[d.Name] = true
+		// packages is not a key here: the bodies are read only for S, of
+		// the bot pull requests of the tab shown, and leaving pull
+		// requests out by them would read every body in every tab.
+		c := conditionsFrom(d.conditionDoc, nil, d.Name, r)
+		out = append(out, Exclude{Name: d.Name, Conditions: c})
 	}
 	return out, ps
 }
@@ -830,9 +871,9 @@ func (r elemReporter) item(key string, j int, format string, args ...any) {
 
 // conditionsFrom reads the conditions of a rule named name, reporting what
 // is wrong at at.
-func conditionsFrom(d conditionDoc, name string, r elemReporter) Conditions {
+func conditionsFrom(d conditionDoc, packages []string, name string, r elemReporter) Conditions {
 	at := r.at
-	c := Conditions{Repos: d.Repos, Authors: d.Authors, Packages: d.Packages, Labels: d.Labels, Requested: d.Requested, Reasons: d.Reasons,
+	c := Conditions{Repos: d.Repos, Authors: d.Authors, Packages: packages, Labels: d.Labels, Requested: d.Requested, Reasons: d.Reasons,
 		Bot: d.Bot, Mine: d.Mine, Draft: d.Draft, ApprovedByMe: d.ApprovedByMe, ReviewedByMe: d.ReviewedByMe}
 	for _, l := range []struct {
 		key  string
@@ -902,7 +943,7 @@ func conditionsFrom(d conditionDoc, name string, r elemReporter) Conditions {
 		*e.dst = *e.v
 	}
 	// A list left empty sets no condition: the rule reads it as none.
-	if len(d.Repos) == 0 && len(d.Authors) == 0 && len(d.Packages) == 0 && len(d.Labels) == 0 && len(d.Requested) == 0 && len(d.Reasons) == 0 && d.Title == nil &&
+	if len(d.Repos) == 0 && len(d.Authors) == 0 && len(packages) == 0 && len(d.Labels) == 0 && len(d.Requested) == 0 && len(d.Reasons) == 0 && d.Title == nil &&
 		d.MaxFiles == nil && d.MaxLines == nil && d.MinFiles == nil && d.MinLines == nil &&
 		d.UpdatedIn == nil && d.CreatedIn == nil && d.UpdatedBefore == nil && d.CreatedBefore == nil &&
 		!d.Bot && !d.Mine && !d.Draft && d.Checks == nil && d.Decision == nil && !d.ApprovedByMe && !d.ReviewedByMe {

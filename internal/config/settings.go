@@ -441,11 +441,14 @@ var elems = map[string][]elem{
 		{Key: "folded", Kind: listKind{Values: GroupNames}, Doc: "The groups folded at start, among groups."},
 		{Key: "sort", Kind: enumKind{TabSorts}, Doc: `"updated" (default) or "drafts_last".`},
 		{Key: "limit", Kind: intKind{Min: 1}, Doc: "How many pull requests, or notifications, to read (at most 1000; 100 by default)."},
-		{Key: "show_settled", Kind: boolKind{}, Doc: "The inbox shows notifications whose pull request is merged or closed from the start."},
+		{Key: "show_settled", Kind: boolKind{}, Doc: "The inbox shows the notifications whose pull request is merged or closed, rather than leave them out with the excluded until a shows them."},
 	},
 	"select": append([]elem{
 		{Key: "name", Kind: stringKind{NonEmpty: true}, Doc: "The rule's name, as S lists it."},
 	}, conditionElems...),
+	"exclude": append([]elem{
+		{Key: "name", Kind: stringKind{NonEmpty: true}, Doc: "The rule's name, as a row it leaves out says."},
+	}, slices.DeleteFunc(slices.Clone(conditionElems), func(e elem) bool { return e.Key == "packages" })...),
 }
 
 // conditionElems are the conditions of a rule, which [[select]] takes.
@@ -571,6 +574,20 @@ title = "(?i)lock file maintenance"
 # authors = ["renovate"]
 # packages = ["actions/checkout", "songmu/tagpr"]
 # checks = "passing"
+
+# Rules that leave pull requests out of every tab, until a shows them. They
+# take the keys of [[select]] but packages; a pull request is left out when
+# it meets every key of one of them. The inbox leaves out its notifications
+# on merged or closed pull requests too, unless show_settled = true.
+#
+# [[exclude]]
+# name = "old upgrades"
+# title = "^Upgrade"
+# updated_before_days = 30
+#
+# [[exclude]]
+# name = "wip"
+# labels = ["wip", "do-not-merge"]
 `
 
 const keysHead = `[keys]
@@ -723,6 +740,12 @@ func Show(f File, onlyDiff bool) string {
 		b.WriteString("[[select]]\n")
 		fmt.Fprintf(&b, "name = %q\n", s.Name)
 		writeConditions(&b, s.Conditions)
+		b.WriteString("\n")
+	}
+	for _, e := range f.Exclude {
+		b.WriteString("[[exclude]]\n")
+		fmt.Fprintf(&b, "name = %q\n", e.Name)
+		writeConditions(&b, e.Conditions)
 		b.WriteString("\n")
 	}
 	for _, t := range tables {
