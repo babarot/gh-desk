@@ -174,6 +174,44 @@ type Event struct {
 	// Locked is set on a skip because the merge would wait while another
 	// gh-desk holds the record of pending merges.
 	Locked bool
+	// Step is the step a Running event starts or goes on with; empty
+	// for one that is no step of its own, such as reading it again.
+	Step Step
+	// Checks names the checks a wait is for, on a wait's events.
+	Checks []string
+	// Forecast is set on an event that only says the steps still ahead,
+	// in Plan; it carries no Text and changes nothing else.
+	Forecast bool
+	// Plan is the steps still ahead, on a Forecast event. It is a guess
+	// made at each decision and replaced by the next one: a decision is
+	// made again after marking ready and approving, and at each read
+	// while waiting.
+	Plan []Step
+}
+
+// Step is a step a job takes on a pull request.
+type Step string
+
+const (
+	StepReady   Step = "ready"
+	StepApprove Step = "approve"
+	// StepReview sends a review other than an approval.
+	StepReview Step = "review"
+	StepUpdate Step = "update-branch"
+	// StepWait is a wait not yet begun, in a Plan: what it waits on is
+	// known once it begins.
+	StepWait         Step = "wait"
+	StepWaitChecks   Step = "wait-checks"
+	StepWaitApproval Step = "wait-approval-checks"
+	// StepWaitBlocked waits on a rule other than checks.
+	StepWaitBlocked Step = "wait-blocked"
+	StepMerge       Step = "merge"
+	StepAutoMerge   Step = "auto-merge"
+)
+
+// Waits reports whether s is a wait.
+func (s Step) Waits() bool {
+	return s == StepWait || s == StepWaitChecks || s == StepWaitApproval || s == StepWaitBlocked
 }
 
 // Runner runs batches.
@@ -368,6 +406,9 @@ type job struct {
 	// stands (a read or a write failed): its record stays, so the next
 	// launch reads it again and goes on.
 	keep bool
+	// planned is the last forecast sent, so the same is not sent again.
+	planned  []Step
+	sentPlan bool
 }
 
 func (j *job) say(res Result, text string) {
@@ -382,6 +423,43 @@ func (j *job) say(res Result, text string) {
 	if res != AutoMergeOn && !j.keep && j.ctx.Err() == nil {
 		j.forget()
 	}
+}
+
+// step says the job starts or goes on with a step.
+func (j *job) step(s Step, text string, checks ...string) {
+	j.emit(Event{Key: j.it.PR.Key, Result: Running, Text: text, Approved: j.approved, Readied: j.readied, Step: s, Checks: checks})
+}
+
+// forecast says the steps still ahead, when they differ from the last
+// said.
+func (j *job) forecast(steps []Step) {
+	if j.sentPlan && slices.Equal(steps, j.planned) {
+		return
+	}
+	j.planned, j.sentPlan = steps, true
+	j.emit(Event{Key: j.it.PR.Key, Result: Running, Forecast: true, Plan: slices.Clone(steps)})
+}
+
+// ahead is what a decision leaves to do, from the step it decides on.
+func ahead(d plan.Decision) []Step {
+	var out []Step
+	if d.Ready {
+		out = append(out, StepReady)
+	}
+	if d.Approve {
+		out = append(out, StepApprove)
+	}
+	switch d.Step {
+	case plan.StepMerge:
+		out = append(out, StepMerge)
+	case plan.StepAutoMerge:
+		out = append(out, StepAutoMerge)
+	case plan.StepUpdate:
+		out = append(out, StepUpdate, StepWait, StepMerge)
+	case plan.StepWait:
+		out = append(out, StepWait, StepMerge)
+	}
+	return out
 }
 
 // locked skips a merge that would wait without the record of pending
@@ -517,13 +595,15 @@ func (j *job) review(rv ReviewText) {
 		return
 	}
 	if approve {
+		j.forecast([]Step{StepApprove})
 		if j.sendApproval(rv.Body) {
 			j.say(Approved, "approved")
 		}
 		return
 	}
 	word := reviewWord[rv.Event]
-	j.say(Running, "sending the "+word)
+	j.forecast([]Step{StepReview})
+	j.step(StepReview, "sending the "+word)
 	pr := j.it.PR
 	pr.HeadOID = j.head
 	if err := j.r.gh.Review(j.ctx, pr, rv.Event, rv.Body); err != nil {
@@ -545,7 +625,8 @@ func (j *job) markReady() {
 		j.say(Skipped, d.Reason)
 		return
 	}
-	j.say(Running, "marking ready")
+	j.forecast([]Step{StepReady})
+	j.step(StepReady, "marking ready")
 	if err := j.r.gh.MarkReady(j.ctx, j.it.PR.Key, j.it.PR.ID, j.head); err != nil {
 		j.say(Failed, "ready for review failed: "+short(err))
 		return
@@ -555,7 +636,7 @@ func (j *job) markReady() {
 
 // sendApproval approves with body, which may be empty.
 func (j *job) sendApproval(body string) bool {
-	j.say(Running, "approving")
+	j.step(StepApprove, "approving")
 	// Recorded as on its way first: should gh-desk stop before the
 	// result is recorded, the next launch does not know whether the
 	// approval reached GitHub, and stops unless it finds it there.
@@ -626,6 +707,7 @@ func (j *job) merge() {
 		j.locked("locked by another gh-desk")
 		return
 	}
+	j.forecast(ahead(d))
 	// The user's approval the merge starts with is recorded too, so the
 	// next launch stops if it was dismissed instead of approving again.
 	j.pend.Approved = j.pend.Approved || approvedBy(mi, j.r.opt.Viewer)
@@ -658,6 +740,7 @@ func (j *job) merge() {
 			j.locked("approved or ready; locked by another gh-desk")
 			return
 		}
+		j.forecast(ahead(d))
 	}
 	switch d.Step {
 	case plan.StepMerge:
@@ -689,7 +772,7 @@ func (j *job) redrafted(d plan.Decision) bool {
 // readyToMerge marks the draft ready for review, on the head the user saw,
 // as the first step of its merge.
 func (j *job) readyToMerge() bool {
-	j.say(Running, "marking ready")
+	j.step(StepReady, "marking ready")
 	// Recorded first, as an approval is: should gh-desk stop before the
 	// result is known, a draft found at the next launch stops the merge.
 	j.pend.Readied = true
@@ -726,7 +809,7 @@ func (j *job) mergeDecided(d plan.Decision) {
 }
 
 func (j *job) mergeNow(method model.MergeMethod) bool {
-	j.say(Running, "merging")
+	j.step(StepMerge, "merging")
 	err := j.r.gh.Merge(j.ctx, j.it.PR.Key, j.it.PR.ID, j.head, method)
 	if err == nil {
 		j.emit(Event{Key: j.it.PR.Key, Result: Merged, Text: "merged", Approved: j.approved, Readied: j.readied, Method: method})
@@ -749,7 +832,7 @@ func (j *job) mergeNow(method model.MergeMethod) bool {
 }
 
 func (j *job) autoMerge(method model.MergeMethod) {
-	j.say(Running, "turning on auto-merge")
+	j.step(StepAutoMerge, "turning on auto-merge")
 	err := j.r.gh.EnableAutoMerge(j.ctx, j.it.PR.Key, j.it.PR.ID, j.head, method)
 	if errors.Is(err, ErrCleanStatus) {
 		j.mergeNow(method)
@@ -829,7 +912,7 @@ func (j *job) updateBranch(base string) bool {
 		j.say(Stopped, "could not read the base branch")
 		return false
 	}
-	j.say(Running, "updating the branch")
+	j.step(StepUpdate, "updating the branch")
 	if err := j.r.gh.UpdateBranch(j.ctx, j.it.PR.Key, j.it.PR.ID, j.head); err != nil {
 		j.unsure("update failed: " + short(err))
 		return false
@@ -892,6 +975,7 @@ func (j *job) wait() {
 		switch d.Step {
 		case plan.StepMerge:
 			end("ready")
+			j.forecast([]Step{StepMerge})
 			j.mergeDecided(d)
 			return
 		case plan.StepSkip:
@@ -917,7 +1001,8 @@ func (j *job) wait() {
 				return
 			}
 			waitOn("checks")
-			j.say(Running, "waiting for checks")
+			j.step(StepWaitChecks, "waiting for checks", plan.RunningChecks(mi, j.r.opt.Settings.ApprovalChecks, false)...)
+			j.forecast([]Step{StepMerge})
 		default:
 			j.pend.BlockedWaited += dt
 			j.save()
@@ -926,12 +1011,15 @@ func (j *job) wait() {
 				j.say(Stopped, "blocked by another rule")
 				return
 			}
-			what, text := "blocked", "waiting"
+			what, text, s := "blocked", "waiting", StepWaitBlocked
+			var checks []string
 			if plan.AwaitingApproval(mi.Checks, j.r.opt.Settings.ApprovalChecks) {
-				what, text = "approval-checks", "waiting for approval checks"
+				what, text, s = "approval-checks", "waiting for approval checks", StepWaitApproval
+				checks = plan.RunningChecks(mi, j.r.opt.Settings.ApprovalChecks, true)
 			}
 			waitOn(what)
-			j.say(Running, text)
+			j.step(s, text, checks...)
+			j.forecast([]Step{StepMerge})
 		}
 		every := j.r.opt.PollFast
 		if j.pend.ChecksWaited+j.pend.BlockedWaited > time.Minute {
