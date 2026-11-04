@@ -319,6 +319,11 @@ func (m *Model) postNext(p *posting) tea.Cmd {
 // writes it again for them.
 func (m *Model) posted(msg postedMsg) tea.Cmd {
 	p := msg.p
+	// A comment GitHub took is shown in the pane at once (ADR-067).
+	var shown tea.Cmd
+	if msg.err == nil {
+		shown = m.addSentComment(p.prs[p.next].Key, p.body)
+	}
 	if msg.err != nil {
 		p.failed = append(p.failed, p.prs[p.next])
 		if p.err == nil {
@@ -329,20 +334,20 @@ func (m *Model) posted(msg postedMsg) tea.Cmd {
 	}
 	p.next++
 	if p.next < len(p.prs) {
-		return m.postNext(p)
+		return tea.Batch(shown, m.postNext(p))
 	}
 	m.posting, m.sending = nil, ""
 	if len(p.failed) == 0 {
 		m.say(fmt.Sprintf("✓ comment sent to %s", prsWord(p.prs)))
-		return nil
+		return shown
 	}
 	clear(m.selected)
 	for _, f := range p.failed {
 		m.selected[f.Key] = byHand
 	}
 	m.unsent = p.body
-	return m.failNoted(fmt.Sprintf("comment failed on %d of %d (%s: %v) · they are selected; %s to send it again",
-		len(p.failed), len(p.prs), p.failed[0].Key, p.err, m.firstKey("comment")), p.failed[0].Key)
+	return tea.Batch(shown, m.failNoted(fmt.Sprintf("comment failed on %d of %d (%s: %v) · they are selected; %s to send it again",
+		len(p.failed), len(p.prs), p.failed[0].Key, p.err, m.firstKey("comment")), p.failed[0].Key))
 }
 
 // postingActivity is a comment on its way.
