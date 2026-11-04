@@ -81,16 +81,28 @@ title = "(?i)lock file maintenance"
 | Key | Type | |
 |---|---|---|
 | `name` | string | The rule's name, as S lists it. |
+| `repos` | list of strings | owner/repo globs the repository must match one of; * matches any part of the owner or the name. |
 | `authors` | list of strings | The logins the author must be one of; bots without app/. |
 | `packages` | list of strings | The dependencies a renovate or dependabot pull request updates, read from its body; every one it updates must be listed. |
 | `title` | string | A regular expression the title must match. |
 | `max_files` | integer, 1 or more | The most files it may change. |
 | `max_lines` | integer, 1 or more | The most lines it may add and delete together: the sum of the two numbers SIZE shows. |
+| `min_files` | integer, 1 or more | The least files it may change. |
+| `min_lines` | integer, 1 or more | The least lines it may add and delete together. |
 | `updated_within_days` | integer, 1 to 36500 | The most days, of 24 hours, since it was last updated: a label or a bot's comment updates it too. An old pull request updated lately matches. |
 | `created_within_days` | integer, 1 to 36500 | The most days, of 24 hours, since it was created. |
+| `updated_before_days` | integer, 1 to 36500 | The least days, of 24 hours, since it was last updated, as AGE counts them in a search tab. |
+| `created_before_days` | integer, 1 to 36500 | The least days, of 24 hours, since it was created. |
 | `bot` | boolean | The author must be a bot. |
-| `checks` | one of `passing` | "passing": passed, or only checks.approval pending. |
+| `mine` | boolean | It must be your own pull request. |
+| `draft` | boolean | It must be a draft; S never selects one, so [[select]] does not take it. |
+| `checks` | one of `passing`, `failing`, `pending` | "passing": passed, or only checks.approval pending; "failing": failed; "pending": still running. |
+| `decision` | one of `approved`, `changes_requested`, `review_required` | The review decision REVIEW shows. |
+| `labels` | list of strings | Labels one of which it must have. |
 | `approved_by_me` | boolean | Your latest review must approve it; a person's pull request matches too, unlike the built-in "approved by me". |
+| `reviewed_by_me` | boolean | You must have reviewed it, whatever the review said. |
+| `requested` | list of strings | Whom a review must be asked of, one of them: "me", or a team as "@slug". |
+| `reasons` | list of `approval_requested`, `assign`, `author`, `ci_activity`, `comment`, `invitation`, `manual`, `member_feature_requested`, `mention`, `review_requested`, `security_advisory_credit`, `security_alert`, `state_change`, `subscribed`, `team_mention` | Reasons of a notification, one of which the row's must have; S has no notification, so [[select]] does not take it. |
 
 ## [list]
 

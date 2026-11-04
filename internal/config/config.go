@@ -17,6 +17,7 @@ import (
 	"fmt"
 	"io/fs"
 	"os"
+	"path"
 	"path/filepath"
 	"reflect"
 	"regexp"
@@ -191,15 +192,23 @@ type Bulk struct {
 	AttentionPaths []Glob
 }
 
-// MaxWithinDays is the most days updated_within_days and
-// created_within_days take: a hundred years, past any pull request, and
-// short of what a time.Duration holds.
+// MaxWithinDays is the most days the conditions on days take
+// (updated_within_days and the like): a hundred years, past any pull
+// request, and short of what a time.Duration holds.
 const MaxWithinDays = 36500
 
 // Select is a rule S offers: a pull request matches when it meets every
-// key given.
+// condition given.
 type Select struct {
 	Name string
+	Conditions
+}
+
+// Conditions are the conditions of a rule, every one of which must hold.
+// A zero field sets no condition.
+type Conditions struct {
+	// Repos are owner/repo globs the repository must match one of.
+	Repos []string
 	// Authors are the logins the author must be one of; bots without app/.
 	Authors []string
 	// Packages are the dependencies a bot's pull request may update, read
@@ -207,22 +216,53 @@ type Select struct {
 	Packages []string
 	// Title is a regular expression the title must match; nil for none.
 	Title *regexp.Regexp
-	// MaxFiles is the most files it may change; 0 for no limit.
+	// MaxFiles and MaxLines are the most files it may change and lines it
+	// may add and delete together; MinFiles and MinLines the least.
 	MaxFiles int
-	// MaxLines is the most lines it may add and delete together; 0 for no
-	// limit.
 	MaxLines int
+	MinFiles int
+	MinLines int
 	// UpdatedWithinDays and CreatedWithinDays are the most days since it
-	// was last updated, or created; 0 for no limit.
+	// was last updated, or created; UpdatedBeforeDays and CreatedBeforeDays
+	// the least.
 	UpdatedWithinDays int
 	CreatedWithinDays int
+	UpdatedBeforeDays int
+	CreatedBeforeDays int
 	Bot               bool
-	// Checks is "passing" to require passing checks, or "".
+	// Mine requires your own pull request; Draft a draft.
+	Mine  bool
+	Draft bool
+	// Checks is "passing", "failing" or "pending", or "".
 	Checks string
+	// Decision is "approved", "changes_requested" or "review_required",
+	// or "".
+	Decision string
+	// Labels are labels one of which it must have.
+	Labels []string
 	// ApprovedByMe requires the viewer's latest review to approve it, a
-	// person's pull request or a bot's.
+	// person's pull request or a bot's; ReviewedByMe a latest review of
+	// any state.
 	ApprovedByMe bool
+	ReviewedByMe bool
+	// Requested are whom a review must be asked of: "me", or a team as
+	// "@slug".
+	Requested []string
+	// Reasons are reasons of a notification, one of which the row's must
+	// have.
+	Reasons []string
 }
+
+// CheckStates are the values of checks.
+var CheckStates = []string{"passing", "failing", "pending"}
+
+// Decisions are the values of decision.
+var Decisions = []string{"approved", "changes_requested", "review_required"}
+
+// Reasons are the reasons GitHub gives a notification, the values of
+// reasons.
+var Reasons = []string{"approval_requested", "assign", "author", "ci_activity", "comment", "invitation", "manual", "member_feature_requested",
+	"mention", "review_requested", "security_advisory_credit", "security_alert", "state_change", "subscribed", "team_mention"}
 
 // Claude configures asking Claude Code.
 type Claude struct {
@@ -471,17 +511,32 @@ type (
 		AttentionPaths *[]Glob `toml:"attention_paths"`
 	}
 	selectDoc struct {
-		Name         string   `toml:"name"`
-		Authors      []string `toml:"authors"`
-		Packages     []string `toml:"packages"`
-		Title        *Regexp  `toml:"title"`
-		MaxFiles     *int     `toml:"max_files"`
-		MaxLines     *int     `toml:"max_lines"`
-		UpdatedIn    *int     `toml:"updated_within_days"`
-		CreatedIn    *int     `toml:"created_within_days"`
-		Bot          bool     `toml:"bot"`
-		Checks       *string  `toml:"checks"`
-		ApprovedByMe bool     `toml:"approved_by_me"`
+		Name string `toml:"name"`
+		conditionDoc
+	}
+	conditionDoc struct {
+		Repos         []string `toml:"repos"`
+		Authors       []string `toml:"authors"`
+		Packages      []string `toml:"packages"`
+		Title         *Regexp  `toml:"title"`
+		MaxFiles      *int     `toml:"max_files"`
+		MaxLines      *int     `toml:"max_lines"`
+		MinFiles      *int     `toml:"min_files"`
+		MinLines      *int     `toml:"min_lines"`
+		UpdatedIn     *int     `toml:"updated_within_days"`
+		CreatedIn     *int     `toml:"created_within_days"`
+		UpdatedBefore *int     `toml:"updated_before_days"`
+		CreatedBefore *int     `toml:"created_before_days"`
+		Bot           bool     `toml:"bot"`
+		Mine          bool     `toml:"mine"`
+		Draft         bool     `toml:"draft"`
+		Checks        *string  `toml:"checks"`
+		Decision      *string  `toml:"decision"`
+		Labels        []string `toml:"labels"`
+		ApprovedByMe  bool     `toml:"approved_by_me"`
+		ReviewedByMe  bool     `toml:"reviewed_by_me"`
+		Requested     []string `toml:"requested"`
+		Reasons       []string `toml:"reasons"`
 	}
 )
 
@@ -720,70 +775,140 @@ func tabsFrom(ds []tabDoc) ([]Tab, Problems) {
 // them.
 func selectFrom(ds []selectDoc) ([]Select, Problems) {
 	var ps Problems
-	at := func(i int, key, format string, args ...any) {
-		k := []string{"select"}
-		if key != "" {
-			k = append(k, key)
-		}
-		ps = append(ps, Problem{Key: k, Element: i + 1, Index: -1, Message: fmt.Sprintf("select[%d]", i) + dotted(key) + " " + fmt.Sprintf(format, args...)})
-	}
 	var out []Select
 	seen := map[string]bool{"approved by me": true}
 	for i, d := range ds {
-		s := Select{Name: d.Name, Authors: d.Authors, Packages: d.Packages, Bot: d.Bot, ApprovedByMe: d.ApprovedByMe}
-		if d.Authors != nil && len(d.Authors) == 0 {
-			at(i, "authors", "must name at least one login")
-		}
+		r := elemReporter{&ps, "select", i}
+		at := r.at
 		switch {
-		case strings.TrimSpace(s.Name) == "":
-			at(i, "name", "must not be empty")
-		case seen[s.Name]:
-			at(i, "name", "%q is used twice (approved by me is taken)", s.Name)
+		case strings.TrimSpace(d.Name) == "":
+			at("name", "must not be empty")
+		case seen[d.Name]:
+			at("name", "%q is used twice (approved by me is taken)", d.Name)
 		}
-		seen[s.Name] = true
-		if d.Title != nil {
-			if d.Title.err != nil {
-				at(i, "title", "is not a regular expression: %v", d.Title.err)
-			}
-			s.Title = d.Title.Re
+		seen[d.Name] = true
+		c := conditionsFrom(d.conditionDoc, d.Name, r)
+		// S selects open pull requests that are not drafts, and matches a
+		// pull request alone, without a notification.
+		if c.Draft {
+			at("draft", "S never selects a draft, so the rule would select nothing")
 		}
-		if d.MaxFiles != nil {
-			if *d.MaxFiles < 1 {
-				at(i, "max_files", "must be 1 or more, got %d", *d.MaxFiles)
-			}
-			s.MaxFiles = *d.MaxFiles
+		if d.Reasons != nil {
+			at("reasons", "is read only by [[exclude]]: S selects pull requests, which have no notification")
 		}
-		if d.MaxLines != nil {
-			if *d.MaxLines < 1 {
-				at(i, "max_lines", "must be 1 or more, got %d", *d.MaxLines)
-			}
-			s.MaxLines = *d.MaxLines
-		}
-		for _, w := range []struct {
-			key string
-			n   *int
-			dst *int
-		}{{"updated_within_days", d.UpdatedIn, &s.UpdatedWithinDays}, {"created_within_days", d.CreatedIn, &s.CreatedWithinDays}} {
-			if w.n == nil {
-				continue
-			}
-			if *w.n < 1 || *w.n > MaxWithinDays {
-				at(i, w.key, "must be between 1 and %d, got %d", MaxWithinDays, *w.n)
-			}
-			*w.dst = *w.n
-		}
-		if d.Checks != nil {
-			if *d.Checks != "passing" {
-				at(i, "checks", `must be "passing", got %q`, *d.Checks)
-			}
-			s.Checks = *d.Checks
-		}
-		if d.Authors == nil && len(s.Packages) == 0 && d.Title == nil && d.MaxFiles == nil && d.MaxLines == nil && d.UpdatedIn == nil && d.CreatedIn == nil && !s.Bot && d.Checks == nil && !s.ApprovedByMe {
-			at(i, "", "%q matches every pull request; give it at least one condition", s.Name)
-		}
-		out = append(out, s)
+		out = append(out, Select{Name: d.Name, Conditions: c})
 	}
 	return out, ps
+}
+
+// elemReporter reports problems in the i-th element of the array of
+// tables table.
+type elemReporter struct {
+	ps    *Problems
+	table string
+	i     int
+}
+
+// at reports a problem at key, or at the element when key is "".
+func (r elemReporter) at(key, format string, args ...any) {
+	r.item(key, -1, format, args...)
+}
+
+// item reports a problem at the j-th value of the list at key, or at the
+// whole value when j is -1.
+func (r elemReporter) item(key string, j int, format string, args ...any) {
+	k := []string{r.table}
+	if key != "" {
+		k = append(k, key)
+	}
+	where := fmt.Sprintf("%s[%d]", r.table, r.i) + dotted(key)
+	if j >= 0 {
+		where += fmt.Sprintf("[%d]", j)
+	}
+	*r.ps = append(*r.ps, Problem{Key: k, Element: r.i + 1, Index: j, Message: where + " " + fmt.Sprintf(format, args...)})
+}
+
+// conditionsFrom reads the conditions of a rule named name, reporting what
+// is wrong at at.
+func conditionsFrom(d conditionDoc, name string, r elemReporter) Conditions {
+	at := r.at
+	c := Conditions{Repos: d.Repos, Authors: d.Authors, Packages: d.Packages, Labels: d.Labels, Requested: d.Requested, Reasons: d.Reasons,
+		Bot: d.Bot, Mine: d.Mine, Draft: d.Draft, ApprovedByMe: d.ApprovedByMe, ReviewedByMe: d.ReviewedByMe}
+	for _, l := range []struct {
+		key  string
+		v    []string
+		noun string
+	}{{"repos", d.Repos, "repository"}, {"authors", d.Authors, "login"}, {"labels", d.Labels, "label"}, {"requested", d.Requested, "reviewer"}, {"reasons", d.Reasons, "reason"}} {
+		if l.v != nil && len(l.v) == 0 {
+			at(l.key, "must name at least one %s", l.noun)
+		}
+	}
+	for j, g := range d.Repos {
+		owner, repo, ok := strings.Cut(g, "/")
+		if _, err := path.Match(g, ""); err != nil || !ok || owner == "" || repo == "" || strings.Contains(repo, "/") {
+			r.item("repos", j, "%q must be owner/repo, where * matches any part of either", g)
+		}
+	}
+	for j, who := range d.Requested {
+		if who != "me" && (!strings.HasPrefix(who, "@") || len(who) == 1) {
+			r.item("requested", j, `%q must be "me" or a team as "@slug"`, who)
+		}
+	}
+	for j, reason := range d.Reasons {
+		if !slices.Contains(Reasons, reason) {
+			r.item("reasons", j, "%q is not a reason GitHub gives: %s", reason, strings.Join(Reasons, ", "))
+		}
+	}
+	if d.Title != nil {
+		if d.Title.err != nil {
+			at("title", "is not a regular expression: %v", d.Title.err)
+		}
+		c.Title = d.Title.Re
+	}
+	for _, n := range []struct {
+		key      string
+		v        *int
+		dst      *int
+		min, max int
+	}{
+		{"max_files", d.MaxFiles, &c.MaxFiles, 1, 0}, {"max_lines", d.MaxLines, &c.MaxLines, 1, 0},
+		{"min_files", d.MinFiles, &c.MinFiles, 1, 0}, {"min_lines", d.MinLines, &c.MinLines, 1, 0},
+		{"updated_within_days", d.UpdatedIn, &c.UpdatedWithinDays, 1, MaxWithinDays}, {"created_within_days", d.CreatedIn, &c.CreatedWithinDays, 1, MaxWithinDays},
+		{"updated_before_days", d.UpdatedBefore, &c.UpdatedBeforeDays, 1, MaxWithinDays}, {"created_before_days", d.CreatedBefore, &c.CreatedBeforeDays, 1, MaxWithinDays},
+	} {
+		if n.v == nil {
+			continue
+		}
+		switch {
+		case n.max > 0 && (*n.v < n.min || *n.v > n.max):
+			at(n.key, "must be between %d and %d, got %d", n.min, n.max, *n.v)
+		case *n.v < n.min:
+			at(n.key, "must be %d or more, got %d", n.min, *n.v)
+		}
+		*n.dst = *n.v
+	}
+	for _, e := range []struct {
+		key    string
+		v      *string
+		dst    *string
+		values []string
+	}{{"checks", d.Checks, &c.Checks, CheckStates}, {"decision", d.Decision, &c.Decision, Decisions}} {
+		if e.v == nil {
+			continue
+		}
+		if !slices.Contains(e.values, *e.v) {
+			at(e.key, "must be one of %s, got %q", quoted(e.values), *e.v)
+		}
+		*e.dst = *e.v
+	}
+	// A list left empty sets no condition: the rule reads it as none.
+	if len(d.Repos) == 0 && len(d.Authors) == 0 && len(d.Packages) == 0 && len(d.Labels) == 0 && len(d.Requested) == 0 && len(d.Reasons) == 0 && d.Title == nil &&
+		d.MaxFiles == nil && d.MaxLines == nil && d.MinFiles == nil && d.MinLines == nil &&
+		d.UpdatedIn == nil && d.CreatedIn == nil && d.UpdatedBefore == nil && d.CreatedBefore == nil &&
+		!d.Bot && !d.Mine && !d.Draft && d.Checks == nil && d.Decision == nil && !d.ApprovedByMe && !d.ReviewedByMe {
+		at("", "%q matches every pull request; give it at least one condition", name)
+	}
+	return c
 }
 
 // dotted is ".key", or "" for no key.
@@ -916,8 +1041,18 @@ func settingsIn(table []string) []string {
 			return nil
 		}
 	}
+	return tagsOf(t)
+}
+
+// tagsOf are the keys of the struct type t, with those of the structs it
+// embeds, which the decoder reads as its own.
+func tagsOf(t reflect.Type) []string {
 	var names []string
 	for f := range t.Fields() {
+		if f.Anonymous && f.Type.Kind() == reflect.Struct {
+			names = append(names, tagsOf(f.Type)...)
+			continue
+		}
 		if tag, _, _ := strings.Cut(f.Tag.Get("toml"), ","); tag != "" && tag != "-" {
 			names = append(names, tag)
 		}

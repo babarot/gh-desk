@@ -443,19 +443,35 @@ var elems = map[string][]elem{
 		{Key: "limit", Kind: intKind{Min: 1}, Doc: "How many pull requests, or notifications, to read (at most 1000; 100 by default)."},
 		{Key: "show_settled", Kind: boolKind{}, Doc: "The inbox shows notifications whose pull request is merged or closed from the start."},
 	},
-	"select": {
+	"select": append([]elem{
 		{Key: "name", Kind: stringKind{NonEmpty: true}, Doc: "The rule's name, as S lists it."},
-		{Key: "authors", Kind: listKind{NonEmpty: true}, Doc: "The logins the author must be one of; bots without app/."},
-		{Key: "packages", Kind: listKind{}, Doc: "The dependencies a renovate or dependabot pull request updates, read from its body; every one it updates must be listed."},
-		{Key: "title", Kind: stringKind{}, Doc: "A regular expression the title must match."},
-		{Key: "max_files", Kind: intKind{Min: 1}, Doc: "The most files it may change."},
-		{Key: "max_lines", Kind: intKind{Min: 1}, Doc: "The most lines it may add and delete together: the sum of the two numbers SIZE shows."},
-		{Key: "updated_within_days", Kind: intKind{Min: 1, Max: MaxWithinDays}, Doc: "The most days, of 24 hours, since it was last updated: a label or a bot's comment updates it too. An old pull request updated lately matches."},
-		{Key: "created_within_days", Kind: intKind{Min: 1, Max: MaxWithinDays}, Doc: "The most days, of 24 hours, since it was created."},
-		{Key: "bot", Kind: boolKind{}, Doc: "The author must be a bot."},
-		{Key: "checks", Kind: enumKind{[]string{"passing"}}, Doc: `"passing": passed, or only checks.approval pending.`},
-		{Key: "approved_by_me", Kind: boolKind{}, Doc: "Your latest review must approve it; a person's pull request matches too, unlike the built-in \"approved by me\"."},
-	},
+	}, conditionElems...),
+}
+
+// conditionElems are the conditions of a rule, which [[select]] takes.
+var conditionElems = []elem{
+	{Key: "repos", Kind: listKind{NonEmpty: true}, Doc: "owner/repo globs the repository must match one of; * matches any part of the owner or the name."},
+	{Key: "authors", Kind: listKind{NonEmpty: true}, Doc: "The logins the author must be one of; bots without app/."},
+	{Key: "packages", Kind: listKind{}, Doc: "The dependencies a renovate or dependabot pull request updates, read from its body; every one it updates must be listed."},
+	{Key: "title", Kind: stringKind{}, Doc: "A regular expression the title must match."},
+	{Key: "max_files", Kind: intKind{Min: 1}, Doc: "The most files it may change."},
+	{Key: "max_lines", Kind: intKind{Min: 1}, Doc: "The most lines it may add and delete together: the sum of the two numbers SIZE shows."},
+	{Key: "min_files", Kind: intKind{Min: 1}, Doc: "The least files it may change."},
+	{Key: "min_lines", Kind: intKind{Min: 1}, Doc: "The least lines it may add and delete together."},
+	{Key: "updated_within_days", Kind: intKind{Min: 1, Max: MaxWithinDays}, Doc: "The most days, of 24 hours, since it was last updated: a label or a bot's comment updates it too. An old pull request updated lately matches."},
+	{Key: "created_within_days", Kind: intKind{Min: 1, Max: MaxWithinDays}, Doc: "The most days, of 24 hours, since it was created."},
+	{Key: "updated_before_days", Kind: intKind{Min: 1, Max: MaxWithinDays}, Doc: "The least days, of 24 hours, since it was last updated, as AGE counts them in a search tab."},
+	{Key: "created_before_days", Kind: intKind{Min: 1, Max: MaxWithinDays}, Doc: "The least days, of 24 hours, since it was created."},
+	{Key: "bot", Kind: boolKind{}, Doc: "The author must be a bot."},
+	{Key: "mine", Kind: boolKind{}, Doc: "It must be your own pull request."},
+	{Key: "draft", Kind: boolKind{}, Doc: "It must be a draft; S never selects one, so [[select]] does not take it."},
+	{Key: "checks", Kind: enumKind{CheckStates}, Doc: `"passing": passed, or only checks.approval pending; "failing": failed; "pending": still running.`},
+	{Key: "decision", Kind: enumKind{Decisions}, Doc: "The review decision REVIEW shows."},
+	{Key: "labels", Kind: listKind{NonEmpty: true}, Doc: "Labels one of which it must have."},
+	{Key: "approved_by_me", Kind: boolKind{}, Doc: "Your latest review must approve it; a person's pull request matches too, unlike the built-in \"approved by me\"."},
+	{Key: "reviewed_by_me", Kind: boolKind{}, Doc: "You must have reviewed it, whatever the review said."},
+	{Key: "requested", Kind: listKind{NonEmpty: true}, Doc: `Whom a review must be asked of, one of them: "me", or a team as "@slug".`},
+	{Key: "reasons", Kind: listKind{Values: Reasons, NonEmpty: true}, Doc: "Reasons of a notification, one of which the row's must have; S has no notification, so [[select]] does not take it."},
 }
 
 // checkSettings checks every setting's value against its kind.
@@ -512,10 +528,16 @@ const selectExamples = `# Rules S offers to select pull requests, besides "appro
 # lines added and deleted together, the sum of the two numbers SIZE shows),
 # updated_within_days and created_within_days (the most days, of 24 hours,
 # since it was last updated or created; a label or a bot's comment updates
-# it too, and the inbox's AGE is its notification's time, not this), a bot as
-# the author with bot = true, checks = "passing" (passed, or only
-# checks.approval pending), and approved_by_me = true (your latest review
-# approves it; a person's pull request matches too).
+# it too, and the inbox's AGE is its notification's time, not this),
+# updated_before_days and created_before_days (the least days), min_files and
+# min_lines (the least), repos (owner/repo globs), labels (one of them),
+# requested ("me" or a team as "@slug"), decision ("approved",
+# "changes_requested" or "review_required"), a bot as the
+# author with bot = true, your own pull request with mine = true, checks =
+# "passing" (passed, or only checks.approval pending), "failing" or
+# "pending", a review of yours that approves it with approved_by_me = true (a
+# person's pull request matches too), and any review of yours with the key
+# reviewed_by_me set to true.
 #
 # The rules below are written to start with, not commented out: S offers
 # only the rules in this file, so delete or comment out one you do not want.
@@ -700,36 +722,7 @@ func Show(f File, onlyDiff bool) string {
 	for _, s := range f.Select {
 		b.WriteString("[[select]]\n")
 		fmt.Fprintf(&b, "name = %q\n", s.Name)
-		if len(s.Authors) > 0 {
-			b.WriteString("authors = " + tomlList(s.Authors) + "\n")
-		}
-		if len(s.Packages) > 0 {
-			b.WriteString("packages = " + tomlList(s.Packages) + "\n")
-		}
-		if s.Title != nil {
-			fmt.Fprintf(&b, "title = %q\n", s.Title.String())
-		}
-		if s.MaxFiles > 0 {
-			fmt.Fprintf(&b, "max_files = %d\n", s.MaxFiles)
-		}
-		if s.MaxLines > 0 {
-			fmt.Fprintf(&b, "max_lines = %d\n", s.MaxLines)
-		}
-		if s.UpdatedWithinDays > 0 {
-			fmt.Fprintf(&b, "updated_within_days = %d\n", s.UpdatedWithinDays)
-		}
-		if s.CreatedWithinDays > 0 {
-			fmt.Fprintf(&b, "created_within_days = %d\n", s.CreatedWithinDays)
-		}
-		if s.Bot {
-			b.WriteString("bot = true\n")
-		}
-		if s.Checks != "" {
-			fmt.Fprintf(&b, "checks = %q\n", s.Checks)
-		}
-		if s.ApprovedByMe {
-			b.WriteString("approved_by_me = true\n")
-		}
+		writeConditions(&b, s.Conditions)
 		b.WriteString("\n")
 	}
 	for _, t := range tables {
@@ -759,4 +752,61 @@ func Show(f File, onlyDiff bool) string {
 func sameTab(a, b Tab) bool {
 	return a.Kind == b.Kind && a.Name == b.Name && a.Query == b.Query && slices.Equal(a.Groups, b.Groups) &&
 		slices.Equal(a.Folded, b.Folded) && a.Sort == b.Sort && a.Limit == b.Limit && a.ShowSettled == b.ShowSettled
+}
+
+// writeConditions writes the conditions c sets, as the file takes them.
+func writeConditions(b *strings.Builder, c Conditions) {
+	for _, l := range []struct {
+		key string
+		v   []string
+	}{{"repos", c.Repos}, {"authors", c.Authors}, {"packages", c.Packages}} {
+		if len(l.v) > 0 {
+			b.WriteString(l.key + " = " + tomlList(l.v) + "\n")
+		}
+	}
+	if c.Title != nil {
+		fmt.Fprintf(b, "title = %q\n", c.Title.String())
+	}
+	for _, n := range []struct {
+		key string
+		v   int
+	}{{"max_files", c.MaxFiles}, {"max_lines", c.MaxLines}, {"min_files", c.MinFiles}, {"min_lines", c.MinLines},
+		{"updated_within_days", c.UpdatedWithinDays}, {"created_within_days", c.CreatedWithinDays},
+		{"updated_before_days", c.UpdatedBeforeDays}, {"created_before_days", c.CreatedBeforeDays}} {
+		if n.v > 0 {
+			fmt.Fprintf(b, "%s = %d\n", n.key, n.v)
+		}
+	}
+	for _, f := range []struct {
+		key string
+		v   bool
+	}{{"bot", c.Bot}, {"mine", c.Mine}, {"draft", c.Draft}} {
+		if f.v {
+			b.WriteString(f.key + " = true\n")
+		}
+	}
+	for _, e := range []struct{ key, v string }{{"checks", c.Checks}, {"decision", c.Decision}} {
+		if e.v != "" {
+			fmt.Fprintf(b, "%s = %q\n", e.key, e.v)
+		}
+	}
+	if len(c.Labels) > 0 {
+		b.WriteString("labels = " + tomlList(c.Labels) + "\n")
+	}
+	for _, f := range []struct {
+		key string
+		v   bool
+	}{{"approved_by_me", c.ApprovedByMe}, {"reviewed_by_me", c.ReviewedByMe}} {
+		if f.v {
+			b.WriteString(f.key + " = true\n")
+		}
+	}
+	for _, l := range []struct {
+		key string
+		v   []string
+	}{{"requested", c.Requested}, {"reasons", c.Reasons}} {
+		if len(l.v) > 0 {
+			b.WriteString(l.key + " = " + tomlList(l.v) + "\n")
+		}
+	}
 }

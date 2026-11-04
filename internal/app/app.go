@@ -447,9 +447,7 @@ func Settings(cfg config.File) tui.Settings {
 		set.StaleDays = cfg.List.StaleDays.N
 	}
 	for _, s := range cfg.Select {
-		set.Rules = append(set.Rules, plan.Rule{Name: s.Name, Authors: s.Authors, Packages: s.Packages, Title: s.Title, MaxFiles: s.MaxFiles, MaxLines: s.MaxLines,
-			UpdatedWithinDays: s.UpdatedWithinDays, CreatedWithinDays: s.CreatedWithinDays,
-			Bot: s.Bot, ChecksPassing: s.Checks == "passing", ApprovedByMe: s.ApprovedByMe})
+		set.Rules = append(set.Rules, rule(s.Name, s.Conditions))
 	}
 	for _, m := range cfg.Merge.Methods {
 		set.Plan.Methods = append(set.Plan.Methods, model.MergeMethod(strings.ToUpper(m)))
@@ -607,4 +605,15 @@ func errString(err error) string {
 		return ""
 	}
 	return err.Error()
+}
+
+// rule is the rule named name with the conditions c, as the config file
+// gives them.
+func rule(name string, c config.Conditions) plan.Rule {
+	return plan.Rule{Name: name, Repos: c.Repos, Authors: c.Authors, Packages: c.Packages, Title: c.Title,
+		MaxFiles: c.MaxFiles, MaxLines: c.MaxLines, MinFiles: c.MinFiles, MinLines: c.MinLines,
+		UpdatedWithinDays: c.UpdatedWithinDays, CreatedWithinDays: c.CreatedWithinDays,
+		UpdatedBeforeDays: c.UpdatedBeforeDays, CreatedBeforeDays: c.CreatedBeforeDays,
+		Bot: c.Bot, Mine: c.Mine, Draft: c.Draft, Checks: plan.Checks(c.Checks), Decision: model.ReviewDecision(strings.ToUpper(c.Decision)),
+		Labels: c.Labels, ApprovedByMe: c.ApprovedByMe, ReviewedByMe: c.ReviewedByMe, Requested: c.Requested, Reasons: c.Reasons}
 }

@@ -497,7 +497,10 @@ func (m *Model) handleData(msg tea.Msg) tea.Cmd {
 			return m.ensure()
 		}
 		t.asOf, t.readAt = time.Time{}, m.set.Now()
-		return tea.Batch(m.ensure(), m.saveInbox(t), m.readBodies(m.inbox))
+		// The inbox reads every field at once, so its pull requests do
+		// not come through the reads of heavy fields, which read the
+		// single checks of the lists' ones.
+		return tea.Batch(m.ensure(), m.saveInbox(t), m.readBodies(m.inbox), m.ensureChecks(slices.Collect(maps.Values(t.inboxPRs))))
 	case diffMsg:
 		e := m.cache.diffs[msg.id]
 		e.loading, e.err, e.val = false, msg.err, safeFiles(msg.files)
@@ -635,9 +638,13 @@ type checksMsg struct {
 	got map[model.PRKey]model.MergeInfo
 }
 
+// checksBatch is the most pull requests one read of single checks takes.
+const checksBatch = 50
+
 // ensureChecks reads the single checks of the pull requests whose checks
-// are pending, in one query, to tell those waiting only for an approval
-// (CI shows ◌) from those still running.
+// are pending, a batch at a time, to tell those waiting only for an
+// approval (CI shows ◌) from those still running. A rule on the checks
+// waits for this, so none is left out.
 func (m *Model) ensureChecks(prs []model.PR) tea.Cmd {
 	if len(m.set.Plan.ApprovalChecks) == 0 {
 		return nil
@@ -645,20 +652,24 @@ func (m *Model) ensureChecks(prs []model.PR) tea.Cmd {
 	var ids []string
 	keys := map[string]model.PRKey{}
 	for _, p := range prs {
-		if _, ok := m.cache.info[p.Key]; ok || p.ID == "" {
+		if _, ok := m.cache.info[p.Key]; ok || p.ID == "" || keys[p.ID] != (model.PRKey{}) {
 			continue
 		}
 		if p.Checks == model.CheckPending || p.Checks == model.CheckExpected {
 			ids = append(ids, p.ID)
 			keys[p.ID] = p.Key
 		}
-		if len(ids) == 50 {
-			break
-		}
 	}
-	if len(ids) == 0 {
-		return nil
+	var cmds []tea.Cmd
+	for batch := range slices.Chunk(ids, checksBatch) {
+		cmds = append(cmds, m.readChecks(batch, keys))
 	}
+	return tea.Batch(cmds...)
+}
+
+// readChecks reads the single checks of the pull requests ids, whose keys
+// keys gives.
+func (m *Model) readChecks(ids []string, keys map[string]model.PRKey) tea.Cmd {
 	return func() tea.Msg {
 		got, err := m.src.MergeInfo(m.ctx, ids, true)
 		if err != nil {

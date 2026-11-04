@@ -97,6 +97,9 @@ type fakeSource struct {
 	browsed []string
 	// info overrides what MergeInfo says of a pull request, by key.
 	info map[model.PRKey]func(*model.MergeInfo)
+	// infoReads are how many pull requests each read of MergeInfo asked
+	// for.
+	infoReads []int
 	// noHeavy has Heavy return nothing, and searchErr fails every search.
 	noHeavy   bool
 	searchErr error
@@ -104,7 +107,9 @@ type fakeSource struct {
 
 func (f *fakeSource) MergeInfo(_ context.Context, ids []string, _ bool) (map[string]model.MergeInfo, error) {
 	out := map[string]model.MergeInfo{}
-	for _, prs := range f.searches {
+	f.infoReads = append(f.infoReads, len(ids))
+	extra := slices.Collect(maps.Values(f.extra))
+	for _, prs := range append(slices.Collect(maps.Values(f.searches)), extra) {
 		for _, p := range prs {
 			for _, id := range ids {
 				if p.ID != id {
@@ -2107,4 +2112,33 @@ func quits(cmd tea.Cmd) bool {
 		return slices.ContainsFunc(msg, quits)
 	}
 	return false
+}
+
+// The inbox reads every field of its pull requests at once, past the reads
+// of heavy fields; the single checks of one only in the inbox are read
+// too, a batch at a time, so that a rule on the checks can tell it.
+func TestInboxReadsTheSingleChecksOfItsOwn(t *testing.T) {
+	f := fixture()
+	for i := range checksBatch + 1 {
+		k := key("acme", "deploy", 100+i)
+		f.extra[k] = model.PR{ID: fmt.Sprintf("d%d", i), Key: k, Title: "Wait for a deploy", State: model.StateOpen,
+			Checks: model.CheckPending, HeadOID: fmt.Sprintf("e%d", i)}
+		f.notifs = append(f.notifs, model.Notification{ThreadID: fmt.Sprintf("d%d", i), Key: k, Title: "Wait for a deploy", Reason: "subscribed",
+			Updated: now.Add(-time.Hour)})
+	}
+	set := testSettings()
+	set.Plan.ApprovalChecks = []string{"deploy/*"}
+	m := New(f, &fakeRunner{results: map[model.PRKey]runner.Event{}}, &fakeClaude{}, keymap.Default(), nil, set)
+	m.Update(tea.WindowSizeMsg{Width: 130, Height: 34})
+	run(m, m.Init())
+	for i := range checksBatch + 1 {
+		if _, ok := m.cache.info[key("acme", "deploy", 100+i)]; !ok {
+			t.Fatalf("the single checks of acme/deploy#%d are not read; reads: %v", 100+i, f.infoReads)
+		}
+	}
+	for _, n := range f.infoReads {
+		if n > checksBatch {
+			t.Errorf("a read asked for %d pull requests, more than %d", n, checksBatch)
+		}
+	}
 }
