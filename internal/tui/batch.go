@@ -176,6 +176,10 @@ func (m *Model) event(msg eventMsg) tea.Cmd {
 		// It says only what is ahead; the row keeps what it was doing.
 		return tea.Batch(cmds...)
 	}
+	// The runner's words can carry what GitHub said, such as an error;
+	// cleaned as they arrive, before the row, the status line or the
+	// progress pane draws them.
+	ev.Text = safeLine(ev.Text)
 	pg := progress{text: ev.Text, result: ev.Result, watch: ev.Watch}
 	if ev.Locked {
 		pg.text, pg.detail, pg.locked = m.lockedBy(), m.lockedDetail(ev.Key, ""), true

@@ -251,6 +251,7 @@ func TestLogViewerCleansWhatGitHubSaid(t *testing.T) {
 	m, log := startLogged(t, 130, 34, 0)
 	feed, a, _ := startBatch(t, m, "b1")
 	feed(0, runner.Event{Key: a, Step: runner.StepWaitChecks, Text: "waiting for checks", Checks: []string{"evil\x1b[2Jname\nnext"}})
+	feed(0, runner.Event{Key: a, Result: runner.Failed, Text: "merge failed: \x1b[2Jboom"})
 	log.Warn("search read in part", "err", "bad\x1b]0;title\x07\nline")
 	press(m, "L")
 	s, _ := m.render()
