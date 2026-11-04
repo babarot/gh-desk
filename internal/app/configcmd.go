@@ -2,7 +2,6 @@ package app
 
 import (
 	"errors"
-	"flag"
 	"fmt"
 	"io"
 	"io/fs"
@@ -12,93 +11,100 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/spf13/cobra"
+
 	"github.com/babarot/gh-desk/internal/config"
 	"github.com/babarot/gh-desk/internal/tui/keymap"
 )
 
-const configUsage = `Usage: gh desk config <command>
-
-Commands:
-  check [path]    read the config file and print its mistakes and warnings,
-                  without starting; exits 1 when it has mistakes
-  show [--diff]   print the settings in effect, or with --diff only those that
-                  differ from the defaults
-  init            write the config file with every setting at its default,
-                  unless one is there
-  edit            open the config file in review.editor, $VISUAL or $EDITOR,
-                  then check it
-  schema          print the JSON Schema of the config file
+// newConfigCommand is gh desk config. None of it reaches GitHub.
+func newConfigCommand(o *options, stdout, stderr io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "config",
+		Short: "check, show or edit the config file",
+		Long: `Check, show or edit the config file.
 
 The config file is the one --config names: by default
-$XDG_CONFIG_HOME/gh-desk/config.toml, or ~/.config/gh-desk/config.toml.
-`
+$XDG_CONFIG_HOME/gh-desk/config.toml, or ~/.config/gh-desk/config.toml.`,
+		Args: cobra.ArbitraryArgs,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			switch {
+			case len(args) == 0:
+				return errors.New("config needs a command")
+			case len(args) == 1 && args[0] == "help":
+				return cmd.Help()
+			}
+			return fmt.Errorf("unknown config command %q", args[0])
+		},
+	}
 
-// configCommand runs gh desk config with args, on the config file at
-// path. None of it reaches GitHub.
-func configCommand(args []string, path string, debug bool, stdout, stderr io.Writer) int {
-	if len(args) == 0 {
-		fmt.Fprint(stderr, configUsage)
-		return 2
+	var diff bool
+	show := &cobra.Command{
+		Use:   "show",
+		Short: "print the settings in effect, or with --diff only those that differ from the defaults",
+		Args:  cobra.NoArgs,
+		RunE: func(*cobra.Command, []string) error {
+			cfg, km, _, err := load(o.config, o.debug, new(slog.LevelVar))
+			if err != nil {
+				fmt.Fprintln(stderr, err)
+				return exitCode(1)
+			}
+			fmt.Fprint(stdout, strings.TrimRight(config.Show(cfg, diff)+keysShown(km, diff), "\n")+"\n")
+			return nil
+		},
 	}
-	switch args[0] {
-	case "help", "-h", "--help":
-		fmt.Fprint(stdout, configUsage)
-		return 0
-	case "check":
-		if len(args) > 2 {
-			fmt.Fprint(stderr, configUsage)
-			return 2
-		}
-		if len(args) == 2 {
-			path = args[1]
-		}
-		return checkConfig(path, debug, stdout)
-	case "show":
-		fl := flag.NewFlagSet("gh desk config show", flag.ContinueOnError)
-		fl.SetOutput(stderr)
-		diff := fl.Bool("diff", false, "only the settings that differ from the defaults")
-		if err := fl.Parse(args[1:]); err != nil || fl.NArg() > 0 {
-			return 2
-		}
-		cfg, km, _, err := load(path, debug, new(slog.LevelVar))
-		if err != nil {
-			fmt.Fprintln(stderr, err)
-			return 1
-		}
-		fmt.Fprint(stdout, strings.TrimRight(config.Show(cfg, *diff)+keysShown(km, *diff), "\n")+"\n")
-		return 0
-	case "init":
-		if len(args) > 1 {
-			fmt.Fprint(stderr, configUsage)
-			return 2
-		}
-		switch err := config.WriteTemplate(path, KeysTemplate()); {
-		case errors.Is(err, fs.ErrExist):
-			fmt.Fprintf(stdout, "%s is there already; nothing was written\n", config.TildePath(path))
-		case err != nil:
-			fmt.Fprintf(stderr, "gh-desk: %v\n", err)
-			return 1
-		default:
-			fmt.Fprintf(stdout, "wrote %s\n", config.TildePath(path))
-		}
-		return 0
-	case "edit":
-		if len(args) > 1 {
-			fmt.Fprint(stderr, configUsage)
-			return 2
-		}
-		return editConfig(path, debug, stdout, stderr)
-	case "schema":
-		if len(args) > 1 {
-			fmt.Fprint(stderr, configUsage)
-			return 2
-		}
-		stdout.Write(config.Schema())
-		return 0
-	}
-	fmt.Fprintf(stderr, "gh-desk: unknown config command %q\n", args[0])
-	fmt.Fprint(stderr, configUsage)
-	return 2
+	show.Flags().BoolVar(&diff, "diff", false, "only the settings that differ from the defaults")
+
+	cmd.AddCommand(
+		&cobra.Command{
+			Use:   "check [path]",
+			Short: "read the config file and print its mistakes and warnings, without starting; exits 1 when it has mistakes",
+			Args:  cobra.MaximumNArgs(1),
+			RunE: func(_ *cobra.Command, args []string) error {
+				path := o.config
+				if len(args) == 1 {
+					path = args[0]
+				}
+				return exited(checkConfig(path, o.debug, stdout))
+			},
+		},
+		show,
+		&cobra.Command{
+			Use:   "init",
+			Short: "write the config file with every setting at its default, unless one is there",
+			Args:  cobra.NoArgs,
+			RunE: func(*cobra.Command, []string) error {
+				switch err := config.WriteTemplate(o.config, KeysTemplate()); {
+				case errors.Is(err, fs.ErrExist):
+					fmt.Fprintf(stdout, "%s is there already; nothing was written\n", config.TildePath(o.config))
+				case err != nil:
+					fmt.Fprintf(stderr, "gh-desk: %v\n", err)
+					return exitCode(1)
+				default:
+					fmt.Fprintf(stdout, "wrote %s\n", config.TildePath(o.config))
+				}
+				return nil
+			},
+		},
+		&cobra.Command{
+			Use:   "edit",
+			Short: "open the config file in review.editor, $VISUAL or $EDITOR, then check it",
+			Args:  cobra.NoArgs,
+			RunE: func(*cobra.Command, []string) error {
+				return exited(editConfig(o.config, o.debug, stdout, stderr))
+			},
+		},
+		&cobra.Command{
+			Use:   "schema",
+			Short: "print the JSON Schema of the config file",
+			Args:  cobra.NoArgs,
+			RunE: func(*cobra.Command, []string) error {
+				stdout.Write(config.Schema())
+				return nil
+			},
+		},
+	)
+	return cmd
 }
 
 // checkConfig prints the mistakes and warnings of the config file at

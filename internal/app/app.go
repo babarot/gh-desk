@@ -8,7 +8,6 @@ import (
 	"cmp"
 	"context"
 	"errors"
-	"flag"
 	"fmt"
 	"io"
 	"io/fs"
@@ -38,52 +37,26 @@ import (
 // EnvLogLevel overrides [log] level in the config file.
 const EnvLogLevel = "GH_DESK_LOG_LEVEL"
 
-const usage = `Usage: gh desk [flags] [command]
-
-Commands:
-  config     check, show or edit the config file (gh desk config help)
-  gc         remove the worktrees of pull requests no longer open
-  log        print where the log file is
-
-Flags:
-`
-
 // Run runs gh-desk with args (without the program name) and returns the
-// exit code.
+// exit code: 1 when a command failed, 2 when it was called wrongly.
 func Run(args []string, stdout, stderr io.Writer) int {
-	flags := flag.NewFlagSet("gh-desk", flag.ContinueOnError)
-	flags.SetOutput(stderr)
-	configPath := flags.String("config", config.FilePath(), "the config file")
-	debug := flags.Bool("debug", false, "log at debug level")
-	noCache := flags.Bool("no-cache", false, "neither show nor keep the lists last read")
-	showVersion := flags.Bool("version", false, "print the version")
-	flags.Usage = func() {
-		fmt.Fprint(stderr, usage)
-		flags.PrintDefaults()
-	}
-	if err := flags.Parse(args); err != nil {
-		if errors.Is(err, flag.ErrHelp) {
-			return 0
-		}
-		return 2
-	}
-	if *showVersion {
-		fmt.Fprintln(stdout, version.String())
+	root := newRootCommand(stdout, stderr)
+	root.SetArgs(args)
+	cmd, err := root.ExecuteC()
+	if err == nil {
 		return 0
 	}
-	switch flags.Arg(0) {
-	case "", "gc":
-	case "config":
-		return configCommand(flags.Args()[1:], *configPath, *debug, stdout, stderr)
-	case "log":
-		fmt.Fprintln(stdout, logging.DefaultPath())
-		return 0
-	default:
-		fmt.Fprintf(stderr, "gh-desk: unknown command %q\n", flags.Arg(0))
-		flags.Usage()
-		return 2
+	if code, ok := errors.AsType[exitCode](err); ok {
+		return int(code)
 	}
+	fmt.Fprintf(stderr, "gh-desk: %v\n", err)
+	fmt.Fprint(stderr, cmd.UsageString())
+	return 2
+}
 
+// start opens the log, reads the config and reaches GitHub, then runs the
+// TUI, or with gcOnly gh desk gc, and returns the exit code.
+func start(o *options, gcOnly bool, stdout, stderr io.Writer) int {
 	level := new(slog.LevelVar)
 	log, closeLog, err := logging.Open(logging.Options{Level: level})
 	if err != nil {
@@ -94,13 +67,13 @@ func Run(args []string, stdout, stderr io.Writer) int {
 	run := logging.NewID()
 	log = log.With(logging.KeyRun, run)
 
-	cfg, km, warns, err := setup(*configPath, *debug, level, log)
+	cfg, km, warns, err := setup(o.config, o.debug, level, log)
 	if err != nil {
 		log.Error("setup failed", "err", err.Error())
 		fmt.Fprintln(stderr, err)
 		return 1
 	}
-	log.Info("start", logging.KeyVersion, version.String(), "config", *configPath, "log", logging.DefaultPath(),
+	log.Info("start", logging.KeyVersion, version.String(), "config", o.config, "log", logging.DefaultPath(),
 		"log_level", level.Level().String(), "refresh", cfg.RefreshInterval().String())
 
 	gh, err := github.New(log, github.Options{})
@@ -109,7 +82,7 @@ func Run(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintf(stderr, "gh-desk: %v (is gh logged in? try gh auth login)\n", err)
 		return 1
 	}
-	if flags.Arg(0) == "gc" {
+	if gcOnly {
 		ws := &claude.Workspace{Dir: cfg.CacheDir(), Log: log}
 		chats := state.OpenChats(state.DefaultDir(), github.DefaultHost())
 		if err := gc(context.Background(), ws, chats, runs(cfg), gh, stdout); err != nil {
@@ -128,7 +101,7 @@ func Run(args []string, stdout, stderr io.Writer) int {
 		return 1
 	}
 	p := assemble(cfg, warns, env{gh: gh, host: github.DefaultHost(), viewer: viewer, stateDir: state.DefaultDir(),
-		borrow: claude.GhqRoots(ctx), noCache: *noCache}, log)
+		borrow: claude.GhqRoots(ctx), noCache: o.noCache}, log)
 	start := time.Now()
 	err = tui.Run(ctx, source{gh}, p.rn, p.cl, km, log, p.set)
 	// Stop the batches and wait for them to stop writing the record before
