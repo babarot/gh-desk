@@ -192,3 +192,26 @@ func TestNoteResultsHang(t *testing.T) {
 		t.Errorf("got\n%s\nwant\n%s", strings.Join(got, "\n"), strings.Join(want, "\n"))
 	}
 }
+
+// The confirm popup shows every note of a pull request, not the first:
+// that a draft stays ready and that auto-merge takes later commits are
+// said even when the files it changes are marked before them (ADR-046).
+func TestBulkShowsEveryNote(t *testing.T) {
+	f := fixture()
+	draft := model.PR{ID: "5", Key: key("me", "tool", 4), Title: "Try a new parser", Author: "me", State: model.StateOpen, Draft: true,
+		HeadOID: "eeeeeee5", BaseRef: "main", Checks: model.CheckSuccess, Updated: now.Add(-time.Hour)}
+	f.searches["mine"] = append(f.searches["mine"], draft)
+	f.info = map[model.PRKey]func(*model.MergeInfo){draft.Key: func(mi *model.MergeInfo) {
+		mi.Draft = true
+		mi.Repo.AutoMerge = true
+		mi.Files = []string{".github/workflows/ci.yaml", "main.go", ".github/workflows/release.yaml"}
+	}}
+	m := start(t, f, keymap.Default())
+	press(m, "2")
+	selectAll(m, []model.PRKey{draft.Key})
+	press(m, "M")
+	text := readPopup(t, m, m.renderBulk, "yes", "j")
+	has(t, text, "changes .github/workflows/ci.yaml, .github/workflows/release.yaml")
+	has(t, text, "it stays ready if the merge stops")
+	has(t, text, "auto-merge also merges commits pushed after it is on")
+}

@@ -542,8 +542,10 @@ func (m *Model) renderBulk() []string {
 		if it.goes() {
 			// On lines of their own, so a long one does not take the
 			// width of the title or of what is done.
-			if len(it.d.Notes) > 0 {
-				r.notes = append(r.notes, bulkNote{"⚠", it.d.Notes[0], st.yellow})
+			// Every note, since each says something a yes agrees to: a
+			// draft that stays ready, commits auto-merge takes later.
+			for _, n := range it.d.Notes {
+				r.notes = append(r.notes, bulkNote{"⚠", n, st.yellow})
 			}
 			// The reason is what to read before merging.
 			if why := m.cautions[notesID(it.pr)]; why != "" {
