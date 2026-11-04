@@ -183,11 +183,11 @@ func TestForMergeDraft(t *testing.T) {
 func TestForMergeNotes(t *testing.T) {
 	mi := info(model.MergeBlocked)
 	mi.Repo.AutoMerge = true
-	mi.Files = []string{".github/workflows/ci.yaml", "main.go"}
+	mi.Files = []string{".github/workflows/ci.yaml", "main.go", ".github/workflows/release.yaml"}
 	mi.Checks = []model.Check{{Name: "lint", State: model.CheckFailure}}
 	d := ForMerge(mi, model.PR{Author: "renovate", AuthorIsBot: true}, "me", set)
 	all := strings.Join(d.Notes, "\n")
-	for _, want := range []string{"changes .github/workflows/ci.yaml", "not required failed: lint", "pushed after it is on"} {
+	for _, want := range []string{"changes .github/workflows/ci.yaml, .github/workflows/release.yaml", "not required failed: lint", "pushed after it is on"} {
 		if !strings.Contains(all, want) {
 			t.Errorf("notes %q lack %q", d.Notes, want)
 		}

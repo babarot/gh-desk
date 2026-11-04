@@ -2,6 +2,7 @@ package plan
 
 import (
 	"slices"
+	"strings"
 
 	"github.com/babarot/gh-desk/internal/model"
 )
@@ -159,12 +160,18 @@ func needsApproval(mi model.MergeInfo, pr model.PR, viewer string) bool {
 	return true
 }
 
+// notes are what the user should know of a pull request apart from how it
+// is merged. The files it changes that call for care make one note, as the
+// popup shows every note of a row.
 func notes(mi model.MergeInfo, set Settings) []string {
-	var ns []string
+	var ns, marked []string
 	for _, f := range mi.Files {
 		if MatchAny(set.AttentionPaths, f) {
-			ns = append(ns, "changes "+f)
+			marked = append(marked, f)
 		}
+	}
+	if len(marked) > 0 {
+		ns = append(ns, "changes "+strings.Join(marked, ", "))
 	}
 	if mi.Checks != nil {
 		for _, c := range mi.Checks {
@@ -331,7 +338,7 @@ func adminMerge(d Decision, mi model.MergeInfo, set Settings) Decision {
 	if mi.ChecksPartial {
 		return blocked(d, mi, set)
 	}
-	// The note goes first: the popup shows the first note of a row.
+	// The note goes first: it changes what merging means.
 	d.Notes = append([]string{adminNote}, d.Notes...)
 	if mi.Checks == nil || ChecksRunning(mi, set.ApprovalChecks) {
 		d.Step, d.Reason = StepWait, "wait for checks, then merge as admin"
