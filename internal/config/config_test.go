@@ -112,8 +112,8 @@ style = "plain"
 [review]
 editor = "code --wait"
 mark_done = false
-[merge]
-checks_timeout = "1h30m"
+[checks]
+wait_timeout = "1h30m"
 [keys]
 approve = "a"
 merge = ["m", "M"]
@@ -126,7 +126,7 @@ language = "Japanese"
 	}
 	if cfg.Log.Level != "debug" || cfg.Theme.Light != "github-light" || cfg.RefreshInterval() != 0 || !cfg.List.StaleDays.Off ||
 		cfg.Claude.Language != "Japanese" || cfg.Preview.Tab != "diff" || cfg.Description.Style != "plain" ||
-		cfg.Review.Editor != "code --wait" || cfg.Review.MarkDone || cfg.Merge.ChecksTimeout.D != 90*time.Minute {
+		cfg.Review.Editor != "code --wait" || cfg.Review.MarkDone || cfg.Checks.WaitTimeout.D != 90*time.Minute {
 		t.Errorf("cfg = %+v", cfg)
 	}
 	if cfg.Merge.BlockedTimeout.D != 30*time.Minute {
@@ -153,7 +153,8 @@ func TestLoadReportsWhereTheMistakeIs(t *testing.T) {
 		{"bad refresh", "[list]\nrefresh = \"soon\"\n", `config.toml:2:11: list.refresh must be a duration such as "3m", or "off", got "soon"`},
 		{"refresh with no unit", "[list]\nrefresh = 180\n", `list.refresh must be a duration with its unit, such as "3m", or "off", got 180`},
 		{"refresh at zero", "[list]\nrefresh = \"0\"\n", `list.refresh must be more than 0, or "off", got 0`},
-		{"timeout off", "[merge]\nchecks_timeout = \"off\"\n", `merge.checks_timeout must be a duration such as "3m", got "off"`},
+		{"timeout off", "[checks]\nwait_timeout = \"off\"\n", `checks.wait_timeout must be a duration such as "3m", got "off"`},
+		{"checks timeout", "[merge]\nchecks_timeout = \"1h\"\n", `config.toml:2:1: "merge.checks_timeout" moved to "checks.wait_timeout"`},
 		{"stale days at zero", "[list]\nstale_days = 0\n", `list.stale_days must be a number of days, 1 or more, or "off", got 0`},
 		{"bad glob", "[diff]\ncollapse = [\"*.lock\", \"[\"]\n", `config.toml:2:23: diff.collapse[1] is not a glob pattern: "["`},
 		{"bad description", "[description]\nstyle = \"markdown\"\n", `config.toml:2:9: description.style must be one of "rendered", "plain", got "markdown"`},
@@ -181,8 +182,8 @@ func TestLoadReportsWhereTheMistakeIs(t *testing.T) {
 func TestReportsEveryMistakeAtOnce(t *testing.T) {
 	// Values checked as they are read are kept, so a second one is
 	// reported as well as the first.
-	wantErrs(t, "[list]\nrefresh = \"soon\"\n[merge]\nchecks_timeout = \"later\"\n",
-		"config.toml:2:11: list.refresh", "config.toml:4:18: merge.checks_timeout")
+	wantErrs(t, "[list]\nrefresh = \"soon\"\n[checks]\nwait_timeout = \"later\"\n",
+		"config.toml:2:11: list.refresh", "config.toml:4:16: checks.wait_timeout")
 }
 
 func TestReportPlacesKeyProblems(t *testing.T) {

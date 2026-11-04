@@ -8,9 +8,9 @@ import (
 )
 
 // Quiet is how long after something that may start workflows on a head
-// what is seen is not taken as all there is: GitHub makes a workflow run
-// some seconds after the push, the opening or the ready for review that
-// starts it.
+// what is seen is not taken as all there is, unless a Trigger says
+// otherwise: GitHub makes a workflow run some seconds after the push, the
+// opening or the ready for review that starts it.
 const Quiet = 30 * time.Second
 
 // Trigger is the last thing that may have started workflows on the head
@@ -23,11 +23,17 @@ type Trigger struct {
 	// nothing. The user's yes waits only while the head has no run, or its
 	// runs could not be read.
 	Always bool
+	// For is how long the quiet time lasts; Quiet when zero.
+	For time.Duration
 }
 
 // quiet reports whether now is still in the quiet time after t.
 func (t Trigger) quiet(mi model.MergeInfo, now time.Time) bool {
-	if t.At.IsZero() || now.Sub(t.At) >= Quiet {
+	quiet := t.For
+	if quiet == 0 {
+		quiet = Quiet
+	}
+	if t.At.IsZero() || now.Sub(t.At) >= quiet {
 		return false
 	}
 	// Runs that could not be read may be none yet.
@@ -37,14 +43,18 @@ func (t Trigger) quiet(mi model.MergeInfo, now time.Time) bool {
 // JobsRunning reports whether jobs of the head are still to finish: a
 // check run or a workflow run not completed, other than one waiting for
 // someone to approve its environment, which would not finish while gh-desk
-// waits. Checks or runs not all read count as running, as does the quiet
-// time after t. Commit statuses are not jobs, and are not waited for here.
+// waits. So does the quiet time after t. Commit statuses are not jobs, and
+// are not waited for here.
 //
-// Workflow runs that could not be read leave the check runs to tell; a job
-// that waits for another has no check run until that one ends, so then
-// there is a moment when nothing seems to run.
+// A workflow run holds every job of its workflow, so runs all read tell
+// for the check runs not read; with neither all read, what runs is not
+// known, and counts as running. Workflow runs that could not be read leave
+// the check runs to tell; a job that waits for another has no check run
+// until that one ends, so then there is a moment when nothing seems to
+// run.
 func JobsRunning(mi model.MergeInfo, t Trigger, now time.Time) bool {
-	return mi.ChecksPartial || mi.RunsPartial || t.quiet(mi, now) || len(RunningJobs(mi)) > 0
+	runsKnown := mi.RunsRead && !mi.RunsPartial
+	return mi.ChecksPartial && !runsKnown || t.quiet(mi, now) || len(RunningJobs(mi)) > 0
 }
 
 // RunningJobs names the jobs being waited for: the check runs not

@@ -71,11 +71,12 @@ type Options struct {
 	CanWait  bool
 	Settings plan.Settings
 	Viewer   string
-	// ChecksTimeout is how long to wait for required checks still running.
-	ChecksTimeout time.Duration
+	// WaitTimeout is how long to wait for the jobs at work on a head, and
+	// for required checks still running before an admin merge.
+	WaitTimeout time.Duration
 	// BlockedTimeout is how long a pull request may stay blocked after its
-	// required checks finished before it is given up as blocked by another
-	// rule.
+	// jobs and required checks finished before it is given up as blocked
+	// by another rule.
 	BlockedTimeout time.Duration
 	// WatchTimeout is how long a pull request put on auto-merge is
 	// followed, 24h unless set: the merge is GitHub's, so this decides
@@ -87,6 +88,10 @@ type Options struct {
 	// Recheck is how often, and RecheckFor how long, a pull request whose
 	// merge state GitHub is still working out is read again.
 	Recheck, RecheckFor time.Duration
+	// Quiet is how long after the user's yes, marking a pull request ready
+	// or updating its branch, jobs not seen yet are waited for; plan.Quiet
+	// unless set.
+	Quiet time.Duration
 }
 
 // Defaults fills in the intervals left zero.
@@ -105,6 +110,9 @@ func (o Options) withDefaults() Options {
 	}
 	if o.RecheckFor == 0 {
 		o.RecheckFor = time.Minute
+	}
+	if o.Quiet == 0 {
+		o.Quiet = plan.Quiet
 	}
 	return o
 }
@@ -363,6 +371,9 @@ func (r *Runner) run(ctx context.Context, kind Kind, items []Item, resume map[mo
 		attrs = append(attrs, "comment", ct.Body != "", "delete_branch", ct.DeleteBranch)
 	}
 	log.Info("batch start", attrs...)
+	// The user said yes now; a pull request opened or pushed just before
+	// may have no workflow run yet.
+	confirmed := time.Now()
 	var wg sync.WaitGroup
 	r.active.Add(1)
 	emit := func(e Event) {
@@ -385,6 +396,9 @@ func (r *Runner) run(ctx context.Context, kind Kind, items []Item, resume map[mo
 				store, canWait := r.waiting()
 				j := &job{r: r, ctx: ctx, log: log.With(logging.KeyPR, it.PR.Key.String()), it: it, head: it.Head, emit: emit, wg: &wg,
 					store: store, canWait: canWait, record: kind == Merge && store != nil}
+				if resume == nil {
+					j.trigger = plan.Trigger{At: confirmed, For: r.opt.Quiet}
+				}
 				if !r.claim(it.PR.Key) {
 					// Its record belongs to the job already on it.
 					j.record = false
@@ -451,6 +465,10 @@ type job struct {
 	// planned is the last forecast sent, so the same is not sent again.
 	planned  []Step
 	sentPlan bool
+	// trigger is the last thing that may have started workflows on the
+	// head: the user's yes, or gh-desk marking it ready or updating its
+	// branch. Jobs it starts are waited for even before they show.
+	trigger plan.Trigger
 }
 
 func (j *job) say(res Result, text string) {
@@ -745,6 +763,7 @@ func (j *job) merge() {
 		// here, on the confirmed head, is what the user agreed to.
 		d.Step = plan.StepWait
 	}
+	d = j.hold(mi, d)
 	if waits(d.Step) && !j.canWait {
 		j.locked("locked by another gh-desk")
 		return
@@ -762,8 +781,19 @@ func (j *job) merge() {
 	if d.Ready && !j.readyToMerge() {
 		return
 	}
-	if d.Approve && !j.sendApproval("") {
-		return
+	if d.Approve {
+		// An approval is not taken back, so it goes once the jobs passed:
+		// a job that fails stops the merge before it.
+		if mi, d, ok = j.jobsEnd(); !ok {
+			return
+		}
+		if d.Step == plan.StepSkip {
+			j.say(Skipped, d.Reason)
+			return
+		}
+		if d.Approve && !j.sendApproval("") {
+			return
+		}
 	}
 	if d.Ready || d.Approve {
 		// Read again: marking it ready and the approval change what is
@@ -778,6 +808,7 @@ func (j *job) merge() {
 		if d.Step == plan.StepAutoMerge && !j.it.AutoMerge {
 			d.Step = plan.StepWait
 		}
+		d = j.hold(mi, d)
 		if waits(d.Step) && !j.canWait {
 			j.locked("approved or ready; locked by another gh-desk")
 			return
@@ -827,6 +858,7 @@ func (j *job) readyToMerge() bool {
 		return false
 	}
 	j.readied = true
+	j.trigger = plan.Trigger{At: time.Now(), Always: true, For: j.r.opt.Quiet}
 	return true
 }
 
@@ -973,6 +1005,7 @@ func (j *job) updateBranch(base string) bool {
 			}
 			j.log.Info("branch updated", "head", mi.HeadOID, "was", j.head)
 			j.head = mi.HeadOID
+			j.trigger = plan.Trigger{At: time.Now(), Always: true, For: j.r.opt.Quiet}
 			return true
 		}
 		if time.Now().After(deadline) {
@@ -983,73 +1016,162 @@ func (j *job) updateBranch(base string) bool {
 	return false
 }
 
+// hold turns a decision to merge, or to turn auto-merge on, into a wait
+// while jobs may still start on the head: what ForMerge cannot know, the
+// quiet time after what gh-desk or the user did last.
+func (j *job) hold(mi model.MergeInfo, d plan.Decision) plan.Decision {
+	if (d.Step == plan.StepMerge || d.Step == plan.StepAutoMerge) && plan.JobsRunning(mi, j.trigger, time.Now()) {
+		d.Step, d.Reason = plan.StepWait, "wait for checks, then merge"
+	}
+	return d
+}
+
+// waitLog logs a wait when it starts, when what it waits on changes, and
+// when it ends.
+type waitLog struct {
+	log   *slog.Logger
+	on    string
+	since time.Time
+}
+
+func (w *waitLog) end(result string) {
+	if w.on != "" {
+		w.log.Info("wait end", logging.KeyStep, w.on, "result", result, logging.KeyDurationMS, time.Since(w.since).Milliseconds())
+		w.on = ""
+	}
+}
+
+func (w *waitLog) start(what string) {
+	if what == w.on {
+		return
+	}
+	w.end("changed")
+	w.on, w.since = what, time.Now()
+	w.log.Info("wait start", logging.KeyStep, what)
+}
+
+// waitedForChecks adds the time since last to the time waited for checks
+// and records it; it reports false, having stopped the job, once that
+// passes WaitTimeout.
+func (j *job) waitedForChecks(last *time.Time, w *waitLog) bool {
+	now := time.Now()
+	j.pend.BlockedWaited = 0
+	j.pend.ChecksWaited += now.Sub(*last)
+	*last = now
+	j.save()
+	if j.pend.ChecksWaited > j.r.opt.WaitTimeout {
+		w.end("timed-out")
+		j.say(Stopped, "checks still running after "+j.r.opt.WaitTimeout.String())
+		return false
+	}
+	return true
+}
+
+// pause sleeps until the next read: often in the first minute of waiting,
+// seldom after. It reports false when the batch is canceled.
+func (j *job) pause(w *waitLog) bool {
+	every := j.r.opt.PollFast
+	if j.pend.ChecksWaited+j.pend.BlockedWaited > time.Minute {
+		every = j.r.opt.PollSlow
+	}
+	if !j.sleep(every) {
+		w.end("canceled")
+		return false
+	}
+	return true
+}
+
+// jobsEnd reads the pull request until no job is at work on its head, and
+// returns the decision made then. A merge approves only after it: a job
+// that fails is a reason to skip, given before the approval.
+func (j *job) jobsEnd() (model.MergeInfo, plan.Decision, bool) {
+	last := time.Now()
+	w := &waitLog{log: j.log}
+	for {
+		mi, d, ok := j.decide()
+		if !ok {
+			w.end("stopped")
+			return mi, d, false
+		}
+		if d.Step == plan.StepSkip || !plan.JobsRunning(mi, j.trigger, time.Now()) {
+			w.end("ready")
+			return mi, d, true
+		}
+		if !j.canWait {
+			j.locked("locked by another gh-desk")
+			return mi, d, false
+		}
+		if !j.waitedForChecks(&last, w) {
+			return mi, d, false
+		}
+		w.start("jobs")
+		j.step(StepWaitChecks, "waiting for checks", plan.RunningJobs(mi)...)
+		j.forecast(ahead(d))
+		if !j.pause(w) {
+			return mi, d, false
+		}
+	}
+}
+
 // wait reads the pull request until it can be merged, then merges it. It
-// gives up when required checks run past ChecksTimeout, or when it stays
-// blocked BlockedTimeout after its required checks finished.
+// gives up when jobs, or the required checks, run past WaitTimeout, or
+// when it stays blocked BlockedTimeout after they finished.
 func (j *job) wait() {
 	// The times waited carry on from a record, so time gh-desk was not
 	// running is not counted.
 	last := time.Now()
-	// What it waits on and since when, for the log: a wait is logged when
-	// it starts, when what it waits on changes, and when it ends.
-	var on string
-	var since time.Time
-	end := func(result string) {
-		if on != "" {
-			j.log.Info("wait end", logging.KeyStep, on, "result", result, logging.KeyDurationMS, time.Since(since).Milliseconds())
-			on = ""
-		}
-	}
-	waitOn := func(what string) {
-		if what == on {
-			return
-		}
-		end("changed")
-		on, since = what, time.Now()
-		j.log.Info("wait start", logging.KeyStep, what)
-	}
+	w := &waitLog{log: j.log}
 	for {
 		mi, d, ok := j.decide()
 		if !ok {
-			end("stopped")
+			w.end("stopped")
 			return
 		}
+		jobs := plan.JobsRunning(mi, j.trigger, time.Now())
 		switch d.Step {
 		case plan.StepMerge:
-			end("ready")
-			j.forecast([]Step{StepMerge})
-			j.mergeDecided(d)
-			return
+			if !jobs {
+				w.end("ready")
+				j.forecast([]Step{StepMerge})
+				j.mergeDecided(d)
+				return
+			}
 		case plan.StepSkip:
-			end("skipped")
+			w.end("skipped")
 			j.say(Skipped, d.Reason)
 			return
 		case plan.StepAutoMerge:
-			// The repository allows auto-merge after all; waiting here is
-			// what was asked, so keep waiting.
-		}
-		running := plan.ChecksRunning(mi, j.r.opt.Settings.ApprovalChecks)
-		now := time.Now()
-		dt := now.Sub(last)
-		last = now
-		switch {
-		case running:
-			j.pend.BlockedWaited = 0
-			j.pend.ChecksWaited += dt
-			j.save()
-			if j.pend.ChecksWaited > j.r.opt.ChecksTimeout {
-				end("timed-out")
-				j.say(Stopped, "checks still running after "+j.r.opt.ChecksTimeout.String())
+			// The jobs are done and the popup said this one goes to
+			// auto-merge: GitHub merges once its rules allow. Otherwise
+			// waiting here is what was asked, so keep waiting.
+			if j.it.AutoMerge && !jobs {
+				w.end("ready")
+				j.forecast([]Step{StepAutoMerge})
+				j.autoMerge(d.Method)
 				return
 			}
-			waitOn("checks")
-			j.step(StepWaitChecks, "waiting for checks", plan.RunningChecks(mi, j.r.opt.Settings.ApprovalChecks, false)...)
+		}
+		switch {
+		case jobs || plan.ChecksRunning(mi, j.r.opt.Settings.ApprovalChecks):
+			if !j.waitedForChecks(&last, w) {
+				return
+			}
+			w.start("checks")
+			checks := plan.RunningJobs(mi)
+			for _, c := range plan.RunningChecks(mi, j.r.opt.Settings.ApprovalChecks, false) {
+				if !slices.Contains(checks, c) {
+					checks = append(checks, c)
+				}
+			}
+			j.step(StepWaitChecks, "waiting for checks", checks...)
 			j.forecast([]Step{StepMerge})
 		default:
-			j.pend.BlockedWaited += dt
+			now := time.Now()
+			j.pend.BlockedWaited += now.Sub(last)
+			last = now
 			j.save()
 			if j.pend.BlockedWaited > j.r.opt.BlockedTimeout {
-				end("timed-out")
+				w.end("timed-out")
 				j.say(Stopped, "blocked by another rule")
 				return
 			}
@@ -1059,16 +1181,11 @@ func (j *job) wait() {
 				what, text, s = "approval-checks", "waiting for approval checks", StepWaitApproval
 				checks = plan.RunningChecks(mi, j.r.opt.Settings.ApprovalChecks, true)
 			}
-			waitOn(what)
+			w.start(what)
 			j.step(s, text, checks...)
 			j.forecast([]Step{StepMerge})
 		}
-		every := j.r.opt.PollFast
-		if j.pend.ChecksWaited+j.pend.BlockedWaited > time.Minute {
-			every = j.r.opt.PollSlow
-		}
-		if !j.sleep(every) {
-			end("canceled")
+		if !j.pause(w) {
 			return
 		}
 	}

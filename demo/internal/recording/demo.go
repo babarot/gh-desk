@@ -43,7 +43,7 @@ func Run(ctx context.Context, speed float64) error {
 	gh := NewGitHub(time.Now())
 	gh.Speed = speed
 	rn := runner.New(gh, log, runner.Options{Settings: set.Plan, Viewer: Viewer, CanWait: true,
-		ChecksTimeout: cfg.Merge.ChecksTimeout.D, BlockedTimeout: cfg.Merge.BlockedTimeout.D})
+		WaitTimeout: cfg.Checks.WaitTimeout.D, BlockedTimeout: cfg.Merge.BlockedTimeout.D})
 	cl := &Claude{Dir: filepath.Join(dir, "worktrees"), Speed: speed}
 	return tui.Run(ctx, gh, rn, cl, keymap.Default(), log, set)
 }

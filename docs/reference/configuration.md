@@ -177,6 +177,12 @@ list of glob patterns · Default: `[]`
 
 Checks that pass only after an approval, such as a policy bot's: glob patterns of check names. While only they are pending, CI shows ◌, and the checks count as passing when deciding a merge.
 
+### checks.wait_timeout
+
+duration · Default: `"6h"`
+
+How long a merge, or an approval asked to wait, waits for the jobs still at work on the pull request's head, required or not; an admin merge also waits for the required checks within it. Only the time gh-desk is running counts.
+
 ## [review]
 
 ### review.mark_done
@@ -205,17 +211,11 @@ boolean · Default: `true`
 
 Use GitHub's auto-merge where the repository allows it; elsewhere gh-desk waits for the checks and merges when they pass. Commits pushed after auto-merge is turned on are merged too, as GitHub does.
 
-### merge.checks_timeout
-
-duration · Default: `"6h"`
-
-Where gh-desk waits, how long to wait for required checks still running. Only the time gh-desk is running counts.
-
 ### merge.blocked_timeout
 
 duration · Default: `"30m"`
 
-Where gh-desk waits, how long a pull request may stay blocked by another rule (a second approval, code owners) after its required checks finished. Only the time gh-desk is running counts.
+Where gh-desk waits, how long a pull request may stay blocked by another rule (a second approval, code owners) after its jobs finished. Only the time gh-desk is running counts.
 
 ### merge.update_branch
 

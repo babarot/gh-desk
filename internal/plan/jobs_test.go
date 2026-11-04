@@ -73,14 +73,23 @@ func TestJobs(t *testing.T) {
 				Runs:   []model.WorkflowRun{workflowRun("Deploy", model.RunWaiting, "")}},
 		},
 		{
-			name:    "checks not all read",
-			mi:      model.MergeInfo{RunsRead: true, ChecksPartial: true},
+			// Every job is in a workflow run, all read.
+			name: "checks not all read, runs all read",
+			mi:   model.MergeInfo{RunsRead: true, ChecksPartial: true, Runs: []model.WorkflowRun{workflowRun("Test", model.RunCompleted, model.CheckSuccess)}},
+		},
+		{
+			name:    "checks not all read, runs not all read",
+			mi:      model.MergeInfo{RunsRead: true, RunsPartial: true, ChecksPartial: true},
 			running: true,
 		},
 		{
-			name:    "runs not all read",
-			mi:      model.MergeInfo{RunsRead: true, RunsPartial: true},
+			name:    "checks not all read, runs not read",
+			mi:      model.MergeInfo{ChecksPartial: true},
 			running: true,
+		},
+		{
+			name: "runs not all read, checks all read",
+			mi:   model.MergeInfo{RunsRead: true, RunsPartial: true, Checks: []model.Check{checkRun("test", model.RunCompleted, model.CheckSuccess)}},
 		},
 		{
 			// Actions off, or the token may not read runs: the check runs
@@ -148,6 +157,72 @@ func TestJobs(t *testing.T) {
 			}
 			if got := FailedJobs(tt.mi); !slices.Equal(got, tt.failed) {
 				t.Errorf("FailedJobs = %q; want %q", got, tt.failed)
+			}
+		})
+	}
+}
+
+// A merge waits for the jobs at work, required or not, and leaves a pull
+// request whose job failed; GitHub's auto-merge, which waits only for the
+// required ones, is not turned on while they are at work.
+func TestForMergeWaitsForJobs(t *testing.T) {
+	human := model.PR{Author: "alice"}
+	mine := model.PR{Author: "me"}
+	at := func(state model.MergeState, checks ...model.Check) model.MergeInfo {
+		mi := info(state)
+		mi.Checks, mi.RunsRead = checks, true
+		mi.Runs = []model.WorkflowRun{workflowRun("CI", model.RunCompleted, model.CheckSuccess)}
+		return mi
+	}
+	atWork := checkRun("test (ubuntu-latest)", inProgress, "")
+	tests := []struct {
+		name   string
+		mi     model.MergeInfo
+		pr     model.PR
+		step   Step
+		reason string
+		admin  bool
+	}{
+		// gh-desk#47: no required check, the tests at work.
+		{"unstable, a job at work", at(model.MergeUnstable, atWork), human, StepWait, "wait for checks, then merge", false},
+		{"clean, a job at work", at(model.MergeClean, atWork), human, StepWait, "wait for checks, then merge", false},
+		{"clean, jobs done", at(model.MergeClean, checkRun("test", model.RunCompleted, model.CheckSuccess)), human, StepMerge, "merge now", false},
+		{"a job not required failed", at(model.MergeUnstable, checkRun("lint", model.RunCompleted, model.CheckFailure)), human, StepSkip, "a job failed: lint", false},
+		{"blocked, auto-merge allowed, a job at work", func() model.MergeInfo {
+			mi := at(model.MergeBlocked, atWork)
+			mi.Repo.AutoMerge = true
+			return mi
+		}(), human, StepWait, "wait for checks, then merge", false},
+		{"blocked, auto-merge allowed, jobs done", func() model.MergeInfo {
+			mi := at(model.MergeBlocked)
+			mi.Repo.AutoMerge = true
+			return mi
+		}(), human, StepAutoMerge, "turn on auto-merge", false},
+		// A policy bot's status waits for the approval: not a job.
+		{"only a status pending", at(model.MergeBlocked, status("policy-bot: main", model.CheckPending, true)), human, StepWait, "wait for checks, then merge", false},
+		{"admin, a job at work", func() model.MergeInfo {
+			mi := at(model.MergeBlocked, atWork)
+			mi.AdminMerge = true
+			return mi
+		}(), mine, StepWait, "wait for checks, then merge as admin", false},
+		// An admin merge goes past GitHub's wait for required checks, so a
+		// required status that failed still stops it.
+		{"admin, a required status failed", func() model.MergeInfo {
+			mi := at(model.MergeBlocked, status("ci/jenkins", model.CheckFailure, true))
+			mi.AdminMerge = true
+			return mi
+		}(), mine, StepSkip, "checks failing", false},
+		{"admin, all done", func() model.MergeInfo {
+			mi := at(model.MergeBlocked, checkRun("test", model.RunCompleted, model.CheckSuccess))
+			mi.AdminMerge = true
+			return mi
+		}(), mine, StepMerge, "merge as admin", true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			d := ForMerge(tt.mi, tt.pr, "me", set)
+			if d.Step != tt.step || d.Reason != tt.reason || d.Admin != tt.admin {
+				t.Errorf("ForMerge = %+v; want step %s, reason %q, admin %v", d, tt.step, tt.reason, tt.admin)
 			}
 		})
 	}

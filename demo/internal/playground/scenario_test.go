@@ -120,8 +120,8 @@ func newDesk(t *testing.T) *desk {
 	set.Lists, set.Chats = nil, nil
 	set.PaneHeight = PaneHeight(45)
 	rn := runner.New(w.Runner(), logging.Discard(), runner.Options{Settings: set.Plan, Viewer: Viewer, CanWait: true,
-		ChecksTimeout: cfg.Merge.ChecksTimeout.D, BlockedTimeout: cfg.Merge.BlockedTimeout.D,
-		PollFast: time.Millisecond, PollSlow: time.Millisecond, Recheck: time.Millisecond, RecheckFor: time.Millisecond})
+		WaitTimeout: cfg.Checks.WaitTimeout.D, BlockedTimeout: cfg.Merge.BlockedTimeout.D,
+		PollFast: time.Millisecond, PollSlow: time.Millisecond, Recheck: time.Millisecond, RecheckFor: time.Millisecond, Quiet: time.Millisecond})
 	t.Cleanup(rn.Wait)
 	d := &desk{t: t, m: tui.New(w.Source(), rn, w.Claude(), keymap.Default(), logging.Discard(), set), w: w}
 	d.update(tea.WindowSizeMsg{Width: 140, Height: 45})

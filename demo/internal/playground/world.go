@@ -466,10 +466,18 @@ func (w *World) mergeInfo(ids []string, details bool) map[string]model.MergeInfo
 			mi.HeadRefID = "ref:" + p.Key.String()
 		}
 		if details {
+			// Every check is a job of one workflow, at work until its
+			// time comes.
 			mi.Checks = []model.Check{}
+			run := model.WorkflowRun{Name: "CI", Status: model.RunCompleted, Conclusion: model.CheckSuccess}
 			for _, c := range p.checks {
-				mi.Checks = append(mi.Checks, model.Check{Name: c.name, State: p.checkState(c), Required: c.required})
+				st, status := p.checkState(c), model.RunCompleted
+				if st == model.CheckPending {
+					status, run.Status, run.Conclusion = "IN_PROGRESS", "IN_PROGRESS", ""
+				}
+				mi.Checks = append(mi.Checks, model.Check{Name: c.name, State: st, Required: c.required, Kind: model.KindCheckRun, Run: status})
 			}
+			mi.Runs, mi.RunsRead = []model.WorkflowRun{run}, true
 			mi.Files = slices.Clone(p.files)
 		}
 		out[id] = mi

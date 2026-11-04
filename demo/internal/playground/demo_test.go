@@ -101,7 +101,7 @@ func TestMergeBots(t *testing.T) {
 	w, _ := newWorld()
 	rn := runner.New(w.Runner(), logging.Discard(), runner.Options{Viewer: Viewer, CanWait: true,
 		Settings: plan.Settings{AutoMerge: true, Methods: []model.MergeMethod{model.MethodMerge}},
-		PollFast: time.Millisecond, PollSlow: time.Millisecond, Recheck: time.Millisecond, RecheckFor: time.Millisecond})
+		PollFast: time.Millisecond, PollSlow: time.Millisecond, Recheck: time.Millisecond, RecheckFor: time.Millisecond, Quiet: time.Millisecond})
 	var items []runner.Item
 	for _, p := range w.prs {
 		if p.AuthorIsBot {

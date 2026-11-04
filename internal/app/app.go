@@ -188,7 +188,7 @@ func assemble(cfg config.File, warns []string, e env, log *slog.Logger) parts {
 		log.Info("another gh-desk holds the record of pending merges")
 	}
 	rn := runner.New(runnerGitHub{e.gh}, log, runner.Options{Settings: set.Plan, Viewer: e.viewer, Store: rstore, CanWait: rstore != nil,
-		ChecksTimeout: cfg.Merge.ChecksTimeout.D, BlockedTimeout: cfg.Merge.BlockedTimeout.D})
+		WaitTimeout: cfg.Checks.WaitTimeout.D, BlockedTimeout: cfg.Merge.BlockedTimeout.D})
 	var lock *pendingLock
 	if store == nil && err == nil {
 		// Taken over once the other gh-desk quits.
