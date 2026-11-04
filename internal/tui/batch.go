@@ -2,6 +2,7 @@ package tui
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 
@@ -47,6 +48,66 @@ type batchState struct {
 	done    map[model.PRKey]progress
 	skipped []noteItem
 	noted   bool
+	// lanes are the steps of each pull request, for the progress pane.
+	lanes map[model.PRKey]*lane
+}
+
+// lane is a pull request's steps in a batch: those done, the one it is
+// on, and those the last forecast puts ahead.
+type lane struct {
+	done []laneStep
+	cur  *laneStep
+	next []runner.Step
+	// checks are what the wait it is on is for.
+	checks []string
+}
+
+// laneStep is a step begun at at, which took took once done.
+type laneStep struct {
+	step runner.Step
+	at   time.Time
+	took time.Duration
+}
+
+// track takes a runner's event into the pull request's lane: a forecast
+// replaces the steps ahead, a step begun ends the one before, and an end
+// ends the one it was on. A wait that changes what it waits on is a new
+// step, so the one before stays among those done.
+func (bs *batchState) track(ev runner.Event, now time.Time) {
+	if bs.lanes == nil {
+		bs.lanes = map[model.PRKey]*lane{}
+	}
+	l := bs.lanes[ev.Key]
+	if l == nil {
+		l = &lane{}
+		bs.lanes[ev.Key] = l
+	}
+	switch {
+	case ev.Forecast:
+		l.next = ev.Plan
+	case ev.Step != "":
+		if l.cur == nil || l.cur.step != ev.Step {
+			l.finish(now)
+			l.cur = &laneStep{step: ev.Step, at: now}
+			if i := slices.IndexFunc(l.next, func(s runner.Step) bool { return s == ev.Step || s.Waits() && ev.Step.Waits() }); i >= 0 {
+				l.next = l.next[i+1:]
+			}
+		}
+		l.checks = ev.Checks
+	case ev.Result.Final():
+		l.finish(now)
+		l.next = nil
+	}
+}
+
+// finish ends the step the lane is on.
+func (l *lane) finish(now time.Time) {
+	if l.cur == nil {
+		return
+	}
+	l.cur.took = now.Sub(l.cur.at)
+	l.done = append(l.done, *l.cur)
+	l.cur, l.checks = nil, nil
 }
 
 type eventMsg struct {
@@ -91,6 +152,13 @@ func (m *Model) event(msg eventMsg) tea.Cmd {
 	}
 	ev := msg.ev
 	cmds := []tea.Cmd{listen(msg.batch, msg.ch)}
+	if bs := m.batches[msg.batch]; bs != nil && !ev.Watch {
+		bs.track(ev, m.set.Now())
+	}
+	if ev.Forecast {
+		// It says only what is ahead; the row keeps what it was doing.
+		return tea.Batch(cmds...)
+	}
 	pg := progress{text: ev.Text, result: ev.Result, watch: ev.Watch}
 	if ev.Locked {
 		pg.text, pg.detail, pg.locked = m.lockedBy(), m.lockedDetail(ev.Key, ""), true

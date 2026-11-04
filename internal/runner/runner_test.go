@@ -262,6 +262,54 @@ func TestWaitIsLogged(t *testing.T) {
 	}
 }
 
+// A merge says each step it begins, what a wait is for, and its guess of
+// the steps ahead at each decision: approving first, then waiting for the
+// check, which the approval's decision did not foresee.
+func TestStepsAndForecasts(t *testing.T) {
+	mi, it := pr("1", "api", 1, "alice")
+	mi.MergeState = model.MergeBlocked
+	f := newFake(mi)
+	approved := false
+	f.onRead = func(_ string, mi *model.MergeInfo, n int) {
+		for _, c := range f.calls {
+			approved = approved || strings.HasPrefix(c, "review ")
+		}
+		switch {
+		case approved && n < 6:
+			mi.Checks = []model.Check{{Name: "build", State: model.CheckPending, Required: true}}
+		case approved:
+			mi.Checks, mi.MergeState = []model.Check{{Name: "build", State: model.CheckSuccess, Required: true}}, model.MergeClean
+		}
+	}
+	var got []string
+	var last string
+	for _, e := range runBatch(t, f, Merge, it)[it.PR.Key] {
+		switch {
+		case e.Forecast:
+			got = append(got, fmt.Sprint("plan ", e.Plan))
+		case e.Step != "":
+			// A wait says its step at every read; once is enough here.
+			if s := fmt.Sprint("step ", e.Step, " ", e.Checks); s != last {
+				got, last = append(got, s), s
+			}
+		case e.Result.Final():
+			got = append(got, "end "+resultWord[e.Result])
+		}
+	}
+	want := []string{
+		"plan [approve wait merge]",
+		"step approve []",
+		"plan [wait merge]",
+		"step wait-checks [build]",
+		"plan [merge]",
+		"step merge []",
+		"end merged",
+	}
+	if !slices.Equal(got, want) {
+		t.Errorf("steps =\n%s\nwant\n%s", strings.Join(got, "\n"), strings.Join(want, "\n"))
+	}
+}
+
 // The viewer's own pull request blocked by a required review is merged as
 // an admin once its checks pass, without an approval.
 func TestOwnBlockedMergesAsAdmin(t *testing.T) {

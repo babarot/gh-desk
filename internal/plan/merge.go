@@ -101,6 +101,23 @@ func ChecksRunning(mi model.MergeInfo, approvalChecks []string) bool {
 	return false
 }
 
+// RunningChecks names the checks a wait is for: the required checks still
+// running, apart from approval checks, or with approval set, the approval
+// checks still running.
+func RunningChecks(mi model.MergeInfo, approvalChecks []string, approval bool) []string {
+	var out []string
+	for _, c := range mi.Checks {
+		if !pending(c.State) {
+			continue
+		}
+		isApproval := MatchAny(approvalChecks, c.Name)
+		if approval && isApproval || !approval && c.Required && !isApproval {
+			out = append(out, c.Name)
+		}
+	}
+	return out
+}
+
 // AwaitingApproval reports whether every check that has not succeeded is
 // one that waits for an approval, and at least one does: the pull request
 // waits for a review, not for CI.

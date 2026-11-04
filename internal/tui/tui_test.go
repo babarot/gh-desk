@@ -2033,6 +2033,52 @@ func TestRefreshIsLogged(t *testing.T) {
 	}
 }
 
+// A batch keeps each pull request's steps from the runner's events: the
+// forecast is replaced at each decision, a step begun ends the one
+// before, a wait that changes what it waits on is a step of its own, and
+// a forecast leaves the row's progress as it was.
+func TestBatchTracksSteps(t *testing.T) {
+	m, _ := startWith(t, fixture(), keymap.Default())
+	clock := now
+	m.set.Now = func() time.Time { return clock }
+	k := key("acme", "api", 12)
+	m.batches["b1"] = &batchState{kind: runner.Merge, goes: map[model.PRKey]bool{k: true}, done: map[model.PRKey]progress{}}
+	ch := make(chan runner.Event)
+	feed := func(after time.Duration, ev runner.Event) {
+		clock = clock.Add(after)
+		ev.Key = k
+		m.event(eventMsg{batch: "b1", ev: ev, ok: true, ch: ch})
+	}
+	feed(0, runner.Event{Forecast: true, Plan: []runner.Step{runner.StepReady, runner.StepApprove, runner.StepMerge}})
+	feed(0, runner.Event{Step: runner.StepReady, Text: "marking ready"})
+	feed(time.Second, runner.Event{Step: runner.StepApprove, Text: "approving"})
+	feed(2*time.Second, runner.Event{Forecast: true, Plan: []runner.Step{runner.StepWait, runner.StepMerge}})
+	if got := m.progress[k].text; got != "approving" {
+		t.Errorf("a forecast changed the row's progress to %q", got)
+	}
+	feed(0, runner.Event{Step: runner.StepWaitApproval, Text: "waiting for approval checks", Checks: []string{"policy-bot"}})
+	feed(4*time.Second, runner.Event{Step: runner.StepWaitChecks, Text: "waiting for checks", Checks: []string{"build", "lint"}})
+	l := m.batches["b1"].lanes[k]
+	var done []string
+	for _, s := range l.done {
+		done = append(done, fmt.Sprint(s.step, " ", s.took))
+	}
+	if want := []string{"ready 1s", "approve 2s", "wait-approval-checks 4s"}; !slices.Equal(done, want) {
+		t.Errorf("done = %q, want %q", done, want)
+	}
+	if l.cur == nil || l.cur.step != runner.StepWaitChecks || !slices.Equal(l.checks, []string{"build", "lint"}) {
+		t.Errorf("on %+v waiting for %q", l.cur, l.checks)
+	}
+	if !slices.Equal(l.next, []runner.Step{runner.StepMerge}) {
+		t.Errorf("ahead = %q, want the merge only", l.next)
+	}
+	feed(3*time.Second, runner.Event{Step: runner.StepMerge, Text: "merging"})
+	feed(time.Second, runner.Event{Result: runner.Merged, Text: "merged"})
+	if l.cur != nil || len(l.next) != 0 || len(l.done) != 5 || l.done[4].took != time.Second {
+		t.Errorf("after the merge: done %+v, on %+v, ahead %q", l.done, l.cur, l.next)
+	}
+}
+
 // esc at the top of the list does not quit; it says q does.
 func TestBackDoesNotQuitAtTop(t *testing.T) {
 	m := startSet(t, testSettings(), 100)
