@@ -83,6 +83,9 @@ func (m *Model) mouse(msg tea.MouseMsg) tea.Cmd {
 	if m.filtering {
 		return nil
 	}
+	if m.logMouse(msg) {
+		return nil
+	}
 	// Pointing at the list or the header above the claude pane goes back
 	// to them, as the list takes no keys while the pane is shown.
 	var back tea.Cmd

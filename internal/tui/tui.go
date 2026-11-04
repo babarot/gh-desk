@@ -264,6 +264,9 @@ type Model struct {
 	// rereading is a reading of the lists again, by r or the clock, until
 	// it is logged.
 	rereading *rereading
+	// logv is the log viewer while it is open; logGen counts its openings.
+	logv   *logView
+	logGen int
 	// telling is r's reading of the shown tab, while it lasts, so that
 	// its end is said.
 	telling *telling
@@ -412,6 +415,8 @@ func (m *Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, m.key(msg)
 	case tickMsg:
 		return m, m.autoRefresh()
+	case logTickMsg:
+		return m, m.logTick(msg)
 	case eventMsg:
 		return m, m.event(msg)
 	case lockMsg:
@@ -482,6 +487,9 @@ func (m *Model) key(msg tea.KeyPressMsg) tea.Cmd {
 	if m.keys.Matches("help", k) {
 		m.openHelp()
 		return nil
+	}
+	if m.logv != nil {
+		return m.logKey(k)
 	}
 	if m.claudeShown() {
 		return m.chatWaiting(k)

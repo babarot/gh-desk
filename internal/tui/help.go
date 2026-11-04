@@ -32,7 +32,7 @@ var helpScopes = []struct {
 }{
 	{keymap.ScopeGlobal, "anywhere"}, {keymap.ScopeNav, "moving"}, {keymap.ScopeList, "the list and its preview"},
 	{keymap.ScopePopup, "a menu or a list popup"}, {keymap.ScopeConfirm, "a confirm popup"},
-	{keymap.ScopeTriage, "claude on the list"}, {keymap.ScopeChat, "claude on a pull request"},
+	{keymap.ScopeTriage, "claude on the list"}, {keymap.ScopeLog, "the log"}, {keymap.ScopeChat, "claude on a pull request"},
 	{keymap.ScopeCompose, "writing a review"},
 }
 
@@ -43,6 +43,9 @@ const homepage = "https://github.com/babarot/gh-desk"
 
 // helpScope is the scope of the screen ? was opened from.
 func (m *Model) helpScope() keymap.Scope {
+	if m.logv != nil {
+		return keymap.ScopeLog
+	}
 	if m.claudeShown() {
 		return keymap.ScopeChat
 	}

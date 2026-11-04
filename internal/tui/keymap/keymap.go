@@ -30,6 +30,9 @@ const (
 	ScopePopup   Scope = "popup"
 	ScopeConfirm Scope = "confirm"
 	ScopeTriage  Scope = "triage"
+	// ScopeLog is read while the log viewer is open, which takes the
+	// keys, as the claude pane does.
+	ScopeLog     Scope = "log"
 	ScopeChat    Scope = "chat"
 	ScopeCompose Scope = "compose"
 	ScopeInput   Scope = "input"
@@ -97,6 +100,8 @@ var Defaults = []Def{
 	{"preview", ScopeList, []string{"p"}, "preview pane"},
 	{"preview_grow", ScopeList, []string{"+"}, "taller pane"},
 	{"preview_shrink", ScopeList, []string{"-"}, "shorter pane"},
+	// Opens the log viewer, and closes it from there.
+	{"log", ScopeList, []string{"L"}, "log"},
 
 	{"choose", ScopePopup, []string{"enter"}, "choose"},
 	{"toggle_rule", ScopePopup, []string{"space"}, "check a rule"},
@@ -106,6 +111,8 @@ var Defaults = []Def{
 	// A confirm popup reads no choose, so enter answers it too.
 	{"confirm", ScopeConfirm, []string{"y", "enter"}, "yes"},
 	{"include_failing", ScopeConfirm, []string{"f"}, "include failing"},
+
+	{"log_this_pr", ScopeLog, []string{"f"}, "this PR only"},
 
 	{"triage_apply", ScopeTriage, []string{"enter"}, "apply"},
 	{"triage_more", ScopeTriage, []string{"i"}, "ask more"},

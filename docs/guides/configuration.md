@@ -107,4 +107,4 @@ instructions = "Point out changes that have no tests."
 
 ## When something is wrong
 
-gh-desk writes a log file; `gh desk log` prints where it is. Set `log.level = "debug"`, or run `gh desk --debug`, to see every read as well as every write.
+gh-desk writes a log file; `gh desk log` prints where it is, and `L` shows it while gh-desk runs. Set `log.level = "debug"`, or run `gh desk --debug`, to see every read as well as every write.

@@ -116,6 +116,8 @@ func (m *Model) listKey(k string) tea.Cmd {
 			t.showSettled = !t.showSettled
 			t.sel = 0
 		}
+	case is("log"):
+		return m.openLog()
 	case is("preview"):
 		m.pane.on = !m.pane.on
 	case is("preview_grow"):
@@ -374,14 +376,19 @@ type layout struct {
 	list, pane int
 }
 
-func (m *Model) layout() layout {
+func (m *Model) layout() layout { return m.layoutFor(m.pane.on || m.logInPane()) }
+
+// layoutFor is the layout with the bottom pane shown or not; the log
+// viewer takes its place when the screen is narrow, whether the preview
+// is on or off.
+func (m *Model) layoutFor(on bool) layout {
 	// header, column header, status line, key line
 	rest := m.height - 4
 	if m.filterLine() {
 		rest--
 	}
 	pane := 0
-	if m.pane.on && m.pane.height > 0 {
+	if on && m.pane.height > 0 {
 		pane = m.pane.height + 2
 		// The list keeps at least a third of the lines; the pane shrinks
 		// first, and goes when it would show fewer than six.
