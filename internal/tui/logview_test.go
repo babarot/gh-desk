@@ -244,3 +244,20 @@ func TestProgressStaysUntilClosed(t *testing.T) {
 		t.Errorf("reopening showed a batch that had ended:\n%s", screen(m))
 	}
 }
+
+// What GitHub said reaches the log viewer cleaned: a check's name or an
+// error with an escape sequence or a line break draws neither.
+func TestLogViewerCleansWhatGitHubSaid(t *testing.T) {
+	m, log := startLogged(t, 130, 34, 0)
+	feed, a, _ := startBatch(t, m, "b1")
+	feed(0, runner.Event{Key: a, Step: runner.StepWaitChecks, Text: "waiting for checks", Checks: []string{"evil\x1b[2Jname\nnext"}})
+	log.Warn("search read in part", "err", "bad\x1b]0;title\x07\nline")
+	press(m, "L")
+	s, _ := m.render()
+	if strings.Contains(s, "\x1b[2J") || strings.Contains(s, "\x1b]0;") || strings.Contains(s, "\x07") {
+		t.Errorf("an escape sequence from GitHub reached the screen")
+	}
+	if strings.Count(screen(m), "\n") != 33 {
+		t.Errorf("a line break from GitHub added a line:\n%s", screen(m))
+	}
+}

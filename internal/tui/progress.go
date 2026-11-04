@@ -71,7 +71,7 @@ func (m *Model) progressBox(bs *batchState, w, room int, wide bool) []string {
 		dots, name := 0, 0
 		for _, k := range bs.order {
 			dots = max(dots, len(stepsOf(bs.lanes[k])))
-			name = max(name, len(shortKey(k)))
+			name = max(name, lipgloss.Width(shortKey(k)))
 		}
 		for _, k := range bs.order {
 			lines = append(lines, m.dotLane(bs, k, min(name, 20), dots))

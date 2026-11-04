@@ -107,7 +107,11 @@ func (bs *batchState) track(ev runner.Event, now time.Time) {
 				l.next = l.next[i+1:]
 			}
 		}
-		l.checks = ev.Checks
+		// Check names come from GitHub; cleaned as they arrive.
+		l.checks = nil
+		for _, c := range ev.Checks {
+			l.checks = append(l.checks, safeLine(c))
+		}
 	case ev.Result.Final():
 		l.finish(now)
 		l.next = nil

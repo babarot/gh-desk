@@ -274,12 +274,14 @@ func (m *Model) logLines(r logging.Record, width int) []string {
 	if r.Level >= slog.LevelWarn {
 		msg = m.levelStyle(r.Level)
 	}
-	words := []logWord{{msg, r.Msg}}
+	// A record can carry what GitHub said, an error or a name; it is
+	// cleaned before it is drawn, as text from GitHub is.
+	words := []logWord{{msg, safeLine(r.Msg)}}
 	for _, a := range r.Attrs {
 		if logHidden[a.Key] {
 			continue
 		}
-		val := a.Value.String()
+		val := safeLine(a.Value.String())
 		if strings.ContainsAny(val, " \t\n\"") || val == "" {
 			val = fmt.Sprintf("%q", val)
 		}
