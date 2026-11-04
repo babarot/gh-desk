@@ -558,6 +558,7 @@ func (m *Model) claudeExited(msg claudeExitMsg) tea.Cmd {
 		c.Unlock()
 	}
 	if msg.err != nil {
+		m.log.Warn("claude code failed", logging.KeyPR, msg.key.String(), "err", msg.err.Error())
 		m.fail("Claude Code: " + msg.err.Error())
 		return nil
 	}

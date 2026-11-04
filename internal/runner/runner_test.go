@@ -1,8 +1,12 @@
 package runner
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
+	"log/slog"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -138,7 +142,12 @@ func runReview(t *testing.T, f *fakeGH, rv ReviewText, items ...Item) map[model.
 
 func runWith(t *testing.T, f *fakeGH, start func(context.Context, *Runner) <-chan Event) map[model.PRKey][]Event {
 	t.Helper()
-	r := New(f, logging.Discard(), Options{Settings: settings, Viewer: "me", CanWait: true,
+	return runLogged(t, f, logging.Discard(), start)
+}
+
+func runLogged(t *testing.T, f *fakeGH, log *slog.Logger, start func(context.Context, *Runner) <-chan Event) map[model.PRKey][]Event {
+	t.Helper()
+	r := New(f, log, Options{Settings: settings, Viewer: "me", CanWait: true,
 		ChecksTimeout: time.Second, BlockedTimeout: 40 * time.Millisecond, WatchTimeout: time.Second,
 		PollFast: 5 * time.Millisecond, PollSlow: 5 * time.Millisecond, Recheck: 2 * time.Millisecond, RecheckFor: 50 * time.Millisecond})
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -215,6 +224,41 @@ func TestWaitForChecksThenMerge(t *testing.T) {
 	es := evs[it.PR.Key]
 	if last(es).Result != Merged || !strings.Contains(fmt.Sprint(es), "waiting for checks") {
 		t.Errorf("events = %+v", es)
+	}
+}
+
+// A wait is logged when it starts and when it ends, with what it waited
+// on, so the log tells how long a merge waited and why.
+func TestWaitIsLogged(t *testing.T) {
+	mi, it := pr("1", "api", 1, "alice")
+	mi.MergeState = model.MergeBlocked
+	mi.Checks = []model.Check{{Name: "build", State: model.CheckPending, Required: true}}
+	f := newFake(mi)
+	f.onRead = func(_ string, mi *model.MergeInfo, n int) {
+		if n > 5 {
+			mi.Checks[0].State, mi.MergeState = model.CheckSuccess, model.MergeClean
+		}
+	}
+	var buf bytes.Buffer
+	runLogged(t, f, logging.New(&buf, slog.LevelInfo), func(ctx context.Context, r *Runner) <-chan Event {
+		_, ch := r.Start(ctx, Merge, []Item{it})
+		return ch
+	})
+	var waits []string
+	for line := range strings.Lines(buf.String()) {
+		var rec map[string]any
+		if err := json.Unmarshal([]byte(line), &rec); err != nil {
+			t.Fatal(err)
+		}
+		if msg, _ := rec["msg"].(string); strings.HasPrefix(msg, "wait ") {
+			if rec[logging.KeyPR] != "acme/api#1" {
+				t.Errorf("%s without its pull request: %v", msg, rec)
+			}
+			waits = append(waits, fmt.Sprint(msg, " ", rec[logging.KeyStep], " ", rec["result"]))
+		}
+	}
+	if want := []string{"wait start checks <nil>", "wait end checks ready"}; !slices.Equal(waits, want) {
+		t.Errorf("waits logged = %q, want %q", waits, want)
 	}
 }
 

@@ -528,6 +528,7 @@ func (m *Model) handleData(msg tea.Msg) tea.Cmd {
 		}
 	case browseMsg:
 		if msg.err != nil {
+			m.log.Warn("could not open the browser", "err", msg.err.Error())
 			m.fail("could not open the browser: " + msg.err.Error())
 		}
 	case notesMsg:

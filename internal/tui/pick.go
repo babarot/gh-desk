@@ -108,6 +108,7 @@ func (m *Model) bodies(msg bodiesMsg) {
 		m.picker.loading = false
 	}
 	if msg.err != nil {
+		m.log.Warn("descriptions read in part", "err", msg.err.Error())
 		m.fail("could not read every description: " + msg.err.Error())
 	}
 }

@@ -249,6 +249,9 @@ type Model struct {
 	refreshed map[int]time.Time
 	// refreshing is the reading r started, while it lasts.
 	refreshing *refreshRun
+	// rereading is a reading of the lists again, by r or the clock, until
+	// it is logged.
+	rereading *rereading
 	// telling is r's reading of the shown tab, while it lasts, so that
 	// its end is said.
 	telling *telling
