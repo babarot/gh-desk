@@ -3,9 +3,12 @@ package app
 import (
 	"bytes"
 	"flag"
+	"io"
 	"os"
 	"strings"
 	"testing"
+
+	"github.com/spf13/cobra"
 )
 
 var update = flag.Bool("update", false, "rewrite docs/reference/commands.md")
@@ -19,16 +22,21 @@ func commandsReference(t *testing.T) string {
 	// The default of --config is written as a reader's own path would
 	// start, not as the path of whoever runs the test.
 	t.Setenv("XDG_CONFIG_HOME", "~/.config")
-	var help, configHelp bytes.Buffer
-	Run([]string{"-h"}, &bytes.Buffer{}, &help)
-	configCommand([]string{"help"}, "", false, &configHelp, &bytes.Buffer{})
-
 	var b strings.Builder
 	b.WriteString("# Commands\n\n")
 	b.WriteString("<!-- Generated from internal/app by TestCommandsReferenceIsUpToDate. Do not edit; run go test ./internal/app -run TestCommandsReferenceIsUpToDate -update. -->\n\n")
-	b.WriteString("Installed as a gh extension, gh-desk runs as `gh desk`; installed with Go or Nix, as `gh-desk`. With no command, it opens the pull requests waiting on you.\n\n")
-	b.WriteString("## gh desk\n\n```\n" + help.String() + "```\n\n")
-	b.WriteString("## gh desk config\n\n```\n" + configHelp.String() + "```\n")
+	b.WriteString("Installed as a gh extension, gh-desk runs as `gh desk`; installed with Go or Nix, as `gh-desk`. With no command, it opens the pull requests waiting on you.\n")
+	var section func(*cobra.Command)
+	section = func(cmd *cobra.Command) {
+		var help bytes.Buffer
+		args := append(strings.Fields(cmd.CommandPath())[2:], "--help")
+		Run(args, &help, &bytes.Buffer{})
+		b.WriteString("\n## " + cmd.CommandPath() + "\n\n```\n" + help.String() + "```\n")
+		for _, sub := range cmd.Commands() {
+			section(sub)
+		}
+	}
+	section(newRootCommand(io.Discard, io.Discard))
 	return b.String()
 }
 

@@ -148,6 +148,52 @@ func TestRunSubcommands(t *testing.T) {
 	}
 }
 
+func TestWrongCallsAreUsageErrors(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config.toml")
+	for _, args := range [][]string{
+		{"gc", "extra"},
+		{"log", "extra"},
+		{"--no-cache", "gc"},
+		{"-debug"},
+		{"config", "init", "extra"},
+		{"config", "show", "extra"},
+		{"config", "check", "a", "b"},
+	} {
+		var out, errb bytes.Buffer
+		if code := Run(append([]string{"--config", path}, args...), &out, &errb); code != 2 || !strings.Contains(errb.String(), "Usage:") {
+			t.Errorf("%v: code %d, err %q", args, code, errb.String())
+		}
+	}
+	if _, err := os.Stat(path); !os.IsNotExist(err) {
+		t.Errorf("a wrong call wrote the config file: %v", err)
+	}
+}
+
+func TestHelpRunsNothing(t *testing.T) {
+	// gc removes worktrees, so asking for its help must never run it.
+	path := filepath.Join(t.TempDir(), "config.toml")
+	for _, args := range [][]string{{"gc", "--help"}, {"gc", "-h"}, {"config", "init", "--help"}, {"config", "check", "--help"}, {"config", "help"}} {
+		var out, errb bytes.Buffer
+		if code := Run(append(args, "--config", path), &out, &errb); code != 0 || !strings.Contains(out.String(), "Usage:") {
+			t.Errorf("%v: code %d, out %q, err %q", args, code, out.String(), errb.String())
+		}
+	}
+	if _, err := os.Stat(path); !os.IsNotExist(err) {
+		t.Errorf("help wrote the config file: %v", err)
+	}
+}
+
+func TestFlagsAfterTheCommand(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config.toml")
+	var out bytes.Buffer
+	if code := Run([]string{"config", "init", "--config", path}, &out, &bytes.Buffer{}); code != 0 {
+		t.Fatalf("code %d", code)
+	}
+	if _, err := os.Stat(path); err != nil {
+		t.Errorf("--config after the command was not used: %v", err)
+	}
+}
+
 func TestOnlyReadingToolsForClaude(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "config.toml")
 	if err := os.WriteFile(path, []byte("[claude]\nallowed_tools = [\"Read\", \"Bash\"]\n"), 0o644); err != nil {
