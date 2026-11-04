@@ -440,6 +440,7 @@ func (m *Model) runBulk() tea.Cmd {
 		return nil
 	}
 	for _, it := range items {
+		m.hold(it.PR.Key)
 		m.progress[it.PR.Key] = progress{text: "queued"}
 		if !b.approves() {
 			delete(m.selected, it.PR.Key)

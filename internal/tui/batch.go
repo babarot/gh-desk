@@ -32,6 +32,24 @@ type progress struct {
 	locked bool
 }
 
+// heldSort is where a row sorts while it shows a result: by what it was
+// when its batch started, so that what the batch changes on it, such as a
+// draft made ready, does not move it away from where it was being watched.
+type heldSort struct {
+	draft   bool
+	updated time.Time
+}
+
+// hold keeps where the row of k sorts now, unless it is kept already.
+func (m *Model) hold(k model.PRKey) {
+	if _, ok := m.held[k]; ok {
+		return
+	}
+	if p, ok := m.knownPR(k); ok {
+		m.held[k] = heldSort{draft: p.Draft, updated: p.Updated}
+	}
+}
+
 // batchState follows a batch until every pull request it acts on has a
 // result, then writes one notification for it.
 type batchState struct {
@@ -155,6 +173,7 @@ func (m *Model) resume() tea.Cmd {
 	for _, p := range m.set.Resume {
 		bs.goes[p.Key] = true
 		bs.order = append(bs.order, p.Key)
+		m.hold(p.Key)
 		m.progress[p.Key] = progress{text: "resuming"}
 	}
 	id, ch := m.run.Resume(m.ctx, m.set.Resume)
@@ -184,6 +203,7 @@ func (m *Model) event(msg eventMsg) tea.Cmd {
 	if ev.Locked {
 		pg.text, pg.detail, pg.locked = m.lockedBy(), m.lockedDetail(ev.Key, ""), true
 	}
+	m.hold(ev.Key)
 	m.progress[ev.Key] = pg
 	if ev.Approved {
 		m.markReviewed(ev.Key, model.ReviewApproved)
@@ -612,6 +632,11 @@ func (m *Model) clearResults() int {
 			}
 		}
 		delete(m.merged, k)
+	}
+	for k := range m.held {
+		if _, shown := m.progress[k]; !shown {
+			delete(m.held, k)
+		}
 	}
 	return n
 }
