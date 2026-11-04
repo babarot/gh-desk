@@ -78,6 +78,9 @@ func (m *Model) render() (string, *tea.Cursor) {
 		popup := m.renderBulk()
 		m.popupAt = boxAt(popup, 2, m.width)
 		lines = m.overlay(lines, popup, 2, m.width)
+		if f := m.bulk.close; f != nil && f.editing {
+			cur = inPopup(f.ta.Cursor(), popup, 2+f.at, m.width)
+		}
 	case m.notesAt != nil:
 		cur = nil
 		popup := m.renderNotes()
@@ -352,7 +355,7 @@ var ready = map[keymap.Action]bool{
 	"next_tab": true, "prev_tab": true, "tab_1": true, "tab_2": true, "tab_3": true, "tab_4": true, "tab_5": true, "tab_6": true, "tab_7": true, "tab_8": true, "tab_9": true,
 	"menu": true, "expand": true, "collapse": true, "approve": true, "comment": true, "review": true, "browse": true, "hide": true,
 	"events": true, "select": true, "select_shown": true, "clear_selection": true, "merge": true, "ready_for_review": true,
-	"include_failing": true, "choose": true, "select_rule": true, "toggle_rule": true, "add_to_selection": true, "filter_by_rule": true,
+	"include_failing": true, "close": true, "delete_branch": true, "write_comment": true, "choose": true, "select_rule": true, "toggle_rule": true, "add_to_selection": true, "filter_by_rule": true,
 	"fold_bots": true, "show_excluded": true, "filter": true,
 	"preview_down": true, "preview_up": true, "preview_grow": true, "preview_shrink": true, "next_file": true, "prev_file": true, "preview_tab": true, "fold": true, "preview": true,
 	"confirm": true, "next_kind": true, "post": true, "editor": true, "accept": true, "erase": true, "erase_word": true,
@@ -372,6 +375,10 @@ func (m *Model) hints() string {
 	switch {
 	case m.bulk != nil && m.bulk.approves():
 		as = []keymap.Action{"confirm", "include_failing"}
+	case m.bulk != nil && m.bulk.close != nil && m.bulk.close.editing:
+		as = nil
+	case m.bulk != nil && m.bulk.close != nil:
+		as = []keymap.Action{"confirm", "delete_branch", "write_comment"}
 	case m.bulk != nil:
 		as = []keymap.Action{"confirm"}
 	case m.picker != nil:

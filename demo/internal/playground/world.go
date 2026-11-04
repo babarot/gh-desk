@@ -59,13 +59,15 @@ type pull struct {
 	checks   []check
 	comments []model.Comment
 	diff     string
-	files    []string
-	behind   bool
-	auto     bool
-	methods  []model.MergeMethod
-	answer   string
-	followUp string
-	draft    draftReview
+	// branchGone is set once its head branch was deleted.
+	branchGone bool
+	files      []string
+	behind     bool
+	auto       bool
+	methods    []model.MergeMethod
+	answer     string
+	followUp   string
+	draft      draftReview
 	// updates counts the branch updates, which move the head.
 	updates int
 }
@@ -458,7 +460,11 @@ func (w *World) mergeInfo(ids []string, details bool) map[string]model.MergeInfo
 		mi := model.MergeInfo{Key: p.Key, ID: p.ID, State: p.State, Draft: p.Draft, HeadOID: p.HeadOID,
 			BaseOID: oid(p.Key.Repository() + "@" + p.BaseRef), MergeState: p.mergeState(), Decision: p.decision(),
 			AutoMerge: p.auto, Rollup: p.rollup(), Repo: model.RepoMerge{Methods: p.methods, AutoMerge: true},
-			Reviews: slices.Clone(p.Reviews)}
+			Reviews: slices.Clone(p.Reviews), CanClose: true, CanWrite: true, CanDeleteHead: p.State != model.StateOpen,
+			Head: model.Branch{Owner: p.Key.Owner, Repo: p.Key.Repo, Name: p.HeadRef}}
+		if !p.branchGone {
+			mi.HeadRefID = "ref:" + p.Key.String()
+		}
 		if details {
 			mi.Checks = []model.Check{}
 			for _, c := range p.checks {
@@ -469,6 +475,22 @@ func (w *World) mergeInfo(ids []string, details bool) map[string]model.MergeInfo
 		out[id] = mi
 	}
 	return out
+}
+
+// BasedOn finds the world's open pull requests whose base each branch is.
+func (s Source) BasedOn(_ context.Context, bs []model.Branch) (map[model.Branch][]int, error) {
+	s.w.pause(250 * time.Millisecond)
+	s.w.mu.Lock()
+	defer s.w.mu.Unlock()
+	out := map[model.Branch][]int{}
+	for _, b := range bs {
+		for _, p := range s.w.prs {
+			if p.State == model.StateOpen && p.Key.Owner == b.Owner && p.Key.Repo == b.Repo && p.BaseRef == b.Name {
+				out[b] = append(out[b], p.Key.Number)
+			}
+		}
+	}
+	return out, nil
 }
 
 func (s Source) Bodies(_ context.Context, ids []string) (map[string]string, error) {
@@ -590,6 +612,39 @@ func (r Runner) MarkReady(_ context.Context, key model.PRKey, _, head string) er
 	}
 	p.Draft = false
 	p.Updated = r.w.now()
+	return nil
+}
+
+func (r Runner) PostComment(ctx context.Context, pr model.PR, body string) error {
+	return Source(r).PostComment(ctx, pr, body)
+}
+
+func (r Runner) BasedOn(ctx context.Context, bs []model.Branch) (map[model.Branch][]int, error) {
+	return Source(r).BasedOn(ctx, bs)
+}
+
+func (r Runner) Close(_ context.Context, key model.PRKey, _, _ string) error {
+	r.w.pause(500 * time.Millisecond)
+	r.w.mu.Lock()
+	defer r.w.mu.Unlock()
+	p := r.w.find(key)
+	if p == nil {
+		return fmt.Errorf("%s is not in the demo", key)
+	}
+	p.State = model.StateClosed
+	p.Updated = r.w.now()
+	return nil
+}
+
+func (r Runner) DeleteBranch(_ context.Context, key model.PRKey, _, _ string) error {
+	r.w.pause(400 * time.Millisecond)
+	r.w.mu.Lock()
+	defer r.w.mu.Unlock()
+	p := r.w.find(key)
+	if p == nil {
+		return fmt.Errorf("%s is not in the demo", key)
+	}
+	p.branchGone = true
 	return nil
 }
 

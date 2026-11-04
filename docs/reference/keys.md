@@ -60,6 +60,7 @@ browse = []
 | `A` | `approve` | approve |
 | `M` | `merge` | merge |
 | `D` | `ready_for_review` | ready for review |
+| (none) | `close` | close |
 | `c` | `comment` | comment |
 | `R` | `review` | review |
 | `C` | `triage` | triage with claude |
@@ -95,6 +96,8 @@ browse = []
 |---|---|---|
 | `y` `enter` | `confirm` | yes |
 | `f` | `include_failing` | include failing |
+| `x` | `delete_branch` | delete branches |
+| `i` | `write_comment` | write a comment |
 
 ## Claude on the list
 

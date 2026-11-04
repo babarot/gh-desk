@@ -97,6 +97,8 @@ func (m *Model) listKey(k string) tea.Cmd {
 		return m.startBulk(runner.Merge)
 	case is("ready_for_review"):
 		return m.startBulk(runner.Ready)
+	case is("close"):
+		return m.startClose()
 	case is("comment"):
 		return m.startComment()
 	case is("review") && len(m.selected) > 0:

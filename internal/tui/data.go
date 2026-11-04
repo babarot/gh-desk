@@ -672,6 +672,9 @@ func (m *Model) handleData(msg tea.Msg) tea.Cmd {
 		return m.edited(msg)
 	case bulkInfoMsg:
 		return m.bulkInfo(msg)
+	case basedOnMsg:
+		m.basedOnRead(msg)
+		return nil
 	case bodiesMsg:
 		m.bodies(msg)
 	case checksMsg:

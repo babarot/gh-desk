@@ -179,7 +179,9 @@ func (g *GitHub) MergeInfo(ctx context.Context, ids []string, details bool) (map
 		g.find(model.PRKey{}, id, func(p *pr) {
 			mi := model.MergeInfo{Key: p.Key, ID: p.ID, State: p.State, Draft: p.Draft, HeadOID: p.HeadOID, BaseOID: "b45e000",
 				MergeState: model.MergeClean, Decision: p.Decision, Rollup: p.Checks, Reviews: p.Reviews,
-				Repo: model.RepoMerge{Methods: []model.MergeMethod{model.MethodMerge, model.MethodSquash}, AutoMerge: true}}
+				Repo:     model.RepoMerge{Methods: []model.MergeMethod{model.MethodMerge, model.MethodSquash}, AutoMerge: true},
+				CanClose: true, CanWrite: true, CanDeleteHead: p.State != model.StateOpen, HeadRefID: "ref:" + p.Key.String(),
+				Head: model.Branch{Owner: p.Key.Owner, Repo: p.Key.Repo, Name: p.HeadRef}}
 			if p.Checks != model.CheckSuccess {
 				mi.MergeState = model.MergeBlocked
 			}
@@ -246,6 +248,24 @@ func (g *GitHub) MarkReady(ctx context.Context, k model.PRKey, id, head string) 
 	}
 	g.find(k, id, func(p *pr) { p.Draft = false })
 	return nil
+}
+
+// BasedOn finds no pull request based on another: the recording has no
+// stacks.
+func (g *GitHub) BasedOn(ctx context.Context, bs []model.Branch) (map[model.Branch][]int, error) {
+	return map[model.Branch][]int{}, g.wait(ctx, 200)
+}
+
+func (g *GitHub) Close(ctx context.Context, k model.PRKey, id, head string) error {
+	if err := g.wait(ctx, 500); err != nil {
+		return err
+	}
+	g.find(k, id, func(p *pr) { p.State = model.StateClosed })
+	return nil
+}
+
+func (g *GitHub) DeleteBranch(ctx context.Context, k model.PRKey, refID, head string) error {
+	return g.wait(ctx, 400)
 }
 
 func (g *GitHub) CommitInfo(ctx context.Context, k model.PRKey, oid string) (runner.Commit, error) {

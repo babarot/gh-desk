@@ -44,6 +44,8 @@ type Source interface {
 	MergeInfo(ctx context.Context, ids []string, details bool) (map[string]model.MergeInfo, error)
 	// Bodies reads descriptions by node ID, for rules that read them.
 	Bodies(ctx context.Context, ids []string) (map[string]string, error)
+	// BasedOn reads the open pull requests whose base each branch is.
+	BasedOn(ctx context.Context, branches []model.Branch) (map[model.Branch][]int, error)
 	// Heavy reads the fields a list's search leaves out, by node ID, each
 	// for the head it has now.
 	Heavy(ctx context.Context, ids []string) (map[string]model.Heavy, error)
@@ -59,6 +61,7 @@ type Layout interface {
 type Runner interface {
 	Start(ctx context.Context, kind runner.Kind, items []runner.Item) (string, <-chan runner.Event)
 	StartReview(ctx context.Context, rv runner.ReviewText, items []runner.Item) (string, <-chan runner.Event)
+	StartClose(ctx context.Context, ct runner.CloseText, items []runner.Item) (string, <-chan runner.Event)
 	Resume(ctx context.Context, ps []model.Pending) (string, <-chan runner.Event)
 }
 
@@ -241,6 +244,9 @@ type Model struct {
 	// failed on some, which the next comment starts with.
 	posting *posting
 	unsent  string
+	// unsentClose is the comment of a close popup closed without
+	// confirming, given back when close is opened again (ADR-066).
+	unsentClose string
 	// unsentReview is the review that was not sent to some of its pull
 	// requests, which the next review starts with.
 	unsentReview *runner.ReviewText
@@ -483,7 +489,7 @@ func (m *Model) key(msg tea.KeyPressMsg) tea.Cmd {
 	}
 	switch {
 	case m.bulk != nil:
-		return m.bulkKey(k)
+		return m.bulkKeyMsg(msg)
 	case m.notesAt != nil:
 		return m.notesKey(k)
 	case m.picker != nil:
@@ -519,6 +525,10 @@ func (m *Model) key(msg tea.KeyPressMsg) tea.Cmd {
 
 func (m *Model) paste(msg tea.PasteMsg) tea.Cmd {
 	switch {
+	case m.bulk != nil:
+		// Pasted text goes only into a text box the user put the focus
+		// in; a review being written under the popup takes none.
+		return m.closePaste(msg)
 	case m.filtering:
 		m.filter += msg.Content
 		m.tab().sel, m.tab().offset = 0, 0

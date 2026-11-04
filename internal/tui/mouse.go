@@ -460,6 +460,11 @@ func boxItems(owner []int, top, h, feet int) []int {
 func (m *Model) popupMouse(msg tea.MouseMsg) (cmd tea.Cmd, ok bool) {
 	switch {
 	case m.bulk != nil:
+		if m.bulk.close != nil {
+			if cmd, ok := m.closeMouse(msg); ok {
+				return cmd, true
+			}
+		}
 		if m.scrollMouse(msg, &m.bulk.offset) {
 			return m.bulkKey(keymap.Back), true
 		}

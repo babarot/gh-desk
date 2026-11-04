@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"slices"
@@ -30,6 +31,52 @@ type fakeGH struct {
 	commits      map[string]Commit
 	// bodies are the bodies of the reviews sent, by pull request ID.
 	bodies map[string]string
+	// based are the pull requests based on each branch; basedErr fails
+	// every read of them, and closeErr every close.
+	based    map[model.Branch][]int
+	basedErr error
+	closeErr error
+}
+
+func (f *fakeGH) PostComment(_ context.Context, pr model.PR, body string) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.log(fmt.Sprintf("comment %s", pr.Key))
+	return nil
+}
+
+func (f *fakeGH) Close(_ context.Context, k model.PRKey, id, head string) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.closeErr != nil {
+		return f.closeErr
+	}
+	f.log(fmt.Sprintf("close %s %s", k, head))
+	f.prs[id].State = model.StateClosed
+	f.prs[id].CanDeleteHead = true
+	return nil
+}
+
+func (f *fakeGH) DeleteBranch(_ context.Context, k model.PRKey, refID, head string) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.log(fmt.Sprintf("delete-branch %s %s", k, refID))
+	return nil
+}
+
+func (f *fakeGH) BasedOn(_ context.Context, bs []model.Branch) (map[model.Branch][]int, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.basedErr != nil {
+		return nil, f.basedErr
+	}
+	out := map[model.Branch][]int{}
+	for _, b := range bs {
+		if ns := f.based[b]; len(ns) > 0 {
+			out[b] = ns
+		}
+	}
+	return out, nil
 }
 
 func (f *fakeGH) log(s string) { f.calls = append(f.calls, s) }
@@ -1054,5 +1101,148 @@ func TestRedraftedStops(t *testing.T) {
 	_, ch = newRunner(f, newStore()).Resume(context.Background(), []model.Pending{p})
 	if e := last(drain(t, ch)); e.Result != Stopped || len(f.calls) != 0 {
 		t.Errorf("resumed: last %+v, calls %v", e, f.calls)
+	}
+}
+
+func runClose(t *testing.T, f *fakeGH, ct CloseText, items ...Item) map[model.PRKey][]Event {
+	t.Helper()
+	return runWith(t, f, func(ctx context.Context, r *Runner) <-chan Event { _, ch := r.StartClose(ctx, ct, items); return ch })
+}
+
+// closable is a pull request the viewer can close, in a repository it can
+// push to. GitHub offers to delete its branch only once it is closed.
+func closable(id, repo string, n int) (model.MergeInfo, Item) {
+	mi, it := pr(id, repo, n, "renovate")
+	mi.CanClose, mi.CanWrite, mi.HeadRefID = true, true, "ref-"+id
+	mi.Head = model.Branch{Owner: "acme", Repo: repo, Name: "branch-" + id}
+	return mi, it
+}
+
+// Close writes the comment, closes, then deletes the branch, in that
+// order, and says the comment was taken once.
+func TestClose(t *testing.T) {
+	mi, it := closable("1", "api", 1)
+	f := newFake(mi)
+	evs := runClose(t, f, CloseText{Body: "Superseded.", DeleteBranch: true}, it)
+	if want := "comment acme/api#1,close acme/api#1 h-1,delete-branch acme/api#1 ref-1"; strings.Join(f.calls, ",") != want {
+		t.Errorf("calls = %v", f.calls)
+	}
+	e := last(evs[it.PR.Key])
+	if e.Result != Closed || e.Text != "closed · branch deleted" || !e.Closed {
+		t.Errorf("last event = %+v", e)
+	}
+	n := 0
+	for _, e := range evs[it.PR.Key] {
+		if e.Commented {
+			n++
+		}
+	}
+	if n != 1 {
+		t.Errorf("%d events say the comment was taken", n)
+	}
+}
+
+// A branch that cannot be deleted is kept, and the pull request is still
+// closed; one not open, or that the viewer cannot close, is skipped.
+func TestCloseKeepsBranches(t *testing.T) {
+	fork, it1 := closable("1", "api", 1)
+	fork.HeadInFork = true
+	stacked, it2 := closable("2", "web", 2)
+	gone, it3 := closable("3", "cli", 3)
+	gone.HeadRefID = ""
+	merged, it4 := closable("4", "doc", 4)
+	merged.State = model.StateMerged
+	locked, it5 := closable("5", "app", 5)
+	locked.CanClose = false
+	reader, it6 := closable("6", "ops", 6)
+	reader.CanWrite = false
+	f := newFake(fork, stacked, gone, merged, locked, reader)
+	f.based = map[model.Branch][]int{stacked.Head: {9}}
+	evs := runClose(t, f, CloseText{DeleteBranch: true}, it1, it2, it3, it4, it5, it6)
+	for k, want := range map[model.PRKey]string{it1.PR.Key: "closed · branch kept: in a fork", it2.PR.Key: "closed · branch kept: base of #9",
+		it3.PR.Key: "closed · branch kept: already deleted", it6.PR.Key: "closed · branch kept: you cannot delete it"} {
+		if e := last(evs[k]); e.Result != Closed || e.Text != want {
+			t.Errorf("%s: last event = %+v, want %q", k, e, want)
+		}
+	}
+	if e := last(evs[it4.PR.Key]); e.Result != Skipped || e.Text != "merged" {
+		t.Errorf("merged: last event = %+v", e)
+	}
+	if e := last(evs[it5.PR.Key]); e.Result != Skipped || e.Text != "you cannot close it" {
+		t.Errorf("cannot close: last event = %+v", e)
+	}
+	for _, c := range f.calls {
+		if strings.HasPrefix(c, "delete-branch") {
+			t.Errorf("a branch was deleted: %v", f.calls)
+		}
+	}
+}
+
+// Not knowing what is based on a branch keeps it.
+func TestCloseKeepsBranchWhenBasedOnFails(t *testing.T) {
+	mi, it := closable("1", "api", 1)
+	f := newFake(mi)
+	f.basedErr = errors.New("rate limited")
+	evs := runClose(t, f, CloseText{DeleteBranch: true}, it)
+	if e := last(evs[it.PR.Key]); e.Result != Closed || e.Text != "closed · branch kept: could not tell what is based on it" {
+		t.Errorf("last event = %+v", e)
+	}
+}
+
+// The pull request is read again before each write: a head that moved
+// after the comment stops the close, and one that moved after the close
+// keeps the branch.
+func TestCloseReadsBeforeEachWrite(t *testing.T) {
+	mi, it := closable("1", "api", 1)
+	f := newFake(mi)
+	f.onRead = func(_ string, mi *model.MergeInfo, reads int) {
+		if reads == 2 {
+			mi.HeadOID = "pushed-later"
+		}
+	}
+	evs := runClose(t, f, CloseText{Body: "Superseded.", DeleteBranch: true}, it)
+	if e := last(evs[it.PR.Key]); e.Result != Stopped || e.Text != "commented; head changed · not closed" {
+		t.Errorf("moved after the comment: last event = %+v", e)
+	}
+	if strings.Contains(strings.Join(f.calls, ","), "close") {
+		t.Errorf("closed on a head the user did not see: %v", f.calls)
+	}
+
+	mi, it = closable("2", "api", 2)
+	f = newFake(mi)
+	f.onRead = func(_ string, mi *model.MergeInfo, reads int) {
+		if reads == 2 {
+			mi.HeadOID = "pushed-later"
+		}
+	}
+	evs = runClose(t, f, CloseText{DeleteBranch: true}, it)
+	if e := last(evs[it.PR.Key]); e.Result != Closed || e.Text != "closed · branch kept: head changed" {
+		t.Errorf("moved after the close: last event = %+v", e)
+	}
+}
+
+// A close that fails after the comment says the comment was written.
+func TestCloseFailsAfterComment(t *testing.T) {
+	mi, it := closable("1", "api", 1)
+	f := newFake(mi)
+	f.closeErr = errors.New("forbidden")
+	evs := runClose(t, f, CloseText{Body: "Superseded."}, it)
+	if e := last(evs[it.PR.Key]); e.Result != Failed || !strings.HasPrefix(e.Text, "commented; close failed") || e.Closed {
+		t.Errorf("last event = %+v", e)
+	}
+}
+
+// GitHub refusing to offer the branch after the close keeps it.
+func TestCloseKeepsBranchGitHubDoesNotOffer(t *testing.T) {
+	mi, it := closable("1", "api", 1)
+	f := newFake(mi)
+	f.onRead = func(_ string, mi *model.MergeInfo, reads int) {
+		if reads == 2 {
+			mi.CanDeleteHead = false
+		}
+	}
+	evs := runClose(t, f, CloseText{DeleteBranch: true}, it)
+	if e := last(evs[it.PR.Key]); e.Result != Closed || e.Text != "closed · branch kept: GitHub does not offer to delete it" {
+		t.Errorf("last event = %+v", e)
 	}
 }

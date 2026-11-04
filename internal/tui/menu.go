@@ -23,7 +23,7 @@ type actionMenu struct {
 
 // menuActions are the actions the menu can offer, in their default order:
 // what reads a pull request, then what answers it, then what finishes it.
-var menuActions = []keymap.Action{"ask_claude", "browse", "review", "comment", "approve", "merge", "ready_for_review", "hide"}
+var menuActions = []keymap.Action{"ask_claude", "browse", "review", "comment", "approve", "merge", "ready_for_review", "close", "hide"}
 
 // MenuActions are the actions the menu can offer, in their default order.
 func MenuActions() []string {
@@ -133,6 +133,11 @@ func (m *Model) aboutOne(a keymap.Action, p model.PR) (string, bool) {
 		return how, false
 	case "ready_for_review":
 		return m.aboutReady(p)
+	case "close":
+		if p.State != model.StateOpen {
+			return stateWords(p.State), true
+		}
+		return "close it, as the next popup says", false
 	case "comment":
 		return "comment on its conversation", false
 	case "review":
@@ -194,6 +199,12 @@ func (m *Model) aboutMany(a keymap.Action, prs []model.PR) (string, bool) {
 			return "none of them is a draft", true
 		}
 		return of("mark ready", n), false
+	case "close":
+		n := count(func(p model.PR) bool { return p.State == model.StateOpen })
+		if n == 0 {
+			return "none of them is open", true
+		}
+		return of("close", n), false
 	case "comment":
 		return fmt.Sprintf("the same comment on each of %d", len(prs)), false
 	case "review":
@@ -304,6 +315,8 @@ func (m *Model) runMenu(it menuItem) tea.Cmd {
 		return m.startBulk(runner.Merge)
 	case "ready_for_review":
 		return m.startBulk(runner.Ready)
+	case "close":
+		return m.startClose()
 	case "comment":
 		return m.startComment()
 	case "review":
@@ -364,7 +377,7 @@ func (m *Model) renderMenu() []string {
 		if it.off {
 			label, key, about = st.dim, st.dim, st.dim
 		}
-		item := hang(cursor+" "+fit(label.Render(m.keys.Help(it.action)), 22)+fit(key.Render(m.firstKey(it.action)), 7), about.Render(it.about), inner)
+		item := hang(cursor+" "+fit(label.Render(m.keys.Help(it.action)), 22)+fit(key.Render(m.menuKeyHint(it.action)), 7), about.Render(it.about), inner)
 		if i == sel {
 			for j := range item {
 				item[j] = onBackground(item[j], st.sel, inner)
@@ -414,4 +427,13 @@ func (m *Model) menuMouse(msg tea.MouseMsg) tea.Cmd {
 		return m.runMenu(its[v.sel])
 	}
 	return nil
+}
+
+// menuKeyHint is an action's key in the menu; none for one without a
+// key, such as close (ADR-066), which the menu is the way to.
+func (m *Model) menuKeyHint(a keymap.Action) string {
+	if ks := m.keys.Keys(a); len(ks) > 0 {
+		return ks[0]
+	}
+	return ""
 }

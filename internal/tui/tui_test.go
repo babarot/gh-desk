@@ -100,6 +100,8 @@ type fakeSource struct {
 	// infoReads are how many pull requests each read of MergeInfo asked
 	// for.
 	infoReads []int
+	// based are the pull requests based on each branch.
+	based map[model.Branch][]int
 	// noHeavy has Heavy return nothing, and searchErr fails every search.
 	noHeavy   bool
 	searchErr error
@@ -117,7 +119,12 @@ func (f *fakeSource) MergeInfo(_ context.Context, ids []string, _ bool) (map[str
 				}
 				mi := model.MergeInfo{Key: p.Key, ID: p.ID, State: model.StateOpen, HeadOID: p.HeadOID, MergeState: model.MergeClean,
 					Rollup: p.Checks, Checks: []model.Check{}, Files: []string{}, Reviews: p.Reviews,
-					Repo: model.RepoMerge{Methods: []model.MergeMethod{model.MethodMerge}}}
+					Repo:     model.RepoMerge{Methods: []model.MergeMethod{model.MethodMerge}},
+					CanClose: true, CanWrite: true, HeadRefID: "ref-" + p.ID,
+					Head: model.Branch{Owner: p.Key.Owner, Repo: p.Key.Repo, Name: p.HeadRef}}
+				if p.State != "" {
+					mi.State = p.State
+				}
 				if fn := f.info[p.Key]; fn != nil {
 					fn(&mi)
 				}
@@ -163,6 +170,16 @@ func (f *fakeSource) Bodies(_ context.Context, ids []string) (map[string]string,
 	return out, nil
 }
 
+func (f *fakeSource) BasedOn(_ context.Context, bs []model.Branch) (map[model.Branch][]int, error) {
+	out := map[model.Branch][]int{}
+	for _, b := range bs {
+		if ns := f.based[b]; len(ns) > 0 {
+			out[b] = ns
+		}
+	}
+	return out, nil
+}
+
 // fakeRunner records the batches it is given and ends each pull request
 // with the result results says, Approved or Merged by default.
 type fakeRunner struct {
@@ -171,6 +188,29 @@ type fakeRunner struct {
 	items   [][]runner.Item
 	results map[model.PRKey]runner.Event
 	resumed []model.Pending
+	closes  []runner.CloseText
+}
+
+// StartClose closes each pull request, saying first that the comment was
+// taken when there is one, as the runner does.
+func (r *fakeRunner) StartClose(_ context.Context, ct runner.CloseText, items []runner.Item) (string, <-chan runner.Event) {
+	r.closes = append(r.closes, ct)
+	r.kinds = append(r.kinds, runner.Close)
+	r.items = append(r.items, items)
+	ch := make(chan runner.Event, 2*len(items))
+	for _, it := range items {
+		if ct.Body != "" {
+			ch <- runner.Event{Key: it.PR.Key, Result: runner.Running, Text: "commented", Commented: true}
+		}
+		ev, ok := r.results[it.PR.Key]
+		if !ok {
+			ev = runner.Event{Result: runner.Closed, Text: "closed", Closed: true}
+		}
+		ev.Key = it.PR.Key
+		ch <- ev
+	}
+	close(ch)
+	return fmt.Sprintf("b%d", len(r.kinds)), ch
 }
 
 func (r *fakeRunner) Resume(ctx context.Context, ps []model.Pending) (string, <-chan runner.Event) {
@@ -2140,5 +2180,128 @@ func TestInboxReadsTheSingleChecksOfItsOwn(t *testing.T) {
 		if n > checksBatch {
 			t.Errorf("a read asked for %d pull requests, more than %d", n, checksBatch)
 		}
+	}
+}
+
+// Close is reached from the menu, with no key of its own. Its popup holds
+// the check and the text box from the start; keys are the popup's until i
+// puts the focus in the box, and the comment comes back after esc.
+func TestClose(t *testing.T) {
+	f := fixture()
+	m, r := startWith(t, f, keymap.Default())
+	if ks := m.keys.Keys("close"); len(ks) != 0 {
+		t.Fatalf("close has keys %v", ks)
+	}
+	openClose := func() {
+		t.Helper()
+		press(m, "enter")
+		for i, it := range m.menuItems() {
+			if it.action == "close" {
+				m.menu.sel = i
+			}
+		}
+		press(m, "enter")
+		if m.bulk == nil || m.bulk.close == nil {
+			t.Fatal("choosing close did not open its popup")
+		}
+	}
+	openClose()
+	golden(t, "close-confirm", screen(m))
+	// y is the popup's key while the box has no focus: typing it would
+	// confirm, so the test types with the focus in the box only.
+	press(m, "x", "i", "L", "G", "T", "M")
+	if got := m.bulk.close.ta.Value(); got != "LGTM" || !m.bulk.close.del {
+		t.Fatalf("comment = %q, delete = %v", got, m.bulk.close.del)
+	}
+	if _, cur := m.render(); cur == nil {
+		t.Error("the text box with the focus gave the terminal no cursor")
+	}
+	golden(t, "close-writing", screen(m))
+	press(m, "esc")
+	if m.bulk == nil || m.bulk.close.editing {
+		t.Fatal("esc in the box did not give the keys back to the popup")
+	}
+	if _, cur := m.render(); cur != nil {
+		t.Error("a cursor is shown while the box has no focus")
+	}
+	run(m, m.paste(tea.PasteMsg{Content: "pasted"}))
+	if got := m.bulk.close.ta.Value(); got != "LGTM" {
+		t.Errorf("a paste outside the box went into it: %q", got)
+	}
+	// Closed without confirming, the comment comes back.
+	press(m, "esc")
+	openClose()
+	if got := m.bulk.close.ta.Value(); got != "LGTM" {
+		t.Fatalf("the comment did not come back: %q", got)
+	}
+	m.bulk.close.del = true
+	press(m, "y")
+	if len(r.closes) != 1 || r.closes[0] != (runner.CloseText{Body: "LGTM", DeleteBranch: true}) {
+		t.Fatalf("closes = %+v", r.closes)
+	}
+	p, _ := m.knownPR(key("acme", "api", 12))
+	if p.State != model.StateClosed {
+		t.Errorf("the row does not show it closed: %s", p.State)
+	}
+	if m.unsentClose != "" {
+		t.Errorf("the comment was kept after it was sent: %q", m.unsentClose)
+	}
+}
+
+// A head branch that is in a fork, gone, or the base of an open pull
+// request is kept, and the popup says so before the user says yes.
+func TestCloseKeepsBranches(t *testing.T) {
+	f := fixture()
+	f.based = map[model.Branch][]int{{Owner: "acme", Repo: "api", Name: "retries"}: {41}}
+	f.info = map[model.PRKey]func(*model.MergeInfo){
+		key("acme", "api", 30): func(mi *model.MergeInfo) { mi.HeadInFork = true },
+	}
+	m := start(t, f, keymap.Default())
+	press(m, "b", "space", "j", "j", "space")
+	press(m, "enter")
+	for i, it := range m.menuItems() {
+		if it.action == "close" {
+			m.menu.sel = i
+		}
+	}
+	press(m, "enter", "x")
+	got := map[model.PRKey]string{}
+	for _, it := range m.bulk.items {
+		got[it.pr.Key] = it.closing.Keep
+	}
+	if got[key("acme", "api", 12)] != "base of #41" || got[key("acme", "api", 30)] != "in a fork" {
+		t.Errorf("kept = %v", got)
+	}
+	if s := screen(m); !strings.Contains(s, "branch kept: base of #41") || !strings.Contains(s, "0 of 2 can be deleted") {
+		t.Errorf("the popup does not say which branches it keeps:\n%s", s)
+	}
+}
+
+// A comment GitHub took is added to the pane's comments without reading
+// the pull request again; a read on its way is thrown away (ADR-067).
+func TestSentCommentShown(t *testing.T) {
+	m := start(t, fixture(), keymap.Default())
+	k := key("acme", "api", 12)
+	if e := m.cache.details[k]; e == nil || e.loading {
+		t.Fatalf("the detail was not read: %+v", e)
+	}
+	run(m, m.addSentComment(k, "Superseded by #40."))
+	cs := m.cache.details[k].val.Comments
+	if len(cs) != 1 || cs[0].Author != "me" || cs[0].Body != "Superseded by #40." {
+		t.Fatalf("comments = %+v", cs)
+	}
+	p, _ := m.knownPR(k)
+	var pane []string
+	for _, l := range m.descLines(p, 80) {
+		pane = append(pane, ansi.Strip(l.text))
+	}
+	if all := strings.Join(pane, "\n"); !strings.Contains(all, "comments (1)") || !strings.Contains(all, "Superseded by #40.") {
+		t.Errorf("the pane does not show the comment:\n%s", all)
+	}
+	m.cache.details[k] = &entry[model.Detail]{loading: true}
+	stale := m.cache.details[k]
+	m.addSentComment(k, "again")
+	if m.cache.details[k] == stale {
+		t.Error("a read on its way was kept")
 	}
 }

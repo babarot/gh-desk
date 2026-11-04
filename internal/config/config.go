@@ -48,7 +48,7 @@ var (
 	Columns = []string{"pr", "title", "author", "ci", "review", "why", "size", "age"}
 	// MenuActions are the actions the menu of enter offers, in their
 	// default order; a test in internal/app keeps them the TUI's.
-	MenuActions        = []string{"ask_claude", "browse", "review", "comment", "approve", "merge", "ready_for_review", "hide"}
+	MenuActions        = []string{"ask_claude", "browse", "review", "comment", "approve", "merge", "ready_for_review", "close", "hide"}
 	UpdateBranchValues = []string{"humans", "all", "never"}
 )
 

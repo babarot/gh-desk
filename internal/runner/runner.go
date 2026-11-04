@@ -32,6 +32,11 @@ type GitHub interface {
 	EnableAutoMerge(ctx context.Context, key model.PRKey, id, head string, method model.MergeMethod) error
 	UpdateBranch(ctx context.Context, key model.PRKey, id, head string) error
 	MarkReady(ctx context.Context, key model.PRKey, id, head string) error
+	PostComment(ctx context.Context, pr model.PR, body string) error
+	Close(ctx context.Context, key model.PRKey, id, head string) error
+	DeleteBranch(ctx context.Context, key model.PRKey, refID, head string) error
+	// BasedOn reads the open pull requests whose base each branch is.
+	BasedOn(ctx context.Context, branches []model.Branch) (map[model.Branch][]int, error)
 	CommitInfo(ctx context.Context, key model.PRKey, oid string) (Commit, error)
 }
 
@@ -114,7 +119,18 @@ const (
 	Merge
 	// Ready marks drafts ready for review.
 	Ready
+	// Close closes pull requests, with the comment and the deletion of
+	// their branches StartClose is given.
+	Close
 )
+
+// CloseText is what a Close batch does besides closing: the comment it
+// writes first, and whether it deletes the head branches. Like a review's
+// text it is held in memory only.
+type CloseText struct {
+	Body         string
+	DeleteBranch bool
+}
 
 // ReviewText is the review a Review batch sends to each of its pull
 // requests. It is held in memory only: a review batch is not recorded for
@@ -146,6 +162,9 @@ const (
 	Readied
 	// Reviewed is a review sent that is not an approval.
 	Reviewed
+	// Closed is a pull request closed; its Text says what became of its
+	// branch.
+	Closed
 	Skipped
 	Stopped
 	Failed
@@ -166,6 +185,13 @@ type Event struct {
 	Approved bool
 	// Readied is set when a draft was marked ready on its way to a merge.
 	Readied bool
+	// Commented is set on the one event that says the comment of a close
+	// was taken, so it can be shown without reading the pull request
+	// again (ADR-067).
+	Commented bool
+	// Closed is set on every event after the pull request was closed,
+	// whatever happens next.
+	Closed bool
 	// Method is how it was merged, on a Merged event gh-desk made.
 	Method model.MergeMethod
 	// Watch is set on events of a pull request put on auto-merge, after
@@ -207,6 +233,9 @@ const (
 	StepWaitBlocked Step = "wait-blocked"
 	StepMerge       Step = "merge"
 	StepAutoMerge   Step = "auto-merge"
+	StepComment     Step = "comment"
+	StepClose       Step = "close"
+	StepDeleteRef   Step = "delete-branch"
 )
 
 // Waits reports whether s is a wait.
@@ -278,7 +307,13 @@ func New(gh GitHub, log *slog.Logger, opt Options) *Runner {
 // StartReview runs a batch that sends rv to each pull request, as Start
 // does a batch of another kind.
 func (r *Runner) StartReview(ctx context.Context, rv ReviewText, items []Item) (string, <-chan Event) {
-	return r.run(ctx, Review, items, nil, rv)
+	return r.run(ctx, Review, items, nil, rv, CloseText{})
+}
+
+// StartClose runs a batch that closes each pull request as ct says, as
+// Start does a batch of another kind.
+func (r *Runner) StartClose(ctx context.Context, ct CloseText, items []Item) (string, <-chan Event) {
+	return r.run(ctx, Close, items, nil, ReviewText{}, ct)
 }
 
 // Start runs a batch of a merge or a ready for review and returns its ID
@@ -286,7 +321,7 @@ func (r *Runner) StartReview(ctx context.Context, rv ReviewText, items []Item) (
 // closed when every pull request has a final result and every auto-merge
 // it turned on is no longer watched. Canceling ctx stops it all.
 func (r *Runner) Start(ctx context.Context, kind Kind, items []Item) (string, <-chan Event) {
-	return r.run(ctx, kind, items, nil, ReviewText{})
+	return r.run(ctx, kind, items, nil, ReviewText{}, CloseText{})
 }
 
 // Resume goes on with the merges recorded by an earlier run. Each pull
@@ -300,10 +335,10 @@ func (r *Runner) Resume(ctx context.Context, ps []model.Pending) (string, <-chan
 			Head: p.Head, AutoMerge: p.AutoMerge}
 		pend[p.Key] = p
 	}
-	return r.run(ctx, Merge, items, pend, ReviewText{})
+	return r.run(ctx, Merge, items, pend, ReviewText{}, CloseText{})
 }
 
-func (r *Runner) run(ctx context.Context, kind Kind, items []Item, resume map[model.PRKey]model.Pending, rv ReviewText) (string, <-chan Event) {
+func (r *Runner) run(ctx context.Context, kind Kind, items []Item, resume map[model.PRKey]model.Pending, rv ReviewText, ct CloseText) (string, <-chan Event) {
 	batch := logging.NewID()
 	log := r.log.With(logging.KeyBatch, batch)
 	events := make(chan Event, 64)
@@ -316,13 +351,16 @@ func (r *Runner) run(ctx context.Context, kind Kind, items []Item, resume map[mo
 		}
 		byRepo[repo] = append(byRepo[repo], it)
 	}
-	verb := map[Kind]string{Review: "review", Merge: "merge", Ready: "ready"}[kind]
+	verb := map[Kind]string{Review: "review", Merge: "merge", Ready: "ready", Close: "close"}[kind]
 	if resume != nil {
 		verb = "resume"
 	}
 	attrs := []any{"kind", verb, "prs", len(items), "repos", len(repos)}
 	if kind == Review {
 		attrs = append(attrs, "event", strings.ToLower(string(rv.Event)))
+	}
+	if kind == Close {
+		attrs = append(attrs, "comment", ct.Body != "", "delete_branch", ct.DeleteBranch)
 	}
 	log.Info("batch start", attrs...)
 	var wg sync.WaitGroup
@@ -361,6 +399,8 @@ func (r *Runner) run(ctx context.Context, kind Kind, items []Item, resume map[mo
 					j.review(rv)
 				case kind == Ready:
 					j.markReady()
+				case kind == Close:
+					j.closePR(ct)
 				default:
 					j.merge()
 				}
@@ -392,6 +432,8 @@ type job struct {
 	approved bool
 	// readied is set once this job marked the draft ready.
 	readied bool
+	// closed is set once this job closed the pull request.
+	closed bool
 	// watching is set once the pull request is handed to watch, which
 	// releases it.
 	watching bool
@@ -412,7 +454,7 @@ type job struct {
 }
 
 func (j *job) say(res Result, text string) {
-	j.emit(Event{Key: j.it.PR.Key, Result: res, Text: text, Approved: j.approved, Readied: j.readied})
+	j.emit(Event{Key: j.it.PR.Key, Result: res, Text: text, Approved: j.approved, Readied: j.readied, Closed: j.closed})
 	if !res.Final() {
 		return
 	}
@@ -427,7 +469,7 @@ func (j *job) say(res Result, text string) {
 
 // step says the job starts or goes on with a step.
 func (j *job) step(s Step, text string, checks ...string) {
-	j.emit(Event{Key: j.it.PR.Key, Result: Running, Text: text, Approved: j.approved, Readied: j.readied, Step: s, Checks: checks})
+	j.emit(Event{Key: j.it.PR.Key, Result: Running, Text: text, Approved: j.approved, Readied: j.readied, Closed: j.closed, Step: s, Checks: checks})
 }
 
 // forecast says the steps still ahead, when they differ from the last
@@ -557,7 +599,7 @@ func approvedBy(mi model.MergeInfo, login string) bool {
 	return false
 }
 
-var resultWord = map[Result]string{Running: "running", Approved: "approved", Merged: "merged", AutoMergeOn: "auto-merge-on", Readied: "readied", Reviewed: "reviewed",
+var resultWord = map[Result]string{Running: "running", Approved: "approved", Merged: "merged", AutoMergeOn: "auto-merge-on", Readied: "readied", Reviewed: "reviewed", Closed: "closed",
 	Skipped: "skipped", Stopped: "stopped", Failed: "failed"}
 
 // read reads the pull request and checks its head is the one confirmed.
@@ -1051,4 +1093,117 @@ func short(err error) string {
 		s = s[:79] + "…"
 	}
 	return s
+}
+
+// closePR writes the comment, closes the pull request and deletes its head
+// branch, as ct asks. It reads the pull request again before each write
+// and decides again (ADR-066): neither the close nor the deletion takes an
+// expected head on GitHub, so this reading is the only check.
+func (j *job) closePR(ct CloseText) {
+	mi, ok := j.read(false)
+	if !ok {
+		return
+	}
+	based, keep := j.basedOn(mi, ct.DeleteBranch)
+	d := plan.ForClose(mi, based, ct.Body != "", ct.DeleteBranch)
+	if d.Skip {
+		j.say(Skipped, d.Reason)
+		return
+	}
+	if keep != "" {
+		d.Delete, d.Keep = false, keep
+	}
+	steps := []Step{StepClose}
+	if ct.Body != "" {
+		steps = append([]Step{StepComment}, steps...)
+	}
+	if d.Delete {
+		steps = append(steps, StepDeleteRef)
+	}
+	j.forecast(steps)
+	done := ""
+	if ct.Body != "" {
+		j.step(StepComment, "commenting")
+		pr := j.it.PR
+		pr.HeadOID = j.head
+		if err := j.r.gh.PostComment(j.ctx, pr, ct.Body); err != nil {
+			j.say(Failed, "comment failed: "+short(err))
+			return
+		}
+		j.emit(Event{Key: j.it.PR.Key, Result: Running, Text: "commented", Commented: true})
+		done = "commented; "
+		// Read again, saying that the comment went out whatever stops the
+		// close, so that confirming again is not taken for a comment not
+		// sent.
+		got, err := j.r.gh.MergeInfo(j.ctx, []string{j.it.PR.ID}, false)
+		if mi, ok = got[j.it.PR.ID]; err != nil || !ok {
+			j.say(Failed, done+"could not read it again, not closed")
+			return
+		}
+		switch {
+		case mi.State != model.StateOpen:
+			j.say(Stopped, done+"not open any more")
+			return
+		case mi.HeadOID != j.head:
+			j.say(Stopped, done+"head changed · not closed")
+			return
+		}
+	}
+	j.step(StepClose, "closing")
+	if err := j.r.gh.Close(j.ctx, j.it.PR.Key, j.it.PR.ID, j.head); err != nil {
+		j.say(Failed, done+"close failed: "+short(err))
+		return
+	}
+	j.closed = true
+	if !ct.DeleteBranch {
+		j.say(Closed, "closed")
+		return
+	}
+	if !d.Delete {
+		j.say(Closed, "closed · branch kept: "+d.Keep)
+		return
+	}
+	// Read again: the branch may have moved, or a pull request may have
+	// been based on it, since the close was decided.
+	got, err := j.r.gh.MergeInfo(j.ctx, []string{j.it.PR.ID}, false)
+	if mi, ok = got[j.it.PR.ID]; err != nil || !ok {
+		j.say(Failed, "closed; could not read it again, branch kept")
+		return
+	}
+	based, keep = j.basedOn(mi, true)
+	if keep == "" {
+		keep = plan.KeepBranch(mi, based)
+	}
+	if keep == "" && mi.HeadOID != j.head {
+		keep = "head changed"
+	}
+	if keep == "" && !mi.CanDeleteHead {
+		keep = "GitHub does not offer to delete it"
+	}
+	if keep != "" {
+		j.say(Closed, "closed · branch kept: "+keep)
+		return
+	}
+	j.step(StepDeleteRef, "deleting the branch")
+	if err := j.r.gh.DeleteBranch(j.ctx, j.it.PR.Key, mi.HeadRefID, j.head); err != nil {
+		j.say(Failed, "closed; deleting the branch failed: "+short(err))
+		return
+	}
+	j.say(Closed, "closed · branch deleted")
+}
+
+// basedOn reads the open pull requests based on the head branch, when its
+// deletion is asked and it is one that could be deleted. keep says why the
+// branch is kept when they could not be read: not knowing whether deleting
+// it closes another pull request keeps it.
+func (j *job) basedOn(mi model.MergeInfo, want bool) (based []int, keep string) {
+	if !want || mi.HeadInFork || mi.HeadRefID == "" || !mi.CanWrite {
+		return nil, ""
+	}
+	got, err := j.r.gh.BasedOn(j.ctx, []model.Branch{mi.Head})
+	if err != nil {
+		j.log.Info("based on failed", "err", err.Error())
+		return nil, "could not tell what is based on it"
+	}
+	return got[mi.Head], ""
 }

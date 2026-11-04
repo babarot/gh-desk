@@ -402,3 +402,37 @@ func TestClickDoesNotMarkDone(t *testing.T) {
 		t.Fatalf("d in the menu did not mark it done: %q", f.done)
 	}
 }
+
+// In the popup of a close, a second click on the check changes it and a
+// click on the text box puts the focus in it; then the box takes no
+// mouse input.
+func TestCloseMouse(t *testing.T) {
+	m := start(t, fixture(), keymap.Default())
+	press(m, "enter")
+	for i, it := range m.menuItems() {
+		if it.action == "close" {
+			m.menu.sel = i
+		}
+	}
+	press(m, "enter")
+	m.render()
+	f := m.bulk.close
+	x, check, box := m.popupAt.x+4, m.popupAt.y+f.checkAt, m.popupAt.y+f.at
+	mouseAt(m, tea.MouseClickMsg{X: x, Y: check, Button: tea.MouseLeft})
+	if f.del {
+		t.Fatal("one click changed the check")
+	}
+	mouseAt(m, tea.MouseClickMsg{X: x, Y: check, Button: tea.MouseLeft})
+	if !f.del {
+		t.Fatal("a second click did not change the check")
+	}
+	mouseAt(m, tea.MouseClickMsg{X: x, Y: box, Button: tea.MouseLeft})
+	if !f.editing {
+		t.Fatal("a click on the text box did not put the focus in it")
+	}
+	clickTwice(m, x, check)
+	clickTwice(m, 0, 0)
+	if !f.del || m.bulk == nil {
+		t.Error("the mouse acted while the text box had the focus")
+	}
+}
