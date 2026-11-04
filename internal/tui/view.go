@@ -45,7 +45,7 @@ func (m *Model) render() (string, *tea.Cursor) {
 	m.renderList(&b, l.list)
 	switch {
 	case l.pane > 0 && m.logInPane():
-		for _, s := range m.renderLog(m.width, l.pane) {
+		for _, s := range m.renderViewer(m.width, l.pane) {
 			b.WriteString(s + "\n")
 		}
 	case l.pane > 0 && m.claudeOpen:
@@ -62,7 +62,7 @@ func (m *Model) render() (string, *tea.Cursor) {
 		// Over the list's right side, from under the header to above the
 		// status line; what is under it is not dimmed, as it is no popup.
 		w, _ := m.logWidth()
-		for i, s := range m.renderLog(w, len(lines)-3) {
+		for i, s := range m.renderViewer(w, len(lines)-3) {
 			lines[1+i] = place(lines[1+i], s, m.width-w)
 		}
 	}

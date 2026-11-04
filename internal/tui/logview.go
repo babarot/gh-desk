@@ -46,6 +46,10 @@ type logView struct {
 	end    int
 	// gen tells this opening's redraws from an earlier one's.
 	gen int
+	// batches are the batches its progress pane shows: those running
+	// when it opened and those started since. A batch that ends stays
+	// until the viewer closes.
+	batches []string
 }
 
 type logTickMsg struct{ gen int }
@@ -83,6 +87,11 @@ func (m *Model) openLog() tea.Cmd {
 	}
 	m.logGen++
 	m.logv = &logView{pr: pr, follow: true, gen: m.logGen}
+	for _, id := range m.batchOrder {
+		if bs := m.batches[id]; bs != nil && !bs.noted {
+			m.logv.batches = append(m.logv.batches, id)
+		}
+	}
 	return m.after(logRedraw, logTickMsg{m.logGen})
 }
 
@@ -161,19 +170,34 @@ func (m *Model) logRecords() []logging.Record {
 	return out
 }
 
-// logInner is how many lines of records the log viewer holds.
-func (m *Model) logInner() int {
+// logArea is the log viewer's place: how wide and how many lines high.
+func (m *Model) logArea() (int, int) {
 	if m.logInPane() {
-		return max(m.layout().pane-2, 1)
+		return m.width, m.layout().pane
 	}
 	// Over the list: from under the header to above the status line.
-	return max(m.height-3-2, 1)
+	w, _ := m.logWidth()
+	return w, m.height - 3
 }
 
-// renderLog is the log viewer's box, w wide and h lines high.
+// logInner is how many lines of records the log viewer holds under its
+// progress pane.
+func (m *Model) logInner() int {
+	w, h := m.logArea()
+	return max(h-len(m.renderProgress(w, h-3, m.logInPane()))-2, 1)
+}
+
+// renderViewer is the log viewer, w wide and h lines high: the progress
+// pane on top while it shows a batch, and the log under it, which keeps
+// at least a line.
+func (m *Model) renderViewer(w, h int) []string {
+	out := m.renderProgress(w, h-3, m.logInPane())
+	return append(out, m.renderLog(w, h-len(out))...)
+}
+
+// renderLog is the log's box, w wide and h lines high.
 func (m *Model) renderLog(w, h int) []string {
 	st, v := m.st, m.logv
-	inner := w - 4
 	right := "following"
 	if !v.follow {
 		right = "paused · " + m.firstKey("bottom") + " to follow"
@@ -181,7 +205,14 @@ func (m *Model) renderLog(w, h int) []string {
 	if v.only {
 		right += " · " + v.pr.String() + " only"
 	}
-	title := st.mauve.Bold(true).Render("log")
+	return m.viewerBox(st.mauve.Bold(true).Render("log"), right, m.logBody(w-4, h-2), w, h-2)
+}
+
+// viewerBox is a box of the log viewer, w wide, with title and right on
+// its top border and n lines of body.
+func (m *Model) viewerBox(title, right string, body []string, w, n int) []string {
+	st := m.st
+	inner := w - 4
 	top := st.border.Render("╭ ") + title + " "
 	tail := " " + st.dim.Render(right) + st.border.Render(" ╮")
 	if lipgloss.Width(top)+lipgloss.Width(tail) > w {
@@ -189,8 +220,7 @@ func (m *Model) renderLog(w, h int) []string {
 	}
 	fill := w - lipgloss.Width(top) - lipgloss.Width(tail)
 	out := []string{top + st.border.Render(strings.Repeat("─", max(fill, 0))) + tail}
-	body := m.logBody(inner, h-2)
-	for i := 0; i < h-2; i++ {
+	for i := range n {
 		s := ""
 		if i < len(body) {
 			s = body[i]
@@ -244,12 +274,14 @@ func (m *Model) logLines(r logging.Record, width int) []string {
 	if r.Level >= slog.LevelWarn {
 		msg = m.levelStyle(r.Level)
 	}
-	words := []logWord{{msg, r.Msg}}
+	// A record can carry what GitHub said, an error or a name; it is
+	// cleaned before it is drawn, as text from GitHub is.
+	words := []logWord{{msg, safeLine(r.Msg)}}
 	for _, a := range r.Attrs {
 		if logHidden[a.Key] {
 			continue
 		}
-		val := a.Value.String()
+		val := safeLine(a.Value.String())
 		if strings.ContainsAny(val, " \t\n\"") || val == "" {
 			val = fmt.Sprintf("%q", val)
 		}

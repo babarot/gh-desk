@@ -50,6 +50,20 @@ type batchState struct {
 	noted   bool
 	// lanes are the steps of each pull request, for the progress pane.
 	lanes map[model.PRKey]*lane
+	// started and ended are when the batch started and when its last
+	// pull request ended.
+	started, ended time.Time
+}
+
+// addBatch keeps a batch that started, and shows it in the log viewer's
+// progress pane if the viewer is open.
+func (m *Model) addBatch(id string, bs *batchState) {
+	bs.started = m.set.Now()
+	m.batches[id] = bs
+	m.batchOrder = append(m.batchOrder, id)
+	if m.logv != nil {
+		m.logv.batches = append(m.logv.batches, id)
+	}
 }
 
 // lane is a pull request's steps in a batch: those done, the one it is
@@ -93,7 +107,11 @@ func (bs *batchState) track(ev runner.Event, now time.Time) {
 				l.next = l.next[i+1:]
 			}
 		}
-		l.checks = ev.Checks
+		// Check names come from GitHub; cleaned as they arrive.
+		l.checks = nil
+		for _, c := range ev.Checks {
+			l.checks = append(l.checks, safeLine(c))
+		}
 	case ev.Result.Final():
 		l.finish(now)
 		l.next = nil
@@ -140,8 +158,7 @@ func (m *Model) resume() tea.Cmd {
 		m.progress[p.Key] = progress{text: "resuming"}
 	}
 	id, ch := m.run.Resume(m.ctx, m.set.Resume)
-	m.batches[id] = bs
-	m.batchOrder = append(m.batchOrder, id)
+	m.addBatch(id, bs)
 	return tea.Batch(note, listen(id, ch))
 }
 
@@ -159,6 +176,10 @@ func (m *Model) event(msg eventMsg) tea.Cmd {
 		// It says only what is ahead; the row keeps what it was doing.
 		return tea.Batch(cmds...)
 	}
+	// The runner's words can carry what GitHub said, such as an error;
+	// cleaned as they arrive, before the row, the status line or the
+	// progress pane draws them.
+	ev.Text = safeLine(ev.Text)
 	pg := progress{text: ev.Text, result: ev.Result, watch: ev.Watch}
 	if ev.Locked {
 		pg.text, pg.detail, pg.locked = m.lockedBy(), m.lockedDetail(ev.Key, ""), true
@@ -201,7 +222,7 @@ func (m *Model) event(msg eventMsg) tea.Cmd {
 		bs.done[ev.Key] = p
 	}
 	if !bs.noted && len(bs.done) == len(bs.goes) {
-		bs.noted = true
+		bs.noted, bs.ended = true, m.set.Now()
 		cmds = append(cmds, m.noteBatch(bs))
 	}
 	return tea.Batch(cmds...)

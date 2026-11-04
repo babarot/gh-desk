@@ -453,8 +453,7 @@ func (m *Model) runBulk() tea.Cmd {
 	} else {
 		id, ch = m.run.Start(m.ctx, b.kind, items)
 	}
-	m.batches[id] = bs
-	m.batchOrder = append(m.batchOrder, id)
+	m.addBatch(id, bs)
 	return listen(id, ch)
 }
 
