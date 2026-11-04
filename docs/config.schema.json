@@ -274,6 +274,19 @@
             "description": "You must have reviewed it, whatever the review said.",
             "type": "boolean"
           },
+          "state": {
+            "description": "The states it must be in one of: \"open\", \"merged\" or \"closed\"; S selects open ones only, so [[select]] takes \"open\" alone.",
+            "items": {
+              "enum": [
+                "open",
+                "merged",
+                "closed"
+              ],
+              "type": "string"
+            },
+            "minItems": 1,
+            "type": "array"
+          },
           "title": {
             "description": "A regular expression the title must match.",
             "type": "string"
@@ -618,6 +631,19 @@
           "reviewed_by_me": {
             "description": "You must have reviewed it, whatever the review said.",
             "type": "boolean"
+          },
+          "state": {
+            "description": "The states it must be in one of: \"open\", \"merged\" or \"closed\"; S selects open ones only, so [[select]] takes \"open\" alone.",
+            "items": {
+              "enum": [
+                "open",
+                "merged",
+                "closed"
+              ],
+              "type": "string"
+            },
+            "minItems": 1,
+            "type": "array"
           },
           "title": {
             "description": "A regular expression the title must match.",

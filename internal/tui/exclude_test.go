@@ -320,3 +320,19 @@ func TestUnnamedRuleIsCalledByItsConditions(t *testing.T) {
 		t.Errorf("status = %q, want the rule's condition", got)
 	}
 }
+
+// A rule on the state, unnamed, is called by it, and what it leaves out of
+// a search tab is not counted as the inbox's merged or closed.
+func TestStateRuleIsNotTheInboxSettled(t *testing.T) {
+	f := withCarol()
+	f.searches["review"][len(f.searches["review"])-1].State = model.StateMerged
+	m := startSource(t, f, excluding(plan.Rule{States: []model.PRState{model.StateMerged, model.StateClosed}}))
+	if !strings.Contains(screen(m), "1 pull request excluded · a to show") {
+		t.Errorf("the count of the state rule:\n%s", screen(m))
+	}
+	press(m, "a")
+	cursorTo(t, m, key("acme", "api", 13))
+	if got := status(m); got != "excluded by state merged or closed" {
+		t.Errorf("status = %q", got)
+	}
+}

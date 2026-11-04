@@ -242,6 +242,8 @@ const settledName = "merged or closed"
 type exclusion struct {
 	by      []string
 	pending bool
+	// settled is set when the inbox excludes it as merged or closed.
+	settled bool
 }
 
 func (x exclusion) excluded() bool { return len(x.by) > 0 }
@@ -262,6 +264,7 @@ func (m *Model) exclusionOf(t *tab, p model.PR, n *model.Notification, now time.
 	var x exclusion
 	if t.inbox && !t.keepSettled && settled(p) {
 		x.by = append(x.by, settledName)
+		x.settled = true
 	}
 	if len(m.set.Exclude) == 0 {
 		return x
@@ -317,7 +320,7 @@ func (m *Model) excludedOf(t *tab) excludedCount {
 			return
 		}
 		c.n++
-		if x.by[0] == settledName {
+		if x.settled {
 			c.settled++
 		}
 		if _, ok := m.unread[p.Key]; ok {

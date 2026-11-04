@@ -366,6 +366,10 @@ reasons = ["mention"]
 [[select]]
 name = "no packages"
 packages = []
+
+[[select]]
+name = "merged"
+state = ["open", "merged", "shipped"]
 `,
 		`config.toml:4:10: select[0].repos[0] "acme" must be owner/repo`,
 		`config.toml:4:18: select[0].repos[1] "a/b/c" must be owner/repo`,
@@ -378,6 +382,8 @@ packages = []
 		`select[1].draft S never selects a draft`,
 		`select[2].reasons is read only by [[exclude]]`,
 		`select[3]: "no packages" matches every pull request`,
+		`select[4].state[1] "merged": S selects open pull requests only`,
+		`select[4].state[2] must be one of "open", "merged", "closed", got "shipped"`,
 	)
 }
 
@@ -392,8 +398,14 @@ updated_before_days = 30
 name = "mentions"
 reasons = ["mention"]
 draft = true
+
+[[exclude]]
+decision = "approved"
+checks = "passing"
+state = ["merged", "closed"]
 `))
-	if err != nil || len(cfg.Exclude) != 2 || !cfg.Exclude[0].Title.MatchString("Upgrade x") || cfg.Exclude[0].UpdatedBeforeDays != 30 ||
+	if err != nil || len(cfg.Exclude) != 3 || !slices.Equal(cfg.Exclude[2].States, []string{"merged", "closed"}) ||
+		!cfg.Exclude[0].Title.MatchString("Upgrade x") || cfg.Exclude[0].UpdatedBeforeDays != 30 ||
 		cfg.Exclude[1].Reasons[0] != "mention" || !cfg.Exclude[1].Draft {
 		t.Fatalf("cfg.Exclude = %+v, %v", cfg.Exclude, err)
 	}
