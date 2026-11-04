@@ -805,6 +805,11 @@ func TestCommentWithBody(t *testing.T) {
 	if p, _ := m.knownPR(key("acme", "api", 12)); len(p.Reviews) != 0 {
 		t.Errorf("a comment shows as a review: %+v", p.Reviews)
 	}
+	// Shown in the pane without reading it again (ADR-067).
+	cs := m.cache.details[key("acme", "api", 12)].val.Comments
+	if len(cs) != 1 || cs[0].Author != "me" || cs[0].Body != "Does this retry on a 429?" {
+		t.Errorf("the pane's comments = %+v", cs)
+	}
 }
 
 // c with a selection sends the same comment to each selected pull
@@ -834,9 +839,17 @@ func TestCommentOnSelection(t *testing.T) {
 		t.Errorf("a second comment was let through while one was on its way: %q", status(m))
 	}
 	press(m, "esc")
+	// #7 read, so a comment shown on it would be seen.
+	m.cache.details[key("acme", "web", 7)] = &entry[model.Detail]{}
 	run(m, cmd)
 	if len(f.posted) != 1 || f.posted[0] != "acme/api#12 @dependabot rebase" {
 		t.Errorf("posted = %q", f.posted)
+	}
+	if cs := m.cache.details[key("acme", "web", 7)].val.Comments; len(cs) != 0 {
+		t.Errorf("a comment GitHub refused is shown: %+v", cs)
+	}
+	if cs := m.cache.details[key("acme", "api", 12)].val.Comments; len(cs) != 1 {
+		t.Errorf("the comment sent is not shown: %+v", cs)
 	}
 	if !strings.Contains(status(m), "failed on 1 of 2") || len(m.selected) != 1 || !m.isSelected(key("acme", "web", 7)) {
 		t.Fatalf("the one it failed on is not selected again: %v, %q", m.selected, status(m))
