@@ -245,6 +245,8 @@ type Conditions struct {
 	// Mine requires your own pull request; Draft a draft.
 	Mine  bool
 	Draft bool
+	// States are "open", "merged" or "closed", one of which it must be in.
+	States []string
 	// Checks is "passing", "failing" or "pending", or "".
 	Checks string
 	// Decision is "approved", "changes_requested" or "review_required",
@@ -264,6 +266,9 @@ type Conditions struct {
 	// have.
 	Reasons []string
 }
+
+// States are the values of state.
+var States = []string{"open", "merged", "closed"}
 
 // CheckStates are the values of checks.
 var CheckStates = []string{"passing", "failing", "pending"}
@@ -547,6 +552,7 @@ type (
 		Bot           bool     `toml:"bot"`
 		Mine          bool     `toml:"mine"`
 		Draft         bool     `toml:"draft"`
+		States        []string `toml:"state"`
 		Checks        *string  `toml:"checks"`
 		Decision      *string  `toml:"decision"`
 		Labels        []string `toml:"labels"`
@@ -815,6 +821,12 @@ func selectFrom(ds []selectDoc) ([]Select, Problems) {
 		if d.Reasons != nil {
 			at("reasons", "is read only by [[exclude]]: S selects pull requests, which have no notification")
 		}
+		for j, st := range c.States {
+			// A state that is none is reported once, above.
+			if st != "open" && slices.Contains(States, st) {
+				r.item("state", j, "%q: S selects open pull requests only, so the rule would select nothing", st)
+			}
+		}
 		out = append(out, Select{Name: d.Name, Conditions: c})
 	}
 	return out, ps
@@ -878,13 +890,13 @@ func (r elemReporter) item(key string, j int, format string, args ...any) {
 // is wrong at at.
 func conditionsFrom(d conditionDoc, packages []string, name string, r elemReporter) Conditions {
 	at := r.at
-	c := Conditions{Repos: d.Repos, Authors: d.Authors, Packages: packages, Labels: d.Labels, Requested: d.Requested, Reasons: d.Reasons,
+	c := Conditions{Repos: d.Repos, Authors: d.Authors, Packages: packages, Labels: d.Labels, Requested: d.Requested, Reasons: d.Reasons, States: d.States,
 		Bot: d.Bot, Mine: d.Mine, Draft: d.Draft, ApprovedByMe: d.ApprovedByMe, ReviewedByMe: d.ReviewedByMe}
 	for _, l := range []struct {
 		key  string
 		v    []string
 		noun string
-	}{{"repos", d.Repos, "repository"}, {"authors", d.Authors, "login"}, {"labels", d.Labels, "label"}, {"requested", d.Requested, "reviewer"}, {"reasons", d.Reasons, "reason"}} {
+	}{{"repos", d.Repos, "repository"}, {"authors", d.Authors, "login"}, {"labels", d.Labels, "label"}, {"requested", d.Requested, "reviewer"}, {"reasons", d.Reasons, "reason"}, {"state", d.States, "state"}} {
 		if l.v != nil && len(l.v) == 0 {
 			at(l.key, "must name at least one %s", l.noun)
 		}
@@ -898,6 +910,11 @@ func conditionsFrom(d conditionDoc, packages []string, name string, r elemReport
 	for j, who := range d.Requested {
 		if who != "me" && (!strings.HasPrefix(who, "@") || len(who) == 1) {
 			r.item("requested", j, `%q must be "me" or a team as "@slug"`, who)
+		}
+	}
+	for j, st := range d.States {
+		if !slices.Contains(States, st) {
+			r.item("state", j, "must be one of %s, got %q", quoted(States), st)
 		}
 	}
 	for j, reason := range d.Reasons {
@@ -948,7 +965,7 @@ func conditionsFrom(d conditionDoc, packages []string, name string, r elemReport
 		*e.dst = *e.v
 	}
 	// A list left empty sets no condition: the rule reads it as none.
-	if len(d.Repos) == 0 && len(d.Authors) == 0 && len(packages) == 0 && len(d.Labels) == 0 && len(d.Requested) == 0 && len(d.Reasons) == 0 && d.Title == nil &&
+	if len(d.Repos) == 0 && len(d.Authors) == 0 && len(packages) == 0 && len(d.Labels) == 0 && len(d.Requested) == 0 && len(d.Reasons) == 0 && len(d.States) == 0 && d.Title == nil &&
 		d.MaxFiles == nil && d.MaxLines == nil && d.MinFiles == nil && d.MinLines == nil &&
 		d.UpdatedIn == nil && d.CreatedIn == nil && d.UpdatedBefore == nil && d.CreatedBefore == nil &&
 		!d.Bot && !d.Mine && !d.Draft && d.Checks == nil && d.Decision == nil && !d.ApprovedByMe && !d.ReviewedByMe {

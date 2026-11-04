@@ -44,6 +44,9 @@ type Rule struct {
 	Mine bool
 	// Draft requires a draft.
 	Draft bool
+	// States are the states it must be in one of; a state not read is
+	// open, as the list reads only open pull requests unless asked.
+	States []model.PRState
 	// Checks is the state its checks must be in; "" does not ask.
 	Checks Checks
 	// Decision is the review decision it must have; "" does not ask.
@@ -177,6 +180,8 @@ func (r Rule) light(pr model.PR, viewer string, f Facts) bool {
 		return false
 	case r.Draft && !pr.Draft:
 		return false
+	case len(r.States) > 0 && !slices.Contains(r.States, stateOf(pr)):
+		return false
 	case r.Title != nil && !r.Title.MatchString(pr.Title):
 		return false
 	case r.UpdatedWithinDays > 0 && !within(pr.Updated, f.Now, r.UpdatedWithinDays):
@@ -252,6 +257,14 @@ func (r Rule) packages(f Facts) bool {
 		}
 	}
 	return true
+}
+
+// stateOf is pr's state, open when it is not read.
+func stateOf(pr model.PR) model.PRState {
+	if pr.State == "" {
+		return model.StateOpen
+	}
+	return pr.State
 }
 
 // requested reports whether a review of pr is asked of who: "me" for the

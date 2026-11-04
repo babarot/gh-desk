@@ -96,6 +96,7 @@ title = "(?i)lock file maintenance"
 | `bot` | boolean | The author must be a bot. |
 | `mine` | boolean | It must be your own pull request. |
 | `draft` | boolean | It must be a draft; S never selects one, so [[select]] does not take it. |
+| `state` | list of `open`, `merged`, `closed` | The states it must be in one of: "open", "merged" or "closed"; S selects open ones only, so [[select]] takes "open" alone. |
 | `checks` | one of `passing`, `failing`, `pending` | "passing": passed, or only checks.approval pending; "failing": failed; "pending": still running. |
 | `decision` | one of `approved`, `changes_requested`, `review_required` | The review decision REVIEW shows. |
 | `labels` | list of strings | Labels one of which it must have. |

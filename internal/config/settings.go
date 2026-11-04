@@ -468,6 +468,7 @@ var conditionElems = []elem{
 	{Key: "bot", Kind: boolKind{}, Doc: "The author must be a bot."},
 	{Key: "mine", Kind: boolKind{}, Doc: "It must be your own pull request."},
 	{Key: "draft", Kind: boolKind{}, Doc: "It must be a draft; S never selects one, so [[select]] does not take it."},
+	{Key: "state", Kind: listKind{Values: States, NonEmpty: true}, Doc: `The states it must be in one of: "open", "merged" or "closed"; S selects open ones only, so [[select]] takes "open" alone.`},
 	{Key: "checks", Kind: enumKind{CheckStates}, Doc: `"passing": passed, or only checks.approval pending; "failing": failed; "pending": still running.`},
 	{Key: "decision", Kind: enumKind{Decisions}, Doc: "The review decision REVIEW shows."},
 	{Key: "labels", Kind: listKind{NonEmpty: true}, Doc: "Labels one of which it must have."},
@@ -534,7 +535,8 @@ const selectExamples = `# Rules S offers to select pull requests, besides "appro
 # it too, and the inbox's AGE is its notification's time, not this),
 # updated_before_days and created_before_days (the least days), min_files and
 # min_lines (the least), repos (owner/repo globs), labels (one of them),
-# requested ("me" or a team as "@slug"), decision ("approved",
+# requested ("me" or a team as "@slug"), state ("open", "merged" or
+# "closed", one of them), decision ("approved",
 # "changes_requested" or "review_required"), a bot as the
 # author with bot = true, your own pull request with mine = true, checks =
 # "passing" (passed, or only checks.approval pending), "failing" or
@@ -814,6 +816,9 @@ func writeConditions(b *strings.Builder, c Conditions) {
 	}
 	if len(c.Labels) > 0 {
 		b.WriteString("labels = " + tomlList(c.Labels) + "\n")
+	}
+	if len(c.States) > 0 {
+		b.WriteString("state = " + tomlList(c.States) + "\n")
 	}
 	for _, f := range []struct {
 		key string

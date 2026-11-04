@@ -390,6 +390,13 @@ func ruleWords(r plan.Rule) string {
 	if r.Draft {
 		parts = append(parts, "drafts")
 	}
+	if len(r.States) > 0 {
+		var ss []string
+		for _, s := range r.States {
+			ss = append(ss, strings.ToLower(string(s)))
+		}
+		parts = append(parts, "state "+strings.Join(ss, " or "))
+	}
 	if r.Bot {
 		parts = append(parts, "bots")
 	}

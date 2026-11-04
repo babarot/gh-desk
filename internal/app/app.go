@@ -618,5 +618,14 @@ func rule(name string, c config.Conditions) plan.Rule {
 		UpdatedWithinDays: c.UpdatedWithinDays, CreatedWithinDays: c.CreatedWithinDays,
 		UpdatedBeforeDays: c.UpdatedBeforeDays, CreatedBeforeDays: c.CreatedBeforeDays,
 		Bot: c.Bot, Mine: c.Mine, Draft: c.Draft, Checks: plan.Checks(c.Checks), Decision: model.ReviewDecision(strings.ToUpper(c.Decision)),
-		Labels: c.Labels, ApprovedByMe: c.ApprovedByMe, ReviewedByMe: c.ReviewedByMe, Requested: c.Requested, Reasons: c.Reasons}
+		Labels: c.Labels, States: states(c.States), ApprovedByMe: c.ApprovedByMe, ReviewedByMe: c.ReviewedByMe, Requested: c.Requested, Reasons: c.Reasons}
+}
+
+// states are the states the config file names, as the model has them.
+func states(ss []string) []model.PRState {
+	var out []model.PRState
+	for _, s := range ss {
+		out = append(out, model.PRState(strings.ToUpper(s)))
+	}
+	return out
 }
