@@ -387,6 +387,9 @@ func ruleWords(r plan.Rule) string {
 	if r.Mine {
 		parts = append(parts, "yours")
 	}
+	if r.Draft {
+		parts = append(parts, "drafts")
+	}
 	if r.Bot {
 		parts = append(parts, "bots")
 	}
@@ -441,6 +444,9 @@ func ruleWords(r plan.Rule) string {
 	}
 	if len(r.Labels) > 0 {
 		parts = append(parts, "labels "+strings.Join(r.Labels, ", "))
+	}
+	if len(r.Reasons) > 0 {
+		parts = append(parts, "notified for "+strings.Join(r.Reasons, ", "))
 	}
 	var s strings.Builder
 	for i, p := range parts {

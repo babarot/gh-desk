@@ -402,7 +402,18 @@ func (m *Model) layoutFor(on bool) layout {
 	return layout{list: max(rest-pane, 1), pane: pane}
 }
 
-func (m *Model) listHeight() int { return m.layout().list }
+// listHeight is how many lines the rows of the tab shown take.
+func (m *Model) listHeight() int { return m.rowLines(m.tab(), m.layout().list) }
+
+// rowLines are the lines of a list of height lines that t's rows take:
+// while the tab leaves some out, its last line says how many, whatever
+// the rows are (D30).
+func (m *Model) rowLines(t *tab, height int) int {
+	if height > 1 && !t.showExcluded && m.excludedOf(t).n > 0 {
+		return height - 1
+	}
+	return height
+}
 
 // column is a column of the list.
 type column struct {
@@ -495,11 +506,12 @@ func (m *Model) renderList(b *strings.Builder, height int) {
 	if len(rs) > 0 {
 		t.sel = min(max(t.sel, 0), len(rs)-1)
 	}
+	rowsH := m.rowLines(t, height)
 	if t.sel < t.offset {
 		t.offset = t.sel
 	}
-	if t.sel >= t.offset+height {
-		t.offset = t.sel - height + 1
+	if t.sel >= t.offset+rowsH {
+		t.offset = t.sel - rowsH + 1
 	}
 	lines := 0
 	switch {
@@ -518,15 +530,15 @@ func (m *Model) renderList(b *strings.Builder, height int) {
 		b.WriteString(m.st.muted.Render("  nothing here") + "\n")
 		lines++
 	}
-	for i := t.offset; i < len(rs) && lines < height; i++ {
+	for i := t.offset; i < len(rs) && lines < rowsH; i++ {
 		b.WriteString(m.renderRow(rs[i], cols, i == t.sel, i) + "\n")
 		lines++
 	}
-	if !t.showExcluded && lines < height && len(rs) < height {
-		if c := m.excludedOf(t); c.n > 0 {
-			b.WriteString(m.st.dim.Render("  "+excludedLine(c)+" · "+m.firstKey("show_excluded")+" to show") + "\n")
-			lines++
-		}
+	if rowsH < height {
+		// The line under the rows, the last one when they fill the list,
+		// says how many the tab leaves out.
+		b.WriteString(m.st.dim.Render("  "+excludedLine(m.excludedOf(t))+" · "+m.firstKey("show_excluded")+" to show") + "\n")
+		lines++
 	}
 	for ; lines < height; lines++ {
 		b.WriteString("\n")
@@ -600,7 +612,7 @@ func (m *Model) onScreen(k model.PRKey) bool {
 	if !t.loaded && t.loading {
 		return false
 	}
-	h := m.layout().list
+	h := m.rowLines(t, m.layout().list)
 	if t.err != nil {
 		// renderList gives the error a line before the rows.
 		h--

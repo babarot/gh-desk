@@ -238,6 +238,15 @@ type exclusion struct {
 
 func (x exclusion) excluded() bool { return len(x.by) > 0 }
 
+// ruleName is what a rule is called where it is shown: its name, or what
+// it asks for when it has none.
+func ruleName(r plan.Rule) string {
+	if r.Name != "" {
+		return r.Name
+	}
+	return ruleWords(r)
+}
+
 // exclusionOf is why t leaves out p, the pull request of the notification
 // n in the inbox (nil elsewhere): its rules are matched again each time,
 // as the rules a tab is narrowed to are (ADR-027).
@@ -256,7 +265,7 @@ func (m *Model) exclusionOf(t *tab, p model.PR, n *model.Notification, now time.
 	for _, r := range m.set.Exclude {
 		switch r.Judge(p, m.viewer, f) {
 		case plan.Yes:
-			x.by = append(x.by, r.Name)
+			x.by = append(x.by, ruleName(r))
 		case plan.Pending:
 			x.pending = true
 		}

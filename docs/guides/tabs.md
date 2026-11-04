@@ -41,7 +41,7 @@ One tab is the inbox (`kind = "inbox"`): the pull requests in your notifications
 
 ## Leaving pull requests out
 
-Rules in `[[exclude]]` leave the pull requests they match out of every tab, the inbox too. They take the keys of `[[select]]` but `packages`, and a pull request is left out when it meets every key of one of them:
+Rules in `[[exclude]]` leave the pull requests they match out of every tab, the inbox too. They take the keys of `[[select]]` but `packages`, and a pull request is left out when it meets every key of one of them. `name` may be left out; a rule without one is called by its conditions:
 
 ```toml
 [[exclude]]
@@ -50,11 +50,10 @@ title               = "^Upgrade"
 updated_before_days = 30
 
 [[exclude]]
-name   = "wip"
 labels = ["wip", "do-not-merge"]
 ```
 
-A tab says how many it leaves out under its rows. `a` shows them, dimmed and marked ⊘, and hides them again; the status line and the pane say which rule leaves out the row under the cursor. What is left out is never selected, by a group's header or by `S`, nor put away by `d`. A rule is matched again at every draw, so a pull request leaves or comes back as it changes. One whose CI, size, review or labels are not read yet stays until they are, its PR column shimmering, or marked `?` with `theme.shimmer = false`, and the cursor stays on its pull request when rows above it leave.
+A tab says how many it leaves out on the last line of its list, and its count in the tab's title leaves them out. `a` shows them, dimmed and marked ⊘, and hides them again; the status line and the pane say which rule leaves out the row under the cursor. What is left out is never selected, by a group's header or by `S`, nor put away by `d`. A rule is matched again at every draw, so a pull request leaves or comes back as it changes. One whose CI, size, review or labels are not read yet stays until they are, its PR column shimmering, or marked `?` with `theme.shimmer = false`, and the cursor stays on its pull request when rows above it leave.
 
 ## Narrowing a tab
 
