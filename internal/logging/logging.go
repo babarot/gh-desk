@@ -37,6 +37,10 @@ const (
 	KeyJobs    = "jobs"
 	KeyEnded   = "ended"
 	KeyStarted = "started"
+	// KeyMergeState is GitHub's mergeStateStatus of a pull request, and
+	// KeyWas what it was before.
+	KeyMergeState = "merge_state"
+	KeyWas        = "was"
 )
 
 // Rotation defaults: the file is moved aside when it is over MaxSize at

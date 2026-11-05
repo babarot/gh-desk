@@ -426,3 +426,73 @@ func TestWaitOnOneJobTellsHowItEnded(t *testing.T) {
 		t.Errorf("wait lines = %q, want %q", got, want)
 	}
 }
+
+// Reading again while GitHub works out whether a pull request can be
+// merged is logged as a wait on its mergeability.
+func TestRecheckIsAWait(t *testing.T) {
+	mi, it := pr("1", "api", 1, "me")
+	mi.MergeState = model.MergeUnknown
+	f := newFake(mi)
+	f.onRead = func(_ string, mi *model.MergeInfo, n int) {
+		if n > 2 {
+			mi.MergeState = model.MergeClean
+		}
+	}
+	var buf bytes.Buffer
+	runLogged(t, f, logging.New(&buf, slog.LevelInfo), func(ctx context.Context, r *Runner) <-chan Event {
+		_, ch := r.Start(ctx, Merge, []Item{it})
+		return ch
+	})
+	want := []string{"wait start mergeable", "wait end mergeable result=ready"}
+	if got := waitLines(t, buf.String()); !slices.Equal(got, want) {
+		t.Errorf("wait lines = %q, want %q", got, want)
+	}
+}
+
+// Watching auto-merge logs GitHub's merge state when it starts and each
+// time it changes, so the log tells what auto-merge waits on.
+func TestWatchLogsTheMergeState(t *testing.T) {
+	mi, _ := pr("1", "api", 1, "renovate")
+	mi.MergeState, mi.AutoMerge = model.MergeBlocked, true
+	f := newFake(mi)
+	f.onRead = func(_ string, mi *model.MergeInfo, n int) {
+		switch {
+		case n == 3:
+			mi.MergeState = model.MergeUnstable
+		case n >= 5:
+			mi.State = model.StateMerged
+		}
+	}
+	st := newStore()
+	p := model.Pending{Key: mi.Key, ID: "1", Head: "h-1", Author: "renovate", AuthorIsBot: true, AutoMerge: true, Watching: true}
+	if err := st.Put(p); err != nil {
+		t.Fatal(err)
+	}
+	var buf bytes.Buffer
+	r := New(f, logging.New(&buf, slog.LevelInfo), Options{Settings: settings, Viewer: "me", Store: st, CanWait: true,
+		WaitTimeout: time.Second, WatchTimeout: time.Second, PollFast: 5 * time.Millisecond, PollSlow: 5 * time.Millisecond, Quiet: 20 * time.Millisecond})
+	_, ch := r.Resume(t.Context(), []model.Pending{p})
+	if e := last(drain(t, ch)); e.Result != Merged {
+		t.Fatalf("last event = %+v", e)
+	}
+	var got []string
+	for line := range strings.Lines(buf.String()) {
+		var rec map[string]any
+		if err := json.Unmarshal([]byte(line), &rec); err != nil {
+			t.Fatal(err)
+		}
+		if msg, _ := rec["msg"].(string); strings.HasPrefix(msg, "watch ") {
+			s := msg
+			for _, k := range []string{logging.KeyMergeState, logging.KeyWas} {
+				if v, ok := rec[k]; ok {
+					s += fmt.Sprintf(" %s=%v", k, v)
+				}
+			}
+			got = append(got, s)
+		}
+	}
+	want := []string{"watch start merge_state=blocked", "watch progress merge_state=unstable was=blocked", "watch end"}
+	if !slices.Equal(got, want) {
+		t.Errorf("watch lines = %q, want %q", got, want)
+	}
+}
