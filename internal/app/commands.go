@@ -75,6 +75,15 @@ func newRootCommand(stdout, stderr io.Writer) *cobra.Command {
 			},
 		},
 		&cobra.Command{
+			Use:    "mcp",
+			Short:  "serve gh-desk's own MCP server to Claude Code, which starts it",
+			Hidden: true,
+			Args:   cobra.NoArgs,
+			RunE: func(*cobra.Command, []string) error {
+				return exited(serveMCP(o, stderr))
+			},
+		},
+		&cobra.Command{
 			Use:   "log",
 			Short: "print where the log file is",
 			Args:  cobra.NoArgs,

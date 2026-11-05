@@ -71,12 +71,15 @@ gh desk config edit         # open it in $EDITOR, then check it
 
 ## Claude
 
-Claude Code runs on a worktree of the pull request at the head you saw, made from gh-desk's own clone in `~/.cache/gh-desk`; your clones are not touched. It runs in restricted mode with only the tools that read (`Read`, `Grep`, `Glob`, and `WebFetch` if you allow it), with no hooks, settings, MCP servers or slash commands of the pull request's repository. A review it drafts goes into the review popup, for you to read and send.
+Claude Code runs on a worktree of the pull request at the head you saw, made from gh-desk's own clone in `~/.cache/gh-desk`; your clones are not touched. It runs in restricted mode with only the tools that read (`Read`, `Grep`, `Glob`, and `WebFetch` if you allow it), with no hooks, settings, MCP servers or slash commands of the pull request's repository. It reaches GitHub only through gh-desk's own tools, which read the pull request's repository and nothing else: its checks and CI logs, after the merge too, and its issues and pull requests. A review it drafts goes into the review popup, for you to read and send.
 
-MCP servers of your own can be given to the conversation in `claude.mcp_servers`. With [claude-recall](https://github.com/babarot/claude-recall), Claude searches your past Claude Code sessions while it reviews, held to the pull request's repository:
+MCP servers of your own can be given to the conversation in `[claude.mcp]`. With [claude-recall](https://github.com/babarot/claude-recall), Claude searches your past Claude Code sessions while it reviews, held to the pull request's repository:
 
 ```toml
-[claude.mcp_servers.recall]
+[claude.mcp]
+builtin = true  # to be written when you give servers of your own
+
+[claude.mcp.servers.recall]
 command = "recall"
 args    = ["mcp", "--repo", "${GH_DESK_URL}"]  # the pull request's repository
 tools   = ["recall_search", "recall_list", "recall_export"]

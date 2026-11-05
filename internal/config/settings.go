@@ -60,6 +60,16 @@ type kind interface {
 	schema() map[string]any
 }
 
+// splitKey is a setting's key as its table and its name in the table: the
+// table is all but the last part, as claude.mcp of claude.mcp.builtin.
+func splitKey(k string) (table, key string) {
+	i := strings.LastIndex(k, ".")
+	if i < 0 {
+		return "", k
+	}
+	return k[:i], k[i+1:]
+}
+
 // as is v, a setting's value, as the type its kind takes. The table pairs
 // every kind with a value of that type, so another type is a mistake in the
 // table and panics.
@@ -73,6 +83,9 @@ func as[T any](v any) T {
 
 type (
 	boolKind struct{}
+	// optBoolKind is a bool the file may leave out, which then has no
+	// value: the default is worked out from other settings.
+	optBoolKind struct{}
 	// intKind is a whole number from Min.
 	// intKind is an int of Min or more, and of Max or less when Max is not 0.
 	intKind struct{ Min, Max int }
@@ -97,8 +110,20 @@ type (
 )
 
 func (boolKind) check(string, any) Problems { return nil }
-func (boolKind) toml(v any) string          { return fmt.Sprint(v) }
-func (boolKind) schema() map[string]any     { return map[string]any{"type": "boolean"} }
+
+func (boolKind) toml(v any) string      { return fmt.Sprint(v) }
+func (boolKind) schema() map[string]any { return map[string]any{"type": "boolean"} }
+
+func (optBoolKind) check(string, any) Problems { return nil }
+
+// toml is "" when the file leaves the setting out, as Show leaves it out.
+func (optBoolKind) toml(v any) string {
+	if b := as[*bool](v); b != nil {
+		return fmt.Sprint(*b)
+	}
+	return `""`
+}
+func (optBoolKind) schema() map[string]any { return map[string]any{"type": "boolean"} }
 
 func (k intKind) check(key string, v any) Problems {
 	if n := as[int](v); n < k.Min || k.Max != 0 && n > k.Max {
@@ -209,6 +234,10 @@ func (globsKind) schema() map[string]any {
 // a permission rule of Claude Code reads as a pattern.
 var mcpName = regexp.MustCompile(`^[A-Za-z0-9_-]+$`)
 
+// BuiltinServer is the name of gh-desk's own MCP server, which the user's
+// servers may not take; internal/app checks it is the server's.
+const BuiltinServer = "gh-desk"
+
 func (mcpServersKind) check(key string, v any) Problems {
 	servers := as[map[string]map[string]any](v)
 	var ps Problems
@@ -220,6 +249,10 @@ func (mcpServersKind) check(key string, v any) Problems {
 		if !mcpName.MatchString(name) {
 			ps = append(ps, Problem{Key: at(name), Index: -1, AtKey: true,
 				Message: fmt.Sprintf("%s.%s: a server's name is made of letters, digits, _ and -", key, name)})
+		}
+		if name == BuiltinServer {
+			ps = append(ps, Problem{Key: at(name), Index: -1, AtKey: true,
+				Message: fmt.Sprintf("%s.%s: %q is the name of gh-desk's own server, which mcp.builtin turns on", key, name, BuiltinServer)})
 		}
 		ts, ok := srv["tools"].([]any)
 		if !ok || len(ts) == 0 {
@@ -343,7 +376,8 @@ var tables = []table{
 	{Name: "review"},
 	{Name: "merge"},
 	{Name: "bulk", Before: selectExamples},
-	{Name: "claude", Doc: "C and i ask Claude Code (claude -p, with the account you are signed in with). i, or ask claude about it in the menu of enter, reviews the pull request under the cursor in a worktree of its head. C plans what to show and select in the tab shown, with no tools, and answers in the language you ask in; enter applies the plan, and an approve or a merge in it opens the confirm popup. Claude's own tools only read: no settings files are loaded, its file tools see only the worktree and the skills of plugins, and it has none that run commands. The conversation also takes the MCP servers of mcp_servers and the skills of plugins, which can do whatever they are made to."},
+	{Name: "claude", Doc: "C and i ask Claude Code (claude -p, with the account you are signed in with). i, or ask claude about it in the menu of enter, reviews the pull request under the cursor in a worktree of its head. C plans what to show and select in the tab shown, with no tools, and answers in the language you ask in; enter applies the plan, and an approve or a merge in it opens the confirm popup. Claude's own tools only read: no settings files are loaded, its file tools see only the worktree and the skills of plugins, and it has none that run commands. The conversation also takes the MCP servers of [claude.mcp] and the skills of plugins, which can do whatever they are made to."},
+	{Name: "claude.mcp", Doc: "The MCP servers of the conversation about a pull request: gh-desk's own, and yours."},
 	{Name: "theme"},
 	{Name: "log"},
 	{Name: "cache"},
@@ -408,13 +442,15 @@ var settings = []setting{
 		Doc: `Appended to the instructions of every review and triage, such as "Point out changes that have no tests."`},
 	{Key: "claude.release_notes_check", Kind: boolKind{}, Value: func(f File) any { return f.Claude.ReleaseNotesCheck },
 		Doc: "Let Claude read the release notes of the bot pull requests in the merge popup, and mark those that need care."},
-	{Key: "claude.mcp_servers", Kind: mcpServersKind{}, Value: func(f File) any { return f.Claude.MCPServers },
+	{Key: "claude.mcp.builtin", Kind: optBoolKind{}, Value: func(f File) any { return f.Claude.MCP.Builtin }, Example: "true",
+		Doc: "Give the conversation gh-desk's own MCP server, whose tools read the pull request's repository and nothing else: its checks and CI logs, its issues and pull requests. They only read, without a prompt, what anyone who sees the pull request can see. Left out, it is on, unless allowed_tools has WebFetch or servers has one: either could send what the tools read out of the conversation, so then write true or false."},
+	{Key: "claude.mcp.servers", Kind: mcpServersKind{}, Value: func(f File) any { return f.Claude.MCP.Servers },
 		Example: `{ recall = { command = "recall", args = ["mcp", "--repo", "${GH_DESK_URL}"], tools = ["recall_search", "recall_list", "recall_export"] } }`,
-		Doc:     "MCP servers for the conversation about a pull request, by name, written as Claude Code configures a server (command, args, env; or type, url, headers), with tools: the server's tools that may run without a prompt. A server started with a command runs in the cache, not in the worktree. ${GH_DESK_OWNER}, ${GH_DESK_REPO}, ${GH_DESK_NUMBER} and ${GH_DESK_URL} (the repository's URL) are the pull request; pass secrets as ${VAR} from your environment. What the pull request says may call these tools: a server that reads private data, together with WebFetch, lets it send the data out."},
+		Doc:     "Your MCP servers for the conversation about a pull request, by name, written as Claude Code configures a server (command, args, env; or type, url, headers), with tools: the server's tools that may run without a prompt. A server started with a command runs in the cache, not in the worktree. ${GH_DESK_OWNER}, ${GH_DESK_REPO}, ${GH_DESK_NUMBER} and ${GH_DESK_URL} (the repository's URL) are the pull request; pass secrets as ${VAR} from your environment. What the pull request says may call these tools: a server that reads private data, together with WebFetch, lets it send the data out."},
 
 	{Key: "claude.plugins", Kind: listKind{}, Value: func(f File) any { return f.Claude.Plugins },
 		Example: `["~/.claude/plugins/cache/<marketplace>/<plugin>/<version>"]`,
-		Doc:     "Plugins whose skills the conversation about a pull request takes, as their directories (~ is your home). Only the skills are taken, copied when gh-desk starts, as gh-desk:<name>; the rest of a plugin (hooks, MCP servers, language servers, commands) is not. A skill whose allowed-tools grants a tool outside allowed_tools, Skill and the tools of mcp_servers is a mistake."},
+		Doc:     "Plugins whose skills the conversation about a pull request takes, as their directories (~ is your home). Only the skills are taken, copied when gh-desk starts, as gh-desk:<name>; the rest of a plugin (hooks, MCP servers, language servers, commands) is not. A skill whose allowed-tools grants a tool outside allowed_tools, Skill and the tools of the MCP servers is a mistake."},
 	{Key: "theme.dark", Kind: enumKind{Themes}, Value: func(f File) any { return f.Theme.Dark },
 		Doc: `The color scheme on a dark terminal, and on one that does not tell its background.`},
 	{Key: "theme.light", Kind: enumKind{Themes}, Value: func(f File) any { return f.Theme.Light },
@@ -625,7 +661,7 @@ func Template(keys string) string {
 		b.WriteString("[" + t.Name + "]\n")
 		b.WriteString(comment(t.Doc))
 		for _, s := range settings {
-			table, key, _ := strings.Cut(s.Key, ".")
+			table, key := splitKey(s.Key)
 			if table != t.Name {
 				continue
 			}
@@ -665,12 +701,21 @@ func Schema() []byte {
 	for _, t := range tables {
 		tp := map[string]any{}
 		for _, s := range settings {
-			table, key, _ := strings.Cut(s.Key, ".")
+			table, key := splitKey(s.Key)
 			if table == t.Name {
 				tp[key] = described(s.Kind.schema(), s.Doc)
 			}
 		}
-		props[t.Name] = described(map[string]any{"type": "object", "additionalProperties": false, "properties": tp}, t.Doc)
+		ts := described(map[string]any{"type": "object", "additionalProperties": false, "properties": tp}, t.Doc)
+		// A table in a table (claude.mcp) is a property of its parent,
+		// which comes first in tables.
+		if parent, name := splitKey(t.Name); parent != "" {
+			pt, _ := props[parent].(map[string]any)
+			pp, _ := pt["properties"].(map[string]any)
+			pp[name] = ts
+			continue
+		}
+		props[t.Name] = ts
 	}
 	for name, es := range elems {
 		ep := map[string]any{}
@@ -754,7 +799,7 @@ func Show(f File, onlyDiff bool) string {
 	for _, t := range tables {
 		var lines []string
 		for _, s := range settings {
-			table, key, _ := strings.Cut(s.Key, ".")
+			table, key := splitKey(s.Key)
 			if table != t.Name {
 				continue
 			}

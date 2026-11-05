@@ -110,3 +110,22 @@ func TestNewID(t *testing.T) {
 		t.Errorf("NewID = %q, %q", a, b)
 	}
 }
+
+func TestOpenNoRotateAppends(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "x.log")
+	if err := os.WriteFile(path, []byte("current-and-too-big\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	l, c, err := Open(Options{Path: path, MaxSize: 5, NoRotate: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	l.Info("fresh")
+	c.Close()
+	if _, err := os.Stat(path + ".1"); !os.IsNotExist(err) {
+		t.Errorf("the file was moved aside")
+	}
+	if b, _ := os.ReadFile(path); !strings.HasPrefix(string(b), "current-and-too-big\n") || !strings.Contains(string(b), `"msg":"fresh"`) {
+		t.Errorf("file = %q", b)
+	}
+}

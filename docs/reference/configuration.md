@@ -233,7 +233,7 @@ Pull requests changing files that match these glob patterns get a mark in the co
 
 ## [claude]
 
-C and i ask Claude Code (claude -p, with the account you are signed in with). i, or ask claude about it in the menu of enter, reviews the pull request under the cursor in a worktree of its head. C plans what to show and select in the tab shown, with no tools, and answers in the language you ask in; enter applies the plan, and an approve or a merge in it opens the confirm popup. Claude's own tools only read: no settings files are loaded, its file tools see only the worktree and the skills of plugins, and it has none that run commands. The conversation also takes the MCP servers of mcp_servers and the skills of plugins, which can do whatever they are made to.
+C and i ask Claude Code (claude -p, with the account you are signed in with). i, or ask claude about it in the menu of enter, reviews the pull request under the cursor in a worktree of its head. C plans what to show and select in the tab shown, with no tools, and answers in the language you ask in; enter applies the plan, and an approve or a merge in it opens the confirm popup. Claude's own tools only read: no settings files are loaded, its file tools see only the worktree and the skills of plugins, and it has none that run commands. The conversation also takes the MCP servers of [claude.mcp] and the skills of plugins, which can do whatever they are made to.
 
 ### claude.command
 
@@ -271,17 +271,27 @@ boolean · Default: `true`
 
 Let Claude read the release notes of the bot pull requests in the merge popup, and mark those that need care.
 
-### claude.mcp_servers
-
-table of MCP servers · Example: `{ recall = { command = "recall", args = ["mcp", "--repo", "${GH_DESK_URL}"], tools = ["recall_search", "recall_list", "recall_export"] } }`
-
-MCP servers for the conversation about a pull request, by name, written as Claude Code configures a server (command, args, env; or type, url, headers), with tools: the server's tools that may run without a prompt. A server started with a command runs in the cache, not in the worktree. ${GH_DESK_OWNER}, ${GH_DESK_REPO}, ${GH_DESK_NUMBER} and ${GH_DESK_URL} (the repository's URL) are the pull request; pass secrets as ${VAR} from your environment. What the pull request says may call these tools: a server that reads private data, together with WebFetch, lets it send the data out.
-
 ### claude.plugins
 
 list of strings · Example: `["~/.claude/plugins/cache/<marketplace>/<plugin>/<version>"]`
 
-Plugins whose skills the conversation about a pull request takes, as their directories (~ is your home). Only the skills are taken, copied when gh-desk starts, as gh-desk:&lt;name&gt;; the rest of a plugin (hooks, MCP servers, language servers, commands) is not. A skill whose allowed-tools grants a tool outside allowed_tools, Skill and the tools of mcp_servers is a mistake.
+Plugins whose skills the conversation about a pull request takes, as their directories (~ is your home). Only the skills are taken, copied when gh-desk starts, as gh-desk:&lt;name&gt;; the rest of a plugin (hooks, MCP servers, language servers, commands) is not. A skill whose allowed-tools grants a tool outside allowed_tools, Skill and the tools of the MCP servers is a mistake.
+
+## [claude.mcp]
+
+The MCP servers of the conversation about a pull request: gh-desk's own, and yours.
+
+### claude.mcp.builtin
+
+boolean, or left out · Example: `true`
+
+Give the conversation gh-desk's own MCP server, whose tools read the pull request's repository and nothing else: its checks and CI logs, its issues and pull requests. They only read, without a prompt, what anyone who sees the pull request can see. Left out, it is on, unless allowed_tools has WebFetch or servers has one: either could send what the tools read out of the conversation, so then write true or false.
+
+### claude.mcp.servers
+
+table of MCP servers · Example: `{ recall = { command = "recall", args = ["mcp", "--repo", "${GH_DESK_URL}"], tools = ["recall_search", "recall_list", "recall_export"] } }`
+
+Your MCP servers for the conversation about a pull request, by name, written as Claude Code configures a server (command, args, env; or type, url, headers), with tools: the server's tools that may run without a prompt. A server started with a command runs in the cache, not in the worktree. ${GH_DESK_OWNER}, ${GH_DESK_REPO}, ${GH_DESK_NUMBER} and ${GH_DESK_URL} (the repository's URL) are the pull request; pass secrets as ${VAR} from your environment. What the pull request says may call these tools: a server that reads private data, together with WebFetch, lets it send the data out.
 
 ## [theme]
 

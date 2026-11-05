@@ -52,7 +52,7 @@ func Reference() string {
 			b.WriteString("\n" + mdText(t.Doc) + "\n")
 		}
 		for _, s := range settings {
-			table, _, _ := strings.Cut(s.Key, ".")
+			table, _ := splitKey(s.Key)
 			if table != t.Name {
 				continue
 			}
@@ -106,6 +106,8 @@ func kindName(k kind) string {
 	switch k := k.(type) {
 	case boolKind:
 		return "boolean"
+	case optBoolKind:
+		return "boolean, or left out"
 	case intKind:
 		if k.Max != 0 {
 			return fmt.Sprintf("integer, %d to %d", k.Min, k.Max)

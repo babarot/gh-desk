@@ -55,6 +55,9 @@ type Options struct {
 	// without a prompt; empty when there are none (ADR-037).
 	MCPConfig string
 	MCPTools  []string
+	// GitHub is whether the servers include gh-desk's own (ADR-078), whose
+	// tools reach GitHub; the instructions say which.
+	GitHub bool
 	// PluginDir is the plugin of the skills of a conversation, as
 	// WritePlugin made it; empty when there are none.
 	PluginDir string
@@ -150,7 +153,7 @@ type Request struct {
 // so it can be resumed, here or in Claude Code. progress hears of each
 // tool Claude uses.
 func (c *Claude) Ask(ctx context.Context, r Request, progress func(Step)) (Answer, error) {
-	args := c.conversation(c.session(r, reviewInstructions+"\n\nAnswer in "+c.opt.Language+".", c.opt.Tools))
+	args := c.conversation(c.session(r, ReviewInstructions(c.opt.GitHub)+"\n\nAnswer in "+c.opt.Language+".", c.opt.Tools))
 	args = append(args, "--allowedTools", strings.Join(append(slices.Clone(c.opt.Tools), c.conversationTools()...), ","))
 	log := c.opt.Log.With(logging.KeyOp, "ask", logging.KeyPR, r.PR.String(), logging.KeyClaude, r.Session)
 	return c.run(ctx, log, r.Dir, prEnv(r.PR), args, r.Prompt, func(s Step) {
