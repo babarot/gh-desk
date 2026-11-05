@@ -218,6 +218,7 @@ func assemble(cfg config.File, warns []string, e env, log *slog.Logger) parts {
 			release = func() {}
 		} else {
 			_, opt.GitHub = servers[mcpserver.Name]
+			opt.Label = mcpserver.Label
 			log.Debug("given to Claude", "servers", slices.Sorted(maps.Keys(servers)), "tools", opt.MCPTools,
 				"plugins", cfg.PluginDirs(), "plugin", opt.PluginDir)
 		}

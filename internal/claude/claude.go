@@ -58,6 +58,9 @@ type Options struct {
 	// GitHub is whether the servers include gh-desk's own (ADR-078), whose
 	// tools reach GitHub; the instructions say which.
 	GitHub bool
+	// Label shows the calls of the tools it knows, gh-desk's own; the
+	// others show what stepArg finds.
+	Label Labeler
 	// PluginDir is the plugin of the skills of a conversation, as
 	// WritePlugin made it; empty when there are none.
 	PluginDir string
@@ -73,6 +76,10 @@ func (c *Claude) conversationTools() []string {
 	}
 	return tools
 }
+
+// Labeler is how a call of a tool is shown in the steps, from the tool's
+// name and its arguments; ok is false for a tool it does not know.
+type Labeler func(tool string, args json.RawMessage) (label string, ok bool)
 
 // Claude runs Claude Code.
 type Claude struct {
@@ -309,7 +316,7 @@ func (c *Claude) run(ctx context.Context, log *slog.Logger, dir string, env, arg
 	// was asked, and how many tools it used.
 	log.Info("claude asked", "model", c.opt.Model)
 	tools := 0
-	answer, readErr := readStream(out, func(s Step) {
+	answer, readErr := readStream(out, c.opt.Label, func(s Step) {
 		log.Debug("claude step", "tool", s.Tool)
 		tools++
 		progress(s)
@@ -355,8 +362,9 @@ type event struct {
 }
 
 // readStream follows claude's stream-json output to its result, reporting
-// each tool used.
-func readStream(r io.Reader, progress func(Step)) (Answer, error) {
+// each tool used, with what it was used on as label says when it knows the
+// tool.
+func readStream(r io.Reader, label Labeler, progress func(Step)) (Answer, error) {
 	br := bufio.NewReader(r)
 	for {
 		line, err := br.ReadBytes('\n')
@@ -367,7 +375,13 @@ func readStream(r io.Reader, progress func(Step)) (Answer, error) {
 				case "assistant":
 					for _, c := range ev.Message.Content {
 						if c.Type == "tool_use" && c.Name != "StructuredOutput" {
-							progress(Step{Tool: c.Name, Arg: stepArg(c.Name, c.Input)})
+							arg := stepArg(c.Input)
+							if label != nil {
+								if l, ok := label(c.Name, c.Input); ok {
+									arg = l
+								}
+							}
+							progress(Step{Tool: c.Name, Arg: arg})
 						}
 					}
 				case "result":
@@ -402,50 +416,11 @@ func readStream(r io.Reader, progress func(Step)) (Answer, error) {
 	}
 }
 
-// builtinTools is how Claude Code names the tools of gh-desk's own MCP
-// server (internal/mcpserver), whose arguments stepArg knows.
-const builtinTools = "mcp__gh-desk__"
-
 // stepArg is what a tool was used on: a path, a pattern, a URL, a skill,
-// or what an MCP server was asked; for gh-desk's own tools, the pull
-// request, check run or search they were given.
-func stepArg(tool string, input json.RawMessage) string {
+// or what an MCP server was asked.
+func stepArg(input json.RawMessage) string {
 	var in map[string]any
 	_ = json.Unmarshal(input, &in)
-	str := func(k string) string { s, _ := in[k].(string); return s }
-	num := func(k string) int64 { n, _ := in[k].(float64); return int64(n) }
-	switch strings.TrimPrefix(tool, builtinTools) {
-	case "checks":
-		if r := str("ref"); r != "" {
-			return r
-		}
-		return "the pull request"
-	case "check_run_log":
-		return fmt.Sprintf("check run %d", num("id"))
-	case "read_issue":
-		return fmt.Sprintf("#%d", num("number"))
-	case "search_issues":
-		var q []string
-		for _, k := range []string{"kind", "state"} {
-			if s := str(k); s != "" {
-				q = append(q, s)
-			}
-		}
-		if a := str("author"); a != "" {
-			q = append(q, "author:"+a)
-		}
-		if ls, ok := in["labels"].([]any); ok {
-			for _, l := range ls {
-				if s, ok := l.(string); ok {
-					q = append(q, fmt.Sprintf("label:%q", s))
-				}
-			}
-		}
-		if t := str("text"); t != "" {
-			q = append(q, fmt.Sprintf("%q", t))
-		}
-		return strings.Join(q, " ")
-	}
 	for _, k := range []string{"file_path", "pattern", "url", "path", "skill", "query"} {
 		if s, ok := in[k].(string); ok && s != "" {
 			return s

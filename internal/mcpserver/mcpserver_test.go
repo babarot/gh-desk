@@ -2,6 +2,7 @@ package mcpserver
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"testing"
@@ -266,5 +267,36 @@ func TestCallsAreBounded(t *testing.T) {
 	}
 	if _, _, err := h(ctx, nil, checksIn{}); err == nil || !strings.Contains(err.Error(), "refused") {
 		t.Errorf("call over the bound: %v", err)
+	}
+}
+
+// TestEveryToolSaysWhatItWasAsked keeps a tool from coming without the
+// way its calls are shown in the steps: with no arguments, or with some,
+// the label says something.
+func TestEveryToolSaysWhatItWasAsked(t *testing.T) {
+	if len(Tools) != len(tools) {
+		t.Fatalf("Tools = %v", Tools)
+	}
+	for _, name := range Tools {
+		for _, args := range []string{`{}`, `{"number":12,"id":9,"ref":"main","kind":"pr","text":"x"}`} {
+			l, ok := Label("mcp__gh-desk__"+name, json.RawMessage(args))
+			if !ok || strings.TrimSpace(l) == "" {
+				t.Errorf("Label(%s, %s) = %q, %v", name, args, l, ok)
+			}
+		}
+	}
+	for _, tc := range []struct{ tool, args, want string }{
+		{"read_issue", `{"number":10262}`, "#10262"},
+		{"check_run_log", `{"id":126666709675}`, "check run 126666709675"},
+		{"checks", `{}`, "the pull request"},
+		{"checks", `{"ref":"main"}`, "main"},
+		{"search_issues", `{"kind":"pr","state":"open","author":"app/renovate","labels":["bug"],"text":"KMS keyring"}`, `pr open author:app/renovate label:"bug" "KMS keyring"`},
+	} {
+		if got, _ := Label("mcp__gh-desk__"+tc.tool, json.RawMessage(tc.args)); got != tc.want {
+			t.Errorf("Label(%s, %s) = %q, want %q", tc.tool, tc.args, got, tc.want)
+		}
+	}
+	if _, ok := Label("mcp__recall__recall_search", json.RawMessage(`{}`)); ok {
+		t.Error("a tool of another server was labeled")
 	}
 }
