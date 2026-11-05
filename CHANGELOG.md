@@ -1,5 +1,13 @@
 # Changelog
 
+## [v0.7.0](https://github.com/babarot/gh-desk/compare/v0.6.0...v0.7.0) - 2026-11-05
+### New Features
+- Let the filter ask one field with author:, repo: and title: by @babarot in https://github.com/babarot/gh-desk/pull/66
+### Improvements
+- Let ctrl+w in the filter stop at a slash or a colon by @babarot in https://github.com/babarot/gh-desk/pull/65
+- Count only the excluded the filter matches while it filters by @babarot in https://github.com/babarot/gh-desk/pull/67
+- Draw the frame of what takes the keys in the focus color by @babarot in https://github.com/babarot/gh-desk/pull/69
+
 ## [v0.6.0](https://github.com/babarot/gh-desk/compare/v0.5.1...v0.6.0) - 2026-11-05
 ### New Features
 - Draw shortcodes in a description as their emoji by @babarot in https://github.com/babarot/gh-desk/pull/61
