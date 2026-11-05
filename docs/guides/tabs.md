@@ -57,6 +57,6 @@ A tab says how many it leaves out on the last line of its list, and its count in
 
 ## Narrowing a tab
 
-`/` filters the rows by what you type. The rules of `S` can narrow them too ([Selecting by rules](selecting.md)); a row is shown when it passes both. The columns are chosen with `list.columns`, and a narrow terminal drops SIZE first, then AUTHOR.
+`/` filters the rows by what you type. A title is drawn with its shortcodes, such as `:sparkles:`, as emoji, and either finds it. The rules of `S` can narrow them too ([Selecting by rules](selecting.md)); a row is shown when it passes both. The columns are chosen with `list.columns`, and a narrow terminal drops SIZE first, then AUTHOR.
 
 See [`[[tabs]]`](../reference/configuration.md#tabs) for every key of a tab.
