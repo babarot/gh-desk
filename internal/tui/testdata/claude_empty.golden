@@ -20,10 +20,10 @@ desk // @me    1 review (3)   2 mine (1)   3 involved (0)   4 inbox (1)         
 
 ╭ claude on acme/api#12 ─────────────────────────────────────────────────────────────────── at aaaaaaa · read-only · pgup/pgdown ╮
 │                                                                                                                                │
-│                                                                                                                                │
-│                                                                                                                                │
-│                                                                                                                                │
-│                                                                                                                                │
+│    ▐▛███▜▌    acme/api#12  Add retries to the client                                                                           │
+│   ▝▜█████▛▘   alice wants to merge retries into main                                                                           │
+│     ▘▘ ▝▝     +40 −3 in 2 files · CI ✓ passing · ○ review required · updated 3h ago                                            │
+│               ✓ worktree ready at aaaaaaa                                                                                      │
 │ ╭ ask claude ──────────────────────────────────────────────────────────────────────────────────────╮                           │
 │ │ ┃ Review this pull request.                                                                      │                           │
 │ │ ┃                                                                                                │                           │

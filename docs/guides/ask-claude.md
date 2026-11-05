@@ -4,7 +4,7 @@ With [Claude Code](https://docs.anthropic.com/en/docs/claude-code) installed and
 
 ## About one pull request
 
-`i` asks Claude to review the pull request under the cursor. The conversation takes the place of the pane, about the pull request under the cursor, and is kept per pull request: move to another and back, and it is still there. Type to ask more.
+`i` opens a conversation with Claude about the pull request under the cursor. It takes the place of the pane, and is kept per pull request: move to another and back, and it is still there. Until something is asked, the pane shows the pull request and a few questions to start with, a review first; `tab` puts them in the text box one after another, and `enter` asks. Type to ask your own.
 
 [Claude on a pull request](https://babarot.me/gh-desk/?scenario=claude "playground")
 

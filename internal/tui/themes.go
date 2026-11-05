@@ -1,11 +1,16 @@
 package tui
 
 import (
+	"image/color"
 	"maps"
 	"slices"
 
 	"charm.land/lipgloss/v2"
 )
+
+// claudeOrange is Claude's own orange, which its mascot keeps on every
+// theme: the color is Claude's, not the theme's (ADR-080).
+func claudeOrange() color.Color { return lipgloss.Color("#d97757") }
 
 // themes are the color schemes that can be chosen by name.
 var themes = map[string]palette{
