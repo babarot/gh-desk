@@ -3,6 +3,7 @@ package plan
 import (
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/babarot/gh-desk/internal/model"
 )
@@ -259,6 +260,13 @@ func ForMerge(mi model.MergeInfo, pr model.PR, viewer string, set Settings) Deci
 	if Failing(mi) {
 		return skip("checks failing")
 	}
+	if failed := FailedJobs(mi); len(failed) > 0 {
+		return skip("a job failed: " + failed[0])
+	}
+	// Jobs at work, required or not, are waited for before any merge: the
+	// merge goes once they passed. The quiet time after a trigger is the
+	// runner's, which knows when it wrote.
+	jobs := JobsRunning(mi, Trigger{}, time.Time{})
 	method, ok := Method(set.Methods, mi.Repo)
 	if !ok {
 		return skip("no merge method allowed")
@@ -277,7 +285,7 @@ func ForMerge(mi model.MergeInfo, pr model.PR, viewer string, set Settings) Deci
 			d.Notes = append([]string{adminNote}, d.Notes...)
 			return d
 		}
-		return blocked(d, mi, set)
+		return blocked(d, mi, set, jobs)
 	}
 	switch mi.MergeState {
 	case model.MergeDirty:
@@ -287,7 +295,11 @@ func ForMerge(mi model.MergeInfo, pr model.PR, viewer string, set Settings) Deci
 	case model.MergeUnknown, "":
 		d.Step, d.Reason = StepRecheck, "checking whether it can be merged"
 	case model.MergeClean, model.MergeUnstable, model.MergeHasHooks:
-		d.Step, d.Reason = StepMerge, "merge now"
+		if jobs {
+			d.Step, d.Reason = StepWait, "wait for checks, then merge"
+		} else {
+			d.Step, d.Reason = StepMerge, "merge now"
+		}
 	case model.MergeBehind:
 		switch {
 		case set.UpdateBranch == "never":
@@ -298,9 +310,9 @@ func ForMerge(mi model.MergeInfo, pr model.PR, viewer string, set Settings) Deci
 		d.Step, d.Reason = StepUpdate, "update the branch, then merge"
 	case model.MergeBlocked:
 		if asAdmin(mi, pr, viewer) {
-			return adminMerge(d, mi, set)
+			return adminMerge(d, mi, set, jobs)
 		}
-		return blocked(d, mi, set)
+		return blocked(d, mi, set, jobs)
 	default:
 		return skip("cannot be merged: " + string(mi.MergeState))
 	}
@@ -309,8 +321,10 @@ func ForMerge(mi model.MergeInfo, pr model.PR, viewer string, set Settings) Deci
 
 // blocked is the step of a pull request that waits for its checks or
 // rules: auto-merge where the repository allows it, waiting otherwise.
-func blocked(d Decision, mi model.MergeInfo, set Settings) Decision {
-	if set.AutoMerge && mi.Repo.AutoMerge {
+// While jobs are at work it waits: GitHub's auto-merge waits only for the
+// required ones.
+func blocked(d Decision, mi model.MergeInfo, set Settings, jobs bool) Decision {
+	if set.AutoMerge && mi.Repo.AutoMerge && !jobs {
 		d.Step, d.Reason = StepAutoMerge, "turn on auto-merge"
 		d.Notes = append(d.Notes, "auto-merge also merges commits pushed after it is on")
 	} else {
@@ -334,13 +348,13 @@ func asAdmin(mi model.MergeInfo, pr model.PR, viewer string) bool {
 //
 // Checks not all read leave it to wait as before: one not read may be
 // failing.
-func adminMerge(d Decision, mi model.MergeInfo, set Settings) Decision {
+func adminMerge(d Decision, mi model.MergeInfo, set Settings, jobs bool) Decision {
 	if mi.ChecksPartial {
-		return blocked(d, mi, set)
+		return blocked(d, mi, set, jobs)
 	}
 	// The note goes first: it changes what merging means.
 	d.Notes = append([]string{adminNote}, d.Notes...)
-	if mi.Checks == nil || ChecksRunning(mi, set.ApprovalChecks) {
+	if mi.Checks == nil || ChecksRunning(mi, set.ApprovalChecks) || jobs {
 		d.Step, d.Reason = StepWait, "wait for checks, then merge as admin"
 		return d
 	}

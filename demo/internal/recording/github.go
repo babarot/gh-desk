@@ -187,6 +187,9 @@ func (g *GitHub) MergeInfo(ctx context.Context, ids []string, details bool) (map
 			}
 			if details {
 				mi.Checks, mi.Files = p.checks, p.files
+				// A workflow run that ended, as a pull request opened a
+				// while ago has: no job is still to start.
+				mi.Runs, mi.RunsRead = []model.WorkflowRun{{Name: "CI", Status: model.RunCompleted, Conclusion: model.CheckSuccess}}, true
 			}
 			out[id] = mi
 		})

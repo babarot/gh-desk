@@ -179,6 +179,43 @@ type Check struct {
 	State CheckState
 	// Required is whether the base branch's rules require it to pass.
 	Required bool
+	// Kind is whether it is a check run or a commit status.
+	Kind CheckKind
+	// Run is a check run's status (QUEUED, IN_PROGRESS, WAITING, COMPLETED,
+	// ...); empty for a commit status. State says PENDING for every run
+	// not completed; Run tells a run waiting for an approval of its
+	// environment from one at work.
+	Run RunStatus
+}
+
+// CheckKind is what reported a check: GitHub Actions and other apps report
+// check runs, a service outside reports a commit status.
+type CheckKind string
+
+const (
+	KindCheckRun CheckKind = "CheckRun"
+	KindStatus   CheckKind = "StatusContext"
+)
+
+// RunStatus is the status of a check run or of a workflow run, upper case
+// as GraphQL gives it.
+type RunStatus string
+
+const (
+	RunCompleted RunStatus = "COMPLETED"
+	// RunWaiting is a run waiting for someone to approve its environment.
+	RunWaiting RunStatus = "WAITING"
+)
+
+// WorkflowRun is one run of a GitHub Actions workflow on a commit. A run is
+// not completed until every one of its jobs is; a job that needs another is
+// made only when that one ends, so before then it has no check run, and
+// only its workflow run says it is still to come.
+type WorkflowRun struct {
+	Name   string
+	Status RunStatus
+	// Conclusion is set once it is completed (SUCCESS, FAILURE, ...).
+	Conclusion CheckState
 }
 
 // MergeState is GitHub's mergeStateStatus: whether a pull request can be
@@ -233,8 +270,15 @@ type MergeInfo struct {
 	Checks []Check
 	// ChecksPartial is whether more checks were reported than were read.
 	ChecksPartial bool
-	Files         []string
-	Repo          RepoMerge
+	// Runs are the workflow runs of the head commit, read with the checks.
+	// RunsRead is false when they were not read, or reading them failed
+	// (Actions turned off, or the token may not read them); RunsPartial is
+	// whether more runs were there than were read.
+	Runs        []WorkflowRun
+	RunsRead    bool
+	RunsPartial bool
+	Files       []string
+	Repo        RepoMerge
 	// Reviews are the latest review of each reviewer.
 	Reviews []Review
 	// CanClose is whether the viewer may close it.

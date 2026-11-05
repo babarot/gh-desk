@@ -376,6 +376,8 @@ var settings = []setting{
 
 	{Key: "checks.approval", Kind: globsKind{}, Value: func(f File) any { return f.Checks.Approval },
 		Doc: "Checks that pass only after an approval, such as a policy bot's: glob patterns of check names. While only they are pending, CI shows ◌, and the checks count as passing when deciding a merge."},
+	{Key: "checks.wait_timeout", Kind: durationKind{}, Value: func(f File) any { return f.Checks.WaitTimeout },
+		Doc: "How long a merge, or an approval asked to wait, waits for the jobs still at work on the pull request's head, required or not; an admin merge also waits for the required checks within it. Only the time gh-desk is running counts."},
 
 	{Key: "review.mark_done", Kind: boolKind{}, Value: func(f File) any { return f.Review.MarkDone },
 		Doc: "Mark a pull request's notification done after you review it here, from any tab."},
@@ -386,10 +388,8 @@ var settings = []setting{
 		Doc: `The order of preference among the methods a repository allows: "merge", "squash", "rebase". The first one the repository allows is used.`},
 	{Key: "merge.auto_merge", Kind: boolKind{}, Value: func(f File) any { return f.Merge.AutoMerge },
 		Doc: "Use GitHub's auto-merge where the repository allows it; elsewhere gh-desk waits for the checks and merges when they pass. Commits pushed after auto-merge is turned on are merged too, as GitHub does."},
-	{Key: "merge.checks_timeout", Kind: durationKind{}, Value: func(f File) any { return f.Merge.ChecksTimeout },
-		Doc: "Where gh-desk waits, how long to wait for required checks still running. Only the time gh-desk is running counts."},
 	{Key: "merge.blocked_timeout", Kind: durationKind{}, Value: func(f File) any { return f.Merge.BlockedTimeout },
-		Doc: "Where gh-desk waits, how long a pull request may stay blocked by another rule (a second approval, code owners) after its required checks finished. Only the time gh-desk is running counts."},
+		Doc: "Where gh-desk waits, how long a pull request may stay blocked by another rule (a second approval, code owners) after its jobs finished. Only the time gh-desk is running counts."},
 	{Key: "merge.update_branch", Kind: enumKind{UpdateBranchValues}, Value: func(f File) any { return f.Merge.UpdateBranch },
 		Doc: `Whose branch is updated when it is behind its base: "humans" (default), "all" or "never". Bots rebase their own branches, and some (renovate) stop updating a branch someone else committed to.`},
 

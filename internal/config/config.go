@@ -159,6 +159,10 @@ type Checks struct {
 	// approval, such as a policy bot's; while only they are pending, a pull
 	// request is shown as waiting for an approval, and counts as passing.
 	Approval []Glob
+	// WaitTimeout is how long an approval or a merge waits for the jobs
+	// still at work on the head, and an admin merge also for the required
+	// checks. Only the time gh-desk is running counts.
+	WaitTimeout Duration
 }
 
 // Review configures sending a review.
@@ -178,10 +182,8 @@ type Merge struct {
 	Methods []string
 	// AutoMerge uses GitHub's auto-merge where the repository allows it.
 	AutoMerge bool
-	// ChecksTimeout is how long to wait for required checks still running,
-	// and BlockedTimeout how long a pull request may stay blocked after
-	// they finished. Both count only time gh-desk is running.
-	ChecksTimeout  Duration
+	// BlockedTimeout is how long a pull request may stay blocked after its
+	// jobs finished. It counts only time gh-desk is running.
 	BlockedTimeout Duration
 	// UpdateBranch is who gets their branch updated when behind: "humans",
 	// "all" or "never".
@@ -418,8 +420,9 @@ func Default() File {
 		Preview:     Preview{Height: DefaultPreviewHeight, Tab: "overview"},
 		Description: Description{Style: "rendered"},
 		Diff:        Diff{Collapse: globs("*.lock", "go.sum", "pnpm-lock.yaml", "package-lock.json", "yarn.lock")},
+		Checks:      Checks{WaitTimeout: dur("6h")},
 		Review:      Review{MarkDone: true},
-		Merge: Merge{Methods: []string{"merge", "squash", "rebase"}, AutoMerge: true, ChecksTimeout: dur("6h"),
+		Merge: Merge{Methods: []string{"merge", "squash", "rebase"}, AutoMerge: true,
 			BlockedTimeout: dur("30m"), UpdateBranch: "humans"},
 		Bulk:   Bulk{AttentionPaths: globs(".github/workflows/*", "CODEOWNERS", ".github/CODEOWNERS", "docs/CODEOWNERS")},
 		Claude: Claude{Command: "claude", Model: "opus", AllowedTools: []string{"Read", "Grep", "Glob"}, Language: "English", ReleaseNotesCheck: true},
@@ -516,7 +519,8 @@ type (
 		Collapse *[]Glob `toml:"collapse"`
 	}
 	checksDoc struct {
-		Approval *[]Glob `toml:"approval"`
+		Approval    *[]Glob   `toml:"approval"`
+		WaitTimeout *Duration `toml:"wait_timeout"`
 	}
 	reviewDoc struct {
 		MarkDone *bool   `toml:"mark_done"`
@@ -525,7 +529,6 @@ type (
 	mergeDoc struct {
 		Methods        *[]string `toml:"methods"`
 		AutoMerge      *bool     `toml:"auto_merge"`
-		ChecksTimeout  *Duration `toml:"checks_timeout"`
 		BlockedTimeout *Duration `toml:"blocked_timeout"`
 		UpdateBranch   *string   `toml:"update_branch"`
 	}
@@ -615,11 +618,11 @@ func Parse(path string, src []byte) (File, Problems, error) {
 	set(&cfg.Description.Style, d.Description.Style)
 	set(&cfg.Diff.Collapse, d.Diff.Collapse)
 	set(&cfg.Checks.Approval, d.Checks.Approval)
+	set(&cfg.Checks.WaitTimeout, d.Checks.WaitTimeout)
 	set(&cfg.Review.MarkDone, d.Review.MarkDone)
 	set(&cfg.Review.Editor, d.Review.Editor)
 	set(&cfg.Merge.Methods, d.Merge.Methods)
 	set(&cfg.Merge.AutoMerge, d.Merge.AutoMerge)
-	set(&cfg.Merge.ChecksTimeout, d.Merge.ChecksTimeout)
 	set(&cfg.Merge.BlockedTimeout, d.Merge.BlockedTimeout)
 	set(&cfg.Merge.UpdateBranch, d.Merge.UpdateBranch)
 	set(&cfg.Bulk.AttentionPaths, d.Bulk.AttentionPaths)
@@ -1083,14 +1086,15 @@ func decodeProblems(err error) Problems {
 // The old name is not read. The decoder names a table it does not know,
 // not each key in it.
 var moved = map[string]string{
-	"claude.cache_dir":    `moved to "cache.dir"`,
-	"theme.name":          `replaced by theme.dark and theme.light, the themes used on a dark terminal and on a light one; write the same theme in both to use it on any`,
-	"sections":            `moved to "tabs"; group = "requested" is groups = ["you", "team", "other", "bots"]`,
-	"inbox":               `moved: the inbox is a [[tabs]] element with kind = "inbox", holding limit, and show_settled for hide_closed with the opposite value; done_after_review is review.mark_done`,
-	"ui":                  `moved: theme is theme.dark and theme.light; stale_days and home_owners are under [list]; editor is review.editor; approval_checks is checks.approval`,
-	"refresh":             `moved: refresh.interval is list.refresh, and "0" is "off"`,
-	"preview.description": `moved to "description.style"`,
-	"merge.watch_timeout": `is no longer a setting: gh-desk watches a pull request on auto-merge for 24h, and GitHub's auto-merge goes on after`,
+	"claude.cache_dir":     `moved to "cache.dir"`,
+	"theme.name":           `replaced by theme.dark and theme.light, the themes used on a dark terminal and on a light one; write the same theme in both to use it on any`,
+	"sections":             `moved to "tabs"; group = "requested" is groups = ["you", "team", "other", "bots"]`,
+	"inbox":                `moved: the inbox is a [[tabs]] element with kind = "inbox", holding limit, and show_settled for hide_closed with the opposite value; done_after_review is review.mark_done`,
+	"ui":                   `moved: theme is theme.dark and theme.light; stale_days and home_owners are under [list]; editor is review.editor; approval_checks is checks.approval`,
+	"refresh":              `moved: refresh.interval is list.refresh, and "0" is "off"`,
+	"preview.description":  `moved to "description.style"`,
+	"merge.checks_timeout": `moved to "checks.wait_timeout"`,
+	"merge.watch_timeout":  `is no longer a setting: gh-desk watches a pull request on auto-merge for 24h, and GitHub's auto-merge goes on after`,
 }
 
 // settingsIn are the keys the file may have in table, a path of table

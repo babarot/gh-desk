@@ -336,8 +336,8 @@ func (t *terminal) run(out output, sc *playground.Scenario, pl play) error {
 	set.LogRecords = recs
 	// The world moves in seconds, so the runner looks often.
 	rn := runner.New(w.Runner(), log, runner.Options{Settings: set.Plan, Viewer: playground.Viewer, CanWait: true,
-		ChecksTimeout: cfg.Merge.ChecksTimeout.D, BlockedTimeout: cfg.Merge.BlockedTimeout.D,
-		PollFast: 3 * time.Second, PollSlow: 5 * time.Second, Recheck: time.Second, RecheckFor: 10 * time.Second})
+		WaitTimeout: cfg.Checks.WaitTimeout.D, BlockedTimeout: cfg.Merge.BlockedTimeout.D,
+		PollFast: 3 * time.Second, PollSlow: 5 * time.Second, Recheck: time.Second, RecheckFor: 10 * time.Second, Quiet: 3 * time.Second})
 	m := tui.New(w.Source(), rn, w.Claude(), km, log, set)
 
 	ctx, cancel := context.WithCancel(context.Background())

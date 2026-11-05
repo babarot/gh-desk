@@ -172,8 +172,10 @@ var settings = plan.Settings{Methods: []model.MergeMethod{model.MethodMerge, mod
 
 func pr(id, repo string, n int, author string) (model.MergeInfo, Item) {
 	k := model.PRKey{Owner: "acme", Repo: repo, Number: n}
+	// Its workflows ran when it was opened: no job is still to start.
 	mi := model.MergeInfo{Key: k, ID: id, State: model.StateOpen, HeadOID: "h-" + id, BaseOID: "base", MergeState: model.MergeClean,
-		Repo: model.RepoMerge{Methods: []model.MergeMethod{model.MethodMerge}}, Checks: []model.Check{}}
+		Repo: model.RepoMerge{Methods: []model.MergeMethod{model.MethodMerge}}, Checks: []model.Check{},
+		Runs: []model.WorkflowRun{{Name: "CI", Status: model.RunCompleted, Conclusion: model.CheckSuccess}}, RunsRead: true}
 	return mi, Item{PR: model.PR{ID: id, Key: k, Author: author, HeadOID: "h-" + id}, Head: "h-" + id}
 }
 
@@ -195,8 +197,8 @@ func runWith(t *testing.T, f *fakeGH, start func(context.Context, *Runner) <-cha
 func runLogged(t *testing.T, f *fakeGH, log *slog.Logger, start func(context.Context, *Runner) <-chan Event) map[model.PRKey][]Event {
 	t.Helper()
 	r := New(f, log, Options{Settings: settings, Viewer: "me", CanWait: true,
-		ChecksTimeout: time.Second, BlockedTimeout: 40 * time.Millisecond, WatchTimeout: time.Second,
-		PollFast: 5 * time.Millisecond, PollSlow: 5 * time.Millisecond, Recheck: 2 * time.Millisecond, RecheckFor: 50 * time.Millisecond})
+		WaitTimeout: time.Second, BlockedTimeout: 40 * time.Millisecond, WatchTimeout: time.Second,
+		PollFast: 5 * time.Millisecond, PollSlow: 5 * time.Millisecond, Recheck: 2 * time.Millisecond, RecheckFor: 50 * time.Millisecond, Quiet: 20 * time.Millisecond})
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	events := start(ctx, r)
@@ -561,9 +563,9 @@ func TestWatchEndsWhenReadsFail(t *testing.T) {
 	it.AutoMerge = true
 	mi.MergeState, mi.Repo.AutoMerge = model.MergeBlocked, true
 	f := newFake(mi)
-	r := New(failingReads{f}, logging.Discard(), Options{Settings: settings, Viewer: "me", CanWait: true, ChecksTimeout: time.Second,
+	r := New(failingReads{f}, logging.Discard(), Options{Settings: settings, Viewer: "me", CanWait: true, WaitTimeout: time.Second,
 		BlockedTimeout: time.Second, WatchTimeout: 30 * time.Millisecond, PollFast: 5 * time.Millisecond, PollSlow: 5 * time.Millisecond,
-		Recheck: 2 * time.Millisecond, RecheckFor: 50 * time.Millisecond})
+		Recheck: 2 * time.Millisecond, RecheckFor: 50 * time.Millisecond, Quiet: 20 * time.Millisecond})
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 	_, events := r.Start(ctx, Merge, []Item{it})
@@ -631,8 +633,8 @@ func (s *memStore) Remove(k model.PRKey) error {
 
 func newRunner(f GitHub, st Store) *Runner {
 	return New(f, logging.Discard(), Options{Settings: settings, Viewer: "me", Store: st, CanWait: true,
-		ChecksTimeout: time.Second, BlockedTimeout: 40 * time.Millisecond, WatchTimeout: time.Second,
-		PollFast: 5 * time.Millisecond, PollSlow: 5 * time.Millisecond, Recheck: 2 * time.Millisecond, RecheckFor: 50 * time.Millisecond})
+		WaitTimeout: time.Second, BlockedTimeout: 40 * time.Millisecond, WatchTimeout: time.Second,
+		PollFast: 5 * time.Millisecond, PollSlow: 5 * time.Millisecond, Recheck: 2 * time.Millisecond, RecheckFor: 50 * time.Millisecond, Quiet: 20 * time.Millisecond})
 }
 
 func drain(t *testing.T, ch <-chan Event) []Event {
@@ -827,7 +829,7 @@ func TestNoWaitWithoutTheLock(t *testing.T) {
 	mi.MergeState = model.MergeBlocked
 	f := newFake(mi)
 	r := New(f, logging.Discard(), Options{Settings: settings, Viewer: "me", PollFast: time.Millisecond,
-		Recheck: time.Millisecond, RecheckFor: 10 * time.Millisecond})
+		Recheck: time.Millisecond, RecheckFor: 10 * time.Millisecond, Quiet: 20 * time.Millisecond})
 	_, ch := r.Start(context.Background(), Merge, []Item{it})
 	es := drain(t, ch)
 	if e := last(es); e.Result != Skipped || len(f.calls) != 0 {
@@ -890,8 +892,8 @@ func TestResumedWatchDoesNotBlock(t *testing.T) {
 		{Key: b.Key, ID: "2", Head: "h-2", Author: "alice"},
 	}
 	r := New(f, logging.Discard(), Options{Settings: settings, Viewer: "me", Store: newStore(), CanWait: true,
-		ChecksTimeout: time.Second, BlockedTimeout: time.Second, WatchTimeout: 300 * time.Millisecond,
-		PollFast: 5 * time.Millisecond, PollSlow: 5 * time.Millisecond, Recheck: 2 * time.Millisecond, RecheckFor: 50 * time.Millisecond})
+		WaitTimeout: time.Second, BlockedTimeout: time.Second, WatchTimeout: 300 * time.Millisecond,
+		PollFast: 5 * time.Millisecond, PollSlow: 5 * time.Millisecond, Recheck: 2 * time.Millisecond, RecheckFor: 50 * time.Millisecond, Quiet: 20 * time.Millisecond})
 	start := time.Now()
 	_, ch := r.Resume(context.Background(), ps)
 	var mergedAt time.Duration

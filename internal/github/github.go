@@ -564,12 +564,12 @@ func (c *Client) Detail(ctx context.Context, key model.PRKey) (model.Detail, err
 			switch n.Typename {
 			case "CheckRun":
 				st := model.CheckState(n.Conclusion)
-				if n.Status != "COMPLETED" {
+				if n.Status != string(model.RunCompleted) {
 					st = model.CheckPending
 				}
-				d.Checks = append(d.Checks, model.Check{Name: n.Name, State: st})
+				d.Checks = append(d.Checks, model.Check{Name: n.Name, State: st, Kind: model.KindCheckRun, Run: model.RunStatus(n.Status)})
 			case "StatusContext":
-				d.Checks = append(d.Checks, model.Check{Name: n.Context, State: model.CheckState(n.State)})
+				d.Checks = append(d.Checks, model.Check{Name: n.Context, State: model.CheckState(n.State), Kind: model.KindStatus})
 			}
 		}
 	}

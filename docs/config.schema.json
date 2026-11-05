@@ -35,6 +35,11 @@
             "type": "string"
           },
           "type": "array"
+        },
+        "wait_timeout": {
+          "description": "How long a merge, or an approval asked to wait, waits for the jobs still at work on the pull request's head, required or not; an admin merge also waits for the required checks within it. Only the time gh-desk is running counts.",
+          "pattern": "^([0-9]+(\\.[0-9]+)?(ns|us|µs|ms|s|m|h))+$",
+          "type": "string"
         }
       },
       "type": "object"
@@ -432,12 +437,7 @@
           "type": "boolean"
         },
         "blocked_timeout": {
-          "description": "Where gh-desk waits, how long a pull request may stay blocked by another rule (a second approval, code owners) after its required checks finished. Only the time gh-desk is running counts.",
-          "pattern": "^([0-9]+(\\.[0-9]+)?(ns|us|µs|ms|s|m|h))+$",
-          "type": "string"
-        },
-        "checks_timeout": {
-          "description": "Where gh-desk waits, how long to wait for required checks still running. Only the time gh-desk is running counts.",
+          "description": "Where gh-desk waits, how long a pull request may stay blocked by another rule (a second approval, code owners) after its jobs finished. Only the time gh-desk is running counts.",
           "pattern": "^([0-9]+(\\.[0-9]+)?(ns|us|µs|ms|s|m|h))+$",
           "type": "string"
         },

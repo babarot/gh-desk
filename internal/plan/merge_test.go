@@ -114,7 +114,7 @@ func TestForMergeAsAdmin(t *testing.T) {
 		{"own, only an approval check left", blocked(true, passed, approval), model.PR{Author: "me"}, StepMerge, true, true},
 		{"own, checks running", blocked(true, running), model.PR{Author: "me"}, StepWait, false, true},
 		{"own, checks not read", unread, model.PR{Author: "me"}, StepWait, false, true},
-		{"own, checks not all read", partial, model.PR{Author: "me"}, StepAutoMerge, false, false},
+		{"own, checks not all read", partial, model.PR{Author: "me"}, StepWait, false, false},
 		{"own, not an admin", blocked(false, passed), model.PR{Author: "me"}, StepAutoMerge, false, false},
 		{"another person's", blocked(true, passed), model.PR{Author: "alice"}, StepAutoMerge, false, false},
 		{"a bot's", blocked(true, passed), model.PR{Author: "renovate", AuthorIsBot: true}, StepAutoMerge, false, false},
