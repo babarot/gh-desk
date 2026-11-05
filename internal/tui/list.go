@@ -409,9 +409,10 @@ func (m *Model) listHeight() int { return m.rowLines(m.tab(), m.layout().list) }
 
 // rowLines are the lines of a list of height lines that t's rows take:
 // while the tab leaves some out, its last line says how many, whatever
-// the rows are (D30).
+// the rows are (D30). Those the filter and rules would hide are not
+// counted.
 func (m *Model) rowLines(t *tab, height int) int {
-	if height > 1 && !t.showExcluded && m.excludedOf(t).n > 0 {
+	if height > 1 && !t.showExcluded && m.excludedPassing(t, m.filter, t.ruleFilter).n > 0 {
 		return height - 1
 	}
 	return height
@@ -539,7 +540,7 @@ func (m *Model) renderList(b *strings.Builder, height int) {
 	if rowsH < height {
 		// The line under the rows, the last one when they fill the list,
 		// says how many the tab leaves out.
-		b.WriteString(m.st.dim.Render("  "+excludedLine(m.excludedOf(t))+" · "+m.firstKey("show_excluded")+" to show") + "\n")
+		b.WriteString(m.st.dim.Render("  "+excludedLine(m.excludedPassing(t, m.filter, t.ruleFilter))+" · "+m.firstKey("show_excluded")+" to show") + "\n")
 		lines++
 	}
 	for ; lines < height; lines++ {
