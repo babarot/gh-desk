@@ -3,6 +3,7 @@ package tui
 import (
 	"strings"
 	"unicode"
+	"unicode/utf8"
 
 	"charm.land/lipgloss/v2"
 
@@ -102,4 +103,46 @@ func renderFilterText(filter string, base, qual lipgloss.Style) string {
 		rest = rest[j:]
 	}
 	return b.String()
+}
+
+// filterPlaceholder is what an empty filter shows while it is typed: the
+// qualifiers, so the user learns they are there.
+func filterPlaceholder() string {
+	qs := make([]string, len(qualifiers))
+	for i, q := range qualifiers {
+		qs[i] = q + ":"
+	}
+	return strings.Join(qs, " ")
+}
+
+// completion is what the complete key adds to filter: the rest of the one
+// qualifier its last word starts, with the colon, once that word has two
+// letters; "" when there is none. The words of a title often start like a
+// qualifier, so it is only offered, never filled in by itself.
+func completion(filter string) string {
+	if filter == "" {
+		return ""
+	}
+	if r, _ := utf8.DecodeLastRuneInString(filter); unicode.IsSpace(r) {
+		return ""
+	}
+	w := filter
+	if i := strings.LastIndexFunc(filter, unicode.IsSpace); i >= 0 {
+		_, n := utf8.DecodeRuneInString(filter[i:])
+		w = filter[i+n:]
+	}
+	if utf8.RuneCountInString(w) < 2 || strings.Contains(w, ":") {
+		return ""
+	}
+	w = strings.ToLower(w)
+	rest := ""
+	for _, q := range qualifiers {
+		if strings.HasPrefix(q, w) {
+			if rest != "" {
+				return ""
+			}
+			rest = q[len(w):] + ":"
+		}
+	}
+	return rest
 }

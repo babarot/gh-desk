@@ -1,11 +1,14 @@
 package tui
 
 import (
+	"strings"
 	"testing"
 
 	"charm.land/lipgloss/v2"
+	"github.com/charmbracelet/x/ansi"
 
 	"github.com/babarot/gh-desk/internal/model"
+	"github.com/babarot/gh-desk/internal/tui/keymap"
 )
 
 func TestFilterWords(t *testing.T) {
@@ -79,5 +82,63 @@ func TestFilterTextColorsQualifiers(t *testing.T) {
 		if lipgloss.Width(got) != lipgloss.Width(tt.filter) {
 			t.Errorf("renderFilterText(%q) is %d wide, want %d", tt.filter, lipgloss.Width(got), lipgloss.Width(tt.filter))
 		}
+	}
+}
+
+func TestFilterCompletion(t *testing.T) {
+	tests := []struct{ filter, want string }{
+		{"", ""},
+		// One letter is not enough: many words start like a qualifier.
+		{"a", ""},
+		{"au", "thor:"},
+		{"AU", "thor:"},
+		{"author", ":"},
+		{"re", "po:"},
+		{"tit", "le:"},
+		{"cursor au", "thor:"},
+		{"cursor　au", "thor:"},
+		{"au ", ""},
+		{"author:", ""},
+		{"author:bo", ""},
+		{"ax", ""},
+		{"autho r", ""},
+	}
+	for _, tt := range tests {
+		if got := completion(tt.filter); got != tt.want {
+			t.Errorf("completion(%q) = %q, want %q", tt.filter, got, tt.want)
+		}
+	}
+}
+
+func TestFilterOffersQualifiers(t *testing.T) {
+	m := start(t, fixture(), keymap.Default())
+	press(m, "/")
+	if s := screen(m); !strings.Contains(s, "/ author: repo: title:") {
+		t.Errorf("an empty filter does not show the qualifiers:\n%s", s)
+	}
+	if strings.Contains(ansi.Strip(m.hints()), "complete") {
+		t.Errorf("tab is told with nothing to complete: %q", ansi.Strip(m.hints()))
+	}
+
+	// The rest of a qualifier follows the word, and tab fills it in.
+	press(m, "a", "u")
+	if s := screen(m); !strings.Contains(s, "/ author:") {
+		t.Errorf("au does not offer author:\n%s", s)
+	}
+	if !strings.Contains(ansi.Strip(m.hints()), "complete") {
+		t.Errorf("tab is not told: %q", ansi.Strip(m.hints()))
+	}
+	press(m, "tab", "o", "c")
+	if m.filter != "author:oc" || !m.filtering {
+		t.Fatalf("filter = %q, filtering = %v; want %q and filtering", m.filter, m.filtering, "author:oc")
+	}
+
+	// An accepted filter offers nothing.
+	press(m, "backspace", "backspace", "backspace", "backspace", "backspace", "enter")
+	if m.filter != "auth" {
+		t.Fatalf("filter = %q, want %q", m.filter, "auth")
+	}
+	if s := screen(m); strings.Contains(s, "author:") {
+		t.Errorf("an accepted filter still offers a completion:\n%s", s)
 	}
 }

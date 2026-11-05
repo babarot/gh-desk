@@ -253,6 +253,8 @@ func (m *Model) filterKey(msg tea.KeyPressMsg) tea.Cmd {
 		m.filtering, m.filter = false, ""
 	case m.keys.Matches("accept", k):
 		m.filtering = false
+	case m.keys.Matches("complete", k):
+		m.filter += completion(m.filter)
 	case m.keys.Matches("erase", k):
 		if r := []rune(m.filter); len(r) > 0 {
 			m.filter = string(r[:len(r)-1])
