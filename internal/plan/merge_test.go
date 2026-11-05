@@ -1,6 +1,7 @@
 package plan
 
 import (
+	"slices"
 	"strings"
 	"testing"
 
@@ -183,6 +184,16 @@ func TestForMergeDraft(t *testing.T) {
 	}
 }
 
+func TestAttentionNoteNamesPatterns(t *testing.T) {
+	set := Settings{AttentionPaths: []string{".github/workflows/*", "CODEOWNERS", ".github/CODEOWNERS", "docs/CODEOWNERS"}}
+	mi := info(model.MergeBlocked)
+	mi.Files = []string{".github/workflows/ci.yaml", ".github/CODEOWNERS", ".github/workflows/release.yaml", "main.go"}
+	d := ForApprove(mi, model.PR{Author: "other"}, "me", false, set)
+	if want := []string{"changes .github/workflows/*, CODEOWNERS"}; !slices.Equal(d.Notes, want) {
+		t.Errorf("notes %q, want %q", d.Notes, want)
+	}
+}
+
 func TestForMergeNotes(t *testing.T) {
 	mi := info(model.MergeBlocked)
 	mi.Repo.AutoMerge = true
@@ -190,7 +201,7 @@ func TestForMergeNotes(t *testing.T) {
 	mi.Checks = []model.Check{{Name: "lint", State: model.CheckFailure}}
 	d := ForMerge(mi, model.PR{Author: "renovate", AuthorIsBot: true}, "me", set)
 	all := strings.Join(d.Notes, "\n")
-	for _, want := range []string{"changes .github/workflows/ci.yaml, .github/workflows/release.yaml", "not required failed: lint"} {
+	for _, want := range []string{"changes .github/workflows/*", "not required failed: lint"} {
 		if !strings.Contains(all, want) {
 			t.Errorf("notes %q lack %q", d.Notes, want)
 		}

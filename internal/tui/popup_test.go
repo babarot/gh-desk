@@ -237,7 +237,7 @@ func TestBulkShowsEveryNote(t *testing.T) {
 	selectAll(m, []model.PRKey{draft.Key})
 	press(m, "M")
 	text := readPopup(t, m, m.renderBulk, "yes", "j")
-	has(t, text, "changes .github/workflows/ci.yaml, .github/workflows/release.yaml")
+	has(t, text, "changes .github/workflows/*")
 	has(t, text, "ready → turn on auto-merge")
 	if strings.Contains(text, "merge commit") {
 		t.Errorf("the first of merge.methods is named:\n%s", text)
