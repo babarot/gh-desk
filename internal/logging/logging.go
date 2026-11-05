@@ -32,6 +32,11 @@ const (
 	KeyGQLRemaining = "gql_remaining"
 	KeyDurationMS   = "duration_ms"
 	KeyClaude       = "claude_session"
+	// KeyJobs names what a wait waits on, KeyEnded what ended since the
+	// last line and how, KeyStarted what began.
+	KeyJobs    = "jobs"
+	KeyEnded   = "ended"
+	KeyStarted = "started"
 )
 
 // Rotation defaults: the file is moved aside when it is over MaxSize at

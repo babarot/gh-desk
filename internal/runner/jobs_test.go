@@ -2,6 +2,9 @@ package runner
 
 import (
 	"bytes"
+	"context"
+	"encoding/json"
+	"fmt"
 	"log/slog"
 	"slices"
 	"strings"
@@ -303,5 +306,101 @@ func TestResumeApproval(t *testing.T) {
 	}
 	if f.reads["1"] <= 3 {
 		t.Errorf("approved after %d reads, before the job ended", f.reads["1"])
+	}
+}
+
+// waitLines are the wait lines of a log, as "msg step key=value ...", with
+// the attributes a wait carries.
+func waitLines(t *testing.T, log string) []string {
+	t.Helper()
+	var out []string
+	for line := range strings.Lines(log) {
+		var rec map[string]any
+		if err := json.Unmarshal([]byte(line), &rec); err != nil {
+			t.Fatal(err)
+		}
+		msg, _ := rec["msg"].(string)
+		if !strings.HasPrefix(msg, "wait ") {
+			continue
+		}
+		s := fmt.Sprint(msg, " ", rec[logging.KeyStep])
+		for _, k := range []string{logging.KeyEnded, logging.KeyStarted, logging.KeyJobs, "result"} {
+			if v, ok := rec[k]; ok {
+				s += fmt.Sprintf(" %s=%v", k, v)
+			}
+		}
+		out = append(out, s)
+	}
+	return out
+}
+
+// A wait on jobs names them when it starts, and logs a line when one ends,
+// with how, or one begins; a read that finds them as they were logs
+// nothing.
+func TestWaitLogsTheJobsAsTheyChange(t *testing.T) {
+	mi, it := pr("1", "api", 1, "me")
+	mi.MergeState = model.MergeUnstable
+	mi.Checks = []model.Check{checkRun("test", "IN_PROGRESS", ""), checkRun("lint", "IN_PROGRESS", "")}
+	f := newFake(mi)
+	f.onRead = func(_ string, mi *model.MergeInfo, n int) {
+		switch {
+		case n == 4:
+			mi.Checks = []model.Check{checkRun("test", "IN_PROGRESS", ""), checkRun("lint", model.RunCompleted, model.CheckSuccess)}
+		case n == 6:
+			mi.Checks = []model.Check{checkRun("test", model.RunCompleted, model.CheckSuccess), checkRun("lint", model.RunCompleted, model.CheckSuccess),
+				checkRun("gate", "QUEUED", "")}
+		case n >= 8:
+			mi.Checks = []model.Check{checkRun("test", model.RunCompleted, model.CheckSuccess), checkRun("lint", model.RunCompleted, model.CheckSuccess),
+				checkRun("gate", model.RunCompleted, model.CheckSuccess)}
+			mi.MergeState = model.MergeClean
+		}
+	}
+	var buf bytes.Buffer
+	runLogged(t, f, logging.New(&buf, slog.LevelInfo), func(ctx context.Context, r *Runner) <-chan Event {
+		_, ch := r.Start(ctx, Merge, []Item{it})
+		return ch
+	})
+	want := []string{
+		"wait start jobs jobs=test, lint",
+		"wait progress jobs ended=lint: success jobs=test",
+		"wait progress jobs ended=test: success started=gate jobs=gate",
+		"wait end jobs result=ready",
+	}
+	if got := waitLines(t, buf.String()); !slices.Equal(got, want) {
+		t.Errorf("wait lines =\n%s\nwant\n%s", strings.Join(got, "\n"), strings.Join(want, "\n"))
+	}
+}
+
+// The quiet time after marking a draft ready is a wait of its own, on the
+// workflows that may still start.
+func TestQuietTimeIsAWaitOnWorkflows(t *testing.T) {
+	mi, it := pr("1", "api", 1, "me")
+	mi.Draft, mi.MergeState = true, model.MergeDraft
+	f := newFake(mi)
+	f.onRead = func(_ string, mi *model.MergeInfo, _ int) {
+		if !mi.Draft {
+			mi.MergeState = model.MergeClean
+		}
+	}
+	var buf bytes.Buffer
+	var events []Event
+	runLogged(t, f, logging.New(&buf, slog.LevelInfo), func(ctx context.Context, r *Runner) <-chan Event {
+		_, ch := r.Start(ctx, Merge, []Item{it})
+		out := make(chan Event)
+		go func() {
+			for e := range ch {
+				events = append(events, e)
+				out <- e
+			}
+			close(out)
+		}()
+		return out
+	})
+	want := []string{"wait start workflows", "wait end workflows result=ready"}
+	if got := waitLines(t, buf.String()); !slices.Equal(got, want) {
+		t.Errorf("wait lines = %q, want %q", got, want)
+	}
+	if !slices.ContainsFunc(events, func(e Event) bool { return e.Step == StepWaitWorkflows }) {
+		t.Error("did not say it waits for workflows")
 	}
 }

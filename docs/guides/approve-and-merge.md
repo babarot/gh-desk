@@ -37,7 +37,7 @@ After an approve, the approved pull requests stay selected, so `M` merges the sa
 
 ## Following a batch
 
-While a batch goes on, each pull request's row says what it is doing now. `L` opens the log beside the list, as it is written: when each wait started and ended and why, every write with its request ID, and why a pull request was skipped. While it is open it takes the keys: `j`/`k` and the page keys scroll it, the bottom follows the newest again, `f` keeps only the pull request the cursor was on, and `L` or `esc` closes it. On a narrow screen it takes the place of the preview.
+While a batch goes on, each pull request's row says what it is doing now. `L` opens the log beside the list, as it is written: when each wait started and ended and why, the jobs it waits on as each ends and begins, every write with its request ID, and why a pull request was skipped. While it is open it takes the keys: `j`/`k` and the page keys scroll it, the bottom follows the newest again, `f` keeps only the pull request the cursor was on, and `L` or `esc` closes it. On a narrow screen it takes the place of the preview.
 
 While a batch runs, the top of it has a line for each pull request: the steps it has been through, the one it is on with how long so far, and those expected ahead, which can change as gh-desk decides again after each write. A wait says what it waits for. A batch that ends while the log is open stays there, done, until it is closed. The status line counts how the batch stands: done, waiting, skipped, stopped.
 

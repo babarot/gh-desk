@@ -57,6 +57,10 @@ func JobsRunning(mi model.MergeInfo, t Trigger, now time.Time) bool {
 	return mi.ChecksPartial && !runsKnown || t.quiet(mi, now) || len(RunningJobs(mi)) > 0
 }
 
+// InQuiet reports whether the quiet time after t holds now: jobs may still
+// start that are not seen yet.
+func InQuiet(mi model.MergeInfo, t Trigger, now time.Time) bool { return t.quiet(mi, now) }
+
 // RunningJobs names the jobs being waited for: the check runs not
 // completed, or when none is, the workflow runs not completed (between a
 // job and the one that needs it, only its workflow run is at work). A

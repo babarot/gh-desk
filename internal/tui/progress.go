@@ -18,8 +18,9 @@ import (
 // stepWords name the steps on a lane.
 var stepWords = map[runner.Step]string{
 	runner.StepReady: "ready", runner.StepApprove: "approve", runner.StepReview: "review", runner.StepUpdate: "update",
-	runner.StepWait: "wait", runner.StepWaitChecks: "checks", runner.StepWaitApproval: "approval checks",
-	runner.StepWaitBlocked: "blocked", runner.StepMerge: "merge", runner.StepAutoMerge: "auto-merge",
+	runner.StepWait: "wait", runner.StepWaitChecks: "checks", runner.StepWaitWorkflows: "workflows",
+	runner.StepWaitApproval: "approval checks",
+	runner.StepWaitBlocked:  "blocked", runner.StepMerge: "merge", runner.StepAutoMerge: "auto-merge",
 	runner.StepComment: "comment", runner.StepClose: "close", runner.StepDeleteRef: "delete branch",
 }
 
