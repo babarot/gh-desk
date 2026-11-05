@@ -7,7 +7,7 @@ import (
 )
 
 // Version is the current release.
-const Version = "0.5.1"
+const Version = "0.6.0"
 
 // String is the version with the commit it was built from, when the build
 // knows it: a build in a clone does. go install does not, but it tells the
