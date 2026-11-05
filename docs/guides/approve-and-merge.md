@@ -29,6 +29,10 @@ Commit statuses, such as a policy bot's, are not jobs: gh-desk waits for them on
 
 The method is the first of `merge.methods` the repository allows, and the popup shows it. A draft of yours or of a bot is marked ready for review first. Your own pull request that GitHub lets you merge as an admin is merged as one, after its required checks pass, and the popup says so first.
 
+## Approving once the checks pass
+
+When some of the pull requests to approve have jobs at work, the approve popup waits for them by default: each is approved once its check runs and workflow runs have finished, and one whose job failed is skipped, unless failing ones are included with `f`. `w` approves at once instead. An approval with a text, written with `R`, is always sent at once.
+
 After an approve, the approved pull requests stay selected, so `M` merges the same set next.
 
 ## Following a batch
@@ -41,6 +45,6 @@ The log shows what the log file has, and no more; `--debug` adds every read.
 
 ## Waiting survives quitting
 
-There is no background process. What a merge is waiting for is recorded, and the next launch goes on with it, reading each pull request again first. Only the time gh-desk runs counts against the timeouts. A second gh-desk started meanwhile skips merges that would wait.
+There is no background process. What a merge or an approval is waiting for is recorded, and the next launch goes on with it, reading each pull request again first. Only the time gh-desk runs counts against the timeouts. A second gh-desk started meanwhile skips merges and approvals that would wait.
 
 See [`[merge]`](../reference/configuration.md#merge) and [`[checks]`](../reference/configuration.md#checks) for the settings.

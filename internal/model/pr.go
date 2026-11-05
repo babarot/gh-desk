@@ -319,15 +319,27 @@ type Detail struct {
 	Comments []Comment
 }
 
+// PendingKind is what a recorded job waits to do.
+type PendingKind string
+
+// PendingApprove is an approval that waits for the jobs at work.
+const PendingApprove PendingKind = "approve"
+
 // Pending is a merge gh-desk waits for, as recorded to go on at the next
 // launch. The times waited are kept, not the times started, so the time
 // gh-desk was not running is not counted against the limits.
 type Pending struct {
-	Key         PRKey  `json:"key"`
-	ID          string `json:"id"`
-	Head        string `json:"head"`
-	Author      string `json:"author"`
-	AuthorIsBot bool   `json:"author_is_bot"`
+	// Kind is what is waited for: a merge when empty, or an approval
+	// asked to wait for the jobs.
+	Kind PendingKind `json:"kind,omitempty"`
+	// IncludeFailing is set on an approval the user let in although a
+	// check failed: a job that fails while it waits does not stop it.
+	IncludeFailing bool   `json:"include_failing,omitempty"`
+	Key            PRKey  `json:"key"`
+	ID             string `json:"id"`
+	Head           string `json:"head"`
+	Author         string `json:"author"`
+	AuthorIsBot    bool   `json:"author_is_bot"`
 	// AutoMerge is whether the user agreed to auto-merge for it.
 	AutoMerge bool `json:"auto_merge"`
 	// Watching is set once auto-merge is on and it is only followed.

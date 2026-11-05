@@ -227,3 +227,34 @@ func TestForMergeWaitsForJobs(t *testing.T) {
 		})
 	}
 }
+
+// An approval asked to wait waits while jobs are at work, and is left
+// when one failed unless failing ones were let in; a skip stays a skip.
+func TestAfterJobs(t *testing.T) {
+	approve := Decision{Approve: true, Reason: "approve"}
+	at := func(checks ...model.Check) model.MergeInfo {
+		return model.MergeInfo{Checks: checks, RunsRead: true, Runs: []model.WorkflowRun{workflowRun("CI", model.RunCompleted, model.CheckSuccess)}}
+	}
+	tests := []struct {
+		name    string
+		d       Decision
+		mi      model.MergeInfo
+		include bool
+		step    Step
+		reason  string
+	}{
+		{"jobs at work", approve, at(checkRun("test", inProgress, "")), false, StepWait, "wait for checks, then approve"},
+		{"jobs done", approve, at(checkRun("test", model.RunCompleted, model.CheckSuccess)), false, "", "approve"},
+		{"a job failed", approve, at(checkRun("lint", model.RunCompleted, model.CheckFailure)), false, StepSkip, "a job failed: lint"},
+		{"a job failed, let in", approve, at(checkRun("lint", model.RunCompleted, model.CheckFailure)), true, "", "approve"},
+		{"already skipped", Decision{Step: StepSkip, Reason: "already approved"}, at(checkRun("test", inProgress, "")), false, StepSkip, "already approved"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			d := AfterJobs(tt.d, tt.mi, Trigger{}, time.Time{}, tt.include)
+			if d.Step != tt.step || d.Reason != tt.reason {
+				t.Errorf("AfterJobs = %+v; want step %q, reason %q", d, tt.step, tt.reason)
+			}
+		})
+	}
+}

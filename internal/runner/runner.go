@@ -156,6 +156,13 @@ type Item struct {
 	// auto-merge, which also merges commits pushed later. Without it the
 	// runner never turns auto-merge on: it waits and merges itself.
 	AutoMerge bool
+	// Wait is set on an approval the user asked to wait for the jobs at
+	// work on the head; it is approved once they passed.
+	Wait bool
+	// IncludeFailing is set when the user let in pull requests whose
+	// checks failed: a job that fails while the approval waits does not
+	// stop it.
+	IncludeFailing bool
 }
 
 // Result is where a pull request ended, or Running while it has not.
@@ -340,7 +347,7 @@ func (r *Runner) Resume(ctx context.Context, ps []model.Pending) (string, <-chan
 	pend := map[model.PRKey]model.Pending{}
 	for i, p := range ps {
 		items[i] = Item{PR: model.PR{ID: p.ID, Key: p.Key, Author: p.Author, AuthorIsBot: p.AuthorIsBot, HeadOID: p.Head},
-			Head: p.Head, AutoMerge: p.AutoMerge}
+			Head: p.Head, AutoMerge: p.AutoMerge, Wait: p.Kind == model.PendingApprove, IncludeFailing: p.IncludeFailing}
 		pend[p.Key] = p
 	}
 	return r.run(ctx, Merge, items, pend, ReviewText{}, CloseText{})
@@ -576,6 +583,10 @@ func (j *job) forget() {
 
 // resume goes on with a recorded merge after reading it again.
 func (j *job) resume() {
+	if j.pend.Kind == model.PendingApprove {
+		j.resumeApproval()
+		return
+	}
 	j.say(Running, "resuming")
 	mi, ok := j.read(false)
 	if !ok {
@@ -609,6 +620,96 @@ func (j *job) resume() {
 		return
 	}
 	j.merge()
+}
+
+// waitToApprove records an approval that waits for the jobs, and waits
+// aside, as auto-merge is watched, so the next pull request of the
+// repository is not held up by it.
+func (j *job) waitToApprove() {
+	if !j.canWait {
+		j.locked("locked by another gh-desk")
+		return
+	}
+	j.record = j.store != nil
+	j.pend.Kind, j.pend.IncludeFailing = model.PendingApprove, j.it.IncludeFailing
+	if !j.save() {
+		j.say(Failed, "could not record the pending approval; nothing was sent")
+		return
+	}
+	j.forecast([]Step{StepWait, StepApprove})
+	j.watching = true
+	j.wg.Go(func() {
+		defer j.r.release(j.it.PR.Key)
+		j.approveAfterJobs()
+	})
+}
+
+// resumeApproval goes on with a recorded approval that waited for the
+// jobs.
+func (j *job) resumeApproval() {
+	j.say(Running, "resuming")
+	mi, ok := j.read(false)
+	if !ok {
+		return
+	}
+	approved := approvedBy(mi, j.r.opt.Viewer)
+	switch {
+	case approved:
+		j.approved = true
+		j.say(Approved, "approved")
+		return
+	case j.pend.Approving:
+		// It may have reached GitHub and been dismissed since.
+		j.say(Stopped, "whether the approval was sent is not known · confirm again")
+		return
+	}
+	j.watching = true
+	j.wg.Go(func() {
+		defer j.r.release(j.it.PR.Key)
+		j.approveAfterJobs()
+	})
+}
+
+// approveAfterJobs reads the pull request until no job is at work on its
+// head, then approves it; a job that failed stops it, unless the user let
+// failing ones in. Every read checks the head is the one confirmed.
+func (j *job) approveAfterJobs() {
+	last := time.Now()
+	w := &waitLog{log: j.log}
+	for {
+		mi, ok := j.read(true)
+		if !ok {
+			w.end("stopped")
+			return
+		}
+		// Failing required checks were left out by the popup unless let
+		// in, as for an approval that does not wait.
+		d := plan.ForApprove(mi, j.it.PR, j.r.opt.Viewer, true, j.r.opt.Settings)
+		d = plan.AfterJobs(d, mi, j.trigger, time.Now(), j.it.IncludeFailing)
+		switch d.Step {
+		case plan.StepSkip:
+			w.end("skipped")
+			j.say(Skipped, d.Reason)
+			return
+		case plan.StepWait:
+			if !j.waitedForChecks(mi, &last, w) {
+				return
+			}
+			w.start("jobs")
+			j.step(StepWaitChecks, "waiting for checks", plan.RunningJobs(mi)...)
+			j.forecast([]Step{StepApprove})
+			if !j.pause(w) {
+				return
+			}
+			continue
+		}
+		w.end("ready")
+		j.forecast([]Step{StepApprove})
+		if j.sendApproval("") {
+			j.say(Approved, "approved")
+		}
+		return
+	}
 }
 
 // approvedBy reports whether login's latest review approves.
@@ -657,6 +758,17 @@ func (j *job) review(rv ReviewText) {
 	if d.Step == plan.StepSkip {
 		j.say(Skipped, d.Reason)
 		return
+	}
+	if approve && j.it.Wait && rv.Body == "" {
+		d = plan.AfterJobs(d, mi, j.trigger, time.Now(), j.it.IncludeFailing)
+		switch d.Step {
+		case plan.StepSkip:
+			j.say(Skipped, d.Reason)
+			return
+		case plan.StepWait:
+			j.waitToApprove()
+			return
+		}
 	}
 	if approve {
 		j.forecast([]Step{StepApprove})
