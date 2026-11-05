@@ -15,6 +15,7 @@ import (
 	"slices"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/cli/go-gh/v2/pkg/api"
@@ -31,6 +32,9 @@ type Client struct {
 	rest *api.RESTClient
 	diff *api.RESTClient
 	log  *slog.Logger
+	// low is set while GitHub's GraphQL points left are under
+	// lowRemaining, so that is said once, not at every query.
+	low atomic.Bool
 }
 
 // Options configure a Client. Transport is for tests; nil uses the network.
@@ -79,14 +83,38 @@ func New(log *slog.Logger, o Options) (*Client, error) {
 type rateLimit struct {
 	Cost      int
 	Remaining int
+	ResetAt   time.Time
 }
+
+// lowRemaining is how few GraphQL points left an hour make gh-desk warn,
+// once, that GitHub may soon refuse its reads: a constant, as GitHub's
+// hourly points are the same for everyone using gh.
+const lowRemaining = 500
 
 func (c *Client) query(ctx context.Context, name, q string, vars map[string]any, resp any, rl *rateLimit) error {
 	err := c.gql.DoWithContext(ctx, q, vars, resp)
 	if rl != nil {
-		c.log.Debug("graphql", "query", name, logging.KeyGQLCost, rl.Cost, logging.KeyGQLRemaining, rl.Remaining)
+		c.noteRateLimit(name, *rl)
 	}
 	return err
+}
+
+// noteRateLimit logs what a query cost at debug, and warns once when the
+// points left fall under lowRemaining, so the log tells why reads may
+// slow down or fail until GitHub resets them.
+func (c *Client) noteRateLimit(name string, rl rateLimit, attrs ...any) {
+	c.log.Debug("graphql", append([]any{"query", name, logging.KeyGQLCost, rl.Cost, logging.KeyGQLRemaining, rl.Remaining}, attrs...)...)
+	if rl.ResetAt.IsZero() {
+		// Not read: the query failed before GitHub said.
+		return
+	}
+	if rl.Remaining >= lowRemaining {
+		c.low.Store(false)
+		return
+	}
+	if !c.low.Swap(true) {
+		c.log.Warn("github points running low", logging.KeyGQLRemaining, rl.Remaining, "reset_at", rl.ResetAt.Format(time.RFC3339))
+	}
 }
 
 // Viewer is the login of the user gh is logged in as.
@@ -224,7 +252,7 @@ func (n prNode) toModel(heavy bool) (model.PR, bool) {
 }
 
 const searchQuery = `query($q: String!, $first: Int!, $after: String) {
-  rateLimit { cost remaining }
+  rateLimit { cost remaining resetAt }
   search(query: $q, type: ISSUE, first: $first, after: $after) {
     issueCount
     pageInfo { hasNextPage endCursor }
@@ -295,7 +323,7 @@ func (c *Client) SearchPage(ctx context.Context, query string, first int, after 
 }
 
 const heavyQuery = `query($ids: [ID!]!) {
-  rateLimit { cost remaining }
+  rateLimit { cost remaining resetAt }
   nodes(ids: $ids) { ... on PullRequest { id ...heavy } }
 }` + heavyFields
 
@@ -382,7 +410,7 @@ func (c *Client) PullRequests(ctx context.Context, keys []model.PRKey) (map[mode
 func (c *Client) pullRequests(ctx context.Context, keys []model.PRKey) (map[model.PRKey]model.PR, error) {
 	out := map[model.PRKey]model.PR{}
 	var b strings.Builder
-	b.WriteString("query {\n  rateLimit { cost remaining }\n")
+	b.WriteString("query {\n  rateLimit { cost remaining resetAt }\n")
 	for i, k := range keys {
 		fmt.Fprintf(&b, "  p%d: repository(owner: %q, name: %q) { pullRequest(number: %d) { ...pr } }\n", i, k.Owner, k.Repo, k.Number)
 	}
@@ -493,7 +521,7 @@ func (c *Client) Comment(ctx context.Context, apiURL string) (model.Comment, err
 }
 
 const detailQuery = `query($owner: String!, $name: String!, $number: Int!) {
-  rateLimit { cost remaining }
+  rateLimit { cost remaining resetAt }
   repository(owner: $owner, name: $name) {
     pullRequest(number: $number) {
       body

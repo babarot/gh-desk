@@ -1,7 +1,9 @@
 package tui
 
 import (
+	"bytes"
 	"fmt"
+	"log/slog"
 	"strings"
 	"testing"
 	"time"
@@ -9,6 +11,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/babarot/gh-desk/internal/listcache"
+	"github.com/babarot/gh-desk/internal/logging"
 	"github.com/babarot/gh-desk/internal/model"
 	"github.com/babarot/gh-desk/internal/plan"
 	"github.com/babarot/gh-desk/internal/runner"
@@ -271,4 +274,18 @@ func flatten(cmd tea.Cmd) []tea.Cmd {
 		return out
 	}
 	return []tea.Cmd{func() tea.Msg { return msg }}
+}
+
+// The lists shown from the cache at launch are logged with how old the
+// oldest of them is, so the log tells the rows are as of then until the
+// lists are read again.
+func TestCachedListsAreLogged(t *testing.T) {
+	var buf bytes.Buffer
+	set := testSettings()
+	set.Viewer, set.Lists = "me", cachedReview()
+	New(fixture(), &fakeRunner{results: map[model.PRKey]runner.Event{}}, &fakeClaude{}, keymap.Default(), logging.New(&buf, slog.LevelInfo), set)
+	log := buf.String()
+	if !strings.Contains(log, `"msg":"lists from the cache"`) || !strings.Contains(log, `"tabs":1`) || !strings.Contains(log, `"age":"18m0s"`) {
+		t.Errorf("the cache shown is not logged with its age:\n%s", log)
+	}
 }
