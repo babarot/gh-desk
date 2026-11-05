@@ -39,7 +39,8 @@ func (m *Model) render() (string, *tea.Cursor) {
 		if m.filtering {
 			cur = tea.NewCursor(min(lipgloss.Width("/ "+m.filter), max(m.width-1, 0)), 1)
 		}
-		b.WriteString(m.renderFilter() + "\n")
+		// Cut to the width, as a line that wraps moves every row under it.
+		b.WriteString(fit(m.renderFilter(), m.width) + "\n")
 	}
 	l := m.layout()
 	m.renderList(&b, l.list)

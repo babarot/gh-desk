@@ -215,3 +215,18 @@ func TestFilterValuesGoRound(t *testing.T) {
 		t.Errorf("tab is told with one value filled in: %q", ansi.Strip(m.hints()))
 	}
 }
+
+func TestFilterLineFitsANarrowScreen(t *testing.T) {
+	// What the filter offers makes its line long; a line that wraps would
+	// move every row under it.
+	m := start(t, fixture(), keymap.Default())
+	m.width = 16
+	press(m, "/")
+	for _, f := range []string{"", "au", "author:", "repo:"} {
+		m.filter = f
+		s, _ := m.render()
+		if l := strings.Split(s, "\n")[1]; lipgloss.Width(l) > m.width {
+			t.Errorf("filter line of %q is %d wide on %d: %q", f, lipgloss.Width(l), m.width, ansi.Strip(l))
+		}
+	}
+}
