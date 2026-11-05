@@ -65,9 +65,13 @@ type styles struct {
 	sel, dim, muted, sub0, sub1, text, bold lipgloss.Style
 	blue, mauve, green, yellow, peach, red  lipgloss.Style
 	teal, key, border, title, group, add    lipgloss.Style
-	del, hunk, file, me                     lipgloss.Style
-	picked, pickedSel, claude, claudeSel    lipgloss.Style
-	fresh                                   lipgloss.Style
+	// focus is the frame of what takes the keys while it is shown (a
+	// popup, the log viewer, the claude pane); border is that of what takes
+	// none (ADR-079).
+	focus                                lipgloss.Style
+	del, hunk, file, me                  lipgloss.Style
+	picked, pickedSel, claude, claudeSel lipgloss.Style
+	fresh                                lipgloss.Style
 	// tabOn and tabOff are a tab that switches the screen or the pane
 	// (the header, the pane's overview and diff), shown or
 	// not; subOn and subOff a choice within one (a file of the diff, the
@@ -113,6 +117,7 @@ func newStyles(p palette) styles {
 		teal:      fg(p.teal),
 		key:       fg(p.blue).Bold(true),
 		border:    fg(p.surface1),
+		focus:     fg(p.blue),
 		title:     fg(p.subtext1).Bold(true),
 		group:     fg(p.subtext0).Bold(true),
 		add:       fg(p.green),

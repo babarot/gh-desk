@@ -321,3 +321,29 @@ func TestLogViewerCleansWhatGitHubSaid(t *testing.T) {
 		t.Errorf("a line break from GitHub added a line:\n%s", screen(m))
 	}
 }
+
+// What takes the keys (a popup, the log viewer, the claude pane) draws its
+// frame in the focus color, and the list's panes keep the plain border
+// while none of them is open (ADR-079).
+func TestFocusedPaneFrame(t *testing.T) {
+	corner := func(m *Model) (focus, plain bool) {
+		s, _ := m.render()
+		return strings.Contains(s, m.st.focus.Render("╭ ")), strings.Contains(s, m.st.border.Render("╭ "))
+	}
+	m, _ := startLogged(t, 130, 34, 4)
+	if f, p := corner(m); m.st.focus.Render("╭ ") == m.st.border.Render("╭ ") || f || !p {
+		t.Fatalf("before L: focus frame %v, plain frame %v", f, p)
+	}
+	press(m, "?")
+	if f, _ := corner(m); !m.help || !f {
+		t.Errorf("help popup shown %v: focus frame %v", m.help, f)
+	}
+	press(m, "esc", "L")
+	if f, p := corner(m); !f || !p {
+		t.Errorf("log viewer open: focus frame %v, plain frame (the preview) %v", f, p)
+	}
+	press(m, "esc", "i")
+	if f, _ := corner(m); !m.claudeShown() || !f {
+		t.Errorf("claude pane shown %v: focus frame %v", m.claudeShown(), f)
+	}
+}

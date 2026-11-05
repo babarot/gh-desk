@@ -24,6 +24,10 @@
 
 - Make a text box with `newInput` in `internal/tui`, and return its `Cursor()`, placed on the screen, from `render` so the view gives it to the terminal. Never draw a cursor: an input method shows the text being composed where the terminal's cursor is. `cursor_test.go` checks both
 
+## Frames
+
+- Draw a popup with `box` in `internal/tui`. A pane that takes the keys while it is shown draws its frame with `focus`; what takes none, even drawn over the screen, keeps `border`. See [ADR-079](docs/adr/079-what-takes-the-keys-says-so-by-its-frame.md)
+
 ## Config
 
 - A mistake in the config file is reported where it is, through `config.Problem` and `config.Report`, never ignored. A check that needs another package (a log level, a key) is done by the caller and reported the same way
