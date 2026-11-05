@@ -261,6 +261,21 @@ func (c *Claude) Interactive(pr model.PRKey, dir, session string) *exec.Cmd {
 	return cmd
 }
 
+// briefLen is how much of an error from Claude Code the log keeps.
+const briefLen = 80
+
+// Brief is an error from Claude Code as the log keeps it: its first line,
+// cut short. Claude Code's error results are meant as errors, but they
+// come in the place of an answer, and the log never holds what Claude
+// says (ADR-003); the status line shows the whole error.
+func Brief(err error) string {
+	s, _, _ := strings.Cut(err.Error(), "\n")
+	if r := []rune(s); len(r) > briefLen {
+		s = string(r[:briefLen-1]) + "…"
+	}
+	return s
+}
+
 // run runs claude in dir; env, when not nil, is its whole environment.
 func (c *Claude) run(ctx context.Context, log *slog.Logger, dir string, env, args []string, prompt string, progress func(Step)) (Answer, error) {
 	bin, err := exec.LookPath(c.opt.Bin)
@@ -305,14 +320,14 @@ func (c *Claude) run(ctx context.Context, log *slog.Logger, dir string, env, arg
 		log.Info("claude stopped", "tools", tools, logging.KeyDurationMS, elapsed)
 		return Answer{}, ctx.Err()
 	case readErr != nil:
-		log.Warn("claude failed", "err", readErr.Error(), logging.KeyDurationMS, elapsed)
+		log.Warn("claude failed", "err", Brief(readErr), logging.KeyDurationMS, elapsed)
 		return Answer{}, readErr
 	case waitErr != nil:
 		msg := strings.TrimSpace(stderr.String())
 		if i := strings.LastIndex(msg, "\n"); i >= 0 {
 			msg = msg[i+1:]
 		}
-		log.Warn("claude failed", "err", waitErr.Error(), logging.KeyDurationMS, elapsed)
+		log.Warn("claude failed", "err", Brief(waitErr), logging.KeyDurationMS, elapsed)
 		return Answer{}, fmt.Errorf("claude: %w %s", waitErr, msg)
 	}
 	log.Info("claude answered", "model", answer.Model, "tools", tools, "cost_usd", answer.Cost, logging.KeyDurationMS, elapsed)

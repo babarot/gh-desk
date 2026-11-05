@@ -371,7 +371,7 @@ type notesMsg struct {
 
 func (m *Model) notesRead(msg notesMsg) tea.Cmd {
 	if msg.err != nil {
-		m.log.Warn("release notes", "err", msg.err.Error())
+		m.log.Warn("release notes", "err", claude.Brief(msg.err))
 		msg.b.notes, msg.b.notesErr = notesFailed, msg.err.Error()
 		return nil
 	}

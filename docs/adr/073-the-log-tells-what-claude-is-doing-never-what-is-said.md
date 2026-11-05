@@ -18,6 +18,7 @@ This adds to what ADR-003 and ADR-057 log at info.
 - The worktree of a pull request is logged when it is ready, with how long it took to make.
 - A triage plan applied is logged with how many of its actions were applied and how many were left out; release notes read for the confirm popup are logged with how many pull requests were read and how many call for care.
 - What is asked, what Claude answers, the tools' arguments (file paths, patterns) and the release notes themselves are never logged, as ADR-003 says. Each tool used stays at debug, by its name only.
+- An error Claude Code returns in the place of an answer is logged as its first line, cut short; the status line shows it whole. It is meant as an error, but comes where Claude's words would.
 - Rejected: logging each tool Claude uses at info. A question can use dozens, and their arguments say what is being read.
 
 ## Consequences

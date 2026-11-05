@@ -45,3 +45,25 @@ func TestAskIsLoggedWithoutWhatIsSaid(t *testing.T) {
 		}
 	}
 }
+
+// An error result of Claude Code reaches the log as its first line, cut
+// short; the error itself keeps it whole for the status line.
+func TestErrorResultIsLoggedBrief(t *testing.T) {
+	dir := t.TempDir()
+	bin := filepath.Join(dir, "claude")
+	long := strings.Repeat("x", 200)
+	script := "#!/bin/sh\ncat > /dev/null\necho '{\"type\":\"result\",\"is_error\":true,\"result\":\"Prompt is too long " + long + "\\\\nsecond line\"}'\n"
+	if err := os.WriteFile(bin, []byte(script), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	var buf bytes.Buffer
+	c := New(Options{Bin: bin, Model: "opus", Language: "English", Log: logging.New(&buf, slog.LevelInfo)})
+	_, err := c.Once(context.Background(), t.TempDir(), "q", "")
+	if err == nil || !strings.Contains(err.Error(), "second line") {
+		t.Fatalf("err = %v; want the whole error", err)
+	}
+	log := buf.String()
+	if !strings.Contains(log, "Prompt is too long") || strings.Contains(log, "second line") || strings.Contains(log, long) {
+		t.Errorf("the error is not logged brief:\n%s", log)
+	}
+}
