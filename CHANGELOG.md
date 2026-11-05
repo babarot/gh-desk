@@ -1,5 +1,10 @@
 # Changelog
 
+## [v0.6.0](https://github.com/babarot/gh-desk/compare/v0.5.1...v0.6.0) - 2026-11-05
+### New Features
+- Draw shortcodes in a description as their emoji by @babarot in https://github.com/babarot/gh-desk/pull/61
+- Draw a title's shortcodes as emoji, and keep the title as written by @babarot in https://github.com/babarot/gh-desk/pull/63
+
 ## [v0.5.1](https://github.com/babarot/gh-desk/compare/v0.5.0...v0.5.1) - 2026-11-05
 ### Improvements
 - Log why the popup skipped, rechecks of mergeability, and what auto-merge waits on by @babarot in https://github.com/babarot/gh-desk/pull/54
