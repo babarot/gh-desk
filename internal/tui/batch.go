@@ -416,6 +416,17 @@ func (m *Model) pushNote(icon, title string, items []noteItem) tea.Cmd {
 	return m.after(toastFor, toastMsg{n})
 }
 
+// takeNoted gives the toasts' timers of the notes pushed where no command
+// could be returned.
+func (m *Model) takeNoted() tea.Cmd {
+	if len(m.noted) == 0 {
+		return nil
+	}
+	cmd := tea.Batch(m.noted...)
+	m.noted = nil
+	return cmd
+}
+
 // configNote tells of the config file's warnings, which did not stop
 // gh-desk, in a notification.
 func (m *Model) configNote() tea.Cmd {

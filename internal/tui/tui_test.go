@@ -1825,8 +1825,12 @@ func TestClaudeAnsweringElsewhere(t *testing.T) {
 		t.Errorf("the answer that came elsewhere is not marked on the folded group:\n%s", s)
 	}
 	m.tab().folded[plan.GroupYou] = false
-	if strings.Count(screen(m), "✦") != 1 {
+	if strings.Count(screen(m), "✦ api#12") != 1 {
 		t.Errorf("the answer that came elsewhere is not marked:\n%s", screen(m))
+	}
+	// It is kept in the notifications too, leading to its pull request.
+	if m.unseen() != 1 || m.notes[0].title != "Claude answered on "+k.String() || m.notes[0].items[0].key != k {
+		t.Errorf("notes = %+v", m.notes)
 	}
 	press(m, "i")
 	if c.unseen {

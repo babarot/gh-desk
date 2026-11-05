@@ -54,6 +54,9 @@ type tab struct {
 	ruleFilter []plan.Rule
 	// readingBodies is set while the bodies a rule reads are on their way.
 	readingBodies bool
+	// bodiesFailing is set while reading the descriptions fails, so the
+	// failure is kept in the notifications once.
+	bodiesFailing bool
 
 	sel, offset int
 	// keep is the pull request the cursor was on when a reading started.
@@ -676,7 +679,7 @@ func (m *Model) handleData(msg tea.Msg) tea.Cmd {
 		m.basedOnRead(msg)
 		return nil
 	case bodiesMsg:
-		m.bodies(msg)
+		return m.bodies(msg)
 	case checksMsg:
 		maps.Copy(m.cache.info, msg.got)
 	}

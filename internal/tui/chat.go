@@ -65,9 +65,13 @@ type chatScreen struct {
 }
 
 // chatStatus puts what a conversation says went wrong on the status line.
+// A failure is kept in the notifications as well: keeping a conversation
+// fails as an answer comes, which may be while the user is elsewhere.
 type chatStatus struct{ m *Model }
 
-func (s chatStatus) Fail(text string)   { s.m.fail(text) }
+func (s chatStatus) Fail(k model.PRKey, text string) {
+	s.m.noted = append(s.m.noted, s.m.failNoted(text, k))
+}
 func (s chatStatus) Refuse(text string) { s.m.refuse(text) }
 
 // Messages of a question on its way.
@@ -404,31 +408,48 @@ func (m *Model) chatAnswered(msg chatAnswerMsg) tea.Cmd {
 	if msg.err != nil {
 		// A session not started is made anew at the next question, as
 		// Claude Code may have taken its ID before failing.
-		if m.ctx.Err() == nil {
-			add(msg.err.Error(), true)
+		if m.ctx.Err() != nil {
+			return nil
 		}
-		return nil
+		add(msg.err.Error(), true)
+		return m.chatFailedElsewhere(msg.key, msg.err)
 	}
 	c.Answered(msg.answer)
 	if msg.draft {
 		d, err := claude.ParseDraft(msg.answer)
 		if err != nil {
 			add(err.Error(), true)
-			return nil
+			return m.chatFailedElsewhere(msg.key, err)
 		}
 		add("Drafted a review ("+kindWords[d.Event]+").", false)
 		if !m.showsChat(msg.key) {
 			c.draft = &d
-			m.say(fmt.Sprintf("the review of %s is drafted; open Claude to see it", msg.key))
-			return nil
+			return m.chatNoted(msg.key, fmt.Sprintf("the review of %s is drafted; open Claude to see it", msg.key))
 		}
 		return m.draftCompose(c, d)
 	}
 	add(msg.answer.Text, false)
 	if !m.showsChat(msg.key) {
-		m.say(fmt.Sprintf("Claude answered on %s", msg.key))
+		return m.chatNoted(msg.key, fmt.Sprintf("Claude answered on %s", msg.key))
 	}
 	return nil
+}
+
+// chatNoted says what Claude left on k while the pane did not show it,
+// and keeps it in the notifications (ADR-007): an answer takes long
+// enough for the user to be elsewhere when it comes.
+func (m *Model) chatNoted(k model.PRKey, text string) tea.Cmd {
+	m.say(text)
+	return m.pushNote("✓", text, []noteItem{{key: k, text: text}})
+}
+
+// chatFailedElsewhere keeps in the notifications a question on k that
+// failed while the pane did not show it; shown, the conversation says so.
+func (m *Model) chatFailedElsewhere(k model.PRKey, err error) tea.Cmd {
+	if m.showsChat(k) {
+		return nil
+	}
+	return m.failNoted(fmt.Sprintf("Claude failed on %s: %s", k, short80(err)), k)
 }
 
 // draftCompose opens the review popup with Claude's draft.
@@ -438,8 +459,7 @@ func (m *Model) draftCompose(c *chatScreen, d claude.Draft) tea.Cmd {
 		// Another review is being written or asked about: the draft
 		// waits, as it does while the pane is not shown.
 		c.draft = &d
-		m.say(fmt.Sprintf("the review of %s is drafted; open Claude again to see it", pr.Key))
-		return nil
+		return m.chatNoted(pr.Key, fmt.Sprintf("the review of %s is drafted; open Claude again to see it", pr.Key))
 	}
 	ev := d.Event
 	if m.own(pr) || pr.State != model.StateOpen {

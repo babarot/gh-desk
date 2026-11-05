@@ -338,8 +338,15 @@ func (m *Model) posted(msg postedMsg) tea.Cmd {
 	}
 	m.posting, m.sending = nil, ""
 	if len(p.failed) == 0 {
-		m.say(fmt.Sprintf("✓ comment sent to %s", prsWord(p.prs)))
-		return shown
+		// Kept in the notifications as its failure is, and as a batch's
+		// end is.
+		text := fmt.Sprintf("comment sent to %s", prsWord(p.prs))
+		m.say("✓ " + text)
+		items := make([]noteItem, len(p.prs))
+		for i, pr := range p.prs {
+			items[i] = noteItem{key: pr.Key, text: "comment sent"}
+		}
+		return tea.Batch(shown, m.pushNote("✓", text, items))
 	}
 	clear(m.selected)
 	for _, f := range p.failed {

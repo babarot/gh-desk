@@ -159,8 +159,8 @@ var testKey = model.PRKey{Owner: "acme", Repo: "api", Number: 12}
 // noStatus drops what a conversation says went wrong.
 type noStatus struct{}
 
-func (noStatus) Fail(string)   {}
-func (noStatus) Refuse(string) {}
+func (noStatus) Fail(model.PRKey, string) {}
+func (noStatus) Refuse(string)            {}
 
 // kept is a conversation as read from what is kept: its worktree and
 // its turns.

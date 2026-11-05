@@ -99,18 +99,30 @@ func (m *Model) fetchBodies(i int) tea.Cmd {
 	}
 }
 
-func (m *Model) bodies(msg bodiesMsg) {
+// bodies takes the descriptions read. A failure is kept in the
+// notifications once while it lasts, as a failed reading of a tab is: the
+// descriptions are read again at every reading, the automatic ones too.
+func (m *Model) bodies(msg bodiesMsg) tea.Cmd {
 	for k, b := range msg.got {
 		m.cache.bodies[k] = safe(b)
 	}
-	m.tabs[msg.tab].readingBodies = false
+	t := m.tabs[msg.tab]
+	t.readingBodies = false
 	if m.picker != nil && msg.tab == m.cur {
 		m.picker.loading = false
 	}
-	if msg.err != nil {
-		m.log.Warn("descriptions read in part", "err", msg.err.Error())
-		m.fail("could not read every description: " + msg.err.Error())
+	if msg.err == nil {
+		t.bodiesFailing = false
+		return nil
 	}
+	m.log.Warn("descriptions read in part", "err", msg.err.Error())
+	text := fmt.Sprintf("could not read every description in %s: %s", t.name, short80(msg.err))
+	if t.bodiesFailing {
+		m.fail(text)
+		return nil
+	}
+	t.bodiesFailing = true
+	return m.failNoted(text, model.PRKey{})
 }
 
 // body is a pull request's description, if it has been read.
