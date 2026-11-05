@@ -1,5 +1,14 @@
 # Changelog
 
+## [v0.5.1](https://github.com/babarot/gh-desk/compare/v0.5.0...v0.5.1) - 2026-11-05
+### Improvements
+- Log why the popup skipped, rechecks of mergeability, and what auto-merge waits on by @babarot in https://github.com/babarot/gh-desk/pull/54
+- Log clues to why reads slow down, rows are missing, or lists are old by @babarot in https://github.com/babarot/gh-desk/pull/55
+- Log what Claude is doing, never what is said by @babarot in https://github.com/babarot/gh-desk/pull/58
+- Move a mark of its own on the progress pane's lanes by @babarot in https://github.com/babarot/gh-desk/pull/59
+- Name the steps of a merge and say what they mean once by @babarot in https://github.com/babarot/gh-desk/pull/60
+- Name the attention patterns a pull request matches, not each file by @babarot in https://github.com/babarot/gh-desk/pull/62
+
 ## [v0.5.0](https://github.com/babarot/gh-desk/compare/v0.4.0...v0.5.0) - 2026-11-05
 ### New Features
 - Close pull requests with a comment and their branches by @babarot in https://github.com/babarot/gh-desk/pull/46
