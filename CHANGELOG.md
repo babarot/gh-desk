@@ -1,5 +1,20 @@
 # Changelog
 
+## [v0.5.0](https://github.com/babarot/gh-desk/compare/v0.4.0...v0.5.0) - 2026-11-05
+### New Features
+- Close pull requests with a comment and their branches by @babarot in https://github.com/babarot/gh-desk/pull/46
+- Let an approval wait for the jobs at work by @babarot in https://github.com/babarot/gh-desk/pull/51
+- Let an approval with a text wait for the jobs too by @babarot in https://github.com/babarot/gh-desk/pull/52
+### Bug fixes
+- Say "merging" for a merge batch, whatever steps it takes by @babarot in https://github.com/babarot/gh-desk/pull/43
+- Show every note of a pull request in the confirm popup by @babarot in https://github.com/babarot/gh-desk/pull/44
+- Wait for the jobs at work before merging, required or not by @babarot in https://github.com/babarot/gh-desk/pull/48
+### Improvements
+- Show a comment sent with c in the pane at once by @babarot in https://github.com/babarot/gh-desk/pull/47
+- Open more of what the screen names with clicks by @babarot in https://github.com/babarot/gh-desk/pull/49
+- Keep Claude's answers and a sent comment in the notifications by @babarot in https://github.com/babarot/gh-desk/pull/50
+- Log the jobs a wait waits on as they end and begin by @babarot in https://github.com/babarot/gh-desk/pull/53
+
 ## [v0.4.0](https://github.com/babarot/gh-desk/compare/v0.3.0...v0.4.0) - 2026-11-04
 ### New Features
 - Judge rules in three ways and give them more conditions by @babarot in https://github.com/babarot/gh-desk/pull/35
