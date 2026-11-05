@@ -420,7 +420,7 @@ var settings = []setting{
 	{Key: "theme.light", Kind: enumKind{Themes}, Value: func(f File) any { return f.Theme.Light },
 		Doc: `The color scheme on a light terminal. Write the same theme as theme.dark to use it on any terminal.`},
 	{Key: "theme.spinner", Kind: enumKind{Spinners}, Value: func(f File) any { return f.Theme.Spinner },
-		Doc: `The spinner shown while something is read: "dots" (default) ⠋⠙⠹, "dense" ⣾⣽⣻, "bounce" ⠁⠂⠄, "snake" ⠉⠙⠚, "jump" ⢄⢂⢁, "fill" ⣀⣤⣶, "sand" ⡀⣀⣤, "line" |/-\, "arc" ◜◠◝, "quarter" ◴◷◶, "block" ▖▘▝, "star" ✶✸✹, or "off", a ⋯ that does not move and is left out before a line that says what is going on.`},
+		Doc: `The spinner shown while something is read: "dots" (default) ⠋⠙⠹, "dense" ⣾⣽⣻, "bounce" ⠁⠂⠄, "snake" ⠉⠙⠚, "jump" ⢄⢂⢁, "fill" ⣀⣤⣶, "sand" ⡀⣀⣤, "line" |/-\, "arc" ◜◠◝, "quarter" ◴◷◶, "block" ▖▘▝, "star" ✶✸✹, or "off", a ⋯ that does not move and is left out before a line that says what is going on. The progress pane of the log viewer turns a spinner and marks of its own, which "off" stops too.`},
 	{Key: "theme.shimmer", Kind: boolKind{}, Value: func(f File) any { return f.Theme.Shimmer },
 		Doc: "Run a light over the text that says what is going on, such as refreshing… or thinking…; the screen is drawn more often while something is read."},
 

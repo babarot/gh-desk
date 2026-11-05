@@ -194,14 +194,15 @@ func startBatch(t *testing.T, m *Model, id string) (func(time.Duration, runner.E
 }
 
 // While a batch runs, the log viewer shows a line for each pull request
-// above the log: its steps as dots, then what it does now, a wait with
-// what it is for; and the status line counts how they stand.
+// above the log: its steps side by side where they fit, over the list
+// too, then what it does now, a wait with what it is for; and the status
+// line counts how they stand.
 func TestProgressOverTheList(t *testing.T) {
 	m, _ := startLogged(t, 130, 34, 2)
 	startBatch(t, m, "b1")
 	press(m, "L")
 	s := screen(m)
-	for _, want := range []string{"╭ progress ", "merging · 1/2 · 7s", "api#12", "●◐○", "checks 5s · build running", "web#7", "●●", "✓ merged (squash)", "╭ log "} {
+	for _, want := range []string{"╭ progress ", "merging · 1/2 · 7s", "api#12", "✓ approve 2s ─ ", "checks 5s · build running ─ · merge", "web#7", "✓ merged (squash)", "╭ log "} {
 		if !strings.Contains(s, want) {
 			t.Errorf("no %q in the progress pane:\n%s", want, s)
 		}
@@ -219,6 +220,64 @@ func TestProgressInThePanesPlace(t *testing.T) {
 	press(m, "L")
 	if s := screen(m); !strings.Contains(s, "✓ approve 2s ─ ") || !strings.Contains(s, "· merge") {
 		t.Errorf("the steps are not side by side:\n%s", s)
+	}
+}
+
+// Where the steps side by side do not fit, each lane is a row of dots,
+// and no spinner leads what it does now: its mark moves instead.
+func TestProgressNarrowIsDots(t *testing.T) {
+	m, _ := startLogged(t, 60, 34, 2)
+	startBatch(t, m, "b1")
+	press(m, "L")
+	s := screen(m)
+	if strings.Contains(s, " ─ ") || !strings.Contains(s, "●●   ✓ merged (squash)") {
+		t.Errorf("the lanes are not rows of dots:\n%s", s)
+	}
+	if !strings.Contains(s, "  checks 5s · build running") {
+		t.Errorf("something leads the step a lane is on:\n%s", s)
+	}
+}
+
+// The step a lane is on has a mark of its lane style that moves, the
+// title a spinner of its own whatever theme.spinner is; the spinner that
+// does not move stops both (ADR-074).
+func TestProgressMarksMove(t *testing.T) {
+	for _, tc := range []struct {
+		width int
+		style laneStyle
+	}{{130, laneStyles[0]}, {60, laneStyles[1]}} {
+		m, _ := startLogged(t, tc.width, 34, 2)
+		startBatch(t, m, "b1")
+		press(m, "L")
+		m.spinStyle = spinner("line")
+		base := m.set.Now()
+		marks, titles := map[string]bool{}, map[string]bool{}
+		for i := range 12 {
+			at := base.Add(time.Duration(i) * 50 * time.Millisecond)
+			m.set.Now = func() time.Time { return at }
+			s := screen(m)
+			for _, f := range tc.style.mark.frames {
+				if strings.Contains(s, f+" checks") || strings.Contains(s, "●"+f+"○") || strings.Contains(s, "●"+f+"  checks") {
+					marks[f] = true
+				}
+			}
+			for _, f := range progressSpinner.frames {
+				if strings.Contains(s, "╭ progress "+f+" ") {
+					titles[f] = true
+				}
+			}
+		}
+		kinds := map[string]bool{}
+		for _, f := range tc.style.mark.frames {
+			kinds[f] = true
+		}
+		if len(marks) != len(kinds) || len(titles) < 2 {
+			t.Errorf("at %d wide the marks seen were %v and the title's spinner %v", tc.width, marks, titles)
+		}
+		m.spinStyle = spinner("off")
+		if s := screen(m); !strings.Contains(s, "╭ progress ─") || !strings.Contains(s, tc.style.mark.frames[0]) {
+			t.Errorf("at %d wide the spinner that does not move did not stop the pane:\n%s", tc.width, s)
+		}
 	}
 }
 

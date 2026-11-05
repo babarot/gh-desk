@@ -795,7 +795,7 @@
           "type": "boolean"
         },
         "spinner": {
-          "description": "The spinner shown while something is read: \"dots\" (default) ⠋⠙⠹, \"dense\" ⣾⣽⣻, \"bounce\" ⠁⠂⠄, \"snake\" ⠉⠙⠚, \"jump\" ⢄⢂⢁, \"fill\" ⣀⣤⣶, \"sand\" ⡀⣀⣤, \"line\" |/-\\, \"arc\" ◜◠◝, \"quarter\" ◴◷◶, \"block\" ▖▘▝, \"star\" ✶✸✹, or \"off\", a ⋯ that does not move and is left out before a line that says what is going on.",
+          "description": "The spinner shown while something is read: \"dots\" (default) ⠋⠙⠹, \"dense\" ⣾⣽⣻, \"bounce\" ⠁⠂⠄, \"snake\" ⠉⠙⠚, \"jump\" ⢄⢂⢁, \"fill\" ⣀⣤⣶, \"sand\" ⡀⣀⣤, \"line\" |/-\\, \"arc\" ◜◠◝, \"quarter\" ◴◷◶, \"block\" ▖▘▝, \"star\" ✶✸✹, or \"off\", a ⋯ that does not move and is left out before a line that says what is going on. The progress pane of the log viewer turns a spinner and marks of its own, which \"off\" stops too.",
           "enum": [
             "dots",
             "dense",
