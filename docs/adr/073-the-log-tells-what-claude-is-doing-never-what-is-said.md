@@ -14,7 +14,7 @@ ADR-003 keeps Claude conversations, pull request bodies and typed text out of th
 
 This adds to what ADR-003 and ADR-057 log at info.
 
-- A question to Claude is logged when it is asked and when it ends, with what it is for (a question about a pull request, a triage, a one-off question such as reading release notes), the pull request when there is one, the model, how many tools Claude used and how long it took.
+- A question to Claude is logged when it is asked, with what it is for (a question about a pull request, a triage, a one-off question such as reading release notes), the pull request when there is one and the model; and when it ends, answered, stopped or failed, with how many tools Claude used and how long it took.
 - The worktree of a pull request is logged when it is ready, with how long it took to make.
 - A triage plan applied is logged with how many of its actions were applied and how many were left out; release notes read for the confirm popup are logged with how many pull requests were read and how many call for care.
 - What is asked, what Claude answers, the tools' arguments (file paths, patterns) and the release notes themselves are never logged, as ADR-003 says. Each tool used stays at debug, by its name only.

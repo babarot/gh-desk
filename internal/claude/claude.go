@@ -320,14 +320,14 @@ func (c *Claude) run(ctx context.Context, log *slog.Logger, dir string, env, arg
 		log.Info("claude stopped", "tools", tools, logging.KeyDurationMS, elapsed)
 		return Answer{}, ctx.Err()
 	case readErr != nil:
-		log.Warn("claude failed", "err", Brief(readErr), logging.KeyDurationMS, elapsed)
+		log.Warn("claude failed", "err", Brief(readErr), "tools", tools, logging.KeyDurationMS, elapsed)
 		return Answer{}, readErr
 	case waitErr != nil:
 		msg := strings.TrimSpace(stderr.String())
 		if i := strings.LastIndex(msg, "\n"); i >= 0 {
 			msg = msg[i+1:]
 		}
-		log.Warn("claude failed", "err", Brief(waitErr), logging.KeyDurationMS, elapsed)
+		log.Warn("claude failed", "err", Brief(waitErr), "tools", tools, logging.KeyDurationMS, elapsed)
 		return Answer{}, fmt.Errorf("claude: %w %s", waitErr, msg)
 	}
 	log.Info("claude answered", "model", answer.Model, "tools", tools, "cost_usd", answer.Cost, logging.KeyDurationMS, elapsed)
