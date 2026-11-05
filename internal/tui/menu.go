@@ -118,7 +118,7 @@ func (m *Model) aboutOne(a keymap.Action, p model.PR) (string, bool) {
 		if d.Step == plan.StepSkip {
 			return d.Reason, true
 		}
-		return mergeHow(d), false
+		return m.mergeHow(d), false
 	case "ready_for_review":
 		return m.aboutReady(p)
 	case "close":

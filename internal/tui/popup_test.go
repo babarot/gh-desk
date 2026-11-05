@@ -193,6 +193,32 @@ func TestNoteResultsHang(t *testing.T) {
 	}
 }
 
+// A merge names its method only when it is not the first of merge.methods:
+// the repository does not allow the one the user expects.
+func TestBulkNamesAnUnusualMethod(t *testing.T) {
+	f := fixture()
+	other := model.PR{ID: "5", Key: key("me", "site", 8), Title: "Fix the footer", Author: "me", State: model.StateOpen,
+		HeadOID: "eeeeeee5", BaseRef: "main", Checks: model.CheckSuccess, Updated: now.Add(-time.Hour)}
+	f.searches["mine"] = append(f.searches["mine"], other)
+	f.info = map[model.PRKey]func(*model.MergeInfo){other.Key: func(mi *model.MergeInfo) {
+		mi.Repo.Methods = []model.MergeMethod{model.MethodSquash}
+	}}
+	set := testSettings()
+	set.Plan.Methods = []model.MergeMethod{model.MethodMerge, model.MethodSquash}
+	m := New(f, &fakeRunner{results: map[model.PRKey]runner.Event{}}, &fakeClaude{}, keymap.Default(), nil, set)
+	m.Update(tea.WindowSizeMsg{Width: 130, Height: 34})
+	run(m, m.Init())
+	press(m, "2")
+	selectAll(m, []model.PRKey{key("me", "tool", 3), other.Key})
+	press(m, "M")
+	text := readPopup(t, m, m.renderBulk, "yes", "j")
+	has(t, text, "Fix the footer merge now (squash)")
+	has(t, text, "Document the flags merge now")
+	if strings.Contains(text, "merge commit") {
+		t.Errorf("the first of merge.methods is named:\n%s", text)
+	}
+}
+
 // The confirm popup shows every note of a pull request under it, and
 // what its steps mean once below the list: that a draft stays ready and
 // that auto-merge takes later commits (ADR-046, ADR-075).
@@ -212,7 +238,10 @@ func TestBulkShowsEveryNote(t *testing.T) {
 	press(m, "M")
 	text := readPopup(t, m, m.renderBulk, "yes", "j")
 	has(t, text, "changes .github/workflows/ci.yaml, .github/workflows/release.yaml")
-	has(t, text, "ready → turn on auto-merge (merge commit)")
+	has(t, text, "ready → turn on auto-merge")
+	if strings.Contains(text, "merge commit") {
+		t.Errorf("the first of merge.methods is named:\n%s", text)
+	}
 	has(t, text, "Marking a draft ready asks for its reviews; it stays ready if the merge stops.")
 	has(t, text, "Auto-merge also merges commits pushed after it is on")
 	if strings.Count(text, "stays ready") != 1 {

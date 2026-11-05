@@ -380,9 +380,20 @@ func methodWord(m model.MergeMethod) string {
 	return strings.ToLower(string(m))
 }
 
+// unusualMethod names the method a merge takes when it is not the first
+// of merge.methods: the repository does not allow that one. The first is
+// the one the user expects, and is not named.
+func (m *Model) unusualMethod(d plan.Decision) string {
+	if d.Method == "" || len(m.set.Plan.Methods) > 0 && d.Method == m.set.Plan.Methods[0] {
+		return ""
+	}
+	return methodWord(d.Method)
+}
+
 // mergeHow says the steps a merge takes, one after another: ready and
-// approve when it takes them, then the rest, with the merge method.
-func mergeHow(d plan.Decision) string {
+// approve when it takes them, then the rest, with the merge method when it
+// is not the usual one.
+func (m *Model) mergeHow(d plan.Decision) string {
 	var steps []string
 	if d.Ready {
 		steps = append(steps, "ready")
@@ -391,8 +402,8 @@ func mergeHow(d plan.Decision) string {
 		steps = append(steps, "approve")
 	}
 	how := strings.Join(append(steps, d.Reason), " → ")
-	if d.Method != "" {
-		how += " (" + methodWord(d.Method) + ")"
+	if w := m.unusualMethod(d); w != "" {
+		how += " (" + w + ")"
 	}
 	return how
 }

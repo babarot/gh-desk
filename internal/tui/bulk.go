@@ -608,7 +608,10 @@ func (m *Model) renderBulk() []string {
 				for s := range strings.SplitSeq(it.d.Reason, " → ") {
 					steps = append(steps, m.stepStyle(it.d.Step).Render(s))
 				}
-				what += strings.Join(steps, st.dim.Render(" → ")) + " " + st.dim.Render("("+methodWord(it.d.Method)+")")
+				what += strings.Join(steps, st.dim.Render(" → "))
+				if w := m.unusualMethod(it.d); w != "" {
+					what += " " + st.dim.Render("("+w+")")
+				}
 			}
 		default:
 			why := it.why(m.firstKey("refresh"), m.lockedBy())
