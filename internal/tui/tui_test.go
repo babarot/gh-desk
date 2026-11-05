@@ -521,6 +521,24 @@ func TestFilterEraseWord(t *testing.T) {
 	}
 }
 
+func TestEraseWord(t *testing.T) {
+	for _, tc := range []struct{ in, want string }{
+		{"", ""},
+		{"abc", ""},
+		{"a bc  ", "a "},
+		{"repo:babarot/gh-desk", "repo:babarot/"},
+		{"repo:babarot/", "repo:"},
+		{"repo:", ""},
+		{"is:open author:me", "is:open author:"},
+		{"a / ", ""},
+		{"レビュー\u3000待ち", "レビュー\u3000"},
+	} {
+		if got := eraseWord(tc.in); got != tc.want {
+			t.Errorf("eraseWord(%q) = %q, want %q", tc.in, got, tc.want)
+		}
+	}
+}
+
 func TestGroupedTabWithoutRequests(t *testing.T) {
 	// A grouped tab of one's own pull requests has no requests to the
 	// viewer or a team: its rows are all under other.
