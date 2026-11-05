@@ -65,6 +65,26 @@ func TestClaudeNotesSeenWhenOpened(t *testing.T) {
 	}
 }
 
+// Choosing a note of a conversation opens it on its pull request; a note
+// of anything else only goes to the pull request.
+func TestChooseClaudeNoteOpensTheConversation(t *testing.T) {
+	m, _ := startWith(t, fixture(), keymap.Default())
+	press(m, "i", "esc")
+	k := m.chat().PR().Key
+	m.Update(chatAnswerMsg{key: k, answer: claude.Answer{Text: "Later answer."}})
+	press(m, "3", "n", "enter")
+	if !m.claudeShown() || m.chatKey != k || m.unseen() != 0 {
+		t.Fatalf("shown %v on %v, unseen %d; want the conversation of %v open", m.claudeShown(), m.chatKey, m.unseen(), k)
+	}
+	press(m, "esc")
+	m.Update(bodiesMsg{err: errString("secondary rate limit"), tab: m.cur})
+	m.notes[0].items = []noteItem{{key: k, text: "about it"}}
+	press(m, "n", "enter")
+	if m.claudeShown() {
+		t.Error("a note of no conversation opened one")
+	}
+}
+
 // A conversation that cannot be kept says so in the notifications, as
 // keeping it fails when an answer comes; the toast's timer is sent.
 func TestConversationNotKeptNoted(t *testing.T) {

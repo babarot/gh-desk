@@ -515,7 +515,8 @@ func (m *Model) notesKey(k string) tea.Cmd {
 }
 
 // chooseNote goes to the pull request of the line under the cursor: an
-// item's, or a note's first.
+// item's, or a note's first. A note of a conversation opens it there, as
+// what it tells of is in the conversation.
 func (m *Model) chooseNote() tea.Cmd {
 	ls, v := m.noteLines(), m.notesAt
 	if v.sel >= len(ls) {
@@ -530,10 +531,14 @@ func (m *Model) chooseNote() tea.Cmd {
 		key = l.n.items[0].key
 	}
 	m.notesAt = nil
-	if key != (model.PRKey{}) {
-		return m.jumpTo(key)
+	if key == (model.PRKey{}) {
+		return nil
 	}
-	return nil
+	cmd := m.jumpTo(key)
+	if p, _, ok := m.currentPR(); ok && p.Key == key && l.n.chat == key {
+		return tea.Batch(cmd, m.openChat(p))
+	}
+	return cmd
 }
 
 // jumpTo puts the cursor on k in whichever tab has it, unfolding its group
