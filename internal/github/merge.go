@@ -163,7 +163,7 @@ func (c *Client) MergeInfo(ctx context.Context, ids []string, details bool) (map
 		return out, nil
 	}
 	var b strings.Builder
-	b.WriteString("query {\n  rateLimit { cost remaining }\n")
+	b.WriteString("query {\n  rateLimit { cost remaining resetAt }\n")
 	for i, id := range ids {
 		fmt.Fprintf(&b, "  n%d: node(id: %q) { ... on PullRequest {%s\n", i, id, infoFields)
 		if details {
@@ -189,7 +189,7 @@ func (c *Client) MergeInfo(ctx context.Context, ids []string, details bool) (map
 	if raw, ok := resp["rateLimit"]; ok {
 		var rl rateLimit
 		if decode(raw, &rl) == nil {
-			c.log.Debug("graphql", "query", name, "prs", len(ids), logging.KeyGQLCost, rl.Cost, logging.KeyGQLRemaining, rl.Remaining)
+			c.noteRateLimit(name, rl, "prs", len(ids))
 		}
 	}
 	for i, id := range ids {
@@ -472,7 +472,7 @@ func (c *Client) Bodies(ctx context.Context, ids []string) (map[string]string, e
 		}
 	}
 	err := c.query(ctx, "bodies", `query($ids: [ID!]!) {
-  rateLimit { cost remaining }
+  rateLimit { cost remaining resetAt }
   nodes(ids: $ids) { ... on PullRequest { id body } }
 }`, map[string]any{"ids": ids}, &resp, &resp.RateLimit)
 	for _, n := range resp.Nodes {

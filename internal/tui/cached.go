@@ -27,6 +27,14 @@ func (m *Model) loadCached() {
 		return
 	}
 	n := 0
+	// oldest is when the oldest list shown was read, so the log tells how
+	// old the rows are until the lists are read again.
+	var oldest time.Time
+	seen := func(at time.Time) {
+		if oldest.IsZero() || at.Before(oldest) {
+			oldest = at
+		}
+	}
 	for _, t := range m.tabs {
 		if t.inbox {
 			in, ok := m.set.Lists.Inbox()
@@ -39,6 +47,7 @@ func (m *Model) loadCached() {
 			}
 			m.setNotifs(t, in.Notifs)
 			t.inboxPRs, t.loaded, t.asOf, t.readAt = prs, true, in.Read, in.Read
+			seen(in.Read)
 			n++
 			continue
 		}
@@ -48,9 +57,14 @@ func (m *Model) loadCached() {
 		}
 		t.prs, t.total, t.loaded, t.asOf, t.readAt = safePRs(l.PRs), l.Total, true, l.Read, l.Read
 		m.toFirstPR(t)
+		seen(l.Read)
 		n++
 	}
-	m.log.Debug("lists from the cache", "tabs", n)
+	if n == 0 {
+		return
+	}
+	m.log.Info("lists from the cache", "tabs", n, "oldest_read", oldest.Format(time.RFC3339),
+		"age", m.set.Now().Sub(oldest).Round(time.Second).String())
 }
 
 // saveTab keeps a tab's list once its reading is over. The rows kept only

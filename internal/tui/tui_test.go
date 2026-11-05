@@ -2087,6 +2087,9 @@ func TestRefreshIsLogged(t *testing.T) {
 			t.Fatal(err)
 		}
 		if rec["msg"] == "refresh" {
+			if _, ok := rec["excluded"]; !ok {
+				t.Errorf("refresh logged without how many rows the rules leave out: %v", rec)
+			}
 			got = append(got, fmt.Sprint(rec[logging.KeyOp], " by ", rec["by"], " ", rec[logging.KeyDurationMS], "ms"))
 		}
 	}

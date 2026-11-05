@@ -96,19 +96,21 @@ func (m *Model) endRereading() {
 	if r == nil {
 		return
 	}
-	prs, failed := 0, 0
+	prs, failed, excluded := 0, 0, 0
 	for _, i := range r.tabs {
 		t := m.tabs[i]
 		if !m.tabDone(t) {
 			return
 		}
 		prs += len(m.allOf(t))
+		// Rows the rules leave out, so the log tells why a row is not seen.
+		excluded += m.excludedOf(t).n
 		if t.failing || t.err != nil {
 			failed++
 		}
 	}
 	m.rereading = nil
-	m.log.Info("refresh", logging.KeyOp, "refresh", "by", r.by, "tabs", len(r.tabs), "prs", prs, "failed", failed,
+	m.log.Info("refresh", logging.KeyOp, "refresh", "by", r.by, "tabs", len(r.tabs), "prs", prs, "excluded", excluded, "failed", failed,
 		logging.KeyDurationMS, m.set.Now().Sub(r.start).Milliseconds())
 }
 
