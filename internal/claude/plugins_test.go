@@ -152,7 +152,7 @@ func TestStepArgOfSkillsAndServers(t *testing.T) {
 		`{"query":"retry policy","limit":5}`:   "retry policy",
 		`{"file_path":"/a/b.go"}`:              "/a/b.go",
 	} {
-		if got := stepArg([]byte(in)); got != want {
+		if got := stepArg("mcp__recall__recall_search", []byte(in)); got != want {
 			t.Errorf("stepArg(%s) = %q, want %q", in, got, want)
 		}
 	}
@@ -164,6 +164,21 @@ func TestStepArgOfSkillsAndServers(t *testing.T) {
 	} {
 		if got := c.skillPath(p); got != want {
 			t.Errorf("skillPath(%s) = %q, want %q", p, got, want)
+		}
+	}
+}
+
+func TestStepArgOfTheBuiltinTools(t *testing.T) {
+	for _, tc := range []struct{ tool, in, want string }{
+		{"mcp__gh-desk__read_issue", `{"number":10262}`, "#10262"},
+		{"mcp__gh-desk__check_run_log", `{"id":126666709675}`, "check run 126666709675"},
+		{"mcp__gh-desk__checks", `{}`, "the pull request"},
+		{"mcp__gh-desk__checks", `{"ref":"main"}`, "main"},
+		{"mcp__gh-desk__search_issues", `{"kind":"pr","state":"open","author":"app/renovate","labels":["bug"],"text":"KMS keyring"}`,
+			`pr open author:app/renovate label:"bug" "KMS keyring"`},
+	} {
+		if got := stepArg(tc.tool, []byte(tc.in)); got != tc.want {
+			t.Errorf("stepArg(%s, %s) = %q, want %q", tc.tool, tc.in, got, tc.want)
 		}
 	}
 }
