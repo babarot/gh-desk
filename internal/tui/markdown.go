@@ -7,6 +7,7 @@ import (
 
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
+	"github.com/kyokomi/emoji/v2"
 )
 
 // A description is drawn from its Markdown, unless the config asks for it
@@ -160,19 +161,48 @@ func (m *Model) inline(s string, style lipgloss.Style) []span {
 	at := 0
 	for _, loc := range mdInline.FindAllStringIndex(s, -1) {
 		if loc[0] > at {
-			out = append(out, span{text: s[at:loc[0]], style: style})
+			out = append(out, span{text: emojize(s[at:loc[0]]), style: style})
 		}
 		if t := s[loc[0]:loc[1]]; t[0] == '`' {
 			out = append(out, span{text: t[1 : len(t)-1], style: m.st.code})
 		} else {
-			out = append(out, span{text: t[2 : len(t)-2], style: style.Bold(true)})
+			out = append(out, span{text: emojize(t[2 : len(t)-2]), style: style.Bold(true)})
 		}
 		at = loc[1]
 	}
 	if at < len(s) {
-		out = append(out, span{text: s[at:], style: style})
+		out = append(out, span{text: emojize(s[at:]), style: style})
 	}
 	return out
+}
+
+// shortcode is an emoji written as GitHub writes it, such as :smile:.
+var shortcode = regexp.MustCompile(`:[a-z0-9_+-]+:`)
+
+// emojize turns the shortcodes in prose into the emoji they name, as
+// GitHub shows them; one with no emoji, such as :shipit:, stays as
+// written. Code is never given to it.
+func emojize(s string) string {
+	if !strings.Contains(s, ":") {
+		return s
+	}
+	codes := emoji.CodeMap()
+	return shortcode.ReplaceAllStringFunc(s, func(c string) string {
+		if e, ok := codes[c]; ok {
+			return e
+		}
+		return c
+	})
+}
+
+// emojizeOutsideCode is emojize for a line that may hold code between
+// backquotes, which stays as written.
+func emojizeOutsideCode(s string) string {
+	parts := strings.Split(s, "`")
+	for i := 0; i < len(parts); i += 2 {
+		parts[i] = emojize(parts[i])
+	}
+	return strings.Join(parts, "`")
 }
 
 // markdownLines draws a description, cleaned as bodyLines cleans it, in
@@ -284,7 +314,7 @@ func (m *Model) table(rows []string, width int) []line {
 		r = strings.TrimSuffix(strings.TrimPrefix(r, "|"), "|")
 		var cs []string
 		for c := range strings.SplitSeq(r, "|") {
-			cs = append(cs, strings.NewReplacer("`", "", "**", "").Replace(strings.TrimSpace(c)))
+			cs = append(cs, strings.NewReplacer("`", "", "**", "").Replace(emojizeOutsideCode(strings.TrimSpace(c))))
 		}
 		cells = append(cells, cs)
 	}

@@ -4,7 +4,7 @@ The pane under the list shows the pull request under the cursor. `p` shows or hi
 
 ## Overview
 
-The overview tab draws the description as Markdown (headings, lists, code, quotes and tables) beside a column of facts: the checks, the reviews, and what blocks a merge. The comments follow the description. HTML in a description is drawn as Markdown too, and `description.style = "plain"` shows it as written.
+The overview tab draws the description as Markdown (headings, lists, code, quotes and tables) beside a column of facts: the checks, the reviews, and what blocks a merge. The comments follow the description. HTML in a description is drawn as Markdown too, shortcodes such as `:rocket:` as their emoji, and `description.style = "plain"` shows it as written.
 
 ## Diff
 
