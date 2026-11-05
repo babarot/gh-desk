@@ -264,7 +264,10 @@ type Model struct {
 	notes      []*note
 	notesAt    *notesView
 	toast      *note
-	merged     map[model.PRKey]bool
+	// noted is the toasts' timers of notes pushed where no command can be
+	// returned, sent at the end of Update.
+	noted  []tea.Cmd
+	merged map[model.PRKey]bool
 	// held is where each row showing a result sorts while it shows it.
 	held map[model.PRKey]heldSort
 	// refreshed is when each tab was last read.
@@ -397,7 +400,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.followCursor(before.Key, had)
 		m.endTabReading()
 		m.endRefresh()
-		return m, tea.Batch(cmd, m.spin(), m.statusTick())
+		return m, tea.Batch(cmd, m.spin(), m.statusTick(), m.takeNoted())
 	}
 	// What is read may make rows come and go under an exclusion rule;
 	// the cursor stays on its pull request, so that the next key does not
@@ -413,7 +416,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 	m.endTabReading()
 	m.endRefresh()
-	return m, tea.Batch(cmd, m.spin(), m.statusTick())
+	return m, tea.Batch(cmd, m.spin(), m.statusTick(), m.takeNoted())
 }
 
 func (m *Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {

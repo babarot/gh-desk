@@ -388,6 +388,9 @@ type note struct {
 	title string
 	items []noteItem
 	seen  bool
+	// chat is the pull request whose conversation the note tells of, so
+	// opening that conversation sees it; zero for any other note.
+	chat model.PRKey
 }
 
 type noteItem struct {
@@ -416,6 +419,17 @@ func (m *Model) pushNote(icon, title string, items []noteItem) tea.Cmd {
 	return m.after(toastFor, toastMsg{n})
 }
 
+// takeNoted gives the toasts' timers of the notes pushed where no command
+// could be returned.
+func (m *Model) takeNoted() tea.Cmd {
+	if len(m.noted) == 0 {
+		return nil
+	}
+	cmd := tea.Batch(m.noted...)
+	m.noted = nil
+	return cmd
+}
+
 // configNote tells of the config file's warnings, which did not stop
 // gh-desk, in a notification.
 func (m *Model) configNote() tea.Cmd {
@@ -442,6 +456,19 @@ func (m *Model) unseen() int {
 		}
 	}
 	return n
+}
+
+// seeChatNotes marks seen the notes that tell of the conversation of k,
+// as it is opened.
+func (m *Model) seeChatNotes(k model.PRKey) {
+	for _, n := range m.notes {
+		if n.chat == k {
+			n.seen = true
+		}
+	}
+	if m.toast != nil && m.toast.chat == k {
+		m.toast = nil
+	}
 }
 
 func (m *Model) openNotes() {
@@ -488,7 +515,8 @@ func (m *Model) notesKey(k string) tea.Cmd {
 }
 
 // chooseNote goes to the pull request of the line under the cursor: an
-// item's, or a note's first.
+// item's, or a note's first. A note of a conversation opens it there, as
+// what it tells of is in the conversation.
 func (m *Model) chooseNote() tea.Cmd {
 	ls, v := m.noteLines(), m.notesAt
 	if v.sel >= len(ls) {
@@ -503,10 +531,14 @@ func (m *Model) chooseNote() tea.Cmd {
 		key = l.n.items[0].key
 	}
 	m.notesAt = nil
-	if key != (model.PRKey{}) {
-		return m.jumpTo(key)
+	if key == (model.PRKey{}) {
+		return nil
 	}
-	return nil
+	cmd := m.jumpTo(key)
+	if p, _, ok := m.currentPR(); ok && p.Key == key && l.n.chat == key {
+		return tea.Batch(cmd, m.openChat(p))
+	}
+	return cmd
 }
 
 // jumpTo puts the cursor on k in whichever tab has it, unfolding its group

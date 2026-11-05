@@ -83,7 +83,8 @@ func (r Record) info() Info {
 
 // Status is where a conversation says what went wrong: the status line.
 type Status interface {
-	Fail(text string)
+	// Fail tells of a failure about the conversation of k.
+	Fail(k model.PRKey, text string)
 	Refuse(text string)
 }
 
@@ -304,7 +305,7 @@ func (s *State) Reload(c *Conversation) {
 		// Read as none, and written over at the next question.
 		if !s.problem[k] {
 			s.problem[k] = true
-			s.status.Fail(fmt.Sprintf("could not read the conversation kept of %s: %v", k, err))
+			s.status.Fail(k, fmt.Sprintf("could not read the conversation kept of %s: %v", k, err))
 		}
 		s.log.Warn("could not read a conversation kept", logging.KeyPR, k.String(), "err", err.Error())
 	case !ok:
@@ -384,7 +385,7 @@ func (s *State) stopKeeping(c *Conversation, err error) {
 	}
 	c.persist = false
 	s.log.Warn("could not keep a conversation", logging.KeyPR, c.pr.Key.String(), "err", err.Error())
-	s.status.Fail(fmt.Sprintf("could not keep the conversation of %s: %v", c.pr.Key, err))
+	s.status.Fail(c.pr.Key, fmt.Sprintf("could not keep the conversation of %s: %v", c.pr.Key, err))
 }
 
 // LoadKeys finds the pull requests that have a conversation kept.
