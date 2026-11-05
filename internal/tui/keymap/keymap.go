@@ -139,6 +139,7 @@ var Defaults = []Def{
 	{"editor", ScopeCompose, []string{"ctrl+e"}, "$EDITOR"},
 
 	{"accept", ScopeInput, []string{"enter"}, "accept"},
+	{"complete", ScopeInput, []string{"tab"}, "complete"},
 	{"erase", ScopeInput, []string{"backspace"}, "erase"},
 	{"erase_word", ScopeInput, []string{"ctrl+w"}, "erase word"},
 }

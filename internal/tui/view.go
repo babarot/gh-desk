@@ -39,7 +39,8 @@ func (m *Model) render() (string, *tea.Cursor) {
 		if m.filtering {
 			cur = tea.NewCursor(min(lipgloss.Width("/ "+m.filter), max(m.width-1, 0)), 1)
 		}
-		b.WriteString(m.renderFilter() + "\n")
+		// Cut to the width, as a line that wraps moves every row under it.
+		b.WriteString(fit(m.renderFilter(), m.width) + "\n")
 	}
 	l := m.layout()
 	m.renderList(&b, l.list)
@@ -392,7 +393,7 @@ var ready = map[keymap.Action]bool{
 	"include_failing": true, "wait_for_checks": true, "close": true, "delete_branch": true, "write_comment": true, "choose": true, "select_rule": true, "toggle_rule": true, "add_to_selection": true, "filter_by_rule": true,
 	"fold_bots": true, "show_excluded": true, "filter": true,
 	"preview_down": true, "preview_up": true, "preview_grow": true, "preview_shrink": true, "next_file": true, "prev_file": true, "preview_tab": true, "fold": true, "preview": true,
-	"confirm": true, "next_kind": true, "post": true, "editor": true, "accept": true, "erase": true, "erase_word": true,
+	"confirm": true, "next_kind": true, "post": true, "editor": true, "accept": true, "complete": true, "erase": true, "erase_word": true,
 	"log": true, "log_this_pr": true,
 	"triage": true, "triage_apply": true, "triage_more": true, "ask_claude": true, "fill_suggestion": true, "draft_review": true, "open_claude": true, "chat_close": true,
 }
@@ -438,6 +439,9 @@ func (m *Model) hints() string {
 		}
 	case m.filtering:
 		as = []keymap.Action{"accept"}
+		if m.canComplete() {
+			as = append(as, "complete")
+		}
 	case m.typingChat():
 		as = []keymap.Action{"accept"}
 		if c := m.chat(); c.input.Value() == "" && suggestion(c) != "" {
@@ -513,7 +517,13 @@ func (m *Model) renderFilter() string {
 	var parts []string
 	if m.filtering || m.filter != "" {
 		// No cursor is drawn: render gives the terminal's to the end of it.
-		parts = append(parts, st.yellow.Render("/ "+m.filter))
+		s := st.yellow.Render("/ ") + renderFilterText(m.filter, st.yellow, st.blue)
+		// While it is typed, what the filter may ask follows the cursor,
+		// faint.
+		if m.filtering {
+			s += st.dim.Render(m.filterGhost())
+		}
+		parts = append(parts, s)
 	}
 	if t.ruleFilter != nil {
 		n := 0
