@@ -603,7 +603,12 @@ func (m *Model) renderBulk() []string {
 				if it.d.Approve {
 					what += st.green.Render("approve") + st.dim.Render(" → ")
 				}
-				what += m.stepStyle(it.d.Step).Render(it.d.Reason) + " " + st.dim.Render("("+methodWord(it.d.Method)+")")
+				// Every arrow dim, so the steps read as the words between.
+				var steps []string
+				for s := range strings.SplitSeq(it.d.Reason, " → ") {
+					steps = append(steps, m.stepStyle(it.d.Step).Render(s))
+				}
+				what += strings.Join(steps, st.dim.Render(" → ")) + " " + st.dim.Render("("+methodWord(it.d.Method)+")")
 			}
 		default:
 			why := it.why(m.firstKey("refresh"), m.lockedBy())
