@@ -1,6 +1,7 @@
 package plan
 
 import (
+	"path"
 	"slices"
 	"strings"
 	"time"
@@ -169,12 +170,20 @@ func needsApproval(mi model.MergeInfo, pr model.PR, viewer string) bool {
 
 // notes are what the user should know of a pull request apart from how it
 // is merged. The files it changes that call for care make one note, as the
-// popup shows every note of a row.
+// popup shows every note of a row; it names the patterns they match, not
+// each file (attentionName).
 func notes(mi model.MergeInfo, set Settings) []string {
 	var ns, marked []string
-	for _, f := range mi.Files {
-		if MatchAny(set.AttentionPaths, f) {
-			marked = append(marked, f)
+	for _, pat := range set.AttentionPaths {
+		name := attentionName(pat)
+		if slices.Contains(marked, name) {
+			continue
+		}
+		for _, f := range mi.Files {
+			if MatchAny([]string{pat}, f) {
+				marked = append(marked, name)
+				break
+			}
 		}
 	}
 	if len(marked) > 0 {
@@ -189,6 +198,17 @@ func notes(mi model.MergeInfo, set Settings) []string {
 		}
 	}
 	return ns
+}
+
+// attentionName is how a note names the files a pattern of
+// AttentionPaths matches: a glob as it is written (.github/workflows/*),
+// and one file by its name, so CODEOWNERS and .github/CODEOWNERS read as
+// one.
+func attentionName(pat string) string {
+	if strings.ContainsAny(pat, "*?[\\") {
+		return pat
+	}
+	return path.Base(pat)
 }
 
 // ForApprove decides approving a pull request. Failing required checks

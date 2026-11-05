@@ -229,7 +229,7 @@ Whose branch is updated when it is behind its base: "humans" (default), "all" or
 
 list of glob patterns · Default: `[".github/workflows/*", "CODEOWNERS", ".github/CODEOWNERS", "docs/CODEOWNERS"]`
 
-Pull requests changing files that match these glob patterns get a mark in the confirm popup.
+Pull requests changing files that match these glob patterns get a mark in the confirm popup, which names the patterns matched; a pattern of one file is named by the file name, as CODEOWNERS.
 
 ## [claude]
 

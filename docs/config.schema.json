@@ -6,7 +6,7 @@
       "additionalProperties": false,
       "properties": {
         "attention_paths": {
-          "description": "Pull requests changing files that match these glob patterns get a mark in the confirm popup.",
+          "description": "Pull requests changing files that match these glob patterns get a mark in the confirm popup, which names the patterns matched; a pattern of one file is named by the file name, as CODEOWNERS.",
           "items": {
             "type": "string"
           },

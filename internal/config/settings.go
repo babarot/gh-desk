@@ -394,7 +394,7 @@ var settings = []setting{
 		Doc: `Whose branch is updated when it is behind its base: "humans" (default), "all" or "never". Bots rebase their own branches, and some (renovate) stop updating a branch someone else committed to.`},
 
 	{Key: "bulk.attention_paths", Kind: globsKind{}, Value: func(f File) any { return f.Bulk.AttentionPaths },
-		Doc: "Pull requests changing files that match these glob patterns get a mark in the confirm popup."},
+		Doc: "Pull requests changing files that match these glob patterns get a mark in the confirm popup, which names the patterns matched; a pattern of one file is named by the file name, as CODEOWNERS."},
 
 	{Key: "claude.command", Kind: stringKind{NonEmpty: true}, Value: func(f File) any { return f.Claude.Command },
 		Doc: "The claude command: a name looked up on PATH, or a path to it (~ is your home), without arguments."},
