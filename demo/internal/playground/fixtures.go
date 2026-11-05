@@ -54,7 +54,7 @@ func (f fixture) pull(start time.Time) *pull {
 	p.PR = model.PR{
 		ID: "PR_" + oid(f.key)[:12], Key: k, Title: f.title, URL: "https://github.com/" + k.Repository() + "/pull/" + fmt.Sprint(k.Number),
 		State: model.StateOpen, Draft: f.isDraft, Author: f.author, AuthorIsBot: f.bot,
-		Created: start.Add(-f.created), Updated: start.Add(-f.updated), HeadRef: f.branch, HeadOID: oid(f.key + " head"), BaseRef: "main",
+		Created: start.Add(-f.created), Updated: start.Add(-f.updated), HeadRef: f.branch, HeadRepo: k.Repository(), HeadOID: oid(f.key + " head"), BaseRef: "main",
 		Requested: f.requested, Reviews: f.reviews, Labels: f.labels,
 	}
 	for _, c := range f.comments {

@@ -37,7 +37,7 @@ func prs(now time.Time) []pr {
 		n++
 		k := key(repo, num)
 		return model.PR{ID: fmt.Sprintf("PR_%d", n), Key: k, Title: title, Author: author, State: model.StateOpen,
-			URL: "https://github.com/" + k.Repository() + fmt.Sprintf("/pull/%d", num), HeadRef: "topic", HeadOID: fmt.Sprintf("%07x0", n*0x1f3a5),
+			URL: "https://github.com/" + k.Repository() + fmt.Sprintf("/pull/%d", num), HeadRef: "topic", HeadRepo: k.Repository(), HeadOID: fmt.Sprintf("%07x0", n*0x1f3a5),
 			BaseRef: "main", Additions: add, Deletions: del, ChangedFiles: files, Checks: checks,
 			Decision: model.DecisionReviewRequired, Created: ago(updated + 26*time.Hour), Updated: ago(updated)}
 	}

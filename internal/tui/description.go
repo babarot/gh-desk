@@ -54,11 +54,14 @@ func (m *Model) descPane(p model.PR, n *model.Notification, height int) []string
 	d := m.cache.details[p.Key]
 	title, titleLinks := m.titleLine(p, left)
 	top := []string{title}
-	if s, ok := m.unreadLine(n); ok {
-		top = append(top, s)
+	topLinks := [][]link{titleLinks}
+	if l, ok := m.unreadLine(n); ok {
+		top = append(top, l.text)
+		topLinks = append(topLinks, l.links)
 	}
 	if s, ok := m.bumpsLine(p, d); ok {
 		top = append(top, s)
+		topLinks = append(topLinks, nil)
 	}
 	ls := m.descLines(p, left)
 	rest := max(height-len(top), 1)
@@ -66,8 +69,7 @@ func (m *Model) descPane(p model.PR, n *model.Notification, height int) []string
 	shown := ls[m.pane.scroll:min(len(ls), m.pane.scroll+rest)]
 	m.pane.tabRow, m.pane.tabs = -1, nil
 	m.pane.heads = make([]string, len(top), height)
-	m.pane.links = make([][]link, len(top), height)
-	m.pane.links[0] = titleLinks
+	m.pane.links = append(make([][]link, 0, height), topLinks...)
 	for _, l := range shown {
 		top = append(top, l.text)
 		part := ""
@@ -207,10 +209,12 @@ func (m *Model) descLines(p model.PR, width int) []line {
 					out = append(out, line{text: gutter})
 				}
 				s := gutter + st.peach.Render("● ") + st.sub0.Bold(true).Render(c.Author)
+				// The gutter and the mark come before the author.
+				links := []link{{x: 4, w: lipgloss.Width(c.Author), url: m.userURL(c.Author)}}
 				if !c.Created.IsZero() {
 					s += "  " + st.dim.Render(shortAge(m.set.Now().Sub(c.Created))+" ago")
 				}
-				out = append(out, line{text: s})
+				out = append(out, line{text: s, links: links})
 				indent(m.bodyLines(c.Body, width-4), "  ")
 			}
 			end()
@@ -295,6 +299,38 @@ func (m *Model) author(p model.PR) fact {
 		return fact{text: m.st.dim.Render(p.Author), url: m.webURL("apps/" + p.Author)}
 	}
 	return fact{text: m.st.sub0.Render(p.Author), url: m.webURL(p.Author)}
+}
+
+// userURL is the page of a login: an app's for a bot's login as REST
+// names it, with "[bot]" after the app's name.
+func (m *Model) userURL(login string) string {
+	if app, ok := strings.CutSuffix(login, "[bot]"); ok {
+		return m.webURL("apps/" + app)
+	}
+	return m.webURL(login)
+}
+
+// branchURL is the page of a branch of the repository "owner/repo".
+func (m *Model) branchURL(repo, branch string) string {
+	segs := strings.Split(branch, "/")
+	for i, s := range segs {
+		segs[i] = url.PathEscape(s)
+	}
+	return m.webURL(repo + "/tree/" + strings.Join(segs, "/"))
+}
+
+// headURL is the page of a pull request's head branch, in a fork for one
+// from a fork, or "" when its repository is gone or was not read.
+func (m *Model) headURL(p model.PR) string {
+	if p.HeadRepo == "" || p.HeadRef == "" {
+		return ""
+	}
+	return m.branchURL(p.HeadRepo, p.HeadRef)
+}
+
+// baseURL is the page of a pull request's base branch.
+func (m *Model) baseURL(p model.PR) string {
+	return m.branchURL(p.Key.Repository(), p.BaseRef)
 }
 
 // facts are what the list's columns leave out, a fact a line, width cells
@@ -412,9 +448,9 @@ func (m *Model) facts(p model.PR, d *entry[model.Detail], width int) []line {
 			" " + st.muted.Render(fmt.Sprintf("· %d files", p.ChangedFiles)), url: pr + "/files"})
 	}
 	if p.HeadRef != "" {
-		add("branch", plain(st.sub0.Render(p.HeadRef))...)
+		add("branch", fact{text: st.sub0.Render(p.HeadRef), url: m.headURL(p)})
 		if p.BaseRef != "" {
-			add("", plain(st.dim.Render("→ "+p.BaseRef))...)
+			add("", fact{text: st.dim.Render("→")}, fact{text: st.dim.Render(p.BaseRef), url: m.baseURL(p)})
 		}
 	}
 	if !p.Created.IsZero() {

@@ -71,17 +71,20 @@ type Review struct {
 // PR is a pull request as the lists show it.
 type PR struct {
 	// ID is GitHub's node ID, for mutations.
-	ID           string
-	Key          PRKey
-	Title        string
-	URL          string
-	State        PRState
-	Draft        bool
-	Author       string
-	AuthorIsBot  bool
-	Created      time.Time
-	Updated      time.Time
-	HeadRef      string
+	ID          string
+	Key         PRKey
+	Title       string
+	URL         string
+	State       PRState
+	Draft       bool
+	Author      string
+	AuthorIsBot bool
+	Created     time.Time
+	Updated     time.Time
+	HeadRef     string
+	// HeadRepo is the repository of the head branch, "owner/repo", which
+	// is another than Key's for a fork; empty when it is gone.
+	HeadRepo     string
 	HeadOID      string
 	BaseRef      string
 	Additions    int

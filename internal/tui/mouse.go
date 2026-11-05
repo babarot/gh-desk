@@ -150,6 +150,11 @@ func (m *Model) listClick(x, y int, prev *armed) tea.Cmd {
 		return tea.Batch(cmd, m.clickLink(s, prev))
 	}
 	if y == 0 {
+		if x0, w, ok := m.eventsAt(); ok && x >= x0 && x < x0+w {
+			m.lastClick = click{}
+			m.openNotes()
+			return nil
+		}
 		from, to := m.shownTabs()
 		var ws []int
 		for i := from; i < to; i++ {
@@ -282,6 +287,16 @@ func (m *Model) linkUnder(x, y int) (spot, bool) {
 	l := m.layout()
 	if top := m.paneTop(l); l.pane > 0 && y >= top {
 		r := y - top - 1
+		if y == top && !m.claudeOpen {
+			if p, _, ok := m.currentPR(); ok {
+				for _, k := range m.hintLinks(p, lipgloss.Width(m.paneTabs(p))) {
+					if spanAt([]int{k.w}, 0, x-k.x) == 0 {
+						return spot{url: k.url, x: k.x, y: y, w: k.w, row: -1}, true
+					}
+				}
+			}
+			return spot{}, false
+		}
 		if y == top || m.claudeOpen || m.pane.mode == paneDiff && r == m.pane.tabRow || r >= len(m.pane.links) {
 			return spot{}, false
 		}
@@ -304,8 +319,8 @@ func (m *Model) linkUnder(x, y int) (spot, bool) {
 	return spot{}, false
 }
 
-// linkAt is the link of row i at x: its pull request's name or its
-// author, as the PR and AUTHOR columns draw them.
+// linkAt is the link of row i at x: its pull request's name, its author
+// or its checks, as the PR, AUTHOR and CI columns draw them.
 func (m *Model) linkAt(i, x int) (spot, bool) {
 	t := m.tab()
 	rs := m.rows(t)
@@ -325,12 +340,15 @@ func (m *Model) linkAt(i, x int) (spot, bool) {
 			}
 		case "author":
 			a := m.author(p)
-			if a.url == "" {
-				return spot{}, false
-			}
 			w := min(lipgloss.Width(a.text), c.width)
-			if spanAt([]int{w}, 0, x-at) == 0 {
+			if a.url != "" && spanAt([]int{w}, 0, x-at) == 0 {
 				return spot{url: a.url, x: at, w: w}, true
+			}
+		case "ci":
+			// The mark stands for the checks once they are read.
+			w := min(lipgloss.Width(m.cell("ci", rs[i], false, i)), c.width)
+			if p.HeavyRead() && p.Checks != "" && spanAt([]int{w}, 0, x-at) == 0 {
+				return spot{url: m.prURL(p) + "/checks", x: at, w: w}, true
 			}
 		}
 		at += c.width + 2

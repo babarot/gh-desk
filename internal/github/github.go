@@ -106,7 +106,7 @@ func (c *Client) Viewer(ctx context.Context) (string, error) {
 const lightFields = `
 fragment light on PullRequest {
   id number title url state isDraft createdAt updatedAt
-  headRefName headRefOid baseRefName
+  headRefName headRefOid baseRefName headRepository { nameWithOwner }
   author { login __typename }
   repository { nameWithOwner }
   reviewRequests(first: 10) { nodes { requestedReviewer { __typename ... on User { login } ... on Team { slug } } } }
@@ -140,6 +140,7 @@ type prNode struct {
 	HeadRefName    string
 	HeadRefOid     string
 	BaseRefName    string
+	HeadRepository *struct{ NameWithOwner string }
 	Additions      int
 	Deletions      int
 	ChangedFiles   int
@@ -187,6 +188,9 @@ func (n prNode) toModel(heavy bool) (model.PR, bool) {
 		Created: n.CreatedAt, Updated: n.UpdatedAt, HeadRef: n.HeadRefName, HeadOID: n.HeadRefOid, BaseRef: n.BaseRefName,
 		Additions: n.Additions, Deletions: n.Deletions, ChangedFiles: n.ChangedFiles, Comments: n.Comments.TotalCount,
 		Decision: model.ReviewDecision(n.ReviewDecision),
+	}
+	if n.HeadRepository != nil {
+		p.HeadRepo = n.HeadRepository.NameWithOwner
 	}
 	if n.Author != nil {
 		p.Author, p.AuthorIsBot = n.Author.Login, n.Author.Typename == "Bot"
