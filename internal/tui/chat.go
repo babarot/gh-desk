@@ -210,6 +210,7 @@ func (m *Model) chatReady(msg chatReadyMsg) tea.Cmd {
 func (m *Model) syncChat(c *chatScreen, p model.PR) {
 	c.SetPR(p)
 	c.unseen = false
+	m.seeChatNotes(p.Key)
 	// Probed before reading: a lock found free means what is read is
 	// what the other gh-desk left.
 	m.chatState.Probe(c.Conversation)
@@ -440,7 +441,9 @@ func (m *Model) chatAnswered(msg chatAnswerMsg) tea.Cmd {
 // enough for the user to be elsewhere when it comes.
 func (m *Model) chatNoted(k model.PRKey, text string) tea.Cmd {
 	m.say(text)
-	return m.pushNote("✓", text, []noteItem{{key: k, text: text}})
+	cmd := m.pushNote("✓", text, []noteItem{{key: k, text: text}})
+	m.notes[0].chat = k
+	return cmd
 }
 
 // chatFailedElsewhere keeps in the notifications a question on k that
@@ -449,7 +452,9 @@ func (m *Model) chatFailedElsewhere(k model.PRKey, err error) tea.Cmd {
 	if m.showsChat(k) {
 		return nil
 	}
-	return m.failNoted(fmt.Sprintf("Claude failed on %s: %s", k, short80(err)), k)
+	cmd := m.failNoted(fmt.Sprintf("Claude failed on %s: %s", k, short80(err)), k)
+	m.notes[0].chat = k
+	return cmd
 }
 
 // draftCompose opens the review popup with Claude's draft.

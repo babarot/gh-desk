@@ -46,6 +46,25 @@ func TestClaudeElsewhereNoted(t *testing.T) {
 	}
 }
 
+// Opening the conversation sees the notes that tell of it, and no other.
+func TestClaudeNotesSeenWhenOpened(t *testing.T) {
+	m, _ := startWith(t, fixture(), keymap.Default())
+	press(m, "i", "esc")
+	k := m.chat().PR().Key
+	m.Update(chatAnswerMsg{key: k, answer: claude.Answer{Text: "Later answer."}})
+	m.Update(bodiesMsg{err: errString("secondary rate limit"), tab: m.cur})
+	if m.unseen() != 2 {
+		t.Fatalf("unseen = %d, want 2", m.unseen())
+	}
+	press(m, "i")
+	if m.unseen() != 1 || notesWith(m, "could not read every description") != 1 || m.notes[0].seen {
+		t.Errorf("opening the conversation saw the wrong notes: %+v", m.notes)
+	}
+	if m.toast != nil && m.toast.chat == k {
+		t.Error("the toast of the conversation opened is still shown")
+	}
+}
+
 // A conversation that cannot be kept says so in the notifications, as
 // keeping it fails when an answer comes; the toast's timer is sent.
 func TestConversationNotKeptNoted(t *testing.T) {

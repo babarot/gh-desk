@@ -388,6 +388,9 @@ type note struct {
 	title string
 	items []noteItem
 	seen  bool
+	// chat is the pull request whose conversation the note tells of, so
+	// opening that conversation sees it; zero for any other note.
+	chat model.PRKey
 }
 
 type noteItem struct {
@@ -453,6 +456,19 @@ func (m *Model) unseen() int {
 		}
 	}
 	return n
+}
+
+// seeChatNotes marks seen the notes that tell of the conversation of k,
+// as it is opened.
+func (m *Model) seeChatNotes(k model.PRKey) {
+	for _, n := range m.notes {
+		if n.chat == k {
+			n.seen = true
+		}
+	}
+	if m.toast != nil && m.toast.chat == k {
+		m.toast = nil
+	}
 }
 
 func (m *Model) openNotes() {
