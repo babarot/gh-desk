@@ -513,7 +513,7 @@ func (m *Model) renderFilter() string {
 	var parts []string
 	if m.filtering || m.filter != "" {
 		// No cursor is drawn: render gives the terminal's to the end of it.
-		parts = append(parts, st.yellow.Render("/ "+m.filter))
+		parts = append(parts, st.yellow.Render("/ ")+renderFilterText(m.filter, st.yellow, st.blue))
 	}
 	if t.ruleFilter != nil {
 		n := 0
