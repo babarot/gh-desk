@@ -35,8 +35,7 @@ type bulk struct {
 	offset         int
 	includeFailing bool
 	// waitJobs is set while approvals wait for the jobs at work on their
-	// head, as they do unless the user says otherwise. An approval with
-	// a body is sent at once.
+	// head, as they do unless the user says otherwise.
 	waitJobs bool
 	// notes is how far Claude has read the release notes of the bot pull
 	// requests to merge, and notesErr why it could not.
@@ -94,13 +93,8 @@ func (b *bulk) approves() bool {
 	return b.kind == runner.Review && b.review.Event == model.EventApprove
 }
 
-// canWait reports whether its approvals may wait for the jobs: an
-// approval with a body is sent at once, so that the body is never kept
-// on disk while it waits.
-func (b *bulk) canWait() bool { return b.approves() && b.review.Body == "" }
-
 // waits reports whether its approvals wait for the jobs.
-func (b *bulk) waits() bool { return b.canWait() && b.waitJobs }
+func (b *bulk) waits() bool { return b.approves() && b.waitJobs }
 
 // atWork counts the pull requests read with jobs at work on their head.
 func (b *bulk) atWork() int {
@@ -443,7 +437,7 @@ func (m *Model) bulkKey(k string) tea.Cmd {
 	case is("include_failing") && b.approves() && !b.loading:
 		b.includeFailing = !b.includeFailing
 		m.decideBulk()
-	case is("wait_for_checks") && b.canWait() && b.atWork() > 0 && !b.loading:
+	case is("wait_for_checks") && b.approves() && b.atWork() > 0 && !b.loading:
 		b.waitJobs = !b.waitJobs
 		m.decideBulk()
 	case is("delete_branch") && b.close != nil:
@@ -663,8 +657,6 @@ func (m *Model) renderBulk() []string {
 	}
 	if n := b.atWork(); b.approves() && n > 0 && !b.loading {
 		switch {
-		case !b.canWait():
-			prose(st.dim, "A review with a text is sent at once, while checks still run.")
 		case b.waitJobs:
 			prose(st.dim, fmt.Sprintf("%d with checks still running are approved once they pass · %s to approve now", n, m.firstKey("wait_for_checks")))
 		default:

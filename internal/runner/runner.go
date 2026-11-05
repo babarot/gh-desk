@@ -622,16 +622,16 @@ func (j *job) resume() {
 	j.merge()
 }
 
-// waitToApprove records an approval that waits for the jobs, and waits
-// aside, as auto-merge is watched, so the next pull request of the
-// repository is not held up by it.
-func (j *job) waitToApprove() {
+// waitToApprove records an approval that waits for the jobs, with its
+// body, and waits aside, as auto-merge is watched, so the next pull
+// request of the repository is not held up by it.
+func (j *job) waitToApprove(body string) {
 	if !j.canWait {
 		j.locked("locked by another gh-desk")
 		return
 	}
 	j.record = j.store != nil
-	j.pend.Kind, j.pend.IncludeFailing = model.PendingApprove, j.it.IncludeFailing
+	j.pend.Kind, j.pend.IncludeFailing, j.pend.Body = model.PendingApprove, j.it.IncludeFailing, body
 	if !j.save() {
 		j.say(Failed, "could not record the pending approval; nothing was sent")
 		return
@@ -705,7 +705,7 @@ func (j *job) approveAfterJobs() {
 		}
 		w.end("ready")
 		j.forecast([]Step{StepApprove})
-		if j.sendApproval("") {
+		if j.sendApproval(j.pend.Body) {
 			j.say(Approved, "approved")
 		}
 		return
@@ -759,14 +759,14 @@ func (j *job) review(rv ReviewText) {
 		j.say(Skipped, d.Reason)
 		return
 	}
-	if approve && j.it.Wait && rv.Body == "" {
+	if approve && j.it.Wait {
 		d = plan.AfterJobs(d, mi, j.trigger, time.Now(), j.it.IncludeFailing)
 		switch d.Step {
 		case plan.StepSkip:
 			j.say(Skipped, d.Reason)
 			return
 		case plan.StepWait:
-			j.waitToApprove()
+			j.waitToApprove(rv.Body)
 			return
 		}
 	}

@@ -1,6 +1,8 @@
 package runner
 
 import (
+	"bytes"
+	"log/slog"
 	"slices"
 	"strings"
 	"testing"
@@ -214,15 +216,54 @@ func TestApprovalWithAFailedJob(t *testing.T) {
 	}
 }
 
-// An approval with a body is sent at once: the body is not kept on disk
-// while it would wait.
-func TestApprovalWithABodyDoesNotWait(t *testing.T) {
+// An approval with a body waits as one without does, and is sent with
+// its body once the jobs passed; the body is kept in the record while it
+// waits, and never logged.
+func TestApprovalWithABodyWaits(t *testing.T) {
+	const body = "Looks good once the tests pass"
 	mi, it := pr("1", "api", 1, "alice")
 	mi.Checks = []model.Check{checkRun("test", "IN_PROGRESS", "")}
 	f := newFake(mi)
-	e := last(runReview(t, f, ReviewText{Event: model.EventApprove, Body: "LGTM"}, approveWait(it))[it.PR.Key])
-	if e.Result != Approved || f.reads["1"] != 1 {
-		t.Errorf("last event = %+v after %d reads", e, f.reads["1"])
+	st := newStore()
+	f.onRead = func(_ string, mi *model.MergeInfo, n int) {
+		if n == 2 && st.now[mi.Key].Body != body {
+			t.Errorf("record = %+v; want the body kept", st.now[mi.Key])
+		}
+		if n > 3 {
+			mi.Checks = []model.Check{checkRun("test", model.RunCompleted, model.CheckSuccess)}
+		}
+	}
+	var buf bytes.Buffer
+	r := New(f, logging.New(&buf, slog.LevelDebug), Options{Settings: settings, Viewer: "me", Store: st, CanWait: true,
+		WaitTimeout: time.Second, PollFast: 5 * time.Millisecond, PollSlow: 5 * time.Millisecond, Quiet: 20 * time.Millisecond})
+	_, ch := r.StartReview(t.Context(), ReviewText{Event: model.EventApprove, Body: body}, []Item{approveWait(it)})
+	if e := last(drain(t, ch)); e.Result != Approved || f.bodies["1"] != body {
+		t.Fatalf("last event = %+v, body sent %q", e, f.bodies["1"])
+	}
+	if f.reads["1"] <= 3 {
+		t.Errorf("approved after %d reads, before the job ended", f.reads["1"])
+	}
+	if len(st.now) != 0 {
+		t.Errorf("record left: %v", st.now)
+	}
+	if strings.Contains(buf.String(), body) {
+		t.Error("the body is in the log")
+	}
+}
+
+// An approval with a body that waited is sent with its body at the next
+// launch.
+func TestResumeApprovalWithABody(t *testing.T) {
+	mi, _ := pr("1", "api", 1, "alice")
+	f := newFake(mi)
+	st := newStore()
+	p := model.Pending{Kind: model.PendingApprove, Body: "LGTM", Key: mi.Key, ID: "1", Head: "h-1", Author: "alice"}
+	if err := st.Put(p); err != nil {
+		t.Fatal(err)
+	}
+	_, ch := newRunner(f, st).Resume(t.Context(), []model.Pending{p})
+	if e := last(drain(t, ch)); e.Result != Approved || f.bodies["1"] != "LGTM" {
+		t.Errorf("last event = %+v, body sent %q", e, f.bodies["1"])
 	}
 }
 

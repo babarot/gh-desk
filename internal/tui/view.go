@@ -409,7 +409,7 @@ func (m *Model) hints() string {
 	switch {
 	case m.bulk != nil && m.bulk.approves():
 		as = []keymap.Action{"confirm", "include_failing"}
-		if m.bulk.canWait() && m.bulk.atWork() > 0 {
+		if m.bulk.atWork() > 0 {
 			as = append(as, "wait_for_checks")
 		}
 	case m.bulk != nil && m.bulk.close != nil && m.bulk.close.editing:
