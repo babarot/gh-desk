@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"slices"
 	"strings"
 	"testing"
 
@@ -140,5 +141,77 @@ func TestFilterOffersQualifiers(t *testing.T) {
 	}
 	if s := screen(m); strings.Contains(s, "author:") {
 		t.Errorf("an accepted filter still offers a completion:\n%s", s)
+	}
+}
+
+func TestFilterValueCandidates(t *testing.T) {
+	m := start(t, fixture(), keymap.Default())
+	tests := []struct {
+		filter, head string
+		want         []string
+	}{
+		// Most pull requests first, then by name; a bot without app/.
+		{"author:", "author:", []string{"alice", "bob", "renovate"}},
+		{"author:B", "author:", []string{"bob"}},
+		{"AUTHOR:r", "AUTHOR:", []string{"renovate"}},
+		{"repo:", "repo:", []string{"acme/api", "acme/web"}},
+		{"repo:acme/w", "repo:", []string{"acme/web"}},
+		// From the start of the repository's name too.
+		{"repo:w", "repo:", []string{"web"}},
+		// Only from what the rest of the filter leaves.
+		{"settings author:", "settings author:", []string{"bob"}},
+		{"repo:web author:", "repo:web author:", []string{"bob"}},
+		// A value typed in full has nothing left to offer.
+		{"author:bob", "author:", nil},
+		{"author:zz", "author:", nil},
+		{"title:", "", nil},
+		{"bob", "", nil},
+	}
+	for _, tt := range tests {
+		head, got := m.valueCandidates(tt.filter)
+		if head != tt.head || !slices.Equal(got, tt.want) {
+			t.Errorf("valueCandidates(%q) = %q, %q; want %q, %q", tt.filter, head, got, tt.head, tt.want)
+		}
+	}
+}
+
+func TestFilterValuesGoRound(t *testing.T) {
+	m := start(t, fixture(), keymap.Default())
+	press(m, "/", "a", "u", "tab")
+	if s := screen(m); !strings.Contains(s, "/ author:alice (1/3)") {
+		t.Errorf("author: does not offer its first value:\n%s", s)
+	}
+	press(m, "tab")
+	if m.filter != "author:alice" || !strings.Contains(screen(m), "/ author:alice (1/3)") {
+		t.Fatalf("filter = %q, screen:\n%s", m.filter, screen(m))
+	}
+	press(m, "tab")
+	if m.filter != "author:bob" || !strings.Contains(screen(m), "/ author:bob (2/3)") {
+		t.Fatalf("filter = %q, screen:\n%s", m.filter, screen(m))
+	}
+	press(m, "tab", "tab")
+	if m.filter != "author:alice" {
+		t.Fatalf("after going round filter = %q, want author:alice", m.filter)
+	}
+
+	// Another key ends the round; the value stays.
+	press(m, "space", "b", "tab")
+	if m.filter != "author:alice b" {
+		t.Fatalf("filter = %q, want %q", m.filter, "author:alice b")
+	}
+
+	// The values come from what the rest of the filter leaves: alice's
+	// pull request is in acme/api alone, so web is not offered, and one
+	// value is filled in with nothing to go round.
+	press(m, "backspace", "r", "e", "p", "o", ":", "w")
+	if m.canComplete() {
+		t.Errorf("repo:w offers a value alice has no pull request in")
+	}
+	press(m, "backspace", "tab")
+	if m.filter != "author:alice repo:acme/api" {
+		t.Fatalf("filter = %q, want %q", m.filter, "author:alice repo:acme/api")
+	}
+	if strings.Contains(ansi.Strip(m.hints()), "complete") {
+		t.Errorf("tab is told with one value filled in: %q", ansi.Strip(m.hints()))
 	}
 }

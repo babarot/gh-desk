@@ -438,7 +438,7 @@ func (m *Model) hints() string {
 		}
 	case m.filtering:
 		as = []keymap.Action{"accept"}
-		if completion(m.filter) != "" {
+		if m.canComplete() {
 			as = append(as, "complete")
 		}
 	case m.typingChat():
@@ -518,13 +518,9 @@ func (m *Model) renderFilter() string {
 		// No cursor is drawn: render gives the terminal's to the end of it.
 		s := st.yellow.Render("/ ") + renderFilterText(m.filter, st.yellow, st.blue)
 		// While it is typed, what the filter may ask follows the cursor,
-		// faint: the qualifiers while it is empty, then the rest of the
-		// one the last word starts.
-		switch {
-		case m.filtering && m.filter == "":
-			s += st.dim.Render(filterPlaceholder())
-		case m.filtering:
-			s += st.dim.Render(completion(m.filter))
+		// faint.
+		if m.filtering {
+			s += st.dim.Render(m.filterGhost())
 		}
 		parts = append(parts, s)
 	}

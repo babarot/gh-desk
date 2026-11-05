@@ -226,6 +226,9 @@ type Model struct {
 
 	filtering bool
 	filter    string
+	// cycle is the value completion going round, while complete is
+	// pressed again and again.
+	cycle filterCycle
 
 	// dragging is set while the pane's top edge is held with the mouse,
 	// lastClick is the row clicked last, to tell a double click, and
@@ -534,6 +537,7 @@ func (m *Model) paste(msg tea.PasteMsg) tea.Cmd {
 		return m.closePaste(msg)
 	case m.filtering:
 		m.filter += msg.Content
+		m.cycle = filterCycle{}
 		m.tab().sel, m.tab().offset = 0, 0
 	case m.triage != nil && m.triage.typing:
 		var cmd tea.Cmd

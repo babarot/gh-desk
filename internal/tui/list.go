@@ -248,13 +248,16 @@ func (m *Model) switchTab(i int) tea.Cmd {
 
 func (m *Model) filterKey(msg tea.KeyPressMsg) tea.Cmd {
 	k := msg.String()
+	if !m.keys.Matches("complete", k) {
+		m.cycle = filterCycle{}
+	}
 	switch {
 	case k == keymap.Back:
 		m.filtering, m.filter = false, ""
 	case m.keys.Matches("accept", k):
 		m.filtering = false
 	case m.keys.Matches("complete", k):
-		m.filter += completion(m.filter)
+		m.complete()
 	case m.keys.Matches("erase", k):
 		if r := []rune(m.filter); len(r) > 0 {
 			m.filter = string(r[:len(r)-1])

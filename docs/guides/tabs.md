@@ -57,6 +57,16 @@ A tab says how many it leaves out on the last line of its list, and its count in
 
 ## Narrowing a tab
 
-`/` filters the rows by what you type. A title is drawn with its shortcodes, such as `:sparkles:`, as emoji, and either finds it. The rules of `S` can narrow them too ([Selecting by rules](selecting.md)); a row is shown when it passes both. The columns are chosen with `list.columns`, and a narrow terminal drops SIZE first, then AUTHOR.
+`/` filters the rows by what you type. Each word, split by spaces, must be found in the pull request's key, title or author, in any order and ignoring case, so `retries alice` shows alice's pull requests about retries. A title is drawn with its shortcodes, such as `:sparkles:`, as emoji, and either finds it. A word can ask one field alone:
+
+| Word | Shows the pull requests |
+|---|---|
+| `author:alice` | whose author's login starts with `alice`; a bot is named without `app/`, as `author:dependabot` |
+| `repo:acme/api` | whose owner/repo contains `acme/api` |
+| `title:retries` | whose title contains `retries` |
+
+Only these are read: a word such as `fix:` is looked for as it is. The filter line colors the words it reads this way. While you type, an empty filter shows them faint, and the rest of one follows faint once a word starts it; `tab` fills it in. After `author:` or `repo:`, the logins or repositories of the rows the rest of the filter leaves follow faint, the most common first; `tab` fills one in, and `tab` again goes to the next.
+
+The rules of `S` can narrow the rows too ([Selecting by rules](selecting.md)); a row is shown when it passes both. The columns are chosen with `list.columns`, and a narrow terminal drops SIZE first, then AUTHOR.
 
 See [`[[tabs]]`](../reference/configuration.md#tabs) for every key of a tab.

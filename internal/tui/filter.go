@@ -1,6 +1,9 @@
 package tui
 
 import (
+	"cmp"
+	"fmt"
+	"slices"
 	"strings"
 	"unicode"
 	"unicode/utf8"
@@ -126,11 +129,7 @@ func completion(filter string) string {
 	if r, _ := utf8.DecodeLastRuneInString(filter); unicode.IsSpace(r) {
 		return ""
 	}
-	w := filter
-	if i := strings.LastIndexFunc(filter, unicode.IsSpace); i >= 0 {
-		_, n := utf8.DecodeRuneInString(filter[i:])
-		w = filter[i+n:]
-	}
+	w := lastWord(filter)
 	if utf8.RuneCountInString(w) < 2 || strings.Contains(w, ":") {
 		return ""
 	}
@@ -145,4 +144,140 @@ func completion(filter string) string {
 		}
 	}
 	return rest
+}
+
+// filterCycle is the value completion going round: the filter as it was
+// typed before complete filled in its first candidate, and the candidate
+// filled in now. It ends at any other key.
+type filterCycle struct {
+	on   bool
+	base string
+	i    int
+}
+
+// lastWord is the word filter ends in, "" when it ends in a space.
+func lastWord(filter string) string {
+	if i := strings.LastIndexFunc(filter, unicode.IsSpace); i >= 0 {
+		_, n := utf8.DecodeRuneInString(filter[i:])
+		return filter[i+n:]
+	}
+	return filter
+}
+
+// valueCandidates are the values the last word of filter may be completed
+// to, when it is author: or repo: with the start of a value: the logins
+// (without app/) or repositories of the pull requests the tab shows under
+// the rest of the filter, so a completion never leaves no rows and never
+// names one hidden. head is the filter up to the value; the most common
+// value in the tab comes first, then by name. author: is matched from the
+// start of the login, as the filter does; repo: from the start of
+// owner/repo or of the repository's name, as only what follows the cursor
+// can be offered.
+func (m *Model) valueCandidates(filter string) (head string, cands []string) {
+	w := lastWord(filter)
+	q, v, ok := qualifier(w)
+	if !ok || !strings.EqualFold(q, "author") && !strings.EqualFold(q, "repo") {
+		return "", nil
+	}
+	before := filter[:len(filter)-len(w)]
+	lv := strings.ToLower(v)
+	n := map[string]int{}
+	t := m.tab()
+	for _, r := range m.rowsOf(t, before, t.ruleFilter, nil) {
+		if r.kind != rowPR {
+			continue
+		}
+		var c string
+		switch {
+		case strings.EqualFold(q, "author"):
+			c = strings.TrimPrefix(r.pr.Author, "app/")
+		case strings.HasPrefix(strings.ToLower(r.pr.Key.Repository()), lv):
+			c = r.pr.Key.Repository()
+		default:
+			c = r.pr.Key.Repo
+		}
+		if lc := strings.ToLower(c); c != "" && lc != lv && strings.HasPrefix(lc, lv) {
+			n[c]++
+		}
+	}
+	for c := range n {
+		cands = append(cands, c)
+	}
+	slices.SortFunc(cands, func(a, b string) int {
+		return cmp.Or(n[b]-n[a], cmp.Compare(strings.ToLower(a), strings.ToLower(b)))
+	})
+	return before + w[:len(q)+1], cands
+}
+
+// complete fills in what the filter's ghost offers: the rest of a
+// qualifier, or a value, and again the next value while the values go
+// round.
+func (m *Model) complete() {
+	if c := completion(m.filter); c != "" {
+		m.filter += c
+		return
+	}
+	if head, cands, ok := m.cycling(); ok {
+		m.cycle.i = (m.cycle.i + 1) % len(cands)
+		m.filter = head + cands[m.cycle.i]
+		return
+	}
+	m.cycle = filterCycle{}
+	if head, cands := m.valueCandidates(m.filter); len(cands) > 0 {
+		m.cycle = filterCycle{on: true, base: m.filter}
+		m.filter = head + cands[0]
+	}
+}
+
+// cycling are the values going round, when they still are: the filter is
+// the one complete filled in last, and the rows still give that value. A
+// filter changed by other means, or rows read again, end the round.
+func (m *Model) cycling() (head string, cands []string, ok bool) {
+	if !m.cycle.on {
+		return "", nil, false
+	}
+	head, cands = m.valueCandidates(m.cycle.base)
+	if m.cycle.i >= len(cands) || m.filter != head+cands[m.cycle.i] {
+		return "", nil, false
+	}
+	return head, cands, true
+}
+
+// canComplete reports whether complete would change the filter.
+func (m *Model) canComplete() bool {
+	if completion(m.filter) != "" {
+		return true
+	}
+	if _, cands, ok := m.cycling(); ok {
+		return len(cands) > 1
+	}
+	_, cands := m.valueCandidates(m.filter)
+	return len(cands) > 0
+}
+
+// filterGhost is what follows the cursor, faint, while the filter is
+// typed: the qualifiers while it is empty, the rest of a qualifier or of
+// the first value it may be completed to, and while there are several
+// values which one of them it is.
+func (m *Model) filterGhost() string {
+	if m.filter == "" {
+		return filterPlaceholder()
+	}
+	if c := completion(m.filter); c != "" {
+		return c
+	}
+	count := func(i, n int) string {
+		if n < 2 {
+			return ""
+		}
+		return fmt.Sprintf(" (%d/%d)", i+1, n)
+	}
+	if _, cands, ok := m.cycling(); ok {
+		return count(m.cycle.i, len(cands))
+	}
+	_, v, _ := qualifier(lastWord(m.filter))
+	if _, cands := m.valueCandidates(m.filter); len(cands) > 0 && len(v) <= len(cands[0]) {
+		return cands[0][len(v):] + count(0, len(cands))
+	}
+	return ""
 }
