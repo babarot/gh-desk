@@ -375,7 +375,7 @@ func (m *Model) postingActivity() string {
 // box starts.
 func (m *Model) renderCompose() ([]string, int) {
 	c, st := m.compose, m.st
-	lines := []string{st.muted.Render(c.pr.Title)}
+	lines := []string{st.muted.Render(shownTitle(c.pr.Title))}
 	if len(c.prs) > 1 {
 		lines = keysLines(st.sub0, c.prs, composeWidth(m.width)-4, composeKeysLines)
 	}
@@ -414,7 +414,7 @@ func (m *Model) renderConfirm() []string {
 	lines := []string{
 		st.sub1.Render(c.pr.Key.String()) + " " + st.muted.Render(c.pr.Author),
 		// The title may be cut: the key above names the pull request.
-		st.muted.Render(c.pr.Title),
+		st.muted.Render(shownTitle(c.pr.Title)),
 	}
 	if len(c.prs) > 1 {
 		title = fmt.Sprintf("comment on %d pull requests", len(c.prs))

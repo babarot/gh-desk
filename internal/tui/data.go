@@ -398,13 +398,17 @@ func (m *Model) passes(p model.PR, filter string, rules []plan.Rule, now time.Ti
 }
 
 // matches reports whether p's key, title or author contains filter,
-// ignoring case.
+// ignoring case. The title is matched as written and as it is drawn, so
+// both :rocket: and the emoji find a title written with the shortcode.
 func matches(p model.PR, filter string) bool {
 	if filter == "" {
 		return true
 	}
 	f := strings.ToLower(filter)
-	return strings.Contains(strings.ToLower(p.Key.String()+" "+p.Title+" "+p.Author), f)
+	in := func(title string) bool {
+		return strings.Contains(strings.ToLower(p.Key.String()+" "+title+" "+p.Author), f)
+	}
+	return in(p.Title) || in(shownTitle(p.Title))
 }
 
 // current is the row under the cursor, if any.

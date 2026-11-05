@@ -347,7 +347,7 @@ func (m *Model) renderMenu() []string {
 	} else if len(prs) > 0 {
 		title = prs[0].Key.String()
 		// The title may be cut: the popup's title names the pull request.
-		lines = append(lines, st.sub0.Render(prs[0].Title))
+		lines = append(lines, st.sub0.Render(shownTitle(prs[0].Title)))
 	}
 	lines = append(lines, "")
 	sel := 0

@@ -132,7 +132,7 @@ func (m *Model) titleLine(p model.PR, width int) (string, []link) {
 	if a.url != "" {
 		links = append(links, link{x: room + 2, w: aw, url: a.url})
 	}
-	return fit(st.dim.Render(num)+" "+st.text.Bold(true).Render(p.Title), room) + "  " + a.text, links
+	return fit(st.dim.Render(num)+" "+st.text.Bold(true).Render(shownTitle(p.Title)), room) + "  " + a.text, links
 }
 
 // descLines are the parts of the description pane, width cells wide, with

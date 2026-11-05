@@ -195,6 +195,12 @@ func emojize(s string) string {
 	})
 }
 
+// shownTitle is a pull request's title as it is drawn, with its
+// shortcodes as emoji as GitHub shows them. The title itself is kept as
+// written: rules, the filter and Claude read it so. Every title drawn
+// goes through it, so that one pull request reads the same everywhere.
+func shownTitle(s string) string { return emojizeOutsideCode(s) }
+
 // emojizeOutsideCode is emojize for a line that may hold code between
 // backquotes, which stays as written.
 func emojizeOutsideCode(s string) string {

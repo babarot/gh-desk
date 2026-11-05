@@ -578,15 +578,15 @@ func (m *Model) renderBulk() []string {
 	}
 	rows := make([]bulkRow, 0, len(b.items))
 	for _, it := range b.items {
-		mark, title := st.dim.Render("·"), st.dim.Render(it.pr.Title)
+		mark, title := st.dim.Render("·"), st.dim.Render(shownTitle(it.pr.Title))
 		var what []string
 		switch {
 		case !it.read:
 			// Shown from the list until it is read again. Nothing on it
 			// moves: the spinner at the foot is the one the popup has.
-			mark, title, what = st.dim.Render("·"), st.muted.Render(it.pr.Title), []string{st.dim.Render("reading…")}
+			mark, title, what = st.dim.Render("·"), st.muted.Render(shownTitle(it.pr.Title)), []string{st.dim.Render("reading…")}
 		case it.goes():
-			mark, title = st.mauve.Render("✓"), st.sub1.Render(it.pr.Title)
+			mark, title = st.mauve.Render("✓"), st.sub1.Render(shownTitle(it.pr.Title))
 			switch b.kind {
 			case runner.Review, runner.Ready:
 				style := st.green

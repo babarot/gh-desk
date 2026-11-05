@@ -372,7 +372,7 @@ func (m *Model) renderPick() []string {
 			}
 			name := st.sub1.Render(p.Key.Repository()) + st.muted.Render(fmt.Sprintf("#%d", p.Key.Number))
 			// A title may be cut: the name beside it tells the pull request.
-			lines = append(lines, "  "+fit(name, 30)+" "+st.sub0.Render(p.Title))
+			lines = append(lines, "  "+fit(name, 30)+" "+st.sub0.Render(shownTitle(p.Title)))
 		}
 	}
 	foot := append([]string{""}, keyLines(st, inner,

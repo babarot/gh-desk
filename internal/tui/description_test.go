@@ -357,3 +357,23 @@ func TestShortcodesAreDrawnAsEmoji(t *testing.T) {
 		t.Errorf("code block line = %q, want the shortcode as written", got)
 	}
 }
+
+// A title is drawn with its shortcodes as emoji, and the filter finds it
+// by either; the title itself stays as written, for rules and Claude.
+func TestTitleShortcodes(t *testing.T) {
+	if got := shownTitle(":sparkles: Add `:x:` retries"); got != "✨ Add `:x:` retries" {
+		t.Errorf("shownTitle = %q", got)
+	}
+	p := model.PR{Key: key("acme", "api", 1), Title: ":bug: Fix retries", Author: "alice"}
+	for _, f := range []string{":bug:", "🐛", "🐛 fix", "fix retries alice", ""} {
+		if !matches(p, f) {
+			t.Errorf("filter %q does not match %q", f, p.Title)
+		}
+	}
+	if matches(p, ":rocket:") {
+		t.Errorf("filter :rocket: matches %q", p.Title)
+	}
+	if got := safePR(p).Title; got != p.Title {
+		t.Errorf("loaded title = %q, want it as written", got)
+	}
+}

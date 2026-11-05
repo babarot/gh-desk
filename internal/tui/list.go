@@ -831,15 +831,15 @@ func (m *Model) cell(id string, r row, sel bool, n int) string {
 		return cursor + " " + mark + " " + name.Render(repo) + num.Render(number)
 	case "title":
 		if m.merged[p.Key] {
-			return st.dim.Render(p.Title)
+			return st.dim.Render(shownTitle(p.Title))
 		}
 		switch {
 		case p.State == model.StateMerged || p.State == model.StateClosed:
-			return st.dim.Render(p.Title) + " " + st.dim.Render(strings.ToLower(string(p.State)))
+			return st.dim.Render(shownTitle(p.Title)) + " " + st.dim.Render(strings.ToLower(string(p.State)))
 		case p.Draft:
-			return st.dim.Render(p.Title)
+			return st.dim.Render(shownTitle(p.Title))
 		}
-		return st.text.Render(p.Title)
+		return st.text.Render(shownTitle(p.Title))
 	case "author":
 		return m.author(p).text
 	case "ci", "review", "size":
