@@ -75,7 +75,7 @@ const searchBody = `{"data": {
   "search": {"issueCount": 3, "pageInfo": {"hasNextPage": false, "endCursor": ""}, "nodes": [
     {"id": "PR_1", "number": 7, "title": "Fix the parser", "url": "https://github.com/acme/tool/pull/7", "state": "OPEN",
      "isDraft": false, "createdAt": "2026-10-01T00:00:00Z", "updatedAt": "2026-10-02T00:00:00Z",
-     "headRefName": "fix", "headRefOid": "abc123", "baseRefName": "main", "additions": 3, "deletions": 1, "changedFiles": 1,
+     "headRefName": "fix", "headRefOid": "abc123", "baseRefName": "main", "headRepository": {"nameWithOwner": "alice/tool"}, "additions": 3, "deletions": 1, "changedFiles": 1,
      "reviewDecision": "REVIEW_REQUIRED", "author": {"login": "alice", "__typename": "User"},
      "repository": {"nameWithOwner": "acme/tool"}, "labels": {"nodes": [{"name": "bug"}]}, "comments": {"totalCount": 2},
      "reviewRequests": {"nodes": [{"requestedReviewer": {"__typename": "User", "login": "me"}},
@@ -100,7 +100,7 @@ func TestSearch(t *testing.T) {
 		t.Fatalf("total %d, prs %d", res.Total, len(res.PRs))
 	}
 	p := res.PRs[0]
-	if p.Key.String() != "acme/tool#7" || p.HeadOID != "abc123" || p.Checks != model.CheckSuccess || p.AuthorIsBot {
+	if p.Key.String() != "acme/tool#7" || p.HeadOID != "abc123" || p.HeadRepo != "alice/tool" || res.PRs[1].HeadRepo != "" || p.Checks != model.CheckSuccess || p.AuthorIsBot {
 		t.Errorf("pr = %+v", p)
 	}
 	if !p.RequestedFrom("me") || p.RequestedFrom("core") || len(p.Requested) != 2 || !p.Requested[1].Team {

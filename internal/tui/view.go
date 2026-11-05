@@ -182,15 +182,20 @@ func place(base, over string, x int) string {
 }
 
 func (m *Model) renderHeader() string {
+	left := m.headerLeft()
+	right := m.headerRight()
+	gap := m.width - lipgloss.Width(left) - lipgloss.Width(right) - 1
+	return m.st.header.Render(fit(left+spaces(gap)+right, m.width))
+}
+
+// headerLeft is the header's left: the app, the viewer and the tabs.
+func (m *Model) headerLeft() string {
 	from, to := m.shownTabs()
 	var tabs []string
 	for i := from; i < to; i++ {
 		tabs = append(tabs, m.tabLabel(i))
 	}
-	left := m.headerLead() + m.st.dim.Render(tabsBefore(from)) + strings.Join(tabs, tabGap) + m.st.dim.Render(tabsAfter(to, len(m.tabs)))
-	right := m.headerRight()
-	gap := m.width - lipgloss.Width(left) - lipgloss.Width(right) - 1
-	return m.st.header.Render(fit(left+spaces(gap)+right, m.width))
+	return m.headerLead() + m.st.dim.Render(tabsBefore(from)) + strings.Join(tabs, tabGap) + m.st.dim.Render(tabsAfter(to, len(m.tabs)))
 }
 
 // shownTabs are the tabs the header has room for, from (included) to
@@ -307,6 +312,35 @@ func (m *Model) tabLabel(i int) string {
 }
 
 func (m *Model) headerRight() string {
+	return m.st.sub0.Render(strings.Join(m.headerParts(), headerSep))
+}
+
+// headerSep is what sets the parts of the header's right apart.
+const headerSep = " · "
+
+// eventsAt is where the header draws the count of the events not seen,
+// which a click opens: from x, w cells wide.
+func (m *Model) eventsAt() (x, w int, ok bool) {
+	parts := m.headerParts()
+	i := slices.IndexFunc(parts, func(s string) bool { return strings.HasPrefix(ansi.Strip(s), "✦") })
+	if i < 0 {
+		return 0, 0, false
+	}
+	right := lipgloss.Width(strings.Join(parts, headerSep))
+	// renderHeader leaves a cell after the right part, which it cuts
+	// when it has no room.
+	if lipgloss.Width(m.headerLeft())+right+1 > m.width {
+		return 0, 0, false
+	}
+	x = m.width - 1 - right
+	for _, s := range parts[:i] {
+		x += lipgloss.Width(s) + len(headerSep)
+	}
+	return x, lipgloss.Width(parts[i]), true
+}
+
+// headerParts are the parts of the header's right.
+func (m *Model) headerParts() []string {
 	t, st := m.tab(), m.st
 	var parts []string
 	// The rows are from the cache, or a reading again failed.
@@ -324,7 +358,7 @@ func (m *Model) headerRight() string {
 	}
 	// Results on the rows take the place of the tab's counts.
 	if len(m.progress) > 0 {
-		return st.sub0.Render(strings.Join(parts, " · "))
+		return parts
 	}
 	if t.grouped && t.loaded {
 		n := map[plan.Group]int{}
@@ -344,7 +378,7 @@ func (m *Model) headerRight() string {
 	if len(t.warnings) > 0 {
 		parts = append(parts, st.yellow.Render("⚠ read in part"))
 	}
-	return st.sub0.Render(strings.Join(parts, " · "))
+	return parts
 }
 
 // ready are the actions this version does; the hints and the ? list show

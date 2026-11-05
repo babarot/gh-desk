@@ -225,3 +225,110 @@ func TestChatAnswerIsDrawnFromMarkdown(t *testing.T) {
 		t.Errorf("lines:\n%s\nwant:\n%s", strings.Join(got, "\n"), strings.Join(want, "\n"))
 	}
 }
+
+// The branches open their pages.
+func TestClickBranchOpensItsPage(t *testing.T) {
+	f := fixture()
+	m := start(t, f, keymap.Default())
+	press(m, "+", "+", "+", "+", "+", "+")
+	x, y := lineOf(t, m, "branch    retries")
+	clickTwice(m, x+11, y)
+	x, y = lineOf(t, m, "→ main")
+	clickTwice(m, x+3, y)
+	want := []string{"https://github.com/acme/api/tree/retries", "https://github.com/acme/api/tree/main"}
+	if strings.Join(f.browsed, " ") != strings.Join(want, " ") {
+		t.Fatalf("browsed %q, want %q", f.browsed, want)
+	}
+
+	// A fork's head branch is in the fork; with its repository gone,
+	// the branch opens nothing.
+	for _, c := range []struct{ repo, want string }{{"alice/api", "https://github.com/alice/api/tree/retries"}, {"", ""}} {
+		f = fixture()
+		f.searches["review"][0].HeadRepo = c.repo
+		m = start(t, f, keymap.Default())
+		press(m, "+", "+", "+", "+", "+", "+")
+		x, y = lineOf(t, m, "branch    retries")
+		clickTwice(m, x+11, y)
+		if strings.Join(f.browsed, " ") != c.want {
+			t.Fatalf("head in %q: browsed %q, want %q", c.repo, f.browsed, c.want)
+		}
+	}
+}
+
+func TestBranchURL(t *testing.T) {
+	m := start(t, fixture(), keymap.Default())
+	if got, want := m.branchURL("acme/api", "babarot/fix #1"), "https://github.com/acme/api/tree/babarot/fix%20%231"; got != want {
+		t.Errorf("branchURL = %q, want %q", got, want)
+	}
+}
+
+// The name on the pane's top border opens the pull request, anywhere on
+// it; the rest of the border still resizes the pane.
+func TestClickPaneBorderName(t *testing.T) {
+	f := fixture()
+	m := start(t, f, keymap.Default())
+	x, y := lineOf(t, m, "acme/api#12 ·")
+	clickTwice(m, x+1, y)
+	clickTwice(m, x+9, y)
+	want := []string{"https://github.com/acme/api/pull/12", "https://github.com/acme/api/pull/12"}
+	if strings.Join(f.browsed, " ") != strings.Join(want, " ") {
+		t.Fatalf("browsed %q, want %q", f.browsed, want)
+	}
+	if m.dragging {
+		t.Fatal("a click on the name started a resize")
+	}
+	mouseAt(m, tea.MouseClickMsg{X: x - 3, Y: y, Button: tea.MouseLeft})
+	if !m.dragging {
+		t.Fatal("a click on the border beside the name did not start a resize")
+	}
+}
+
+// The diff tab's first line links what the overview's facts do.
+func TestClickDiffMetaOpensItsPages(t *testing.T) {
+	f := fixture()
+	m := start(t, f, keymap.Default())
+	press(m, "v")
+	click := func(s string, dx int) {
+		t.Helper()
+		x, y := lineOf(t, m, s)
+		clickTwice(m, x+dx, y)
+	}
+	click("retries → main", 1)
+	click("retries → main", 11)
+	click("@core", 1)
+	want := []string{"https://github.com/acme/api/tree/retries", "https://github.com/acme/api/tree/main", "https://github.com/orgs/acme/teams/core"}
+	if strings.Join(f.browsed, " ") != strings.Join(want, " ") {
+		t.Fatalf("browsed %q, want %q", f.browsed, want)
+	}
+}
+
+// A comment's author opens their page, an app's for a bot.
+func TestClickCommentAuthor(t *testing.T) {
+	f := fixture()
+	d := f.details[key("acme", "api", 12)]
+	d.Comments = []model.Comment{{Author: "dave", Body: "Looks good."}, {Author: "octo-bot[bot]", Body: "Deployed."}}
+	f.details[key("acme", "api", 12)] = d
+	m := start(t, f, keymap.Default())
+	press(m, "+", "+", "+", "+", "+", "+", "+", "+")
+	x, y := lineOf(t, m, "● dave")
+	clickTwice(m, x+3, y)
+	x, y = lineOf(t, m, "● octo-bot[bot]")
+	clickTwice(m, x+3, y)
+	want := []string{"https://github.com/dave", "https://github.com/apps/octo-bot"}
+	if strings.Join(f.browsed, " ") != strings.Join(want, " ") {
+		t.Fatalf("browsed %q, want %q", f.browsed, want)
+	}
+}
+
+// The author of the unread comment a notification is about opens their
+// page.
+func TestClickUnreadCommentAuthor(t *testing.T) {
+	f := fixture()
+	m := start(t, f, keymap.Default())
+	press(m, "4", "a", "j")
+	x, y := lineOf(t, m, "❝ dave")
+	clickTwice(m, x+3, y)
+	if want := "https://github.com/dave"; strings.Join(f.browsed, " ") != want {
+		t.Fatalf("browsed %q, want %q", f.browsed, want)
+	}
+}

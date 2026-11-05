@@ -133,9 +133,9 @@ browse = []
 
 | | |
 |---|---|
-| click | tab, row, pane tab |
+| click | tab, row, pane tab, ✦: events |
 | double click | actions |
-| click twice | @you, an author, a PR: browser; an item of a popup: choose |
+| click twice | a PR, a user, a branch, a fact: browser; an item of a popup: choose |
 | click outside | a popup: close |
 | wheel | scroll |
 | drag | the pane's top edge: resize |

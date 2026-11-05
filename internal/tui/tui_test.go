@@ -44,7 +44,7 @@ func fixture() *fakeSource {
 	team := model.Reviewer{Login: "core", Team: true}
 	prs := []model.PR{
 		{ID: "1", Key: key("acme", "api", 12), Title: "Add retries to the client", Author: "alice", State: model.StateOpen,
-			HeadRef: "retries", HeadOID: "aaaaaaa1", BaseRef: "main", Additions: 40, Deletions: 3, ChangedFiles: 2,
+			HeadRef: "retries", HeadRepo: "acme/api", HeadOID: "aaaaaaa1", BaseRef: "main", Additions: 40, Deletions: 3, ChangedFiles: 2,
 			Decision: model.DecisionReviewRequired, Checks: model.CheckSuccess, Requested: []model.Reviewer{me, team},
 			Updated: now.Add(-3 * time.Hour), URL: "https://github.com/acme/api/pull/12"},
 		{ID: "2", Key: key("acme", "web", 7), Title: "Rework the settings page", Author: "bob", State: model.StateOpen, Draft: true,

@@ -60,6 +60,35 @@ type link struct {
 	url  string
 }
 
+// linked is a line built from pieces, some of which are links.
+type linked struct {
+	text  string
+	n     int
+	links []link
+}
+
+// add puts s at the end of the line, a link to url unless it is "".
+func (l *linked) add(s, url string) {
+	w := lipgloss.Width(s)
+	if url != "" {
+		l.links = append(l.links, link{x: l.n, w: w, url: url})
+	}
+	l.text += s
+	l.n += w
+}
+
+// clip is the line's links within width cells, where it is cut.
+func (l *linked) clip(width int) []link {
+	var out []link
+	for _, k := range l.links {
+		if k.x < width {
+			k.w = min(k.w, width-k.x)
+			out = append(out, k)
+		}
+	}
+	return out
+}
+
 func (p *pane) toggleMode() {
 	if p.mode == paneOverview {
 		p.mode = paneDiff
@@ -465,10 +494,8 @@ func (m *Model) renderPane(b *strings.Builder, height int) {
 		if e != nil && !e.loading && e.err == nil {
 			files = e.val
 		}
-		diffTab := m.diffTabName(p)
-		tabs = pill(st.tabOn, st.tabOff, "overview", m.pane.mode == paneOverview) + tabGap +
-			pill(st.tabOn, st.tabOff, diffTab, m.pane.mode == paneDiff)
-		hint = p.Key.String() + " · " + m.firstKey("preview_down") + "/" + m.firstKey("preview_up") + " · " + m.firstKey("preview_tab")
+		tabs = m.paneTabs(p)
+		hint = m.paneHint(p)
 		body = m.paneBody(p, n, e, files, height-2)
 	}
 	top := st.border.Render("╭ ") + tabs + " "
@@ -483,6 +510,30 @@ func (m *Model) renderPane(b *strings.Builder, height int) {
 		b.WriteString(st.border.Render("│ ") + fit(s, inner) + st.border.Render(" │") + "\n")
 	}
 	b.WriteString(st.border.Render("╰"+strings.Repeat("─", max(m.width-2, 0))+"╯") + "\n")
+}
+
+// paneTabs are the pane's tabs as its top border draws them.
+func (m *Model) paneTabs(p model.PR) string {
+	return pill(m.st.tabOn, m.st.tabOff, "overview", m.pane.mode == paneOverview) + tabGap +
+		pill(m.st.tabOn, m.st.tabOff, m.diffTabName(p), m.pane.mode == paneDiff)
+}
+
+// paneHint is what the pane's top border says at its right of the pull
+// request shown: its name, which a click opens, and the pane's keys.
+func (m *Model) paneHint(p model.PR) string {
+	return p.Key.String() + " · " + m.firstKey("preview_down") + "/" + m.firstKey("preview_up") + " · " + m.firstKey("preview_tab")
+}
+
+// hintLinks are the links of the pane's top border, by the cells of the
+// screen: the name of the pull request shown. The border is drawn as
+// renderPane does, with the hint at its right end.
+func (m *Model) hintLinks(p model.PR, tabs int) []link {
+	hint := lipgloss.Width(m.paneHint(p))
+	// "╭ ", the tabs and a space; a space before the hint and " ╮" after.
+	if 2+tabs+1+1+hint+2 > m.width {
+		return nil
+	}
+	return []link{{x: m.width - 2 - hint, w: lipgloss.Width(p.Key.String()), url: m.prURL(p)}}
 }
 
 // diffTabName is the name of the pane's diff tab, with the count of files
@@ -503,26 +554,29 @@ func (m *Model) paneBody(p model.PR, n *model.Notification, e *entry[[]diff.File
 		return m.descPane(p, n, height)
 	}
 	st := m.st
-	meta := st.sub0.Render(p.HeadRef)
+	// The branches, the teams and the reviewers open their pages, as the
+	// overview's facts do.
+	var meta linked
+	meta.add(st.sub0.Render(p.HeadRef), m.headURL(p))
 	if p.BaseRef != "" {
-		meta += st.dim.Render(" → " + p.BaseRef)
+		meta.add(st.dim.Render(" → "), "")
+		meta.add(st.dim.Render(p.BaseRef), m.baseURL(p))
 	}
-	var teams, others []string
+	gap := "  "
 	for _, r := range p.Requested {
 		if r.Team {
-			teams = append(teams, st.teal.Render("@"+r.Login))
+			meta.add(gap, "")
+			meta.add(st.teal.Render("@"+r.Login), m.webURL("orgs/"+p.Key.Owner+"/teams/"+r.Login))
+			gap = " "
 		}
 	}
+	gap = "  "
 	for _, r := range p.Reviews {
 		if r.Author != m.viewer {
-			others = append(others, reviewerStyle(st, r.State).Render(r.Author+reviewMark[r.State]))
+			meta.add(gap, "")
+			meta.add(reviewerStyle(st, r.State).Render(r.Author+reviewMark[r.State]), m.webURL(r.Author))
+			gap = " "
 		}
-	}
-	if len(teams) > 0 {
-		meta += "  " + strings.Join(teams, " ")
-	}
-	if len(others) > 0 {
-		meta += "  " + strings.Join(others, " ")
 	}
 	if mi, ok := m.cache.info[p.Key]; ok && p.State == model.StateOpen {
 		d := plan.ForMerge(mi, p, m.viewer, m.set.Plan)
@@ -533,14 +587,17 @@ func (m *Model) paneBody(p model.PR, n *model.Notification, e *entry[[]diff.File
 		if d.Ready {
 			how = "mark ready, then " + how
 		}
-		meta += "  " + st.muted.Render("merge:") + " " + m.stepStyle(d.Step).Render(how)
+		meta.add("  "+st.muted.Render("merge:")+" "+m.stepStyle(d.Step).Render(how), "")
 	}
-	top := []string{meta}
-	if s, ok := m.unreadLine(n); ok {
-		top = append(top, s)
+	top := []string{meta.text}
+	topLinks := [][]link{meta.clip(max(m.width-4, 10))}
+	if l, ok := m.unreadLine(n); ok {
+		top = append(top, l.text)
+		topLinks = append(topLinks, l.links)
 	}
 	if s, ok := m.bumpsLine(p, m.cache.details[p.Key]); ok {
 		top = append(top, s)
+		topLinks = append(topLinks, nil)
 	}
 
 	var ls []line
@@ -565,9 +622,10 @@ func (m *Model) paneBody(p model.PR, n *model.Notification, e *entry[[]diff.File
 		s, spans := m.fileTabLine(files, cur, max(m.width-4, 10))
 		m.pane.tabRow, m.pane.tabs = len(top), spans
 		top = append(top, s)
+		topLinks = append(topLinks, nil)
 	}
 	m.pane.heads = make([]string, len(top), height)
-	m.pane.links = make([][]link, len(top), height)
+	m.pane.links = append(make([][]link, 0, height), topLinks...)
 	for _, l := range shown {
 		top = append(top, l.text)
 		// A file shown in its own tab does not fold.
@@ -582,16 +640,16 @@ func (m *Model) paneBody(p model.PR, n *model.Notification, e *entry[[]diff.File
 }
 
 // unreadLine is the first line of the unread comment a notification is
-// about, if it has one.
-func (m *Model) unreadLine(n *model.Notification) (string, bool) {
+// about, if it has one, with its author's page.
+func (m *Model) unreadLine(n *model.Notification) (line, bool) {
 	st := m.st
 	if n == nil || !n.Unread || n.LatestCommentURL == "" {
-		return "", false
+		return line{}, false
 	}
 	c := m.cache.comments[n.LatestCommentURL]
 	switch {
 	case c == nil || c.loading:
-		return st.peach.Render("❝ ") + st.dim.Render("reading the comment…"), true
+		return line{text: st.peach.Render("❝ ") + st.dim.Render("reading the comment…")}, true
 	case c.err == nil:
 		first := ""
 		for l := range strings.SplitSeq(c.val.Body, "\n") {
@@ -600,9 +658,13 @@ func (m *Model) unreadLine(n *model.Notification) (string, bool) {
 				break
 			}
 		}
-		return st.peach.Render("❝ ") + st.sub0.Render(c.val.Author) + " " + st.dim.Render(n.Reason) + "  " + st.sub1.Render(first), true
+		// The mark comes before the author.
+		return line{
+			text:  st.peach.Render("❝ ") + st.sub0.Render(c.val.Author) + " " + st.dim.Render(n.Reason) + "  " + st.sub1.Render(first),
+			links: []link{{x: 2, w: lipgloss.Width(c.val.Author), url: m.userURL(c.val.Author)}},
+		}, true
 	}
-	return "", false
+	return line{}, false
 }
 
 // bumpsLine is what a bot's pull request updates, read from its body.

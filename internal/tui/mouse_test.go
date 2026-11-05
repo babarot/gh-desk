@@ -436,3 +436,29 @@ func TestCloseMouse(t *testing.T) {
 		t.Error("the mouse acted while the text box had the focus")
 	}
 }
+
+// The CI column's mark opens the checks of its pull request.
+func TestClickCIMark(t *testing.T) {
+	f := fixture()
+	m := start(t, f, keymap.Default())
+	cx, _ := lineOf(t, m, "CI  REVIEW")
+	_, y := lineOf(t, m, "Add retries")
+	clickTwice(m, cx, y)
+	if want := "https://github.com/acme/api/pull/12/checks"; strings.Join(f.browsed, " ") != want {
+		t.Fatalf("browsed %q, want %q", f.browsed, want)
+	}
+}
+
+// The count of the events not seen in the header opens them on a click.
+func TestClickEventsCount(t *testing.T) {
+	m := start(t, fixture(), keymap.Default())
+	m.pushNote("✓", "merged 1", []noteItem{{key: key("acme", "api", 30), text: "merged (merge commit)", result: runner.Merged}})
+	x, y := lineOf(t, m, "✦1")
+	if y != 0 {
+		t.Fatalf("the count is on line %d, want the header", y)
+	}
+	mouseAt(m, tea.MouseClickMsg{X: x, Y: y, Button: tea.MouseLeft})
+	if m.notesAt == nil {
+		t.Fatalf("a click on the count did not open the events:\n%s", screen(m))
+	}
+}
