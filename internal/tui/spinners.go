@@ -66,8 +66,7 @@ func (m *Model) claudeFrame() string {
 	if m.spinStyle.still {
 		return claudeStill
 	}
-	s := claudeSpinner
-	return s.frames[int(m.set.Now().UnixMilli()/s.every.Milliseconds())%len(s.frames)]
+	return m.frame(claudeSpinner)
 }
 
 // SpinnerNames are the names of the spinners, sorted.
@@ -83,8 +82,11 @@ func spinner(name string) spinnerStyle {
 }
 
 // spinner is the spinner's frame now.
-func (m *Model) spinner() string {
-	s := m.spinStyle
+func (m *Model) spinner() string { return m.frame(m.spinStyle) }
+
+// frame is s's frame now; every spinner and mark on the screen turns from
+// the same clock, so they keep in step.
+func (m *Model) frame(s spinnerStyle) string {
 	return s.frames[int(m.set.Now().UnixMilli()/s.every.Milliseconds())%len(s.frames)]
 }
 

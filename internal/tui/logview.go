@@ -184,14 +184,14 @@ func (m *Model) logArea() (int, int) {
 // progress pane.
 func (m *Model) logInner() int {
 	w, h := m.logArea()
-	return max(h-len(m.renderProgress(w, h-3, m.logInPane()))-2, 1)
+	return max(h-len(m.renderProgress(w, h-3))-2, 1)
 }
 
 // renderViewer is the log viewer, w wide and h lines high: the progress
 // pane on top while it shows a batch, and the log under it, which keeps
 // at least a line.
 func (m *Model) renderViewer(w, h int) []string {
-	out := m.renderProgress(w, h-3, m.logInPane())
+	out := m.renderProgress(w, h-3)
 	return append(out, m.renderLog(w, h-len(out))...)
 }
 

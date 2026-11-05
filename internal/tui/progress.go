@@ -40,43 +40,61 @@ func (m *Model) progressShown() []*batchState {
 }
 
 // renderProgress is the progress pane, w wide, at most max lines: a box
-// for each batch shown. In wide, a lane lays its steps side by side when
-// every lane of its batch fits; otherwise each is a row of dots.
-func (m *Model) renderProgress(w, limit int, wide bool) []string {
+// for each batch shown.
+func (m *Model) renderProgress(w, limit int) []string {
 	var out []string
 	for _, bs := range m.progressShown() {
 		room := limit - len(out) - 2
 		if room < 1 {
 			break
 		}
-		out = append(out, m.progressBox(bs, w, room, wide)...)
+		out = append(out, m.progressBox(bs, w, room)...)
 	}
 	return out
 }
 
-func (m *Model) progressBox(bs *batchState, w, room int, wide bool) []string {
+// laneStyle is a way to draw the lanes of a batch: how it draws them, and
+// the mark that moves on the step each is on. A style says where its mark
+// goes; the pane only picks the style (ADR-074).
+type laneStyle struct {
+	lanes func(m *Model, bs *batchState, mark string) []string
+	// mark's first frame is the one shown when the spinner does not
+	// move.
+	mark spinnerStyle
+}
+
+// laneStyles are the ways to draw lanes, the widest first. A batch is
+// drawn in the first whose lanes all fit the pane, and in the last
+// otherwise.
+var laneStyles = []laneStyle{
+	// The steps side by side, the mark filling and emptying before the
+	// step on.
+	{lanes: (*Model).wideLanes, mark: spinnerStyle{frames: strings.Split("◐●◐○", ""), every: 300 * time.Millisecond}},
+	// A row of dots, the one on blinking.
+	{lanes: (*Model).dotLanes, mark: spinnerStyle{frames: strings.Split("◐○", ""), every: 300 * time.Millisecond}},
+}
+
+// progressSpinner turns in the title of a running batch's box, whatever
+// theme.spinner is, unless it is the one that does not move (ADR-074).
+var progressSpinner = spinners["quarter"]
+
+// progressMark is a progress pane's spinner or mark now: its first frame
+// when the spinner chosen does not move.
+func (m *Model) progressMark(s spinnerStyle) string {
+	if m.spinStyle.still {
+		return s.frames[0]
+	}
+	return m.frame(s)
+}
+
+func (m *Model) progressBox(bs *batchState, w, room int) []string {
 	st := m.st
 	inner := w - 4
 	var lines []string
-	if wide {
-		for _, k := range bs.order {
-			lines = append(lines, m.wideLane(bs, k))
-		}
-		for _, l := range lines {
-			if lipgloss.Width(l) > inner {
-				lines = nil
-				break
-			}
-		}
-	}
-	if lines == nil {
-		dots, name := 0, 0
-		for _, k := range bs.order {
-			dots = max(dots, len(stepsOf(bs.lanes[k])))
-			name = max(name, lipgloss.Width(shortKey(k)))
-		}
-		for _, k := range bs.order {
-			lines = append(lines, m.dotLane(bs, k, min(name, 20), dots))
+	for i, ls := range laneStyles {
+		lines = ls.lanes(m, bs, st.mauve.Render(m.progressMark(ls.mark)))
+		if i == len(laneStyles)-1 || all(lines, func(l string) bool { return lipgloss.Width(l) <= inner }) {
+			break
 		}
 	}
 	if len(lines) > room {
@@ -84,13 +102,51 @@ func (m *Model) progressBox(bs *batchState, w, room int, wide bool) []string {
 		lines = append(lines[:room-1], st.dim.Render(fmt.Sprintf("  … %d more", more)))
 	}
 	now := m.set.Now()
-	title := st.mauve.Bold(true).Render("progress " + m.spinner())
+	title := "progress"
+	if !m.spinStyle.still {
+		title += " " + m.frame(progressSpinner)
+	}
+	head := st.mauve.Bold(true).Render(title)
 	right := fmt.Sprintf("%s · %d/%d · %s", m.batchVerb(bs), len(bs.done), len(bs.goes), clock(now.Sub(bs.started)))
 	if bs.noted {
-		title = st.green.Bold(true).Render("progress ✓")
+		head = st.green.Bold(true).Render("progress ✓")
 		right = fmt.Sprintf("%s · %d/%d · done in %s", m.batchVerb(bs), len(bs.done), len(bs.goes), clock(bs.ended.Sub(bs.started)))
 	}
-	return m.viewerBox(title, right, lines, w, len(lines))
+	return m.viewerBox(head, right, lines, w, len(lines))
+}
+
+// all reports whether f holds for every line.
+func all(lines []string, f func(string) bool) bool {
+	for _, l := range lines {
+		if !f(l) {
+			return false
+		}
+	}
+	return true
+}
+
+// dotLanes are a batch's lanes as rows of dots, the names and the dots
+// lined up.
+func (m *Model) dotLanes(bs *batchState, mark string) []string {
+	dots, name := 0, 0
+	for _, k := range bs.order {
+		dots = max(dots, len(stepsOf(bs.lanes[k])))
+		name = max(name, lipgloss.Width(shortKey(k)))
+	}
+	var out []string
+	for _, k := range bs.order {
+		out = append(out, m.dotLane(bs, k, min(name, 20), dots, mark))
+	}
+	return out
+}
+
+// wideLanes are a batch's lanes with their steps side by side.
+func (m *Model) wideLanes(bs *batchState, mark string) []string {
+	var out []string
+	for _, k := range bs.order {
+		out = append(out, m.wideLane(bs, k, mark))
+	}
+	return out
 }
 
 // drawnStep is a step on a lane as drawn: done, the one it is on, or
@@ -134,10 +190,10 @@ func (m *Model) laneHead(k model.PRKey, name int) string {
 	return mark + m.st.text.Render(fit(shortKey(k), name))
 }
 
-// dotLane is a lane in one row of dots, then what it does now or how it
-// ended; what a wait is for is cut to the width rather than wrapped, so
-// the pane keeps its height.
-func (m *Model) dotLane(bs *batchState, k model.PRKey, name, dots int) string {
+// dotLane is a lane in one row of dots, mark on the step it is on, then
+// what it does now or how it ended; what a wait is for is cut to the
+// width rather than wrapped, so the pane keeps its height.
+func (m *Model) dotLane(bs *batchState, k model.PRKey, name, dots int, mark string) string {
 	st := m.st
 	l := bs.lanes[k]
 	head := m.laneHead(k, name) + " "
@@ -151,7 +207,7 @@ func (m *Model) dotLane(bs *batchState, k model.PRKey, name, dots int) string {
 		case 0:
 			b.WriteString(st.green.Render("●"))
 		case 1:
-			b.WriteString(st.mauve.Render("◐"))
+			b.WriteString(mark)
 		default:
 			b.WriteString(st.dim.Render("○"))
 		}
@@ -167,8 +223,8 @@ func (m *Model) dotLane(bs *batchState, k model.PRKey, name, dots int) string {
 }
 
 // wideLane is a lane with its steps side by side, each with how long it
-// took or has taken so far.
-func (m *Model) wideLane(bs *batchState, k model.PRKey) string {
+// took or has taken so far, mark before the step it is on.
+func (m *Model) wideLane(bs *batchState, k model.PRKey, mark string) string {
 	st := m.st
 	l := bs.lanes[k]
 	head := m.laneHead(k, 10) + " "
@@ -187,7 +243,7 @@ func (m *Model) wideLane(bs *batchState, k model.PRKey) string {
 		case 0:
 			parts = append(parts, st.green.Render("✓ "+word)+st.dim.Render(" "+took(s.took)))
 		case 1:
-			parts = append(parts, m.laneNow(l))
+			parts = append(parts, mark+" "+m.laneNow(l))
 		default:
 			parts = append(parts, st.dim.Render("· "+word))
 		}
@@ -200,10 +256,10 @@ func (m *Model) wideLane(bs *batchState, k model.PRKey) string {
 }
 
 // laneNow is the step a lane is on: its word, how long so far, and for a
-// wait, what it is for.
+// wait, what it is for. No spinner leads it: the lane's mark moves.
 func (m *Model) laneNow(l *lane) string {
 	st := m.st
-	s := st.mauve.Render(m.spinner()) + " " + st.text.Render(stepWords[l.cur.step]) + st.muted.Render(" "+clock(m.set.Now().Sub(l.cur.at)))
+	s := st.text.Render(stepWords[l.cur.step]) + st.muted.Render(" "+clock(m.set.Now().Sub(l.cur.at)))
 	if w := checksWord(l.checks); w != "" {
 		s += st.dim.Render(" · " + w)
 	}

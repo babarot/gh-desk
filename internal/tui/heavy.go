@@ -162,6 +162,13 @@ func (m *Model) spin() tea.Cmd {
 	if m.set.Shimmer {
 		every = min(every, shimmerStep)
 	}
+	if m.logv != nil && !m.spinStyle.still {
+		// The progress pane's spinner and marks turn at their own pace.
+		every = min(every, progressSpinner.every)
+		for _, ls := range laneStyles {
+			every = min(every, ls.mark.every)
+		}
+	}
 	for _, c := range m.chats {
 		if c.Running() && !m.spinStyle.still {
 			// Claude's own spinner turns at its own pace.
