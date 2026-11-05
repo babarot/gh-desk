@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 	"unicode"
+	"unicode/utf8"
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
@@ -276,11 +277,22 @@ func (m *Model) nothingToClear() string {
 	return fmt.Sprintf("esc: nothing to clear; %s quits", quit)
 }
 
-// eraseWord drops the last word of s and the spaces after it, as ctrl+w
-// does in a shell.
+// eraseWord drops the last word of s and the separators after it, as
+// ctrl+w does in a shell. A word ends at a space, a slash or a colon, so
+// "repo:owner/name" goes back to "repo:owner/", then "repo:".
 func eraseWord(s string) string {
-	s = strings.TrimRightFunc(s, unicode.IsSpace)
-	return s[:strings.LastIndexFunc(s, unicode.IsSpace)+1]
+	s = strings.TrimRightFunc(s, isWordSeparator)
+	i := strings.LastIndexFunc(s, isWordSeparator)
+	if i < 0 {
+		return ""
+	}
+	_, n := utf8.DecodeRuneInString(s[i:])
+	return s[:i+n]
+}
+
+// isWordSeparator tells whether r ends a word for eraseWord.
+func isWordSeparator(r rune) bool {
+	return unicode.IsSpace(r) || r == '/' || r == ':'
 }
 
 // hide puts a pull request away: in a section it is hidden here only; in
