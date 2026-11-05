@@ -118,7 +118,7 @@ func scrollEdge(st styles, w, above, below int, keys string) string {
 	}
 	tell = ansi.Truncate(tell+" ", max(w-3, 0), "…")
 	fill := max(w-2-lipgloss.Width(tell)-1, 0)
-	return st.border.Render("╰"+strings.Repeat("─", fill)) + st.dim.Render(tell) + st.border.Render("─╯")
+	return st.focus.Render("╰"+strings.Repeat("─", fill)) + st.dim.Render(tell) + st.focus.Render("─╯")
 }
 
 // scrollKeys names the keys that scroll a popup's body.

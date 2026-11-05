@@ -209,9 +209,11 @@ func (m *Model) renderLog(w, h int) []string {
 }
 
 // viewerBox is a box of the log viewer, w wide, with title and right on
-// its top border and n lines of body.
+// its top border and n lines of body. Its frame is drawn in the color of
+// a pane that takes the keys, which the log viewer does (ADR-079).
 func (m *Model) viewerBox(title, right string, body []string, w, n int) []string {
 	st := m.st
+	st.border = st.focus
 	inner := w - 4
 	top := st.border.Render("╭ ") + title + " "
 	tail := " " + st.dim.Render(right) + st.border.Render(" ╮")

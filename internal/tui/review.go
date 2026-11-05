@@ -473,13 +473,16 @@ func newInput() textarea.Model {
 	return ta
 }
 
+// box is a popup's box, w wide, with title on its top border. It takes
+// the keys while it is shown, so its frame is in the focus color
+// (ADR-079).
 func box(st styles, title string, lines []string, w int) []string {
 	inner := w - 4
-	top := st.border.Render("╭ ") + st.title.Render(title) + " "
-	top += st.border.Render(strings.Repeat("─", max(w-lipgloss.Width(top)-1, 0)) + "╮")
+	top := st.focus.Render("╭ ") + st.title.Render(title) + " "
+	top += st.focus.Render(strings.Repeat("─", max(w-lipgloss.Width(top)-1, 0)) + "╮")
 	out := []string{top}
 	for _, l := range lines {
-		out = append(out, st.border.Render("│ ")+fit(l, inner)+st.border.Render(" │"))
+		out = append(out, st.focus.Render("│ ")+fit(l, inner)+st.focus.Render(" │"))
 	}
-	return append(out, st.border.Render("╰"+strings.Repeat("─", max(w-2, 0))+"╯"))
+	return append(out, st.focus.Render("╰"+strings.Repeat("─", max(w-2, 0))+"╯"))
 }

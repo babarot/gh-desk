@@ -885,7 +885,10 @@ func (m *Model) renderClaude(b *strings.Builder, height int) *tea.Cursor {
 	}
 	var ask []string
 	if !busy(c) {
-		ask = box(st, "ask claude", strings.Split(c.input.View(), "\n"), min(inner, chatMaxWidth))
+		// A box inside the pane, whose frame alone tells the focus.
+		plain := st
+		plain.focus = st.border
+		ask = box(plain, "ask claude", strings.Split(c.input.View(), "\n"), min(inner, chatMaxWidth))
 	}
 	bodyH := max(height-2-len(ask), 1)
 	L := m.chatLines(c, inner)
@@ -893,10 +896,13 @@ func (m *Model) renderClaude(b *strings.Builder, height int) *tea.Cursor {
 	start := max(len(L)-bodyH-c.scroll, 0)
 	body := L[start:min(start+bodyH, len(L))]
 	info = append(info, m.firstKey("page_up")+"/"+m.firstKey("page_down"))
-	head := st.border.Render("╭ ") + title + " "
-	right := " " + st.dim.Render(strings.Join(info, " · ")) + st.border.Render(" ╮")
+	// The pane takes the keys while it is shown, and its frame says so
+	// (ADR-079); the ask box inside keeps the plain border.
+	frame := st.focus
+	head := frame.Render("╭ ") + title + " "
+	right := " " + st.dim.Render(strings.Join(info, " · ")) + frame.Render(" ╮")
 	fill := m.width - lipgloss.Width(head) - lipgloss.Width(right)
-	b.WriteString(head + st.border.Render(strings.Repeat("─", max(fill, 0))) + right + "\n")
+	b.WriteString(head + frame.Render(strings.Repeat("─", max(fill, 0))) + right + "\n")
 	bodyH = height - 2 - len(ask)
 	for i := 0; i < height-2; i++ {
 		s := ""
@@ -906,9 +912,9 @@ func (m *Model) renderClaude(b *strings.Builder, height int) *tea.Cursor {
 		case i >= bodyH && i-bodyH < len(ask):
 			s = ask[i-bodyH]
 		}
-		b.WriteString(st.border.Render("│ ") + fit(s, inner) + st.border.Render(" │") + "\n")
+		b.WriteString(frame.Render("│ ") + fit(s, inner) + frame.Render(" │") + "\n")
 	}
-	b.WriteString(st.border.Render("╰"+strings.Repeat("─", max(m.width-2, 0))+"╯") + "\n")
+	b.WriteString(frame.Render("╰"+strings.Repeat("─", max(m.width-2, 0))+"╯") + "\n")
 	if len(ask) == 0 {
 		return nil
 	}
