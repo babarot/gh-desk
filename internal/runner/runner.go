@@ -241,9 +241,12 @@ const (
 	StepUpdate Step = "update-branch"
 	// StepWait is a wait not yet begun, in a Plan: what it waits on is
 	// known once it begins.
-	StepWait         Step = "wait"
-	StepWaitChecks   Step = "wait-checks"
-	StepWaitApproval Step = "wait-approval-checks"
+	StepWait       Step = "wait"
+	StepWaitChecks Step = "wait-checks"
+	// StepWaitWorkflows waits the quiet time for workflows that may still
+	// start, before anything is seen at work.
+	StepWaitWorkflows Step = "wait-workflows"
+	StepWaitApproval  Step = "wait-approval-checks"
 	// StepWaitBlocked waits on a rule other than checks.
 	StepWaitBlocked Step = "wait-blocked"
 	StepMerge       Step = "merge"
@@ -255,7 +258,7 @@ const (
 
 // Waits reports whether s is a wait.
 func (s Step) Waits() bool {
-	return s == StepWait || s == StepWaitChecks || s == StepWaitApproval || s == StepWaitBlocked
+	return s == StepWait || s == StepWaitChecks || s == StepWaitWorkflows || s == StepWaitApproval || s == StepWaitBlocked
 }
 
 // Runner runs batches.
@@ -682,6 +685,7 @@ func (j *job) approveAfterJobs() {
 			w.end("stopped")
 			return
 		}
+		w.read(mi)
 		// Failing required checks were left out by the popup unless let
 		// in, as for an approval that does not wait.
 		d := plan.ForApprove(mi, j.it.PR, j.r.opt.Viewer, true, j.r.opt.Settings)
@@ -695,8 +699,7 @@ func (j *job) approveAfterJobs() {
 			if !j.waitedForChecks(mi, &last, w) {
 				return
 			}
-			w.start("jobs")
-			j.step(StepWaitChecks, "waiting for checks", plan.RunningJobs(mi)...)
+			j.waitingFor(mi, w)
 			j.forecast([]Step{StepApprove})
 			if !j.pause(w) {
 				return
@@ -1143,27 +1146,123 @@ func (j *job) hold(mi model.MergeInfo, d plan.Decision) plan.Decision {
 }
 
 // waitLog logs a wait when it starts, when what it waits on changes, and
-// when it ends.
+// when it ends; while it waits on jobs or checks, also when one of them
+// ends or begins, naming them. Nothing is logged at a read that finds
+// them as they were.
 type waitLog struct {
 	log   *slog.Logger
 	on    string
 	since time.Time
+	// names are what the wait waits on, as last logged, and last the
+	// pull request as last read, which tells how they ended.
+	names []string
+	last  model.MergeInfo
 }
 
+// read keeps mi as the last reading, for the end of the wait to tell how
+// what it waited on ended.
+func (w *waitLog) read(mi model.MergeInfo) { w.last = mi }
+
+// end logs the end of the wait, with what it waited on that ended since
+// the last line: the last of the jobs ends the wait, not a line of its own.
 func (w *waitLog) end(result string) {
-	if w.on != "" {
-		w.log.Info("wait end", logging.KeyStep, w.on, "result", result, logging.KeyDurationMS, time.Since(w.since).Milliseconds())
-		w.on = ""
-	}
-}
-
-func (w *waitLog) start(what string) {
-	if what == w.on {
+	if w.on == "" {
 		return
 	}
-	w.end("changed")
-	w.on, w.since = what, time.Now()
-	w.log.Info("wait start", logging.KeyStep, what)
+	attrs := []any{logging.KeyStep, w.on}
+	var ended []string
+	for _, n := range w.names {
+		if o := outcome(w.last, n); o != "" {
+			ended = append(ended, n+": "+o)
+		}
+	}
+	if len(ended) > 0 {
+		attrs = append(attrs, logging.KeyEnded, strings.Join(ended, ", "))
+	}
+	attrs = append(attrs, "result", result, logging.KeyDurationMS, time.Since(w.since).Milliseconds())
+	w.log.Info("wait end", attrs...)
+	w.on, w.names = "", nil
+}
+
+// at logs the start of a wait on what, naming what it waits on; a wait
+// already on what logs what of names ended, with how it ended in mi, and
+// what began.
+func (w *waitLog) at(what string, mi model.MergeInfo, names []string) {
+	w.last = mi
+	if what != w.on {
+		w.end("changed")
+		w.on, w.since, w.names = what, time.Now(), slices.Clone(names)
+		attrs := []any{logging.KeyStep, what}
+		if len(names) > 0 {
+			attrs = append(attrs, logging.KeyJobs, strings.Join(names, ", "))
+		}
+		w.log.Info("wait start", attrs...)
+		return
+	}
+	var ended, started []string
+	for _, n := range w.names {
+		if !slices.Contains(names, n) {
+			o := outcome(mi, n)
+			if o == "" {
+				o = "gone"
+			}
+			ended = append(ended, n+": "+o)
+		}
+	}
+	for _, n := range names {
+		if !slices.Contains(w.names, n) {
+			started = append(started, n)
+		}
+	}
+	if len(ended) == 0 && len(started) == 0 {
+		return
+	}
+	w.names = slices.Clone(names)
+	attrs := []any{logging.KeyStep, what}
+	if len(ended) > 0 {
+		attrs = append(attrs, logging.KeyEnded, strings.Join(ended, ", "))
+	}
+	if len(started) > 0 {
+		attrs = append(attrs, logging.KeyStarted, strings.Join(started, ", "))
+	}
+	attrs = append(attrs, logging.KeyJobs, strings.Join(names, ", "))
+	w.log.Info("wait progress", attrs...)
+}
+
+// outcome is how the job or check name ended, as mi has it: its
+// conclusion in lower case, or "" when it has not ended or is not there.
+func outcome(mi model.MergeInfo, name string) string {
+	for _, c := range mi.Checks {
+		if c.Name == name && (c.Kind != model.KindCheckRun || c.Run == model.RunCompleted) && c.State != model.CheckPending {
+			return strings.ToLower(string(c.State))
+		}
+	}
+	for _, r := range mi.Runs {
+		if r.Name == name && r.Status == model.RunCompleted {
+			return strings.ToLower(string(r.Conclusion))
+		}
+	}
+	return ""
+}
+
+// waitingFor says and logs what a wait for the head's work is on: the jobs
+// at work, the workflows that may still start in the quiet time, or with
+// neither, the required checks still running.
+func (j *job) waitingFor(mi model.MergeInfo, w *waitLog) {
+	now := time.Now()
+	jobs := plan.RunningJobs(mi)
+	switch {
+	case len(jobs) > 0 || plan.JobsRunning(mi, j.trigger, now) && !plan.InQuiet(mi, j.trigger, now):
+		w.at("jobs", mi, jobs)
+		j.step(StepWaitChecks, "waiting for checks", jobs...)
+	case plan.InQuiet(mi, j.trigger, now):
+		w.at("workflows", mi, nil)
+		j.step(StepWaitWorkflows, "waiting for workflows to start")
+	default:
+		checks := plan.RunningChecks(mi, j.r.opt.Settings.ApprovalChecks, false)
+		w.at("checks", mi, checks)
+		j.step(StepWaitChecks, "waiting for checks", checks...)
+	}
 }
 
 // waitedForChecks adds the time since last to the time waited for checks
@@ -1212,6 +1311,7 @@ func (j *job) jobsEnd() (model.MergeInfo, plan.Decision, bool) {
 			w.end("stopped")
 			return mi, d, false
 		}
+		w.read(mi)
 		if d.Step == plan.StepSkip || !plan.JobsRunning(mi, j.trigger, time.Now()) {
 			w.end("ready")
 			return mi, d, true
@@ -1223,8 +1323,7 @@ func (j *job) jobsEnd() (model.MergeInfo, plan.Decision, bool) {
 		if !j.waitedForChecks(mi, &last, w) {
 			return mi, d, false
 		}
-		w.start("jobs")
-		j.step(StepWaitChecks, "waiting for checks", plan.RunningJobs(mi)...)
+		j.waitingFor(mi, w)
 		j.forecast(ahead(d))
 		if !j.pause(w) {
 			return mi, d, false
@@ -1246,6 +1345,7 @@ func (j *job) wait() {
 			w.end("stopped")
 			return
 		}
+		w.read(mi)
 		jobs := plan.JobsRunning(mi, j.trigger, time.Now())
 		switch d.Step {
 		case plan.StepMerge:
@@ -1275,14 +1375,7 @@ func (j *job) wait() {
 			if !j.waitedForChecks(mi, &last, w) {
 				return
 			}
-			w.start("checks")
-			checks := plan.RunningJobs(mi)
-			for _, c := range plan.RunningChecks(mi, j.r.opt.Settings.ApprovalChecks, false) {
-				if !slices.Contains(checks, c) {
-					checks = append(checks, c)
-				}
-			}
-			j.step(StepWaitChecks, "waiting for checks", checks...)
+			j.waitingFor(mi, w)
 			j.forecast([]Step{StepMerge})
 		default:
 			now := time.Now()
@@ -1300,7 +1393,7 @@ func (j *job) wait() {
 				what, text, s = "approval-checks", "waiting for approval checks", StepWaitApproval
 				checks = plan.RunningChecks(mi, j.r.opt.Settings.ApprovalChecks, true)
 			}
-			w.start(what)
+			w.at(what, mi, checks)
 			j.step(s, text, checks...)
 			j.forecast([]Step{StepMerge})
 		}
