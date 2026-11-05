@@ -1,6 +1,6 @@
 // Package mcpserver is gh-desk's own MCP server, which Claude Code starts
 // for the conversation about a pull request (gh desk mcp). Its tools only
-// read, and only the pull request's repository (ADR-078): checks and their
+// read, and only the pull request's repository (ADR-080): checks and their
 // logs, issues and pull requests. The repository is fixed when the server
 // starts; no tool takes one, and whatever GitHub returns from another
 // repository is left out.

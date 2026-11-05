@@ -315,7 +315,7 @@ type Claude struct {
 // MCP configures the MCP servers of the conversation about a pull request.
 type MCP struct {
 	// Builtin is whether the conversation takes gh-desk's own server
-	// (ADR-078); nil when the file does not say, which BuiltinMCP decides.
+	// (ADR-080); nil when the file does not say, which BuiltinMCP decides.
 	Builtin *bool `toml:"builtin"`
 	// Servers are the user's servers, by name, as Claude Code configures a
 	// server, with Tools (`tools`) added (ADR-037).
@@ -324,7 +324,7 @@ type MCP struct {
 
 // BuiltinMCP is whether the conversation takes gh-desk's own MCP server:
 // as the file says, or else when nothing could send what its tools read
-// out of the conversation (ADR-078). Load reports a file that leaves it
+// out of the conversation (ADR-080). Load reports a file that leaves it
 // out where something could.
 func (f File) BuiltinMCP() bool {
 	if b := f.Claude.MCP.Builtin; b != nil {

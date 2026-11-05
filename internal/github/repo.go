@@ -15,7 +15,7 @@ import (
 	"github.com/babarot/gh-desk/internal/model"
 )
 
-// The reads below are what gh-desk's MCP server gives Claude (ADR-078).
+// The reads below are what gh-desk's MCP server gives Claude (ADR-080).
 // Every one is asked of one repository, by its owner and name, which the
 // caller fixes; none takes another repository from its arguments. Each
 // result carries the repository GitHub returned it from, so the caller can

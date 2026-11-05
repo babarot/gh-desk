@@ -3,7 +3,7 @@ package model
 import "time"
 
 // The types below are what Claude may read of a pull request's repository
-// through gh-desk's own MCP server (ADR-078): checks and their logs, and
+// through gh-desk's own MCP server (ADR-080): checks and their logs, and
 // the repository's issues and pull requests. Each carries the repository it
 // came from, so the server can leave out anything GitHub returns from
 // another one.

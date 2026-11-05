@@ -243,7 +243,7 @@ func absPath(p string) string {
 }
 
 // mcpServers are the MCP servers of the conversation: the user's, and
-// gh-desk's own when it is on (ADR-078), started as this program's mcp
+// gh-desk's own when it is on (ADR-080), started as this program's mcp
 // command with the config file read and --debug, so that it logs as this
 // run does.
 func mcpServers(cfg config.File, configPath, exe string, debug bool) map[string]map[string]any {

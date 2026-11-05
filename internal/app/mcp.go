@@ -24,7 +24,7 @@ const (
 )
 
 // serveMCP is gh desk mcp: gh-desk's own MCP server, which Claude Code
-// starts for a conversation and talks to over stdin and stdout (ADR-078).
+// starts for a conversation and talks to over stdin and stdout (ADR-080).
 // The pull request is read from the environment gh-desk runs Claude Code
 // in, never from what Claude sends. stdout belongs to the protocol;
 // nothing else is written there.

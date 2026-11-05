@@ -1,4 +1,4 @@
-# ADR-078: Claude reads the pull request's repository through gh-desk's own MCP server
+# ADR-080: Claude reads the pull request's repository through gh-desk's own MCP server
 
 ## Status
 

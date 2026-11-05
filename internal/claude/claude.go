@@ -55,7 +55,7 @@ type Options struct {
 	// without a prompt; empty when there are none (ADR-037).
 	MCPConfig string
 	MCPTools  []string
-	// GitHub is whether the servers include gh-desk's own (ADR-078), whose
+	// GitHub is whether the servers include gh-desk's own (ADR-080), whose
 	// tools reach GitHub; the instructions say which.
 	GitHub bool
 	// Label shows the calls of the tools it knows, gh-desk's own; the
