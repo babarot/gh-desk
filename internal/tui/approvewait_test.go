@@ -21,7 +21,7 @@ func TestApprovalWaitsForChecks(t *testing.T) {
 	selectAll(m, []model.PRKey{k})
 	press(m, "A")
 	text := readPopup(t, m, m.renderBulk, "yes", "j")
-	has(t, text, "wait for checks, then approve")
+	has(t, text, "wait for checks → approve")
 	has(t, text, "1 with checks still running are approved once they pass · w to approve now")
 	press(m, "w")
 	text = readPopup(t, m, m.renderBulk, "yes", "j")
@@ -47,7 +47,7 @@ func TestApprovalWithATextWaitsForChecks(t *testing.T) {
 		t.Fatalf("the confirm popup of an approval did not open: %+v", m.bulk)
 	}
 	text := readPopup(t, m, m.renderBulk, "yes", "j")
-	has(t, text, "wait for checks, then approve")
+	has(t, text, "wait for checks → approve")
 	has(t, text, "1 with checks still running are approved once they pass · w to approve now")
 	press(m, "y")
 	if len(r.items) != 1 || len(r.items[0]) != 1 || !r.items[0][0].Wait {

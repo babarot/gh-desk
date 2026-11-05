@@ -580,14 +580,7 @@ func (m *Model) paneBody(p model.PR, n *model.Notification, e *entry[[]diff.File
 	}
 	if mi, ok := m.cache.info[p.Key]; ok && p.State == model.StateOpen {
 		d := plan.ForMerge(mi, p, m.viewer, m.set.Plan)
-		how := d.Reason
-		if d.Method != "" {
-			how += " (" + methodWord(d.Method) + ")"
-		}
-		if d.Ready {
-			how = "mark ready, then " + how
-		}
-		meta.add("  "+st.muted.Render("merge:")+" "+m.stepStyle(d.Step).Render(how), "")
+		meta.add("  "+st.muted.Render("merge:")+" "+m.stepStyle(d.Step).Render(m.mergeHow(d)), "")
 	}
 	top := []string{meta.text}
 	topLinks := [][]link{meta.clip(max(m.width-4, 10))}

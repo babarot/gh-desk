@@ -1160,7 +1160,10 @@ func (j *job) updateBranch(base string) bool {
 // quiet time after what gh-desk or the user did last.
 func (j *job) hold(mi model.MergeInfo, d plan.Decision) plan.Decision {
 	if (d.Step == plan.StepMerge || d.Step == plan.StepAutoMerge) && plan.JobsRunning(mi, j.trigger, time.Now()) {
-		d.Step, d.Reason = plan.StepWait, "wait for checks, then merge"
+		d.Step, d.Reason = plan.StepWait, "wait for checks → merge"
+		if d.Admin {
+			d.Reason, d.AdminLater = "wait for checks → merge as admin", true
+		}
 	}
 	return d
 }

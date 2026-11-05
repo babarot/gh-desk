@@ -559,12 +559,18 @@ func (m *Model) renderBulk() []string {
 		lines = append(lines, wrapped(st.red, "could not read them all: "+b.err.Error(), inner)...)
 	}
 	goes := 0
-	auto := false
+	// The steps taken by any pull request that goes, said once below the
+	// list rather than under each.
+	auto, readies, admin := false, false, false
 	failing := 0
 	for _, it := range b.items {
 		if it.goes() {
 			goes++
 			auto = auto || it.d.Step == plan.StepAutoMerge
+			if b.kind == runner.Merge {
+				readies = readies || it.d.Ready
+				admin = admin || it.d.Admin || it.d.AdminLater
+			}
 		}
 		if it.ok && (plan.Failing(it.mi) || b.waits() && len(plan.FailedJobs(it.mi)) > 0) {
 			failing++
@@ -573,12 +579,12 @@ func (m *Model) renderBulk() []string {
 	rows := make([]bulkRow, 0, len(b.items))
 	for _, it := range b.items {
 		mark, title := st.dim.Render("·"), st.dim.Render(it.pr.Title)
-		var what string
+		var what []string
 		switch {
 		case !it.read:
 			// Shown from the list until it is read again. Nothing on it
 			// moves: the spinner at the foot is the one the popup has.
-			mark, title, what = st.dim.Render("·"), st.muted.Render(it.pr.Title), st.dim.Render("reading…")
+			mark, title, what = st.dim.Render("·"), st.muted.Render(it.pr.Title), []string{st.dim.Render("reading…")}
 		case it.goes():
 			mark, title = st.mauve.Render("✓"), st.sub1.Render(it.pr.Title)
 			switch b.kind {
@@ -587,31 +593,43 @@ func (m *Model) renderBulk() []string {
 				if it.d.Step == plan.StepWait {
 					style = m.stepStyle(it.d.Step)
 				}
-				what = style.Render(it.d.Reason)
+				var steps []string
+				for s := range strings.SplitSeq(it.d.Reason, " → ") {
+					steps = append(steps, style.Render(s))
+				}
+				what = m.arrowed(steps)
 			case runner.Close:
 				what = m.closeWhat(it.closing)
 			default:
+				var steps []string
 				if it.d.Ready {
-					what = st.green.Render("ready") + st.dim.Render(" → ")
+					steps = append(steps, st.green.Render("ready"))
 				}
 				if it.d.Approve {
-					what += st.green.Render("approve") + st.dim.Render(" → ")
+					steps = append(steps, st.green.Render("approve"))
 				}
-				what += m.stepStyle(it.d.Step).Render(it.d.Reason) + " " + st.dim.Render("("+methodWord(it.d.Method)+")")
+				for s := range strings.SplitSeq(it.d.Reason, " → ") {
+					steps = append(steps, m.stepStyle(it.d.Step).Render(s))
+				}
+				what = m.arrowed(steps)
+				if w := m.unusualMethod(it.d); w != "" {
+					what = append(what, st.dim.Render("("+w+")"))
+				}
 			}
 		default:
 			why := it.why(m.firstKey("refresh"), m.lockedBy())
-			what = st.dim.Render("skip · ") + st.red.Render(why)
+			what = []string{st.dim.Render("skip · ") + st.red.Render(why)}
 			if rest, ok := strings.CutPrefix(why, "locked"); ok && it.lockedOut() {
-				what = st.dim.Render("skip · ") + st.peach.Render("locked") + st.red.Render(rest)
+				what = []string{st.dim.Render("skip · ") + st.peach.Render("locked") + st.red.Render(rest)}
 			}
 		}
 		r := bulkRow{pr: it.pr, mark: mark, title: title, what: what}
 		if it.goes() {
 			// On lines of their own, so a long one does not take the
 			// width of the title or of what is done.
-			// Every note, since each says something a yes agrees to: a
-			// draft that stays ready, commits auto-merge takes later.
+			// Every note, since each says something of this pull request a
+			// yes agrees to: files marked for attention, a check that failed.
+			// What a step means is said once, below the list.
 			for _, n := range it.d.Notes {
 				r.notes = append(r.notes, bulkNote{"⚠", n, st.yellow})
 			}
@@ -648,6 +666,12 @@ func (m *Model) renderBulk() []string {
 		prose(st.dim, text)
 	case notesFailed:
 		prose(st.yellow, "Claude could not read the release notes: "+safeLine(b.notesErr))
+	}
+	if admin {
+		prose(st.yellow, "Merging as admin goes past the rules of the base branch.")
+	}
+	if readies {
+		prose(st.yellow, "Marking a draft ready asks for its reviews; it stays ready if the merge stops.")
 	}
 	if auto {
 		prose(st.dim, "Auto-merge also merges commits pushed after it is on, as GitHub does.")
@@ -756,9 +780,48 @@ func (m *Model) placeCloseInput(out, foot []string, inputAt int) {
 // bulkRow is a pull request in the confirm popup, styled: what is done
 // with it and the notes to read before it is done.
 type bulkRow struct {
-	pr                model.PR
-	mark, title, what string
-	notes             []bulkNote
+	pr          model.PR
+	mark, title string
+	// what is what is done, in pieces joined by a space: a line is broken
+	// only between them, so a step is never cut in two or off the popup.
+	what  []string
+	notes []bulkNote
+}
+
+// arrowed is styled steps as pieces of a bulkRow's what, each but the
+// last followed by a dim arrow, so the steps read as the words between and
+// a broken line ends with the arrow to the next.
+func (m *Model) arrowed(steps []string) []string {
+	out := make([]string, len(steps))
+	for i, s := range steps {
+		if i < len(steps)-1 {
+			s += m.st.dim.Render(" →")
+		}
+		out[i] = s
+	}
+	return out
+}
+
+// wrapPieces breaks pieces into lines of at most width cells, only between
+// pieces; a piece wider than a line alone is wrapped by itself.
+func wrapPieces(pieces []string, width int) []string {
+	var lines []string
+	cur := ""
+	for _, p := range pieces {
+		switch {
+		case cur == "":
+			cur = p
+		case ansi.StringWidth(cur)+1+ansi.StringWidth(p) <= width:
+			cur += " " + p
+		default:
+			lines, cur = append(lines, cur), p
+		}
+		if ansi.StringWidth(cur) > width {
+			ls := strings.Split(ansi.Wrap(cur, width, " "), "\n")
+			lines, cur = append(lines, ls[:len(ls)-1]...), ls[len(ls)-1]
+		}
+	}
+	return append(lines, cur)
 }
 
 type bulkNote struct {
@@ -783,7 +846,7 @@ func (m *Model) layoutBulk(rows []bulkRow, inner int, single bool) []string {
 	nameW, whatW := 0, 0
 	for _, r := range rows {
 		nameW = max(nameW, ansi.StringWidth(bulkNumber(r.pr))+ansi.StringWidth(r.pr.Key.Repository()))
-		whatW = max(whatW, lipgloss.Width(r.what))
+		whatW = max(whatW, lipgloss.Width(strings.Join(r.what, " ")))
 	}
 	nameW = min(nameW, bulkNameMax)
 	titleW := inner - 2 - nameW - 1 - 2 - whatW
@@ -796,7 +859,7 @@ func (m *Model) layoutBulk(rows []bulkRow, inner int, single bool) []string {
 			head += ansi.Truncate(r.title, max(inner-lipgloss.Width(head), 1), "…")
 			subs = append(subs, "")
 		} else {
-			head += fit(r.title, titleW) + "  " + r.what
+			head += fit(r.title, titleW) + "  " + strings.Join(r.what, " ")
 		}
 		lines = append(lines, head)
 		for _, n := range r.notes {
@@ -805,7 +868,15 @@ func (m *Model) layoutBulk(rows []bulkRow, inner int, single bool) []string {
 		for i := range subs {
 			first, rest := treeLines(st, "  ", i == len(subs)-1)
 			if under && i == 0 {
-				lines = append(lines, first+r.what)
+				// Broken, never cut: a step cut off would hide what is
+				// done, such as a merge as an admin (ADR-075).
+				for j, l := range wrapPieces(r.what, max(inner-ansi.StringWidth(first), 1)) {
+					if j == 0 {
+						lines = append(lines, first+l)
+					} else {
+						lines = append(lines, rest+l)
+					}
+				}
 				continue
 			}
 			n := r.notes[i-len(subs)+len(r.notes)]
