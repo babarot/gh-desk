@@ -11,6 +11,7 @@ import (
 	"github.com/charmbracelet/x/ansi"
 
 	"github.com/babarot/gh-desk/internal/claude"
+	"github.com/babarot/gh-desk/internal/logging"
 	"github.com/babarot/gh-desk/internal/model"
 	"github.com/babarot/gh-desk/internal/plan"
 	"github.com/babarot/gh-desk/internal/runner"
@@ -469,6 +470,8 @@ func (m *Model) runBulk() tea.Cmd {
 		}
 		delete(m.selected, it.pr.Key)
 		why := it.why(m.firstKey("refresh"), m.lockedBy())
+		// The row says why for a while; the log keeps it.
+		m.log.Info("pr skipped", logging.KeyOp, b.verb(), logging.KeyPR, it.pr.Key.String(), "why", why)
 		pg := progress{text: "– " + why, result: runner.Skipped}
 		if it.lockedOut() {
 			// The row has room for the reason only; the rest is on the

@@ -840,9 +840,13 @@ func (j *job) sendApproval(body string) bool {
 // if it finds the recorded approval dismissed.
 func (j *job) decide() (model.MergeInfo, plan.Decision, bool) {
 	deadline := time.Now().Add(j.r.opt.RecheckFor)
+	// Reading again while GitHub works out whether it can be merged is a
+	// wait of its own.
+	w := &waitLog{log: j.log}
 	for {
 		mi, ok := j.read(true)
 		if !ok {
+			w.end("stopped")
 			return mi, plan.Decision{}, false
 		}
 		if mi.State == model.StateMerged {
@@ -850,19 +854,24 @@ func (j *job) decide() (model.MergeInfo, plan.Decision, bool) {
 			return mi, plan.Decision{}, false
 		}
 		d := plan.ForMerge(mi, j.it.PR, j.r.opt.Viewer, j.r.opt.Settings)
-		j.log.Debug("decided", logging.KeyStep, string(d.Step), "merge_state", string(mi.MergeState), "approve", d.Approve)
+		j.log.Debug("decided", logging.KeyStep, string(d.Step), logging.KeyMergeState, string(mi.MergeState), "approve", d.Approve)
 		if j.dismissed(d) || j.redrafted(d) {
+			w.end("stopped")
 			return mi, d, false
 		}
 		if d.Step != plan.StepRecheck {
+			w.end("ready")
 			return mi, d, true
 		}
 		if time.Now().After(deadline) {
+			w.end("timed-out")
 			j.say(Skipped, "GitHub could not tell whether it can be merged")
 			return mi, d, false
 		}
+		w.at("mergeable", mi, nil)
 		j.say(Running, "checking")
 		if !j.sleep(j.r.opt.Recheck) {
+			w.end("canceled")
 			return mi, d, false
 		}
 	}
@@ -1055,9 +1064,20 @@ func (j *job) startWatch() {
 // it is closed, auto-merge is turned off, or the watch times out.
 func (j *job) watch() {
 	last := time.Now()
+	// state is GitHub's merge state as last seen; a change is logged, so
+	// the log tells what GitHub's auto-merge is waiting on.
+	var state model.MergeState
 	for j.sleep(j.r.opt.PollSlow) {
 		got, err := j.r.gh.MergeInfo(j.ctx, []string{j.it.PR.ID}, false)
 		mi, ok := got[j.it.PR.ID]
+		if err == nil && ok && mi.State == model.StateOpen && mi.MergeState != state {
+			if state == "" {
+				j.log.Info("watch start", logging.KeyMergeState, strings.ToLower(string(mi.MergeState)))
+			} else {
+				j.log.Info("watch progress", logging.KeyMergeState, strings.ToLower(string(mi.MergeState)), logging.KeyWas, strings.ToLower(string(state)))
+			}
+			state = mi.MergeState
+		}
 		say := func(res Result, text string) {
 			j.emit(Event{Key: j.it.PR.Key, Result: res, Text: text, Watch: true})
 			j.log.Info("watch end", logging.KeyStep, resultWord[res], "why", text)
