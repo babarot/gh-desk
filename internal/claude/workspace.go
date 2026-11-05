@@ -97,7 +97,7 @@ func (w *Workspace) Prepare(ctx context.Context, k model.PRKey, head string) (st
 		// Claude only reads, so the worktree has nothing to keep. One left
 		// half done (a lock of a checkout cut short) is made again.
 		if _, err := git(ctx, wt, "checkout", "--quiet", "--force", "--detach", head); err == nil {
-			log.Debug("worktree ready", "head", head, logging.KeyDurationMS, time.Since(start).Milliseconds())
+			log.Info("worktree ready", "head", head, logging.KeyDurationMS, time.Since(start).Milliseconds())
 			return wt, nil
 		}
 		if ctx.Err() != nil {
@@ -118,7 +118,7 @@ func (w *Workspace) Prepare(ctx context.Context, k model.PRKey, head string) (st
 	if _, err := git(ctx, repo, "worktree", "add", "--quiet", "--detach", wt, head); err != nil {
 		return "", err
 	}
-	log.Debug("worktree ready", "head", head, logging.KeyDurationMS, time.Since(start).Milliseconds())
+	log.Info("worktree ready", "head", head, logging.KeyDurationMS, time.Since(start).Milliseconds())
 	return wt, nil
 }
 

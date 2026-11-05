@@ -382,6 +382,7 @@ func (m *Model) notesRead(msg notesMsg) tea.Cmd {
 	for _, p := range msg.asked {
 		m.cautions[notesID(p)] = why[p.Key]
 	}
+	m.log.Info("release notes read", logging.KeyOp, "release-notes", "prs", len(msg.asked), "cautions", len(why))
 	msg.b.notes = notesRead
 	return nil
 }

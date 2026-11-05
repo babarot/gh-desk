@@ -152,7 +152,8 @@ type Request struct {
 func (c *Claude) Ask(ctx context.Context, r Request, progress func(Step)) (Answer, error) {
 	args := c.conversation(c.session(r, reviewInstructions+"\n\nAnswer in "+c.opt.Language+".", c.opt.Tools))
 	args = append(args, "--allowedTools", strings.Join(append(slices.Clone(c.opt.Tools), c.conversationTools()...), ","))
-	return c.run(ctx, c.opt.Log.With(logging.KeyClaude, r.Session), r.Dir, prEnv(r.PR), args, r.Prompt, func(s Step) {
+	log := c.opt.Log.With(logging.KeyOp, "ask", logging.KeyPR, r.PR.String(), logging.KeyClaude, r.Session)
+	return c.run(ctx, log, r.Dir, prEnv(r.PR), args, r.Prompt, func(s Step) {
 		s.Arg = c.skillPath(s.Arg)
 		progress(s)
 	})
@@ -210,7 +211,7 @@ func prEnv(k model.PRKey) []string {
 func (c *Claude) Triage(ctx context.Context, r Request) (Answer, error) {
 	r.Schema = TriageSchema
 	args := c.session(r, triageInstructions, nil)
-	return c.run(ctx, c.opt.Log.With(logging.KeyClaude, r.Session), r.Dir, nil, args, r.Prompt, func(Step) {})
+	return c.run(ctx, c.opt.Log.With(logging.KeyOp, "triage", logging.KeyClaude, r.Session), r.Dir, nil, args, r.Prompt, func(Step) {})
 }
 
 // session are the arguments of a question in a session, with tools and
@@ -246,7 +247,7 @@ func (c *Claude) Once(ctx context.Context, dir, prompt, schema string) (Answer, 
 	if schema != "" {
 		args = append(args, "--json-schema", schema)
 	}
-	return c.run(ctx, c.opt.Log, dir, nil, args, prompt, func(Step) {})
+	return c.run(ctx, c.opt.Log.With(logging.KeyOp, "once"), dir, nil, args, prompt, func(Step) {})
 }
 
 // Interactive is Claude Code resuming the session about pr in dir,
@@ -286,8 +287,13 @@ func (c *Claude) run(ctx context.Context, log *slog.Logger, dir string, env, arg
 	if err := cmd.Start(); err != nil {
 		return Answer{}, err
 	}
+	// What is asked and what Claude says are never logged, only that it
+	// was asked, and how many tools it used.
+	log.Info("claude asked", "model", c.opt.Model)
+	tools := 0
 	answer, readErr := readStream(out, func(s Step) {
 		log.Debug("claude step", "tool", s.Tool)
+		tools++
 		progress(s)
 	})
 	// Read to the end, so claude is not stuck writing.
@@ -296,7 +302,7 @@ func (c *Claude) run(ctx context.Context, log *slog.Logger, dir string, env, arg
 	elapsed := time.Since(start).Milliseconds()
 	switch {
 	case ctx.Err() != nil:
-		log.Info("claude stopped", logging.KeyDurationMS, elapsed)
+		log.Info("claude stopped", "tools", tools, logging.KeyDurationMS, elapsed)
 		return Answer{}, ctx.Err()
 	case readErr != nil:
 		log.Warn("claude failed", "err", readErr.Error(), logging.KeyDurationMS, elapsed)
@@ -309,7 +315,7 @@ func (c *Claude) run(ctx context.Context, log *slog.Logger, dir string, env, arg
 		log.Warn("claude failed", "err", waitErr.Error(), logging.KeyDurationMS, elapsed)
 		return Answer{}, fmt.Errorf("claude: %w %s", waitErr, msg)
 	}
-	log.Info("claude answered", "model", answer.Model, "cost_usd", answer.Cost, logging.KeyDurationMS, elapsed)
+	log.Info("claude answered", "model", answer.Model, "tools", tools, "cost_usd", answer.Cost, logging.KeyDurationMS, elapsed)
 	return answer, nil
 }
 
