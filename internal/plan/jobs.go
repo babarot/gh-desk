@@ -122,7 +122,7 @@ func AfterJobs(d Decision, mi model.MergeInfo, t Trigger, now time.Time, include
 		return d
 	}
 	if JobsRunning(mi, t, now) {
-		d.Step, d.Reason = StepWait, "wait for checks, then approve"
+		d.Step, d.Reason = StepWait, "wait for checks → approve"
 	}
 	return d
 }

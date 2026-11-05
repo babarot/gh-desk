@@ -20,14 +20,14 @@ desk // @me    1 review (3)   2 mine (1)   3 involved (0)   4 inbox (1)         
 
 ╭  overview   diff (2)  ────────────────────────────────────────────────────────────────────────────────── acme/api#12 · J/K · v ╮
 │ #12 Add retries to the client                                                       alice │ status    open                     │
-│ ▾ description ─────────────────────────────────────────────────────────────────────────── │ merge     merge now (merge commit) │
-│ │ What                                                                                    │ requested me @core                 │
-│ │ Retry failed requests.                                                                  │ checks    ✓1                       │
-│ ╵                                                                                         │ size      +40 −3 · 2 files         │
-│                                                                                           │ branch    retries                  │
-│ ▾ checks (1)  ✓1 ──────────────────────────────────────────────────────────────────────── │           → main                   │
-│ │ ✓ test                                                                                  │ updated   3h ago                   │
-│ ╵                                                                                         │                                    │
+│ ▾ description ─────────────────────────────────────────────────────────────────────────── │ merge     approve → merge now      │
+│ │ What                                                                                    │           (merge commit)           │
+│ │ Retry failed requests.                                                                  │ requested me @core                 │
+│ ╵                                                                                         │ checks    ✓1                       │
+│                                                                                           │ size      +40 −3 · 2 files         │
+│ ▾ checks (1)  ✓1 ──────────────────────────────────────────────────────────────────────── │ branch    retries                  │
+│ │ ✓ test                                                                                  │           → main                   │
+│ ╵                                                                                         │ updated   3h ago                   │
 │                                                                                           │                                    │
 ╰────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
                                                                                                                                   

@@ -2007,7 +2007,7 @@ func TestBulkRowsFit(t *testing.T) {
 		Title: "chore(deps): update octo-org/reusable-workflows action to v4.12.0"}
 	rows := []bulkRow{
 		{pr: model.PR{Key: key("acme", "api", 12), Title: "Add retries to the client"}, mark: "✓", title: "Add retries to the client", what: "approve → merge now (squash)"},
-		{pr: long, mark: "✓", title: long.Title, what: "approve → wait for checks, then merge (merge commit)",
+		{pr: long, mark: "✓", title: long.Title, what: "approve → wait for checks → merge (merge commit)",
 			notes: []bulkNote{{"⚑", "v4 drops the node16 runtime; jobs that still pin node16 stop running after this update", m.st.peach}}},
 	}
 	const inner = 90
@@ -2024,7 +2024,7 @@ func TestBulkRowsFit(t *testing.T) {
 		"✓ acme/api#12                          Add retries to the client",
 		"  └ approve → merge now (squash)",
 		"✓ octo-org/platform-bootstrap-te…#1287 chore(deps): update octo-org/reusable-workflows ac…",
-		"  ├ approve → wait for checks, then merge (merge commit)",
+		"  ├ approve → wait for checks → merge (merge commit)",
 		"  └ ⚑ v4 drops the node16 runtime; jobs that still pin node16 stop running after this",
 		"      update",
 	}

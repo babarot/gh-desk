@@ -1,7 +1,6 @@
 package plan
 
 import (
-	"slices"
 	"strings"
 	"testing"
 
@@ -107,7 +106,7 @@ func TestForMergeAsAdmin(t *testing.T) {
 		pr    model.PR
 		step  Step
 		admin bool
-		note  bool
+		later bool
 	}{
 		{"own, checks passed", blocked(true, passed), model.PR{Author: "me"}, StepMerge, true, true},
 		{"own, no checks", blocked(true), model.PR{Author: "me"}, StepMerge, true, true},
@@ -125,9 +124,11 @@ func TestForMergeAsAdmin(t *testing.T) {
 			if d.Step != tt.step || d.Admin != tt.admin {
 				t.Errorf("ForMerge = %+v; want step %s admin %v", d, tt.step, tt.admin)
 			}
-			said := len(d.Notes) > 0 && strings.Contains(d.Notes[0], "as an admin")
-			if said != tt.note {
-				t.Errorf("notes %q; want the admin merge said first: %v", d.Notes, tt.note)
+			if d.AdminLater != (tt.later && !tt.admin) {
+				t.Errorf("ForMerge = %+v; want admin later %v", d, tt.later && !tt.admin)
+			}
+			if said := strings.Contains(d.Reason, "as admin"); said != tt.later {
+				t.Errorf("reason %q; want the admin merge said: %v", d.Reason, tt.later)
 			}
 		})
 	}
@@ -137,7 +138,7 @@ func TestForMergeAsAdmin(t *testing.T) {
 	}
 	draft := blocked(true, passed)
 	draft.Draft, draft.MergeState = true, model.MergeDraft
-	if d := ForMerge(draft, model.PR{Author: "me"}, "me", set); !d.Ready || d.Step != StepWait || d.Admin || !strings.Contains(d.Notes[0], "as an admin") {
+	if d := ForMerge(draft, model.PR{Author: "me"}, "me", set); !d.Ready || d.Step != StepWait || d.Admin || !d.AdminLater || !strings.Contains(d.Reason, "as admin") {
 		t.Errorf("own draft: %+v", d)
 	}
 }
@@ -168,8 +169,10 @@ func TestForMergeDraft(t *testing.T) {
 			if !d.Ready || d.Step != tt.step || d.Approve != tt.approve || d.Method != model.MethodMerge {
 				t.Errorf("ForMerge = %+v; want ready, step %s approve %v", d, tt.step, tt.approve)
 			}
-			if !slices.ContainsFunc(d.Notes, func(n string) bool { return strings.Contains(n, "stays ready") }) {
-				t.Errorf("notes %q do not say it stays ready", d.Notes)
+			// What marking it ready means is the popup's to say once, for
+			// every draft: not a note of this pull request.
+			if len(d.Notes) > 0 {
+				t.Errorf("notes %q; want none", d.Notes)
 			}
 		})
 	}
@@ -187,13 +190,16 @@ func TestForMergeNotes(t *testing.T) {
 	mi.Checks = []model.Check{{Name: "lint", State: model.CheckFailure}}
 	d := ForMerge(mi, model.PR{Author: "renovate", AuthorIsBot: true}, "me", set)
 	all := strings.Join(d.Notes, "\n")
-	for _, want := range []string{"changes .github/workflows/ci.yaml, .github/workflows/release.yaml", "not required failed: lint", "pushed after it is on"} {
+	for _, want := range []string{"changes .github/workflows/ci.yaml, .github/workflows/release.yaml", "not required failed: lint"} {
 		if !strings.Contains(all, want) {
 			t.Errorf("notes %q lack %q", d.Notes, want)
 		}
 	}
 	if strings.Contains(all, "main.go") {
 		t.Error("main.go marked")
+	}
+	if strings.Contains(all, "auto-merge") {
+		t.Errorf("notes %q say what auto-merge is: the popup says it once", d.Notes)
 	}
 }
 

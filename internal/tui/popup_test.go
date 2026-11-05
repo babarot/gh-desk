@@ -193,9 +193,9 @@ func TestNoteResultsHang(t *testing.T) {
 	}
 }
 
-// The confirm popup shows every note of a pull request, not the first:
-// that a draft stays ready and that auto-merge takes later commits are
-// said even when the files it changes are marked before them (ADR-046).
+// The confirm popup shows every note of a pull request under it, and
+// what its steps mean once below the list: that a draft stays ready and
+// that auto-merge takes later commits (ADR-046, ADR-075).
 func TestBulkShowsEveryNote(t *testing.T) {
 	f := fixture()
 	draft := model.PR{ID: "5", Key: key("me", "tool", 4), Title: "Try a new parser", Author: "me", State: model.StateOpen, Draft: true,
@@ -212,6 +212,10 @@ func TestBulkShowsEveryNote(t *testing.T) {
 	press(m, "M")
 	text := readPopup(t, m, m.renderBulk, "yes", "j")
 	has(t, text, "changes .github/workflows/ci.yaml, .github/workflows/release.yaml")
-	has(t, text, "it stays ready if the merge stops")
-	has(t, text, "auto-merge also merges commits pushed after it is on")
+	has(t, text, "ready → turn on auto-merge (merge commit)")
+	has(t, text, "Marking a draft ready asks for its reviews; it stays ready if the merge stops.")
+	has(t, text, "Auto-merge also merges commits pushed after it is on")
+	if strings.Count(text, "stays ready") != 1 {
+		t.Errorf("what marking it ready means is said more than once:\n%s", text)
+	}
 }

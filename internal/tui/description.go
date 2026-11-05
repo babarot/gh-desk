@@ -406,14 +406,7 @@ func (m *Model) facts(p model.PR, d *entry[model.Detail], width int) []line {
 	}
 	if mi, ok := m.cache.info[p.Key]; ok && p.State == model.StateOpen {
 		dec := plan.ForMerge(mi, p, m.viewer, m.set.Plan)
-		how := dec.Reason
-		if dec.Method != "" {
-			how += " (" + methodWord(dec.Method) + ")"
-		}
-		if dec.Ready {
-			how = "mark ready, then " + how
-		}
-		add("merge", words(how, m.stepStyle(dec.Step))...)
+		add("merge", words(mergeHow(dec), m.stepStyle(dec.Step))...)
 	}
 	var reviews []fact
 	for _, r := range p.Reviews {

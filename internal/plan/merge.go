@@ -54,12 +54,18 @@ type Decision struct {
 	Approve bool
 	Step    Step
 	Method  model.MergeMethod
-	// Reason says why it is skipped, or how it will be merged.
+	// Reason says why it is skipped, or, as steps joined by " → ", how it
+	// will be merged: the steps after Ready and Approve.
 	Reason string
 	// Admin is whether it is merged as an admin, past the rules of its base
 	// branch.
 	Admin bool
-	// Notes are what the user should know before saying yes.
+	// AdminLater is whether the merge it waits for goes as an admin (for a
+	// draft, if it is still blocked once it is ready).
+	AdminLater bool
+	// Notes are what the user should know of this pull request before
+	// saying yes. What a step means, the same for every pull request that
+	// takes it, is not a note: the confirm popup says it once.
 	Notes []string
 }
 
@@ -245,7 +251,7 @@ func ForReady(mi model.MergeInfo) Decision {
 func ForMerge(mi model.MergeInfo, pr model.PR, viewer string, set Settings) Decision {
 	d := Decision{Notes: notes(mi, set)}
 	skip := func(why string) Decision {
-		d.Step, d.Reason, d.Ready, d.Approve, d.Method, d.Admin = StepSkip, why, false, false, "", false
+		d.Step, d.Reason, d.Ready, d.Approve, d.Method, d.Admin, d.AdminLater = StepSkip, why, false, false, "", false, false
 		return d
 	}
 	if mi.State != model.StateOpen {
@@ -277,12 +283,10 @@ func ForMerge(mi model.MergeInfo, pr model.PR, viewer string, set Settings) Deci
 		// What GitHub says of a draft is only that it is one. Marking it
 		// ready starts its checks, so it waits for them; the runner
 		// decides again once it is ready.
-		d.Notes = append(d.Notes, "marking it ready asks for its reviews; it stays ready if the merge stops")
 		if asAdmin(mi, pr, viewer) {
 			// Auto-merge would wait for the review an admin merge goes
 			// past; waiting here decides again once it is ready.
-			d.Step, d.Reason = StepWait, "wait for checks, then merge, as admin if blocked"
-			d.Notes = append([]string{adminNote}, d.Notes...)
+			d.Step, d.Reason, d.AdminLater = StepWait, "wait for checks → merge as admin if blocked", true
 			return d
 		}
 		return blocked(d, mi, set, jobs)
@@ -296,7 +300,7 @@ func ForMerge(mi model.MergeInfo, pr model.PR, viewer string, set Settings) Deci
 		d.Step, d.Reason = StepRecheck, "checking whether it can be merged"
 	case model.MergeClean, model.MergeUnstable, model.MergeHasHooks:
 		if jobs {
-			d.Step, d.Reason = StepWait, "wait for checks, then merge"
+			d.Step, d.Reason = StepWait, "wait for checks → merge"
 		} else {
 			d.Step, d.Reason = StepMerge, "merge now"
 		}
@@ -307,7 +311,7 @@ func ForMerge(mi model.MergeInfo, pr model.PR, viewer string, set Settings) Deci
 		case pr.AuthorIsBot && set.UpdateBranch != "all":
 			return skip("behind · the bot will rebase")
 		}
-		d.Step, d.Reason = StepUpdate, "update the branch, then merge"
+		d.Step, d.Reason = StepUpdate, "update the branch → wait for checks → merge"
 	case model.MergeBlocked:
 		if asAdmin(mi, pr, viewer) {
 			return adminMerge(d, mi, set, jobs)
@@ -326,9 +330,8 @@ func ForMerge(mi model.MergeInfo, pr model.PR, viewer string, set Settings) Deci
 func blocked(d Decision, mi model.MergeInfo, set Settings, jobs bool) Decision {
 	if set.AutoMerge && mi.Repo.AutoMerge && !jobs {
 		d.Step, d.Reason = StepAutoMerge, "turn on auto-merge"
-		d.Notes = append(d.Notes, "auto-merge also merges commits pushed after it is on")
 	} else {
-		d.Step, d.Reason = StepWait, "wait for checks, then merge"
+		d.Step, d.Reason = StepWait, "wait for checks → merge"
 	}
 	return d
 }
@@ -352,17 +355,13 @@ func adminMerge(d Decision, mi model.MergeInfo, set Settings, jobs bool) Decisio
 	if mi.ChecksPartial {
 		return blocked(d, mi, set, jobs)
 	}
-	// The note goes first: it changes what merging means.
-	d.Notes = append([]string{adminNote}, d.Notes...)
 	if mi.Checks == nil || ChecksRunning(mi, set.ApprovalChecks) || jobs {
-		d.Step, d.Reason = StepWait, "wait for checks, then merge as admin"
+		d.Step, d.Reason, d.AdminLater = StepWait, "wait for checks → merge as admin", true
 		return d
 	}
 	d.Step, d.Reason, d.Admin = StepMerge, "merge as admin", true
 	return d
 }
-
-const adminNote = "merges as an admin, past the rules of the base branch"
 
 func stateWord(s model.PRState) string {
 	switch s {

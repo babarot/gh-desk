@@ -380,6 +380,23 @@ func methodWord(m model.MergeMethod) string {
 	return strings.ToLower(string(m))
 }
 
+// mergeHow says the steps a merge takes, one after another: ready and
+// approve when it takes them, then the rest, with the merge method.
+func mergeHow(d plan.Decision) string {
+	var steps []string
+	if d.Ready {
+		steps = append(steps, "ready")
+	}
+	if d.Approve {
+		steps = append(steps, "approve")
+	}
+	how := strings.Join(append(steps, d.Reason), " → ")
+	if d.Method != "" {
+		how += " (" + methodWord(d.Method) + ")"
+	}
+	return how
+}
+
 // note is an in-app notification: kept for the session, so a result that
 // came while the user looked elsewhere can still be found.
 type note struct {

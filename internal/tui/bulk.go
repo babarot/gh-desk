@@ -559,12 +559,18 @@ func (m *Model) renderBulk() []string {
 		lines = append(lines, wrapped(st.red, "could not read them all: "+b.err.Error(), inner)...)
 	}
 	goes := 0
-	auto := false
+	// The steps taken by any pull request that goes, said once below the
+	// list rather than under each.
+	auto, readies, admin := false, false, false
 	failing := 0
 	for _, it := range b.items {
 		if it.goes() {
 			goes++
 			auto = auto || it.d.Step == plan.StepAutoMerge
+			if b.kind == runner.Merge {
+				readies = readies || it.d.Ready
+				admin = admin || it.d.Admin || it.d.AdminLater
+			}
 		}
 		if it.ok && (plan.Failing(it.mi) || b.waits() && len(plan.FailedJobs(it.mi)) > 0) {
 			failing++
@@ -610,8 +616,9 @@ func (m *Model) renderBulk() []string {
 		if it.goes() {
 			// On lines of their own, so a long one does not take the
 			// width of the title or of what is done.
-			// Every note, since each says something a yes agrees to: a
-			// draft that stays ready, commits auto-merge takes later.
+			// Every note, since each says something of this pull request a
+			// yes agrees to: files marked for attention, a check that failed.
+			// What a step means is said once, below the list.
 			for _, n := range it.d.Notes {
 				r.notes = append(r.notes, bulkNote{"⚠", n, st.yellow})
 			}
@@ -648,6 +655,12 @@ func (m *Model) renderBulk() []string {
 		prose(st.dim, text)
 	case notesFailed:
 		prose(st.yellow, "Claude could not read the release notes: "+safeLine(b.notesErr))
+	}
+	if admin {
+		prose(st.yellow, "Merging as admin goes past the rules of the base branch.")
+	}
+	if readies {
+		prose(st.yellow, "Marking a draft ready asks for its reviews; it stays ready if the merge stops.")
 	}
 	if auto {
 		prose(st.dim, "Auto-merge also merges commits pushed after it is on, as GitHub does.")

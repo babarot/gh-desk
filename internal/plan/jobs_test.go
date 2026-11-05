@@ -184,27 +184,27 @@ func TestForMergeWaitsForJobs(t *testing.T) {
 		admin  bool
 	}{
 		// gh-desk#47: no required check, the tests at work.
-		{"unstable, a job at work", at(model.MergeUnstable, atWork), human, StepWait, "wait for checks, then merge", false},
-		{"clean, a job at work", at(model.MergeClean, atWork), human, StepWait, "wait for checks, then merge", false},
+		{"unstable, a job at work", at(model.MergeUnstable, atWork), human, StepWait, "wait for checks → merge", false},
+		{"clean, a job at work", at(model.MergeClean, atWork), human, StepWait, "wait for checks → merge", false},
 		{"clean, jobs done", at(model.MergeClean, checkRun("test", model.RunCompleted, model.CheckSuccess)), human, StepMerge, "merge now", false},
 		{"a job not required failed", at(model.MergeUnstable, checkRun("lint", model.RunCompleted, model.CheckFailure)), human, StepSkip, "a job failed: lint", false},
 		{"blocked, auto-merge allowed, a job at work", func() model.MergeInfo {
 			mi := at(model.MergeBlocked, atWork)
 			mi.Repo.AutoMerge = true
 			return mi
-		}(), human, StepWait, "wait for checks, then merge", false},
+		}(), human, StepWait, "wait for checks → merge", false},
 		{"blocked, auto-merge allowed, jobs done", func() model.MergeInfo {
 			mi := at(model.MergeBlocked)
 			mi.Repo.AutoMerge = true
 			return mi
 		}(), human, StepAutoMerge, "turn on auto-merge", false},
 		// A policy bot's status waits for the approval: not a job.
-		{"only a status pending", at(model.MergeBlocked, status("policy-bot: main", model.CheckPending, true)), human, StepWait, "wait for checks, then merge", false},
+		{"only a status pending", at(model.MergeBlocked, status("policy-bot: main", model.CheckPending, true)), human, StepWait, "wait for checks → merge", false},
 		{"admin, a job at work", func() model.MergeInfo {
 			mi := at(model.MergeBlocked, atWork)
 			mi.AdminMerge = true
 			return mi
-		}(), mine, StepWait, "wait for checks, then merge as admin", false},
+		}(), mine, StepWait, "wait for checks → merge as admin", false},
 		// An admin merge goes past GitHub's wait for required checks, so a
 		// required status that failed still stops it.
 		{"admin, a required status failed", func() model.MergeInfo {
@@ -243,7 +243,7 @@ func TestAfterJobs(t *testing.T) {
 		step    Step
 		reason  string
 	}{
-		{"jobs at work", approve, at(checkRun("test", inProgress, "")), false, StepWait, "wait for checks, then approve"},
+		{"jobs at work", approve, at(checkRun("test", inProgress, "")), false, StepWait, "wait for checks → approve"},
 		{"jobs done", approve, at(checkRun("test", model.RunCompleted, model.CheckSuccess)), false, "", "approve"},
 		{"a job failed", approve, at(checkRun("lint", model.RunCompleted, model.CheckFailure)), false, StepSkip, "a job failed: lint"},
 		{"a job failed, let in", approve, at(checkRun("lint", model.RunCompleted, model.CheckFailure)), true, "", "approve"},
