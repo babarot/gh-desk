@@ -133,16 +133,16 @@ const (
 )
 
 // CloseText is what a Close batch does besides closing: the comment it
-// writes first, and whether it deletes the head branches. Like a review's
-// text it is held in memory only.
+// writes first, and whether it deletes the head branches. It is held in
+// memory only.
 type CloseText struct {
 	Body         string
 	DeleteBranch bool
 }
 
 // ReviewText is the review a Review batch sends to each of its pull
-// requests. It is held in memory only: a review batch is not recorded for
-// the next launch.
+// requests. It is held in memory only, but for an approval that waits for
+// the jobs: that is recorded for the next launch with its body.
 type ReviewText struct {
 	Event model.ReviewEvent
 	Body  string
