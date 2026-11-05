@@ -126,6 +126,28 @@ func TestExcludedAreNotSelected(t *testing.T) {
 	}
 }
 
+// The filter narrows the excluded as it narrows the rows, out of sight: the
+// line under the rows counts only those a would show, and leaves when none
+// of them match.
+func TestFilterNarrowsTheExcludedCount(t *testing.T) {
+	m := startSource(t, withCarol(), excluding(plan.Rule{Name: "carol's", Authors: []string{"carol"}}))
+	m.filter = "slow"
+	if strings.Contains(screen(m), "api#13") {
+		t.Fatalf("the filter shows the excluded pull request:\n%s", screen(m))
+	}
+	if !strings.Contains(screen(m), "1 pull request excluded · a to show") {
+		t.Errorf("the filter matching the excluded hides the count:\n%s", screen(m))
+	}
+	m.filter = "retries"
+	if strings.Contains(screen(m), "excluded · a to show") {
+		t.Errorf("the count has an excluded row the filter hides:\n%s", screen(m))
+	}
+	m.filter = ""
+	if !strings.Contains(screen(m), "1 pull request excluded · a to show") {
+		t.Errorf("clearing the filter does not bring the count back:\n%s", screen(m))
+	}
+}
+
 // A selection made before a row is excluded stays, as one a filter hides
 // does; d acts only on what is shown.
 func TestHideSkipsTheExcludedSelection(t *testing.T) {

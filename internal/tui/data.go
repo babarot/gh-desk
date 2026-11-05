@@ -308,18 +308,24 @@ func (m *Model) shows(t *tab, p model.PR, n *model.Notification, filter string, 
 
 // excludedCount is how many of t's pull requests, or the inbox's
 // notifications, are excluded, of them how many as merged or closed and
-// how many unread, put away ones left out. The filter is left out, as it
-// only looks for rows for a moment.
+// how many unread, put away ones left out.
 type excludedCount struct {
 	n, settled, unread int
 }
 
-func (m *Model) excludedOf(t *tab) excludedCount {
+// excludedOf counts what t excludes, whatever is typed in the filter: the
+// tab's count and the key line ask it.
+func (m *Model) excludedOf(t *tab) excludedCount { return m.excludedPassing(t, "", nil) }
+
+// excludedPassing counts what t excludes that passes filter and rules: what
+// a would show among the rows narrowed. The line under the rows asks it, so
+// that the excluded are filtered as the rows are, out of sight.
+func (m *Model) excludedPassing(t *tab, filter string, rules []plan.Rule) excludedCount {
 	var c excludedCount
 	now := m.set.Now()
 	add := func(p model.PR, n *model.Notification) {
 		x := m.exclusionOf(t, p, n, now)
-		if t.hidden[p.Key] || !x.excluded() {
+		if t.hidden[p.Key] || !x.excluded() || !m.passes(p, filter, rules, now) {
 			return
 		}
 		c.n++
