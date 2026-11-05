@@ -183,8 +183,9 @@ func (m *Model) closePaste(msg tea.PasteMsg) tea.Cmd {
 	return cmd
 }
 
-// closeWhat says what a close does to one pull request it acts on.
-func (m *Model) closeWhat(c plan.Close) string {
+// closeWhat says what a close does to one pull request it acts on, as the
+// pieces of a bulkRow's what.
+func (m *Model) closeWhat(c plan.Close) []string {
 	st := m.st
 	var steps []string
 	if m.bulk.close.body() != "" {
@@ -194,9 +195,12 @@ func (m *Model) closeWhat(c plan.Close) string {
 	if c.Delete {
 		steps = append(steps, "delete branch")
 	}
-	what := st.green.Render(strings.Join(steps, " → "))
+	for i, s := range steps {
+		steps[i] = st.green.Render(s)
+	}
+	what := m.arrowed(steps)
 	if c.Keep != "" {
-		what += st.dim.Render(" · ") + st.peach.Render("branch kept: "+c.Keep)
+		what = append(what, st.dim.Render("·")+" "+st.peach.Render("branch kept: "+c.Keep))
 	}
 	return what
 }

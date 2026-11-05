@@ -16,7 +16,7 @@ This replaces, in ADR-048, "The confirm popup says that it merges as an admin, p
 
 - What a merge does to a pull request is said as its steps, each named, joined in the order they are taken. The same words are used wherever gh-desk says how it will merge a pull request, not only in the popup.
 - The merge method is named only when it is not the first of the user's order of preference, which is when the repository does not allow that one. The first is what the user expects; naming it on every pull request is the same words repeated, and hides the one that differs. Which method is usual is the user's setting, not a method gh-desk assumes most people use.
-- A merge as an admin is named in the steps of each pull request it applies to, including when it first waits or is a draft, so which pull requests go past the rules can be told one by one.
+- A merge as an admin is named in the steps of each pull request it applies to, including when it first waits or is a draft, so which pull requests go past the rules can be told one by one. On a screen too narrow for the steps, they are broken between steps onto more lines, never cut off: a cut would hide the merge as an admin, the last step.
 - Under a pull request the popup says only what is true of that pull request.
 - What a step means is said once, below the list, when any pull request that goes takes the step: what marking a draft ready leaves behind, that a merge as an admin goes past the rules of the base branch, what auto-merge takes later. ADR-046 and ADR-006 still hold that the popup says these; ADR-048's warning of an admin merge is still said, once below the list instead of under each pull request.
 

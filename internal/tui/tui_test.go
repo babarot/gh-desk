@@ -2006,8 +2006,8 @@ func TestBulkRowsFit(t *testing.T) {
 	long := model.PR{Key: key("octo-org", "platform-bootstrap-templates", 1287),
 		Title: "chore(deps): update octo-org/reusable-workflows action to v4.12.0"}
 	rows := []bulkRow{
-		{pr: model.PR{Key: key("acme", "api", 12), Title: "Add retries to the client"}, mark: "✓", title: "Add retries to the client", what: "approve → merge now (squash)"},
-		{pr: long, mark: "✓", title: long.Title, what: "approve → wait for checks → merge (merge commit)",
+		{pr: model.PR{Key: key("acme", "api", 12), Title: "Add retries to the client"}, mark: "✓", title: "Add retries to the client", what: []string{"approve →", "merge now", "(squash)"}},
+		{pr: long, mark: "✓", title: long.Title, what: []string{"approve →", "wait for checks →", "merge", "(merge commit)"},
 			notes: []bulkNote{{"⚑", "v4 drops the node16 runtime; jobs that still pin node16 stop running after this update", m.st.peach}}},
 	}
 	const inner = 90
@@ -2027,6 +2027,42 @@ func TestBulkRowsFit(t *testing.T) {
 		"  ├ approve → wait for checks → merge (merge commit)",
 		"  └ ⚑ v4 drops the node16 runtime; jobs that still pin node16 stop running after this",
 		"      update",
+	}
+	if strings.Join(plain, "\n") != strings.Join(want, "\n") {
+		t.Errorf("got\n%s\nwant\n%s", strings.Join(plain, "\n"), strings.Join(want, "\n"))
+	}
+}
+
+// On a narrow popup, the steps under a pull request are broken between
+// steps, never cut: a merge as an admin and an unusual method stay in
+// sight (ADR-075).
+func TestBulkStepsBreakOnANarrowPopup(t *testing.T) {
+	m := start(t, fixture(), keymap.Default())
+	rows := []bulkRow{
+		{pr: model.PR{Key: key("me", "desk", 88), Title: "Let the log viewer follow new lines"}, mark: "✓", title: "Let the log viewer follow new lines",
+			what: m.arrowed([]string{"ready", "wait for checks", "merge as admin if blocked"})},
+		{pr: model.PR{Key: key("me", "blog", 21), Title: "Add an archive page"}, mark: "✓", title: "Add an archive page",
+			what:  append(m.arrowed([]string{"update the branch", "wait for checks", "merge"}), "(squash)"),
+			notes: []bulkNote{{"⚠", "changes .github/workflows/ci.yaml", m.st.yellow}}},
+	}
+	const inner = 36
+	var plain []string
+	for _, l := range m.layoutBulk(rows, inner, false) {
+		p := ansi.Strip(l)
+		if w := ansi.StringWidth(p); w > inner {
+			t.Errorf("%d cells, over %d: %q", w, inner, p)
+		}
+		plain = append(plain, p)
+	}
+	want := []string{
+		"✓ me/desk#88 Let the log viewer fol…",
+		"  └ ready → wait for checks →",
+		"    merge as admin if blocked",
+		"✓ me/blog#21 Add an archive page",
+		"  ├ update the branch →",
+		"  │ wait for checks → merge (squash)",
+		"  └ ⚠ changes",
+		"      .github/workflows/ci.yaml",
 	}
 	if strings.Join(plain, "\n") != strings.Join(want, "\n") {
 		t.Errorf("got\n%s\nwant\n%s", strings.Join(plain, "\n"), strings.Join(want, "\n"))
