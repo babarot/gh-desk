@@ -332,3 +332,28 @@ func TestClickUnreadCommentAuthor(t *testing.T) {
 		t.Fatalf("browsed %q, want %q", f.browsed, want)
 	}
 }
+
+// A shortcode in prose, bold text and a table is drawn as its emoji; one
+// in code, or one with no emoji, stays as written.
+func TestShortcodesAreDrawnAsEmoji(t *testing.T) {
+	m := start(t, fixture(), keymap.Default())
+	for _, tc := range []struct{ body, want string }{
+		{"Fixed :bug: in **:rocket: deploy**", "Fixed 🐛 in 🚀 deploy"},
+		{"- :+1: and :tada:", "• 👍 and 🎉"},
+		{"see `:smile:` and :shipit:", "see :smile: and :shipit:"},
+		{"10:30:00 at a:b", "10:30:00 at a:b"},
+		{"| a |\n|---|\n| :white_check_mark: `:x:` |", "a\n──────\n✅ :x:"},
+	} {
+		var got []string
+		for _, l := range m.markdownLines(tc.body, 40) {
+			got = append(got, strings.TrimRight(ansi.Strip(l.text), " "))
+		}
+		if strings.Join(got, "\n") != tc.want {
+			t.Errorf("%q:\n%s\nwant:\n%s", tc.body, strings.Join(got, "\n"), tc.want)
+		}
+	}
+	got := ansi.Strip(m.bodyLines("```\n:smile:\n```", 40)[0].text)
+	if !strings.Contains(got, ":smile:") {
+		t.Errorf("code block line = %q, want the shortcode as written", got)
+	}
+}

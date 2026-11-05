@@ -39,7 +39,7 @@ var layers = []layer{
 	{"internal/runner", 3, []string{"internal/model", "internal/logging", "internal/plan"}, nil, "Bulk approve and merge, auto-merge watching, resuming"},
 	{"internal/tui/chat", 3, []string{"internal/model", "internal/logging", "internal/claude"}, nil, "The conversations with Claude about pull requests: what each holds, keeping them and their locks"},
 	{"internal/tui", 4, []string{"internal/model", "internal/logging", "internal/plan", "internal/diff", "internal/tui/keymap", "internal/runner", "internal/claude", "internal/listcache", "internal/tui/statusline", "internal/tui/chat"},
-		[]string{"charm.land/bubbletea/v2", "charm.land/bubbles/v2", "charm.land/lipgloss/v2", "github.com/charmbracelet/x/ansi", "golang.org/x/net/html"}, "The terminal UI"},
+		[]string{"charm.land/bubbletea/v2", "charm.land/bubbles/v2", "charm.land/lipgloss/v2", "github.com/charmbracelet/x/ansi", "golang.org/x/net/html", "github.com/kyokomi/emoji/v2"}, "The terminal UI"},
 	{"demo/internal/playground", 4, []string{"internal/model", "internal/claude", "internal/runner", "internal/tui/keymap"}, nil, "A made-up GitHub and Claude that the playground on the site runs against, and the scenarios that take it to a screen; never built into gh-desk"},
 	{"internal/app", 5, []string{"internal/model", "internal/logging", "internal/config", "internal/tui/keymap", "internal/plan", "internal/github", "internal/state", "internal/claude", "internal/listcache", "internal/runner", "internal/tui", "internal/tui/chat", "internal/version"}, []string{"github.com/spf13/cobra"}, "Putting it together: commands and flags, config, log, and starting the TUI"},
 	{"", 6, []string{"internal/app"}, nil, "Calls app.Run"},
