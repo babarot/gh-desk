@@ -105,3 +105,20 @@ func FailedJobs(mi model.MergeInfo) []string {
 	}
 	return out
 }
+
+// AfterJobs is an approval the user asked to wait for the jobs: a wait
+// while they are at work, and a skip when one failed, unless failing ones
+// were let in. Any other decision is kept.
+func AfterJobs(d Decision, mi model.MergeInfo, t Trigger, now time.Time, includeFailing bool) Decision {
+	if d.Step == StepSkip || !d.Approve {
+		return d
+	}
+	if failed := FailedJobs(mi); len(failed) > 0 && !includeFailing {
+		d.Step, d.Reason, d.Approve = StepSkip, "a job failed: "+failed[0], false
+		return d
+	}
+	if JobsRunning(mi, t, now) {
+		d.Step, d.Reason = StepWait, "wait for checks, then approve"
+	}
+	return d
+}

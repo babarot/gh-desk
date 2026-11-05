@@ -116,6 +116,7 @@ var Defaults = []Def{
 	// A confirm popup reads no choose, so enter answers it too.
 	{"confirm", ScopeConfirm, []string{"y", "enter"}, "yes"},
 	{"include_failing", ScopeConfirm, []string{"f"}, "include failing"},
+	{"wait_for_checks", ScopeConfirm, []string{"w"}, "wait for checks"},
 	{"delete_branch", ScopeConfirm, []string{"x"}, "delete branches"},
 	{"write_comment", ScopeConfirm, []string{"i"}, "write a comment"},
 

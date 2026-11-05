@@ -96,6 +96,7 @@ browse = []
 |---|---|---|
 | `y` `enter` | `confirm` | yes |
 | `f` | `include_failing` | include failing |
+| `w` | `wait_for_checks` | wait for checks |
 | `x` | `delete_branch` | delete branches |
 | `i` | `write_comment` | write a comment |
 

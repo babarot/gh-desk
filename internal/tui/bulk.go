@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"slices"
 	"strings"
+	"time"
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
@@ -33,6 +34,10 @@ type bulk struct {
 	// offset is the first line of the popup's body shown.
 	offset         int
 	includeFailing bool
+	// waitJobs is set while approvals wait for the jobs at work on their
+	// head, as they do unless the user says otherwise. An approval with
+	// a body is sent at once.
+	waitJobs bool
 	// notes is how far Claude has read the release notes of the bot pull
 	// requests to merge, and notesErr why it could not.
 	notes    notesState
@@ -87,6 +92,25 @@ func (it bulkItem) goes() bool {
 // approves reports whether the popup sends approvals.
 func (b *bulk) approves() bool {
 	return b.kind == runner.Review && b.review.Event == model.EventApprove
+}
+
+// canWait reports whether its approvals may wait for the jobs: an
+// approval with a body is sent at once, so that the body is never kept
+// on disk while it waits.
+func (b *bulk) canWait() bool { return b.approves() && b.review.Body == "" }
+
+// waits reports whether its approvals wait for the jobs.
+func (b *bulk) waits() bool { return b.canWait() && b.waitJobs }
+
+// atWork counts the pull requests read with jobs at work on their head.
+func (b *bulk) atWork() int {
+	n := 0
+	for _, it := range b.items {
+		if it.ok && plan.JobsRunning(it.mi, plan.Trigger{}, time.Time{}) {
+			n++
+		}
+	}
+	return n
 }
 
 // verb names what the popup does, in its title and question.
@@ -186,7 +210,7 @@ func (m *Model) startBulkFor(kind runner.Kind, rv runner.ReviewText, prs []model
 	if len(prs) == 0 {
 		return nil
 	}
-	b := &bulk{kind: kind, review: rv, loading: true}
+	b := &bulk{kind: kind, review: rv, loading: true, waitJobs: true}
 	var ids []string
 	for _, p := range prs {
 		pg, inBatch := m.progress[p.Key]
@@ -378,6 +402,10 @@ func (m *Model) decideBulk() {
 		switch b.kind {
 		case runner.Review:
 			it.d = plan.ForReview(it.mi, it.pr, m.viewer, b.review.Event, b.includeFailing, m.set.Plan)
+			if b.waits() {
+				it.d = plan.AfterJobs(it.d, it.mi, plan.Trigger{}, time.Time{}, b.includeFailing)
+				it.noWait = it.d.Step == plan.StepWait && !m.set.CanWait
+			}
 		case runner.Ready:
 			it.d = plan.ForReady(it.mi)
 		case runner.Close:
@@ -415,6 +443,9 @@ func (m *Model) bulkKey(k string) tea.Cmd {
 	case is("include_failing") && b.approves() && !b.loading:
 		b.includeFailing = !b.includeFailing
 		m.decideBulk()
+	case is("wait_for_checks") && b.canWait() && b.atWork() > 0 && !b.loading:
+		b.waitJobs = !b.waitJobs
+		m.decideBulk()
 	case is("delete_branch") && b.close != nil:
 		b.close.del = !b.close.del
 		m.decideBulk()
@@ -436,7 +467,8 @@ func (m *Model) runBulk() tea.Cmd {
 	bs := &batchState{kind: b.kind, review: b.review, byClaude: b.by != "", goes: map[model.PRKey]bool{}, done: map[model.PRKey]progress{}}
 	for _, it := range b.items {
 		if it.goes() {
-			items = append(items, runner.Item{PR: it.pr, Head: it.mi.HeadOID, AutoMerge: it.d.Step == plan.StepAutoMerge})
+			items = append(items, runner.Item{PR: it.pr, Head: it.mi.HeadOID, AutoMerge: it.d.Step == plan.StepAutoMerge,
+				Wait: b.waits(), IncludeFailing: b.includeFailing})
 			bs.goes[it.pr.Key] = true
 			bs.order = append(bs.order, it.pr.Key)
 			continue
@@ -536,7 +568,7 @@ func (m *Model) renderBulk() []string {
 			goes++
 			auto = auto || it.d.Step == plan.StepAutoMerge
 		}
-		if it.ok && plan.Failing(it.mi) {
+		if it.ok && (plan.Failing(it.mi) || b.waits() && len(plan.FailedJobs(it.mi)) > 0) {
 			failing++
 		}
 	}
@@ -553,7 +585,11 @@ func (m *Model) renderBulk() []string {
 			mark, title = st.mauve.Render("✓"), st.sub1.Render(it.pr.Title)
 			switch b.kind {
 			case runner.Review, runner.Ready:
-				what = st.green.Render(it.d.Reason)
+				style := st.green
+				if it.d.Step == plan.StepWait {
+					style = m.stepStyle(it.d.Step)
+				}
+				what = style.Render(it.d.Reason)
 			case runner.Close:
 				what = m.closeWhat(it.closing)
 			default:
@@ -624,6 +660,16 @@ func (m *Model) renderBulk() []string {
 			state = "included"
 		}
 		prose(st.dim, fmt.Sprintf("%d with failing checks are %s · %s to change", failing, state, m.firstKey("include_failing")))
+	}
+	if n := b.atWork(); b.approves() && n > 0 && !b.loading {
+		switch {
+		case !b.canWait():
+			prose(st.dim, "A review with a text is sent at once, while checks still run.")
+		case b.waitJobs:
+			prose(st.dim, fmt.Sprintf("%d with checks still running are approved once they pass · %s to approve now", n, m.firstKey("wait_for_checks")))
+		default:
+			prose(st.dim, fmt.Sprintf("%d with checks still running are approved now · %s to wait for the checks", n, m.firstKey("wait_for_checks")))
+		}
 	}
 	switch {
 	case b.loading:
