@@ -15,7 +15,7 @@ The steps of a wait had two names in the log for the same thing: a merge's wait 
 This replaces, in ADR-057, "with what it waited on (checks, approval checks, or another rule that blocks it)" for a wait on the head's work, and adds to when a wait is logged.
 
 - A wait on the head's work is one of three: on the jobs at work, on the workflows that may still start in the quiet time, or, with neither, on the required checks still running (as an admin merge waits). The log and the runner's steps tell them apart.
-- A wait on jobs or checks names them when it starts. While it waits, a line is logged at info each time one of them ends, with how it ended, or a new one begins, with those still waited on. A read that finds them as they were logs nothing; the reads stay at debug.
+- A wait on jobs or checks names them when it starts. While it waits, a line is logged at info each time one of them ends, with how it ended, or a new one begins, with those still waited on. Those that end the wait, the last of them, are told by the line of its end, with how they ended. A read that finds them as they were logs nothing; the reads stay at debug.
 - Job and check names are not text a user wrote, and may be logged; the rules of ADR-003 on what is never logged are unchanged.
 - The attribute keys are the ones [`internal/logging`](../../internal/logging) holds.
 - Rejected: a line at every read while waiting. A wait of hours polled every minute would fill the log with lines that say nothing changed.

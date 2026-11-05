@@ -335,8 +335,8 @@ func waitLines(t *testing.T, log string) []string {
 }
 
 // A wait on jobs names them when it starts, and logs a line when one ends,
-// with how, or one begins; a read that finds them as they were logs
-// nothing.
+// with how, or one begins; the last to end is told by the end of the wait.
+// A read that finds them as they were logs nothing.
 func TestWaitLogsTheJobsAsTheyChange(t *testing.T) {
 	mi, it := pr("1", "api", 1, "me")
 	mi.MergeState = model.MergeUnstable
@@ -364,7 +364,7 @@ func TestWaitLogsTheJobsAsTheyChange(t *testing.T) {
 		"wait start jobs jobs=test, lint",
 		"wait progress jobs ended=lint: success jobs=test",
 		"wait progress jobs ended=test: success started=gate jobs=gate",
-		"wait end jobs result=ready",
+		"wait end jobs ended=gate: success result=ready",
 	}
 	if got := waitLines(t, buf.String()); !slices.Equal(got, want) {
 		t.Errorf("wait lines =\n%s\nwant\n%s", strings.Join(got, "\n"), strings.Join(want, "\n"))
@@ -402,5 +402,27 @@ func TestQuietTimeIsAWaitOnWorkflows(t *testing.T) {
 	}
 	if !slices.ContainsFunc(events, func(e Event) bool { return e.Step == StepWaitWorkflows }) {
 		t.Error("did not say it waits for workflows")
+	}
+}
+
+// A wait on one job tells how it ended when the wait ends.
+func TestWaitOnOneJobTellsHowItEnded(t *testing.T) {
+	mi, it := pr("1", "api", 1, "me")
+	mi.MergeState = model.MergeUnstable
+	mi.Checks = []model.Check{checkRun("test", "IN_PROGRESS", "")}
+	f := newFake(mi)
+	f.onRead = func(_ string, mi *model.MergeInfo, n int) {
+		if n > 3 {
+			mi.Checks, mi.MergeState = []model.Check{checkRun("test", model.RunCompleted, model.CheckFailure)}, model.MergeClean
+		}
+	}
+	var buf bytes.Buffer
+	runLogged(t, f, logging.New(&buf, slog.LevelInfo), func(ctx context.Context, r *Runner) <-chan Event {
+		_, ch := r.Start(ctx, Merge, []Item{it})
+		return ch
+	})
+	want := []string{"wait start jobs jobs=test", "wait end jobs ended=test: failure result=skipped"}
+	if got := waitLines(t, buf.String()); !slices.Equal(got, want) {
+		t.Errorf("wait lines = %q, want %q", got, want)
 	}
 }
