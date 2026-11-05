@@ -371,7 +371,7 @@ type notesMsg struct {
 
 func (m *Model) notesRead(msg notesMsg) tea.Cmd {
 	if msg.err != nil {
-		m.log.Warn("release notes", "err", msg.err.Error())
+		m.log.Warn("release notes", "err", claude.Brief(msg.err))
 		msg.b.notes, msg.b.notesErr = notesFailed, msg.err.Error()
 		return nil
 	}
@@ -382,6 +382,7 @@ func (m *Model) notesRead(msg notesMsg) tea.Cmd {
 	for _, p := range msg.asked {
 		m.cautions[notesID(p)] = why[p.Key]
 	}
+	m.log.Info("release notes read", logging.KeyOp, "release-notes", "prs", len(msg.asked), "cautions", len(why))
 	msg.b.notes = notesRead
 	return nil
 }

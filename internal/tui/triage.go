@@ -431,7 +431,7 @@ func (m *Model) applyTriage() tea.Cmd {
 	if last.reply != "" {
 		m.say("claude: " + safeLine(firstLine(last.reply)))
 	}
-	m.log.Debug("triage applied", logging.KeyOp, "triage", logging.KeyClaude, tr.session, "actions", applied, "left_out", len(steps)-applied)
+	m.log.Info("triage applied", logging.KeyOp, "triage", logging.KeyClaude, tr.session, "actions", applied, "left_out", len(steps)-applied)
 	return tea.Batch(cmds...)
 }
 
