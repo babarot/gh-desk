@@ -31,7 +31,7 @@ The method is the first of `merge.methods` the repository allows, and the popup 
 
 ## Approving once the checks pass
 
-When some of the pull requests to approve have jobs at work, the approve popup waits for them by default: each is approved once its check runs and workflow runs have finished, and one whose job failed is skipped, unless failing ones are included with `f`. `w` approves at once instead. An approval with a text, written with `R`, is always sent at once.
+When some of the pull requests to approve have jobs at work, the approve popup waits for them by default: each is approved once its check runs and workflow runs have finished, and one whose job failed is skipped, unless failing ones are included with `f`. `w` approves at once instead. An approval with a text, written with `R`, waits the same way; a comment or a request for changes is sent at once.
 
 After an approve, the approved pull requests stay selected, so `M` merges the same set next.
 
