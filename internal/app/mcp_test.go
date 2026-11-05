@@ -17,7 +17,7 @@ func TestTheBuiltinServerNameIsReserved(t *testing.T) {
 
 func TestMCPServersTakeTheBuiltinOne(t *testing.T) {
 	cfg := config.Default()
-	servers := mcpServers(cfg, "/home/me/.config/gh-desk/config.toml", "/bin/gh-desk")
+	servers := mcpServers(cfg, "/home/me/.config/gh-desk/config.toml", "/bin/gh-desk", false)
 	srv, ok := servers[mcpserver.Name]
 	if !ok {
 		t.Fatalf("servers = %v", servers)
@@ -30,14 +30,18 @@ func TestMCPServersTakeTheBuiltinOne(t *testing.T) {
 	if !slices.Contains(skillTools(cfg), "mcp__gh-desk__check_run_log") {
 		t.Errorf("skills may not grant the built-in tools: %v", skillTools(cfg))
 	}
-	if len(mcpServers(cfg, "c", "")) != 0 {
+	debugArgs, _ := mcpServers(cfg, "c", "/bin/gh-desk", true)[mcpserver.Name]["args"].([]any)
+	if !slices.Equal(debugArgs, []any{"mcp", "--config", "c", "--debug"}) {
+		t.Errorf("args with --debug = %v", debugArgs)
+	}
+	if len(mcpServers(cfg, "c", "", false)) != 0 {
 		t.Error("given without a program to start")
 	}
 
 	off := false
 	cfg.Claude.MCP.Builtin = &off
 	cfg.Claude.MCP.Servers = map[string]map[string]any{"recall": {"command": "recall", "tools": []any{"recall_search"}}}
-	servers = mcpServers(cfg, "c", "/bin/gh-desk")
+	servers = mcpServers(cfg, "c", "/bin/gh-desk", false)
 	if _, ok := servers[mcpserver.Name]; ok || len(servers) != 1 {
 		t.Errorf("servers with builtin = false: %v", servers)
 	}
@@ -47,7 +51,7 @@ func TestMCPServersTakeTheBuiltinOne(t *testing.T) {
 	// The user's servers are not changed by adding the built-in one.
 	on := true
 	cfg.Claude.MCP.Builtin = &on
-	_ = mcpServers(cfg, "c", "/bin/gh-desk")
+	_ = mcpServers(cfg, "c", "/bin/gh-desk", false)
 	if len(cfg.Claude.MCP.Servers) != 1 {
 		t.Errorf("the config's servers were changed: %v", cfg.Claude.MCP.Servers)
 	}

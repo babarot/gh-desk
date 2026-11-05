@@ -1,7 +1,7 @@
 package mcpserver
 
 import (
-	"fmt"
+	"errors"
 	"regexp"
 	"strings"
 )
@@ -37,20 +37,20 @@ func searchQuery(owner, repo string, in searchIn) (string, error) {
 	if in.Kind != "" {
 		k, ok := kinds[in.Kind]
 		if !ok {
-			return "", fmt.Errorf(`kind must be "issue" or "pr", got %q`, in.Kind)
+			return "", errors.New(`kind must be "issue" or "pr"`)
 		}
 		q = append(q, k)
 	}
 	if in.State != "" {
 		st, ok := states[in.State]
 		if !ok {
-			return "", fmt.Errorf(`state must be "open", "closed" or "merged", got %q`, in.State)
+			return "", errors.New(`state must be "open", "closed" or "merged"`)
 		}
 		q = append(q, st)
 	}
 	if in.Author != "" {
 		if !login.MatchString(in.Author) {
-			return "", fmt.Errorf("author must be a login, or app/<name> for a bot, got %q", in.Author)
+			return "", errors.New("author must be a login, or app/<name> for a bot")
 		}
 		q = append(q, "author:"+in.Author)
 	}

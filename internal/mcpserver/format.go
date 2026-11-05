@@ -53,6 +53,9 @@ func formatChecks(sets []model.CommitChecks) string {
 			}
 			b.WriteString("\n")
 		}
+		if cs.More {
+			b.WriteString("(there are more checks than these)\n")
+		}
 		b.WriteString("</checks>\n")
 	}
 	return b.String()
@@ -187,7 +190,7 @@ func formatIssue(d model.IssueDetail) string {
 	}
 	b.WriteString("</comments>\n")
 	if d.PR {
-		b.WriteString("<reviews>\n")
+		fmt.Fprintf(&b, "<reviews count=%d shown=%d>\n", d.ReviewCount, len(d.Reviews))
 		for _, r := range d.Reviews {
 			fmt.Fprintf(&b, "%s: %s\n", r.Author, r.State)
 			if strings.TrimSpace(r.Body) != "" {
@@ -195,13 +198,13 @@ func formatIssue(d model.IssueDetail) string {
 			}
 			b.WriteString("\n")
 		}
-		b.WriteString("</reviews>\n<review_threads>\n")
+		fmt.Fprintf(&b, "</reviews>\n<review_threads count=%d shown=%d>\n", d.ThreadCount, len(d.Threads))
 		for _, t := range d.Threads {
 			state := "open"
 			if t.Resolved {
 				state = "resolved"
 			}
-			fmt.Fprintf(&b, "%s:%d (%s)\n", t.Path, t.Line, state)
+			fmt.Fprintf(&b, "%s:%d (%s, comments: %d)\n", t.Path, t.Line, state, t.CommentCount)
 			for _, c := range t.Comments {
 				fmt.Fprintf(&b, "  %s: %s\n", c.Author, strings.ReplaceAll(cut(c.Body, maxText), "\n", "\n  "))
 			}

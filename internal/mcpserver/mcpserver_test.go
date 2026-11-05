@@ -242,9 +242,9 @@ func TestSearchLeavesOutOtherRepositories(t *testing.T) {
 func TestReadIssueLeavesOutOtherRepositories(t *testing.T) {
 	f := &fakeGitHub{issue: model.IssueDetail{Repo: "babarot/gh-desk", Number: 47, PR: true, Title: "t", Body: "b",
 		Closes:  []model.IssueRef{{Repo: "babarot/gh-desk", Number: 12}, {Repo: "other/private", Number: 99}},
-		Threads: []model.Thread{{Path: "a.go", Line: 3, Comments: []model.Comment{{Author: "x", Body: "nit"}}}}}}
+		Threads: []model.Thread{{Path: "a.go", Line: 3, CommentCount: 1, Comments: []model.Comment{{Author: "x", Body: "nit"}}}}}}
 	text, isErr := call(t, New(f, pr, logging.Discard()), "read_issue", map[string]any{"number": 47})
-	if isErr || !strings.Contains(text, "<closes>#12</closes>") || strings.Contains(text, "99") || !strings.Contains(text, "a.go:3 (open)") {
+	if isErr || !strings.Contains(text, "<closes>#12</closes>") || strings.Contains(text, "99") || !strings.Contains(text, "a.go:3 (open, comments: 1)") {
 		t.Errorf("text:\n%s", text)
 	}
 	onlyOurs(t, f)

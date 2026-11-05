@@ -83,7 +83,8 @@ func (s *Server) MCP() *mcp.Server {
 }
 
 // handle wraps a tool: it counts the call against maxCalls, logs it, and
-// gives Claude the text the tool wrote.
+// gives Claude the text the tool wrote. An error's text is logged, so the
+// tools never put what Claude sent in one.
 func handle[In any](s *Server, tool string, f func(context.Context, In) (string, []any, error)) mcp.ToolHandlerFor[In, any] {
 	return func(ctx context.Context, _ *mcp.CallToolRequest, in In) (*mcp.CallToolResult, any, error) {
 		log := s.log.With("tool", tool)

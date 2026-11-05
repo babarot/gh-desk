@@ -33,6 +33,8 @@ type CommitChecks struct {
 	Label  string
 	OID    string
 	Checks []RepoCheck
+	// More is set when there were more checks than were read.
+	More bool
 }
 
 // CheckRunDetail is what a check run says of itself, and its annotations.
@@ -89,7 +91,9 @@ type IssueDetail struct {
 	Comments     []Comment
 	CommentCount int
 	Reviews      []SubmittedReview
+	ReviewCount  int
 	Threads      []Thread
+	ThreadCount  int
 	Files        []ChangedFile
 	FileCount    int
 	// Closes are the issues the pull request closes, as their repository
@@ -110,6 +114,9 @@ type Thread struct {
 	Line     int
 	Resolved bool
 	Comments []Comment
+	// CommentCount is how many comments the thread has, those not sent yet
+	// included.
+	CommentCount int
 }
 
 // ChangedFile is a file a pull request changes.

@@ -133,7 +133,7 @@ func (c *Client) CommitChecks(ctx context.Context, owner, repo, label, expr stri
 		}
 		obj := resp.Repository.Object
 		if obj == nil || obj.Oid == "" {
-			return out, fmt.Errorf("no commit %q in %s/%s", expr, owner, repo)
+			return out, fmt.Errorf("no such commit in %s/%s", owner, repo)
 		}
 		out.OID = obj.Oid
 		if obj.StatusCheckRollup == nil {
@@ -168,6 +168,7 @@ func (c *Client) CommitChecks(ctx context.Context, owner, repo, label, expr stri
 		cur := ctxs.PageInfo.EndCursor
 		after = &cur
 	}
+	out.More = true
 	return out, nil
 }
 
@@ -241,9 +242,22 @@ func (c *Client) JobLog(ctx context.Context, owner, repo string, id int64) (log 
 		return nil, false, err
 	}
 	defer resp.Body.Close()
-	b, err := io.ReadAll(io.LimitReader(resp.Body, maxJobLog*4))
-	if err != nil {
-		return nil, false, err
+	// Read to the end, keeping only the last maxJobLog: the end of a long
+	// log is where it failed.
+	var b []byte
+	buf := make([]byte, 64<<10)
+	for {
+		n, rerr := resp.Body.Read(buf)
+		b = append(b, buf[:n]...)
+		if len(b) > 2*maxJobLog {
+			b = append(b[:0:0], b[len(b)-maxJobLog:]...)
+		}
+		if rerr == io.EOF {
+			break
+		}
+		if rerr != nil {
+			return nil, false, rerr
+		}
 	}
 	if len(b) > maxJobLog {
 		b = b[len(b)-maxJobLog:]
@@ -321,14 +335,14 @@ var issueQuery = fmt.Sprintf(`query($owner: String!, $name: String!, $number: In
     issueOrPullRequest(number: $number) {
       __typename
       ... on Issue {
-        number title state body author { login } labels(first: 20) { nodes { name } }
+        number title state body author { login } repository { nameWithOwner } labels(first: 20) { nodes { name } }
         comments(last: %[1]d) { totalCount nodes { author { login } body createdAt } }
       }
       ... on PullRequest {
-        number title state body author { login } labels(first: 20) { nodes { name } }
+        number title state body author { login } repository { nameWithOwner } labels(first: 20) { nodes { name } }
         comments(last: %[1]d) { totalCount nodes { author { login } body createdAt } }
-        reviews(last: %[2]d, states: [APPROVED, CHANGES_REQUESTED, COMMENTED, DISMISSED]) { nodes { author { login } state body } }
-        reviewThreads(first: %[3]d) { nodes { path line isResolved comments(first: %[4]d) { nodes { author { login } body createdAt state } } } }
+        reviews(last: %[2]d, states: [APPROVED, CHANGES_REQUESTED, COMMENTED, DISMISSED]) { totalCount nodes { author { login } state body } }
+        reviewThreads(first: %[3]d) { totalCount nodes { path line isResolved comments(first: %[4]d) { totalCount nodes { author { login } body createdAt state } } } }
         files(first: %[5]d) { totalCount nodes { path additions deletions } }
         closingIssuesReferences(first: %[6]d) { nodes { number repository { nameWithOwner } } }
       }
@@ -364,31 +378,35 @@ func (c *Client) Issue(ctx context.Context, owner, repo string, number int) (mod
 		Repository *struct {
 			NameWithOwner      string
 			IssueOrPullRequest *struct {
-				Typename string `json:"__typename"`
-				Number   int
-				Title    string
-				State    string
-				Body     string
-				Author   *struct{ Login string }
-				Labels   struct{ Nodes []struct{ Name string } }
-				Comments struct {
+				Typename   string `json:"__typename"`
+				Number     int
+				Title      string
+				State      string
+				Body       string
+				Author     *struct{ Login string }
+				Repository struct{ NameWithOwner string }
+				Labels     struct{ Nodes []struct{ Name string } }
+				Comments   struct {
 					TotalCount int
 					Nodes      []authored
 				}
 				Reviews struct {
-					Nodes []struct {
+					TotalCount int
+					Nodes      []struct {
 						Author *struct{ Login string }
 						State  string
 						Body   string
 					}
 				}
 				ReviewThreads struct {
-					Nodes []struct {
+					TotalCount int
+					Nodes      []struct {
 						Path       string
 						Line       int
 						IsResolved bool
 						Comments   struct {
-							Nodes []struct {
+							TotalCount int
+							Nodes      []struct {
 								authored
 								State string
 							}
@@ -420,9 +438,11 @@ func (c *Client) Issue(ctx context.Context, owner, repo string, number int) (mod
 		return model.IssueDetail{}, fmt.Errorf("no issue or pull request #%d in %s/%s", number, owner, repo)
 	}
 	n := resp.Repository.IssueOrPullRequest
-	d := model.IssueDetail{Repo: resp.Repository.NameWithOwner, Number: n.Number, PR: n.Typename == "PullRequest", Title: n.Title,
+	// The issue's own repository, which the caller compares with its own.
+	d := model.IssueDetail{Repo: n.Repository.NameWithOwner, Number: n.Number, PR: n.Typename == "PullRequest", Title: n.Title,
 		State: strings.ToLower(n.State), Author: login(n.Author), Body: n.Body,
-		Comments: comments(n.Comments.Nodes), CommentCount: n.Comments.TotalCount, FileCount: n.Files.TotalCount}
+		Comments: comments(n.Comments.Nodes), CommentCount: n.Comments.TotalCount, FileCount: n.Files.TotalCount,
+		ReviewCount: n.Reviews.TotalCount, ThreadCount: n.ReviewThreads.TotalCount}
 	for _, l := range n.Labels.Nodes {
 		d.Labels = append(d.Labels, l.Name)
 	}
@@ -430,7 +450,7 @@ func (c *Client) Issue(ctx context.Context, owner, repo string, number int) (mod
 		d.Reviews = append(d.Reviews, model.SubmittedReview{Author: login(r.Author), State: r.State, Body: r.Body})
 	}
 	for _, t := range n.ReviewThreads.Nodes {
-		th := model.Thread{Path: t.Path, Line: t.Line, Resolved: t.IsResolved}
+		th := model.Thread{Path: t.Path, Line: t.Line, Resolved: t.IsResolved, CommentCount: t.Comments.TotalCount}
 		for _, cm := range t.Comments.Nodes {
 			if cm.State == "PENDING" {
 				continue

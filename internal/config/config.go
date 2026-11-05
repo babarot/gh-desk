@@ -1130,6 +1130,7 @@ var moved = map[string]string{
 	"refresh":              `moved: refresh.interval is list.refresh, and "0" is "off"`,
 	"preview.description":  `moved to "description.style"`,
 	"merge.checks_timeout": `moved to "checks.wait_timeout"`,
+	"claude.mcp_servers":   `moved to "claude.mcp.servers", beside claude.mcp.builtin`,
 	"merge.watch_timeout":  `is no longer a setting: gh-desk watches a pull request on auto-merge for 24h, and GitHub's auto-merge goes on after`,
 }
 

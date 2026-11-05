@@ -108,7 +108,7 @@ func start(o *options, gcOnly bool, stdout, stderr io.Writer) int {
 		log.Warn("gh-desk's own MCP server is left out: where this program is is unknown", "err", err.Error())
 	}
 	p := assemble(cfg, warns, env{gh: gh, host: github.DefaultHost(), viewer: viewer, stateDir: state.DefaultDir(),
-		borrow: claude.GhqRoots(ctx), noCache: o.noCache, config: absPath(o.config), exe: exe}, log)
+		borrow: claude.GhqRoots(ctx), noCache: o.noCache, config: absPath(o.config), exe: exe, debug: o.debug}, log)
 	p.set.LogRecords = recs
 	start := time.Now()
 	err = tui.Run(ctx, source{gh}, p.rn, p.cl, km, log, p.set)
@@ -143,9 +143,11 @@ type env struct {
 	borrow   []string
 	noCache  bool
 	// config is the config file read, and exe this program, which gh-desk's
-	// own MCP server is started as; with exe empty it is not given.
+	// own MCP server is started as, logging at debug with debug; with exe
+	// empty it is not given.
 	config string
 	exe    string
+	debug  bool
 }
 
 // parts are what the TUI runs with. store and lock, when set, are closed
@@ -206,7 +208,7 @@ func assemble(cfg config.File, warns []string, e env, log *slog.Logger) parts {
 	}
 	opt := claude.Options{Bin: cfg.ClaudeCommand(), Model: cfg.Claude.Model, Tools: cfg.Claude.AllowedTools, Language: cfg.Claude.Language, Instructions: cfg.Claude.Instructions, Log: log}
 	release := func() {}
-	if servers := mcpServers(cfg, e.config, e.exe); len(servers) > 0 || len(cfg.Claude.Plugins) > 0 {
+	if servers := mcpServers(cfg, e.config, e.exe, e.debug); len(servers) > 0 || len(cfg.Claude.Plugins) > 0 {
 		var err error
 		release, err = conversationFiles(cfg, servers, &opt)
 		if err != nil {
@@ -241,8 +243,9 @@ func absPath(p string) string {
 
 // mcpServers are the MCP servers of the conversation: the user's, and
 // gh-desk's own when it is on (ADR-078), started as this program's mcp
-// command with the config file read, so that it logs as this run does.
-func mcpServers(cfg config.File, configPath, exe string) map[string]map[string]any {
+// command with the config file read and --debug, so that it logs as this
+// run does.
+func mcpServers(cfg config.File, configPath, exe string, debug bool) map[string]map[string]any {
 	out := maps.Clone(cfg.Claude.MCP.Servers)
 	if !cfg.BuiltinMCP() || exe == "" {
 		return out
@@ -254,7 +257,11 @@ func mcpServers(cfg config.File, configPath, exe string) map[string]map[string]a
 	for i, t := range mcpserver.Tools {
 		tools[i] = t
 	}
-	out[mcpserver.Name] = map[string]any{"command": exe, "args": []any{"mcp", "--config", configPath}, "tools": tools}
+	args := []any{"mcp", "--config", configPath}
+	if debug {
+		args = append(args, "--debug")
+	}
+	out[mcpserver.Name] = map[string]any{"command": exe, "args": args, "tools": tools}
 	return out
 }
 

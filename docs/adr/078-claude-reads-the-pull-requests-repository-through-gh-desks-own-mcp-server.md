@@ -12,7 +12,7 @@ Giving Claude a shell is not an answer. In `-p` the allowed tools run without a 
 
 The tools only read, so what they guard against is a leak, not a change. A leak needs something to read and a way out. WebFetch and a server of the user's that reaches a service are ways out the configuration can close. One is not: the review Claude drafts, which the user posts on the pull request. A pull request's text can ask Claude to quote what it read in the draft, and a long review is easy to post without noticing.
 
-Measured against GitHub on public repositories: the ID of another repository's check run or job, asked under this repository's path, is answered 404 for the check run, its annotations, the job and its log; a ref with `../` does not reach another repository; two `repo:` qualifiers in a search are ORed; a pull request's `closingIssuesReferences` and its timeline return issues of other repositories, private ones the viewer can see included.
+Measured against GitHub on public repositories: the ID of another repository's check run or job, asked under this repository's path, is answered 404 for the check run, its annotations, the job and its log; a ref with `../` does not reach another repository; two `repo:` qualifiers in a search are ORed. Not measured, but as GitHub documents linking: a pull request may close, and a timeline may reference, an issue of another repository written as `owner/repo#n`, so `closingIssuesReferences` and the timeline can return issues of other repositories, private ones the viewer can see included.
 
 ## Decision
 
@@ -25,7 +25,7 @@ Measured against GitHub on public repositories: the ID of another repository's c
 - `claude.mcp.builtin` turns the server on or off; the user's servers are `claude.mcp.servers`. Left out, it is on, unless `claude.allowed_tools` has WebFetch or `claude.mcp.servers` has a server: either can carry what the tools read to someone who is not the pull request's reader, so the file must then say true or false, and leaving it out is a mistake in the file. This is the one setting whose default depends on others rather than being a value (ADR-016): a value would open that way out silently for a file written before the server existed. gh-desk does not judge each server of the user's, as it cannot tell which reach out (ADR-037).
 - The server logs to gh-desk's log file and never moves it aside, which only the TUI does; its reads are logged at debug, never what they returned.
 
-This replaces, in ADR-010's Consequences, "Claude cannot read outside the worktree": through these tools it reads the pull request's repository on GitHub. In ADR-037's Decision, the user's servers are configured in `claude.mcp.servers` rather than `claude.mcp_servers`; the rest of that decision stands, and these tools join those a skill may grant.
+This replaces, in ADR-010's Consequences, "Claude cannot read outside the worktree": through these tools it reads the pull request's repository on GitHub. In ADR-037's Decision, the user's servers are configured in `claude.mcp.servers` rather than `claude.mcp_servers`, which stays in the table of old names; the rest of that decision stands, and these tools join those a skill may grant. In ADR-016's Decision, "A key left out takes its default" no longer holds for `claude.mcp.builtin`, whose default depends on other settings as above.
 
 ## Alternatives
 
