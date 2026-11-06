@@ -43,6 +43,20 @@ func ForClose(mi model.MergeInfo, basedOn []int, comment, deleteBranch bool) Clo
 	return c
 }
 
+// ForComment decides commenting on a pull request. A comment is taken
+// whatever its state, so it is never skipped: the popup tells what the
+// user may not know since the list was read.
+func ForComment(mi model.MergeInfo) Decision {
+	d := Decision{Reason: "comment"}
+	if mi.State != model.StateOpen {
+		d.Notes = append(d.Notes, "it is "+stateWord(mi.State))
+	}
+	if mi.Locked {
+		d.Notes = append(d.Notes, "its conversation is locked; GitHub may refuse the comment")
+	}
+	return d
+}
+
 // KeepBranch says why the head branch of a pull request must be kept, or
 // "" when it can be deleted: it is in a fork, gone, the viewer cannot push
 // to the repository, or an open pull request is based on it, which

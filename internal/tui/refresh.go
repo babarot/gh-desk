@@ -27,7 +27,7 @@ func (m *Model) tick() tea.Cmd {
 func (m *Model) autoRefresh() tea.Cmd {
 	// Rules approve whatever is open: they change no row under the user.
 	auto := m.autoApprove()
-	if m.bulk != nil || m.confirm != nil || m.compose != nil || m.notesAt != nil || m.picker != nil || m.menu != nil || m.typingChat() || m.viewer == "" {
+	if m.bulk != nil || m.compose != nil || m.notesAt != nil || m.picker != nil || m.menu != nil || m.typingChat() || m.viewer == "" {
 		return tea.Batch(auto, m.tick())
 	}
 	m.fadeResults()

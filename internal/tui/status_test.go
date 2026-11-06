@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/babarot/gh-desk/internal/model"
+	"github.com/babarot/gh-desk/internal/runner"
 	"github.com/babarot/gh-desk/internal/tui/keymap"
 	"github.com/babarot/gh-desk/internal/tui/statusline"
 )
@@ -35,10 +36,9 @@ func TestStatusActivities(t *testing.T) {
 	m := start(t, fixture(), keymap.Default())
 	m.tab().loading = true
 	m.refreshing = &refreshRun{tabs: []int{m.cur}, cleared: 2}
-	p, _, _ := m.currentPR()
-	m.posting = &posting{prs: []model.PR{p, p}, next: 0}
-	m.sending = "2 pull requests"
-	want := "sending the comment… 1/2 · refreshing… · 2 results cleared"
+	m.addBatch("b1", &batchState{kind: runner.Comment, goes: map[model.PRKey]bool{key("acme", "api", 12): true, key("acme", "web", 7): true},
+		done: map[model.PRKey]progress{}})
+	want := "commenting… 0/2 · refreshing… · 2 results cleared"
 	if got := status(m); !strings.HasSuffix(got, want) {
 		t.Fatalf("status = %q, want it to end with %q", got, want)
 	}

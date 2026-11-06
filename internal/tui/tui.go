@@ -37,7 +37,6 @@ type Source interface {
 	Diff(ctx context.Context, pr model.PR) ([]byte, error)
 	Comment(ctx context.Context, apiURL string) (model.Comment, error)
 	Review(ctx context.Context, pr model.PR, event model.ReviewEvent, body string) error
-	PostComment(ctx context.Context, pr model.PR, body string) error
 	MarkDone(ctx context.Context, n model.Notification) error
 	Browse(url string) error
 	// MergeInfo reads what deciding a merge needs, by node ID; with
@@ -63,6 +62,7 @@ type Runner interface {
 	Start(ctx context.Context, kind runner.Kind, items []runner.Item) (string, <-chan runner.Event)
 	StartReview(ctx context.Context, rv runner.ReviewText, items []runner.Item) (string, <-chan runner.Event)
 	StartClose(ctx context.Context, ct runner.CloseText, items []runner.Item) (string, <-chan runner.Event)
+	StartComment(ctx context.Context, body string, items []runner.Item) (string, <-chan runner.Event)
 	Resume(ctx context.Context, ps []model.Pending) (string, <-chan runner.Event)
 }
 
@@ -257,11 +257,6 @@ type Model struct {
 
 	pane  pane
 	cache cache
-	// sending names the pull requests a comment is on its way to; none
-	// other is sent until it is back. Empty when none is.
-	sending string
-	// posting is the comment on its way.
-	posting *posting
 	// unsentClose is the comment of a close popup closed without
 	// confirming, given back when close is opened again (ADR-066).
 	unsentClose string
@@ -306,7 +301,6 @@ type Model struct {
 	// its end is said.
 	telling *telling
 	compose *compose
-	confirm *confirm
 	// chats are the conversations with Claude, by pull request; chatState
 	// keeps them and takes their locks. claudeOpen puts the claude pane in
 	// place of the preview.
@@ -533,8 +527,6 @@ func (m *Model) key(msg tea.KeyPressMsg) tea.Cmd {
 		return m.pickKey(k)
 	case m.menu != nil:
 		return m.menuKey(k)
-	case m.confirm != nil:
-		return m.confirmKey(k)
 	case m.triage != nil && m.triage.open:
 		return m.triageKey(msg)
 	case m.help && m.relBox != nil:

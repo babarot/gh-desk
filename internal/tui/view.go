@@ -97,11 +97,6 @@ func (m *Model) render() (string, *tea.Cursor) {
 		popup := m.renderMenu()
 		m.popupAt = boxAt(popup, 2, m.width)
 		lines = m.overlay(lines, popup, 2, m.width)
-	case m.confirm != nil:
-		cur = nil
-		popup := m.renderConfirm()
-		m.popupAt = boxAt(popup, 2, m.width)
-		lines = m.overlay(lines, popup, 2, m.width)
 	case m.triage != nil && m.triage.open:
 		popup, at := m.renderTriage()
 		m.popupAt = boxAt(popup, 2, m.width)
@@ -440,8 +435,6 @@ func (m *Model) hints() string {
 		as = []keymap.Action{"toggle_rule", "choose", "add_to_selection", "filter_by_rule"}
 	case m.notesAt != nil, m.menu != nil:
 		as = []keymap.Action{"choose"}
-	case m.confirm != nil:
-		as = []keymap.Action{"confirm"}
 	case m.compose != nil:
 		as = []keymap.Action{"next_kind", "post", "editor"}
 	case m.triage != nil && m.triage.open:

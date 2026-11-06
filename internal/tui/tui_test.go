@@ -92,7 +92,6 @@ type fakeSource struct {
 	comments map[string]model.Comment
 
 	reviews []string
-	posted  []string
 	done    []string
 	browsed []string
 	// info overrides what MergeInfo says of a pull request, by key.
@@ -183,12 +182,13 @@ func (f *fakeSource) BasedOn(_ context.Context, bs []model.Branch) (map[model.Br
 // fakeRunner records the batches it is given and ends each pull request
 // with the result results says, Approved or Merged by default.
 type fakeRunner struct {
-	kinds   []runner.Kind
-	reviews []runner.ReviewText
-	items   [][]runner.Item
-	results map[model.PRKey]runner.Event
-	resumed []model.Pending
-	closes  []runner.CloseText
+	comments []string
+	kinds    []runner.Kind
+	reviews  []runner.ReviewText
+	items    [][]runner.Item
+	results  map[model.PRKey]runner.Event
+	resumed  []model.Pending
+	closes   []runner.CloseText
 }
 
 // StartClose closes each pull request, saying first that the comment was
@@ -208,6 +208,26 @@ func (r *fakeRunner) StartClose(_ context.Context, ct runner.CloseText, items []
 		}
 		ev.Key = it.PR.Key
 		ch <- ev
+	}
+	close(ch)
+	return fmt.Sprintf("b%d", len(r.kinds)), ch
+}
+
+// StartComment says the comment was taken, as the runner does, unless a
+// result says otherwise.
+func (r *fakeRunner) StartComment(_ context.Context, body string, items []runner.Item) (string, <-chan runner.Event) {
+	r.comments = append(r.comments, body)
+	r.kinds = append(r.kinds, runner.Comment)
+	r.items = append(r.items, items)
+	ch := make(chan runner.Event, 2*len(items))
+	for _, it := range items {
+		if ev, ok := r.results[it.PR.Key]; ok {
+			ev.Key = it.PR.Key
+			ch <- ev
+			continue
+		}
+		ch <- runner.Event{Key: it.PR.Key, Result: runner.Running, Text: "commented", Commented: true}
+		ch <- runner.Event{Key: it.PR.Key, Result: runner.CommentSent, Text: "commented"}
 	}
 	close(ch)
 	return fmt.Sprintf("b%d", len(r.kinds)), ch
@@ -312,10 +332,6 @@ func (f *fakeSource) Comment(_ context.Context, url string) (model.Comment, erro
 }
 func (f *fakeSource) Review(_ context.Context, p model.PR, ev model.ReviewEvent, body string) error {
 	f.reviews = append(f.reviews, p.Key.String()+" "+string(ev)+" "+p.HeadOID+" "+body)
-	return nil
-}
-func (f *fakeSource) PostComment(_ context.Context, p model.PR, body string) error {
-	f.posted = append(f.posted, p.Key.String()+" "+body)
 	return nil
 }
 func (f *fakeSource) MarkDone(_ context.Context, n model.Notification) error {
@@ -807,7 +823,7 @@ func TestApprove(t *testing.T) {
 // of the viewer stays, and the notification is not marked done.
 func TestCommentWithBody(t *testing.T) {
 	f := fixture()
-	m := start(t, f, keymap.Default())
+	m, r := startWith(t, f, keymap.Default())
 	press(m, "c", "tab", "ctrl+s")
 	if !strings.Contains(status(m), "write the comment first") {
 		t.Errorf("empty comment was not refused: %q", status(m))
@@ -818,8 +834,8 @@ func TestCommentWithBody(t *testing.T) {
 		t.Errorf("the confirm popup does not tell a comment from a review:\n%s", screen(m))
 	}
 	press(m, "y")
-	if len(f.posted) != 1 || f.posted[0] != "acme/api#12 Does this retry on a 429?" || len(f.reviews) != 0 {
-		t.Errorf("posted = %q, reviews = %q", f.posted, f.reviews)
+	if len(r.comments) != 1 || r.comments[0] != "Does this retry on a 429?" || len(r.items[0]) != 1 || len(f.reviews) != 0 {
+		t.Errorf("comments = %q, reviews = %q", r.comments, f.reviews)
 	}
 	if m.compose != nil {
 		t.Error("the popup stayed open")
@@ -838,73 +854,70 @@ func TestCommentWithBody(t *testing.T) {
 }
 
 // c with a selection sends the same comment to each selected pull
-// request. The popup closes at once and the status line counts the
-// comment through them; none stays selected, and the retry key sends the
-// comment again to those it failed on.
+// request through the runner, as a review is. Each row and the
+// notification tell how it went; none stays selected, and the retry key
+// sends the comment again to those it failed on.
 func TestCommentOnSelection(t *testing.T) {
-	f := fixture()
-	m := start(t, f, keymap.Default())
-	m.src = &failingComment{fakeSource: f, on: key("acme", "web", 7)}
+	m, r := startWith(t, fixture(), keymap.Default())
+	web := key("acme", "web", 7)
+	r.results[web] = runner.Event{Result: runner.Failed, Text: "comment failed: locked"}
 	// space on #12, then on the team group under it, which selects #7.
 	press(m, "space", "space", "k", "c")
 	run(m, m.paste(tea.PasteMsg{Content: "@dependabot rebase"}))
 	press(m, "ctrl+s")
-	if s := screen(m); !strings.Contains(s, "comment on 2 pull requests") || !strings.Contains(s, "acme/api#12  acme/web#7") {
-		t.Fatalf("the confirm popup does not name both:\n%s", s)
+	if m.bulk == nil || m.bulk.kind != runner.Comment || !strings.Contains(screen(m), "comment 2 of 2") {
+		t.Fatalf("the confirm popup does not name both:\n%s", screen(m))
 	}
-	// y without running the command: the comment is on its way.
-	_, cmd := m.Update(keyMsg("y"))
-	if m.compose != nil || !strings.Contains(screen(m), "sending the comment… 1/2") {
-		t.Fatalf("the popup did not close for the comment to go behind it:\n%s", screen(m))
+	press(m, "y")
+	if len(r.comments) != 1 || r.comments[0] != "@dependabot rebase" || len(r.items[0]) != 2 {
+		t.Fatalf("comments = %q, items = %+v", r.comments, r.items)
 	}
-	press(m, "c")
-	run(m, m.paste(tea.PasteMsg{Content: "again"}))
-	press(m, "ctrl+s")
-	if m.confirm != nil || !strings.Contains(status(m), "being sent") {
-		t.Errorf("a second comment was let through while one was on its way: %q", status(m))
+	if len(m.selected) != 0 || m.compose != nil {
+		t.Fatalf("selection = %v, compose = %+v", m.selected, m.compose)
 	}
-	press(m, "esc")
-	// #7 read, so a comment shown on it would be seen.
-	m.cache.details[key("acme", "web", 7)] = &entry[model.Detail]{}
-	run(m, cmd)
-	if len(f.posted) != 1 || f.posted[0] != "acme/api#12 @dependabot rebase" {
-		t.Errorf("posted = %q", f.posted)
+	if got := m.progress[web]; got.result != runner.Failed {
+		t.Errorf("the row of the one that failed says %+v", got)
 	}
-	if cs := m.cache.details[key("acme", "web", 7)].val.Comments; len(cs) != 0 {
-		t.Errorf("a comment GitHub refused is shown: %+v", cs)
-	}
-	if cs := m.cache.details[key("acme", "api", 12)].val.Comments; len(cs) != 1 {
-		t.Errorf("the comment sent is not shown: %+v", cs)
-	}
-	if !strings.Contains(status(m), "failed on 1 of 2") || len(m.selected) != 0 {
-		t.Fatalf("selection = %v, status = %q", m.selected, status(m))
+	if n := m.notes[0]; !strings.Contains(n.title, "commented 1, 1 stopped") || len(n.items) != 2 {
+		t.Errorf("the notification does not name each: %+v", n)
 	}
 	press(m, ".")
-	if m.confirm == nil || len(m.confirm.prs) != 1 || m.confirm.body != "@dependabot rebase" {
-		t.Fatalf("the retry key does not offer the comment again: %+v", m.confirm)
+	if m.bulk == nil || m.bulk.kind != runner.Comment || len(m.bulk.items) != 1 || m.bulk.items[0].pr.Key != web ||
+		m.bulk.review.Body != "@dependabot rebase" {
+		t.Fatalf("the retry key does not offer the comment again: %+v", m.bulk)
 	}
 	press(m, "esc")
 	if m.retry == nil {
 		t.Fatal("esc lost what is left to try again")
 	}
-	press(m, ".")
-	m.src = f
-	press(m, "y")
-	if len(f.posted) != 2 || f.posted[1] != "acme/web#7 @dependabot rebase" || m.retry != nil {
-		t.Errorf("posted = %q, retry = %+v", f.posted, m.retry)
+	delete(r.results, web)
+	press(m, ".", "y")
+	if len(r.comments) != 2 || len(r.items[1]) != 1 || r.items[1][0].PR.Key != web || m.retry != nil {
+		t.Errorf("comments = %q, items = %+v, retry = %+v", r.comments, r.items, m.retry)
 	}
 }
 
-type failingComment struct {
-	*fakeSource
-	on model.PRKey
-}
-
-func (f *failingComment) PostComment(ctx context.Context, p model.PR, body string) error {
-	if p.Key == f.on {
-		return fmt.Errorf("locked")
+// A comment on a pull request merged since the list was read still goes,
+// and the popup says what it is.
+func TestCommentTellsOfAMergedPullRequest(t *testing.T) {
+	f := fixture()
+	m := start(t, f, keymap.Default())
+	k := key("acme", "api", 12)
+	press(m, "c")
+	run(m, m.paste(tea.PasteMsg{Content: "Thanks!"}))
+	press(m, "ctrl+s")
+	if m.bulk == nil {
+		t.Fatal("no confirm popup")
 	}
-	return f.fakeSource.PostComment(ctx, p, body)
+	it := &m.bulk.items[0]
+	if it.pr.Key != k {
+		t.Fatalf("item = %v", it.pr.Key)
+	}
+	it.mi.State = model.StateMerged
+	m.decideBulk()
+	if !it.goes() || !strings.Contains(screen(m), "it is merged") {
+		t.Errorf("goes = %v:\n%s", it.goes(), screen(m))
+	}
 }
 
 // R writes a review, and the confirm popup of a batch asks about it: the
@@ -929,7 +942,7 @@ func TestReviewWithBody(t *testing.T) {
 	}
 	press(m, "ctrl+s", "y")
 	if len(r.reviews) != 1 || r.reviews[0] != (runner.ReviewText{Event: model.EventComment, Body: "Looks good, one question."}) ||
-		len(r.items[0]) != 1 || r.items[0][0].Head != "aaaaaaa1" || len(f.reviews) != 0 || len(f.posted) != 0 {
+		len(r.items[0]) != 1 || r.items[0][0].Head != "aaaaaaa1" || len(f.reviews) != 0 {
 		t.Errorf("reviews = %+v, items = %+v, sent directly = %q", r.reviews, r.items, f.reviews)
 	}
 	if m.compose != nil {

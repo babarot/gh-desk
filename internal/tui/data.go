@@ -666,8 +666,6 @@ func (m *Model) handleData(msg tea.Msg) tea.Cmd {
 			return nil
 		}
 		msg.e.loading, msg.e.err, msg.e.val = false, msg.err, safeComment(msg.c)
-	case postedMsg:
-		return m.posted(msg)
 	case doneMsg:
 		if msg.err != nil {
 			delete(m.inboxTab().hidden, msg.n.Key)

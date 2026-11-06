@@ -417,9 +417,6 @@ func (m *Model) applyTriage() tea.Cmd {
 				cmds = append(cmds, m.ensure())
 			}
 		case claude.DoApprove, claude.DoMerge:
-			if m.busy() {
-				continue
-			}
 			if s.Do == claude.DoApprove {
 				cmds = append(cmds, m.startBulkFor(runner.Review, runner.ReviewText{Event: model.EventApprove}, s.prs))
 			} else {
