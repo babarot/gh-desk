@@ -42,6 +42,10 @@ var token = regexp.MustCompile(`[!-~]+|\s+|.`)
 // the next line with what comes before it.
 const noLineStart = "、。，．）」』】,.;:)!?！？"
 
+// noLineEnd are the characters a line may not end with; each goes to the
+// next line with what comes after it.
+const noLineEnd = "（「『【("
+
 // piece is a token of the span from.
 type piece struct {
 	text string
@@ -50,8 +54,9 @@ type piece struct {
 
 // units are the tokens of ss, joined where a line may not break between
 // them: a word that goes on in the next span with no space between, such
-// as code and the comma after it, and a character a line may not start
-// with and what comes before it.
+// as code and the comma after it, a character a line may not start with
+// and what comes before it, and a character a line may not end with and
+// what comes after it.
 func units(ss []span) [][]piece {
 	var out [][]piece
 	word := false
@@ -71,7 +76,8 @@ func units(ss []span) [][]piece {
 
 func joined(prev, next string) bool {
 	r, _ := utf8.DecodeRuneInString(next)
-	return ascii(prev) && ascii(next) || strings.ContainsRune(noLineStart, r)
+	l, _ := utf8.DecodeLastRuneInString(prev)
+	return ascii(prev) && ascii(next) || strings.ContainsRune(noLineStart, r) || strings.ContainsRune(noLineEnd, l)
 }
 
 func ascii(s string) bool {
@@ -308,7 +314,13 @@ func (m *Model) codeBlock(code []string, lang string, width int) []line {
 	return out
 }
 
-// table draws a Markdown table with its columns lined up, cut at the edge.
+// minColumn is how narrow a table's column may be made to fit the pane.
+const minColumn = 10
+
+// table draws a Markdown table with its columns lined up. While it is
+// wider than the pane, its widest column is narrowed, down to minColumn,
+// so that every column shows; a cell wider than its column is cut with
+// "…", and what is still too wide is cut at the edge.
 func (m *Model) table(rows []string, width int) []line {
 	st := m.st
 	var cells [][]string
@@ -333,6 +345,23 @@ func (m *Model) table(rows []string, width int) []line {
 			ws[j] = max(ws[j], ansi.StringWidth(c))
 		}
 	}
+	total := 3 * (len(ws) - 1)
+	for _, w := range ws {
+		total += w
+	}
+	for total > width {
+		k := 0
+		for j, w := range ws {
+			if w > ws[k] {
+				k = j
+			}
+		}
+		if ws[k] <= minColumn {
+			break
+		}
+		ws[k]--
+		total--
+	}
 	var out []line
 	for i, cs := range cells {
 		style := st.sub1
@@ -348,7 +377,7 @@ func (m *Model) table(rows []string, width int) []line {
 			if j < len(cs) {
 				c = cs[j]
 			}
-			b.WriteString(style.Render(c + spaces(w-ansi.StringWidth(c))))
+			b.WriteString(style.Render(fit(c, w)))
 		}
 		out = append(out, line{text: ansi.Truncate(b.String(), width, "…")})
 		if i == 0 && len(cells) > 1 {
