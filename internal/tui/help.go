@@ -98,7 +98,7 @@ func (m *Model) helpSections() []helpSection {
 	}
 	works := func(s keymap.Scope) bool {
 		if s == keymap.ScopeInput {
-			return here == keymap.ScopeChat || here == keymap.ScopeTriage
+			return here == keymap.ScopeChat
 		}
 		return s == here || s == keymap.ScopeGlobal || s == keymap.ScopeNav || s == keymap.ScopeHelp
 	}

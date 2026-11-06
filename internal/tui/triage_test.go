@@ -777,3 +777,25 @@ func TestChatHasNoMenu(t *testing.T) {
 		t.Errorf("a menu in i:\n%s", s)
 	}
 }
+
+// A question of several lines is drawn as far as its first, and filled in
+// whole.
+func TestAskGhostOfSeveralLines(t *testing.T) {
+	h := &memoryHistory{entries: []askbox.Entry{{Question: "foo\n\n\nbar"}}}
+	m := withHistory(t, h)
+	press(m, "C", "f")
+	before := strings.Count(screen(m), "\n")
+	lines := m.askLines(&m.triage.input, askGhost(&m.triage.input, &m.triage.recall, nil, m.triage.history))
+	for _, l := range lines {
+		if strings.Contains(l, "\n") {
+			t.Fatalf("a line of the box holds a line break: %q", l)
+		}
+	}
+	if !strings.Contains(screen(m), "┃ foo") || strings.Count(screen(m), "\n") != before {
+		t.Errorf("screen:\n%s", screen(m))
+	}
+	press(m, "tab")
+	if got := m.triage.input.Value(); got != "foo\n\n\nbar" {
+		t.Errorf("tab gave %q", got)
+	}
+}

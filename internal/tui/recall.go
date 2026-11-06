@@ -334,6 +334,8 @@ func completeAsk(r *askbox.Recall, in *textarea.Model, try []string, list []askb
 func (m *Model) askLines(in *textarea.Model, ghost string) []string {
 	lines := strings.Split(in.View(), "\n")
 	cur := in.Cursor()
+	// A question may hold lines of its own; the box has the one to draw on.
+	ghost = safe(firstLine(ghost))
 	if ghost == "" || cur == nil || cur.Y >= len(lines) {
 		return lines
 	}

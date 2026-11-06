@@ -45,7 +45,7 @@ const (
 // their keys are checked against its own.
 var borrowed = map[Scope][]Action{
 	ScopeHelp: {"fold"},
-	ScopeChat: {"complete"},
+	ScopeChat: {"complete", "expand"},
 }
 
 // Def is an action with its default keys and the words the key hints show.
