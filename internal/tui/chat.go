@@ -55,6 +55,8 @@ type chatScreen struct {
 	// recall the place among the questions asked in it.
 	input  textarea.Model
 	recall askbox.Recall
+	// search is the search of the questions, nil when none is open.
+	search *search
 	// cancel stops the question on its way, nil when none is; stopping is
 	// set once the user stopped it, until its end comes back.
 	cancel   context.CancelFunc
@@ -519,6 +521,9 @@ func (m *Model) draftCompose(c *chatScreen, d claude.Draft) tea.Cmd {
 func (m *Model) chatTyping(msg tea.KeyPressMsg) tea.Cmd {
 	c, k := m.chat(), msg.String()
 	is := func(a keymap.Action) bool { return m.keys.Matches(a, k) }
+	if c.search != nil {
+		return m.searchKey(&c.search, &c.input, &c.recall, chatHistory(c), msg)
+	}
 	armed := c.restart
 	c.restart = false
 	switch {
@@ -532,6 +537,8 @@ func (m *Model) chatTyping(msg tea.KeyPressMsg) tea.Cmd {
 		return nil
 	case m.recallKey(&c.recall, &c.input, chatHistory(c), msg):
 		return nil
+	case is("history_search"):
+		return m.openSearch(&c.search, &c.input, chatHistory(c))
 	case is("fill_suggestion"):
 		if s := nextSuggestion(suggestions(c), c.input.Value()); s != "" {
 			c.input.SetValue(s)
@@ -595,11 +602,17 @@ const draftShown = "Draft the review."
 
 // chatHistory are the questions asked in c, the newest first.
 func chatHistory(c *chatScreen) []askbox.Entry {
+	turns := c.Turns()
 	var out []askbox.Entry
-	for _, t := range slices.Backward(c.Turns()) {
-		if t.You && t.Text != draftShown {
-			out = append(out, askbox.Entry{Question: t.Text, At: t.At})
+	for i, t := range slices.Backward(turns) {
+		if !t.You || t.Text == draftShown {
+			continue
 		}
+		e := askbox.Entry{Question: t.Text, At: t.At}
+		if i+1 < len(turns) && !turns[i+1].You && !turns[i+1].Err {
+			e.Reply = keptReply(turns[i+1].Text)
+		}
+		out = append(out, e)
 	}
 	return askbox.Unique(out)
 }
@@ -663,6 +676,9 @@ const (
 	// chatMaxWidth is the widest a line of text is wrapped at, however
 	// wide the terminal.
 	chatMaxWidth = 100
+	// chatSearchRows is how many questions a search shows in the pane,
+	// which is not tall.
+	chatSearchRows = 5
 	// chatLiveSteps is how many of the tools used so far are shown while
 	// Claude answers.
 	chatLiveSteps = 3
@@ -966,7 +982,16 @@ func (m *Model) renderClaude(b *strings.Builder, height int) *tea.Cursor {
 		// A box inside the pane, whose frame alone tells the focus.
 		plain := st
 		plain.focus = st.border
-		ask = box(plain, "ask claude", strings.Split(c.input.View(), "\n"), min(inner, chatMaxWidth))
+		w := min(inner, chatMaxWidth)
+		if c.search != nil {
+			// Within the pane, so the text box of the search stays in sight.
+			room := max(height-4, 1)
+			lines := strings.Split(c.search.input.View(), "\n")
+			lines = append(lines, m.searchLines(c.search, chatHistory(c), w-4, searchRows(room, chatSearchRows))...)
+			ask = box(plain, "history · "+c.PR().Key.String(), lines[:min(len(lines), room)], w)
+		} else {
+			ask = box(plain, "ask claude", strings.Split(c.input.View(), "\n"), w)
+		}
 	}
 	bodyH := max(height-2-len(ask), 1)
 	L := m.chatLines(c, inner)
@@ -1000,6 +1025,9 @@ func (m *Model) renderClaude(b *strings.Builder, height int) *tea.Cursor {
 		return nil
 	}
 	cur := c.input.Cursor()
+	if c.search != nil {
+		cur = c.search.input.Cursor()
+	}
 	if cur != nil {
 		// Inside the box inside the pane: after both left edges, under
 		// the pane's top edge and the box's.

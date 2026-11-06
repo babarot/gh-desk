@@ -7,6 +7,7 @@ import (
 
 	"charm.land/bubbles/v2/textarea"
 	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 
 	"github.com/babarot/gh-desk/internal/claude"
 	"github.com/babarot/gh-desk/internal/logging"
@@ -180,3 +181,123 @@ func (m *Model) recallHint(r *askbox.Recall, list []askbox.Entry) string {
 	}
 	return out
 }
+
+// triageSearchRows is how many questions a search shows in the popup.
+const triageSearchRows = 8
+
+// search is a search of the questions, which takes the place of the text box
+// and has a text box of its own, so an input method works in it.
+type search struct {
+	input textarea.Model
+	hits  askbox.Search
+}
+
+// edit gives msg to the search's text box; a text changed starts from the
+// first hit.
+func (s *search) edit(msg tea.Msg) tea.Cmd {
+	before := s.input.Value()
+	var cmd tea.Cmd
+	s.input, cmd = s.input.Update(msg)
+	if s.input.Value() != before {
+		s.hits.Reset()
+	}
+	return cmd
+}
+
+// openSearch opens a search of list in place of the text box in; with no
+// questions there is nothing to search.
+func (m *Model) openSearch(sp **search, in *textarea.Model, list []askbox.Entry) tea.Cmd {
+	if len(list) == 0 {
+		m.refuse("nothing has been asked yet")
+		return nil
+	}
+	ta := newInput(m.st)
+	ta.Placeholder = "Search the questions"
+	ta.ShowLineNumbers = false
+	ta.SetHeight(1)
+	ta.SetWidth(in.Width())
+	in.Blur()
+	*sp = &search{input: ta}
+	return (*sp).input.Focus()
+}
+
+// searchKey handles a key while the search of list is open. accept puts the
+// question in the text box in, and sends nothing.
+func (m *Model) searchKey(sp **search, in *textarea.Model, r *askbox.Recall, list []askbox.Entry, msg tea.KeyPressMsg) tea.Cmd {
+	s, k := *sp, msg.String()
+	is := func(a keymap.Action) bool { return m.keys.Matches(a, k) }
+	hits := askbox.Hits(list, s.input.Value())
+	switch {
+	case k == keymap.Back:
+	case is("accept"):
+		if len(hits) > 0 {
+			in.SetValue(hits[s.hits.At(len(hits))].Question)
+			r.Leave()
+		}
+	case is("history_search"), is("history_next"), is("down") && msg.Text == "":
+		s.hits.Next(len(hits))
+		return nil
+	case is("history_prev"), is("up") && msg.Text == "":
+		s.hits.Prev(len(hits))
+		return nil
+	default:
+		return s.edit(msg)
+	}
+	*sp = nil
+	return in.Focus()
+}
+
+// searchLines are the hits of s among list, at most rows of them, the one
+// chosen marked, and the first line of its answer, in width.
+func (m *Model) searchLines(s *search, list []askbox.Entry, width, rows int) []string {
+	st := m.st
+	q := s.input.Value()
+	hits := askbox.Hits(list, q)
+	if len(hits) == 0 {
+		return []string{st.dim.Render("no question holds that")}
+	}
+	at := s.hits.At(len(hits))
+	from, to := askbox.Shown(at, len(hits), rows)
+	var out []string
+	for i := from; i < to; i++ {
+		e := hits[i]
+		mark, text := "  ", st.dim
+		if i == at {
+			mark, text = st.mauve.Render("›")+" ", st.sub1
+		}
+		age := ""
+		if !e.At.IsZero() {
+			age = shortAge(m.set.Now().Sub(e.At))
+		}
+		lead := mark + st.dim.Render(fit(age, 5))
+		if e.Tab != "" {
+			lead += st.muted.Render(fit(safeLine(e.Tab), 10))
+		}
+		out = append(out, lead+m.markHit(safeLine(e.Question), q, text))
+	}
+	reply := hits[at].Reply
+	if reply == "" {
+		reply = "no answer kept"
+	}
+	return append(out, st.dim.Render("⏺ "+safeLine(reply)))
+}
+
+// markHit is text in style, with what holds q in the search's color. It looks
+// by rune, as lower case keeps the runes of a text but not always its bytes.
+func (m *Model) markHit(text, q string, style lipgloss.Style) string {
+	rs, low, want := []rune(text), []rune(strings.ToLower(text)), []rune(strings.ToLower(q))
+	if len(want) == 0 || len(low) != len(rs) {
+		return style.Render(text)
+	}
+	for i := 0; i+len(want) <= len(low); i++ {
+		if slices.Equal(low[i:i+len(want)], want) {
+			end := i + len(want)
+			return style.Render(string(rs[:i])) + m.st.peach.Render(string(rs[i:end])) + style.Render(string(rs[end:]))
+		}
+	}
+	return style.Render(text)
+}
+
+// searchRows is how many hits fit in rows lines of a search's box, beside its
+// text box and the line of the answer.
+func searchRows(lines, most int) int { return max(min(most, lines-2), 1) }

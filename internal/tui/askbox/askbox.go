@@ -5,6 +5,7 @@ package askbox
 
 import (
 	"slices"
+	"strings"
 	"time"
 )
 
@@ -49,6 +50,48 @@ func Unique(list []Entry) []Entry {
 		}
 	}
 	return out
+}
+
+// Hits are the questions of list that hold q, ignoring case.
+func Hits(list []Entry, q string) []Entry {
+	q = strings.ToLower(q)
+	var out []Entry
+	for _, e := range list {
+		if strings.Contains(strings.ToLower(e.Question), q) {
+			out = append(out, e)
+		}
+	}
+	return out
+}
+
+// Search is the place among the hits of a search.
+type Search struct{ at int }
+
+// At is the place in n hits.
+func (s *Search) At(n int) int { return min(s.at, max(n-1, 0)) }
+
+// Next moves to the next of n hits, round to the first.
+func (s *Search) Next(n int) {
+	if n > 0 {
+		s.at = (s.At(n) + 1) % n
+	}
+}
+
+// Prev moves to the previous of n hits, round to the last.
+func (s *Search) Prev(n int) {
+	if n > 0 {
+		s.at = (s.At(n) + n - 1) % n
+	}
+}
+
+// Reset goes back to the first hit.
+func (s *Search) Reset() { s.at = 0 }
+
+// Shown are the first and the end of the at most room hits shown of n, the
+// one at at among them.
+func Shown(at, n, room int) (from, to int) {
+	from = max(at-room+1, 0)
+	return from, min(from+room, n)
 }
 
 // Recall is the place among the questions, the newest first, while the user

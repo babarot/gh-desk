@@ -578,11 +578,17 @@ func (m *Model) paste(msg tea.PasteMsg) tea.Cmd {
 		m.cycle = filterCycle{}
 		m.tab().sel, m.tab().offset = 0, 0
 	case m.triage != nil && m.triage.typing:
+		if s := m.triage.search; s != nil {
+			return s.edit(msg)
+		}
 		return editAsk(&m.triage.recall, &m.triage.input, msg)
 	case m.compose != nil:
 		return m.compose.update(msg)
 	case m.typingChat():
 		c := m.chat()
+		if c.search != nil {
+			return c.search.edit(msg)
+		}
 		return editAsk(&c.recall, &c.input, msg)
 	}
 	return nil

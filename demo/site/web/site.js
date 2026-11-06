@@ -325,7 +325,7 @@
   new ResizeObserver(size).observe(screen);
   screen.addEventListener('mousedown', () => { if (globalThis.ghDesk) { globalThis.ghDesk.takeOver(); taken(); } });
 
-  const keyOf = { '\\t': '\t', '\\r': '\r', '\\x1b': '\x1b', '\\x12': '\x12' };
+  const keyOf = { '\\t': '\t', '\\r': '\r', '\\x1b': '\x1b', '\\x18': '\x18' };
   document.querySelectorAll('#keys button').forEach(b => b.addEventListener('click', () => {
     const k = keyOf[b.dataset.k] ?? b.dataset.k;
     if (globalThis.ghDesk) {

@@ -27,6 +27,7 @@ func TestCursorAfterTheTypedText(t *testing.T) {
 		{"claude", []string{"C"}},
 		{"chat", []string{"i"}},
 		{"filter", []string{"/"}},
+		{"chat search", []string{"i", "x", "enter", "ctrl+r"}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			m, _ := startWith(t, fixture(), keymap.Default())

@@ -57,6 +57,51 @@ func TestRecallOfNothing(t *testing.T) {
 	}
 }
 
+func TestHits(t *testing.T) {
+	got := Hits(entries("Bots with passing checks", "先週から動いていないものは？", "bots again"), "BOTS")
+	if len(got) != 2 {
+		t.Errorf("Hits = %+v", got)
+	}
+	if got := Hits(entries("先週から動いていないものは？"), "動いて"); len(got) != 1 {
+		t.Errorf("Hits in the middle of Japanese = %+v", got)
+	}
+	if got := Hits(entries("a"), ""); len(got) != 1 {
+		t.Errorf("Hits of nothing = %+v", got)
+	}
+}
+
+func TestSearchGoesRound(t *testing.T) {
+	var s Search
+	s.Prev(3)
+	if s.At(3) != 2 {
+		t.Errorf("Prev from the first = %d", s.At(3))
+	}
+	s.Next(3)
+	if s.At(3) != 0 {
+		t.Errorf("Next from the last = %d", s.At(3))
+	}
+	s.Next(3)
+	s.Next(3)
+	if s.At(1) != 0 {
+		t.Errorf("At of fewer hits = %d", s.At(1))
+	}
+	s.Next(0)
+	s.Prev(0)
+	if s.At(0) != 0 {
+		t.Errorf("At of no hits = %d", s.At(0))
+	}
+}
+
+func TestShownFollowsTheHit(t *testing.T) {
+	for _, tc := range []struct{ at, n, room, from, to int }{
+		{0, 3, 5, 0, 3}, {4, 9, 5, 0, 5}, {5, 9, 5, 1, 6}, {8, 9, 5, 4, 9},
+	} {
+		if from, to := Shown(tc.at, tc.n, tc.room); from != tc.from || to != tc.to {
+			t.Errorf("Shown(%d, %d, %d) = %d, %d", tc.at, tc.n, tc.room, from, to)
+		}
+	}
+}
+
 func TestPrependAndUnique(t *testing.T) {
 	got := Prepend(entries("a", "b"), Entry{Question: "b"})
 	if len(got) != 2 || got[0].Question != "b" || got[1].Question != "a" {
