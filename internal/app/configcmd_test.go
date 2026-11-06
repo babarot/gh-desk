@@ -209,6 +209,140 @@ approve = "ctrl+a"
 	}
 }
 
+func applied(t *testing.T, path, src string) (int, string, string) {
+	t.Helper()
+	var out, errb bytes.Buffer
+	code := applyConfig(path, false, strings.NewReader(src), &out, &errb)
+	return code, out.String(), errb.String()
+}
+
+func read(t *testing.T, path string) string {
+	t.Helper()
+	b, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(b)
+}
+
+func TestConfigApply(t *testing.T) {
+	const before, after = "[list]\nbell = true\n", "[list]\nbell = false\n"
+	path := writeFile(t, before)
+	if err := os.Chmod(path, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	code, out, errb := applied(t, path, after)
+	if code != 0 || !strings.Contains(out, "wrote") || !strings.Contains(out, ".bak") {
+		t.Fatalf("code %d, out %q, err %q", code, out, errb)
+	}
+	if got := read(t, path); got != after {
+		t.Errorf("file %q", got)
+	}
+	if got := read(t, path+".bak"); got != before {
+		t.Errorf("bak %q", got)
+	}
+	if st, _ := os.Stat(path); st.Mode().Perm() != 0o600 {
+		t.Errorf("mode %v", st.Mode())
+	}
+	left, _ := filepath.Glob(filepath.Join(filepath.Dir(path), ".config-*"))
+	if len(left) != 0 {
+		t.Errorf("left behind: %v", left)
+	}
+}
+
+// What gh-desk refuses at start is refused here, whether config.Parse finds
+// it or not, and the file stays as it was.
+func TestConfigApplyRefuses(t *testing.T) {
+	for _, tt := range []struct{ name, src, want string }{
+		{"not toml", "[list\n", "config.toml"},
+		{"a mistake", "[list]\nrefresh = \"soon\"\n", "list.refresh"},
+		{"a key", "[keys]\napprove = 123\n", "keys.approve"},
+		{"a tool", "[claude]\nallowed_tools = [\"Bash\"]\n", "claude.allowed_tools"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			const before = "[list]\nbell = true\n"
+			path := writeFile(t, before)
+			code, _, errb := applied(t, path, tt.src)
+			if code != 1 || !strings.Contains(errb, tt.want) {
+				t.Errorf("code %d, err %q", code, errb)
+			}
+			if strings.Contains(errb, ".config-") {
+				t.Errorf("the temporary file is named: %q", errb)
+			}
+			if got := read(t, path); got != before {
+				t.Errorf("file %q", got)
+			}
+			if _, err := os.Stat(path + ".bak"); err == nil {
+				t.Error("a .bak was written")
+			}
+		})
+	}
+}
+
+// Nothing to apply is no mistake: config ui closed without saving gives
+// nothing, and the pipe it is in should not fail for it.
+func TestConfigApplyWithNothing(t *testing.T) {
+	const before = "# kept\n[list]\nbell = true\n"
+	path := writeFile(t, before)
+	code, _, errb := applied(t, path, " \n")
+	if code != 0 || !strings.Contains(errb, "nothing to apply") {
+		t.Errorf("code %d, err %q", code, errb)
+	}
+	if got := read(t, path); got != before {
+		t.Errorf("file %q", got)
+	}
+	if _, err := os.Stat(path + ".bak"); err == nil {
+		t.Error("a .bak was written")
+	}
+}
+
+func TestConfigApplyThroughALink(t *testing.T) {
+	dir := t.TempDir()
+	real := filepath.Join(dir, "real.toml")
+	link := filepath.Join(dir, "config.toml")
+	if err := os.WriteFile(real, []byte("[list]\nbell = true\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(real, link); err != nil {
+		t.Fatal(err)
+	}
+	if code, _, errb := applied(t, link, "[list]\nbell = false\n"); code != 0 {
+		t.Fatalf("code %d, err %q", code, errb)
+	}
+	if st, _ := os.Lstat(link); st.Mode()&os.ModeSymlink == 0 {
+		t.Error("the link was replaced")
+	}
+	if got := read(t, real); !strings.Contains(got, "false") {
+		t.Errorf("file %q", got)
+	}
+}
+
+func TestConfigApplyToAFileThatCannotBeWritten(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "config.toml")
+	const before = "[list]\nbell = true\n"
+	if err := os.WriteFile(path, []byte(before), 0o444); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(dir, 0o555); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(dir, 0o755) })
+	if code, _, errb := applied(t, path, "[list]\nbell = false\n"); code != 1 || !strings.Contains(errb, "cannot write") {
+		t.Errorf("code %d, err %q", code, errb)
+	}
+	if got := read(t, path); got != before {
+		t.Errorf("file %q", got)
+	}
+}
+
+func TestConfigApplyWithNoFileYet(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "gh-desk", "config.toml")
+	if code, out, errb := applied(t, path, "[list]\nbell = true\n"); code != 0 || strings.Contains(out, ".bak") {
+		t.Fatalf("code %d, out %q, err %q", code, out, errb)
+	}
+}
+
 func TestConfigInitEditSchema(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "gh-desk", "config.toml")
 	if code, out, _ := runConfig(t, path, "init"); code != 0 || !strings.Contains(out, "wrote") {

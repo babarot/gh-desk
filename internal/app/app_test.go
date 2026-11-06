@@ -158,6 +158,7 @@ func TestWrongCallsAreUsageErrors(t *testing.T) {
 		{"config", "init", "extra"},
 		{"config", "show", "extra"},
 		{"config", "check", "a", "b"},
+		{"config", "apply", "a"},
 	} {
 		var out, errb bytes.Buffer
 		if code := Run(append([]string{"--config", path}, args...), &out, &errb); code != 2 || !strings.Contains(errb.String(), "Usage:") {

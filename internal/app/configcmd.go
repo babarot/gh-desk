@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"slices"
 	"strings"
 
@@ -57,7 +58,26 @@ $XDG_CONFIG_HOME/gh-desk/config.toml, or ~/.config/gh-desk/config.toml.`,
 	}
 	show.Flags().BoolVar(&diff, "diff", false, "only the settings that differ from the defaults")
 
+	apply := &cobra.Command{
+		Use:   "apply",
+		Short: "replace the config file with the one read from standard input, if it has no mistakes",
+		Long: `Replace the config file with the one read from standard input.
+
+The file is checked as gh-desk checks it at start, and nothing is written
+when it has mistakes. The file it replaces is kept beside it, with .bak
+added to its name.`,
+		Args: cobra.NoArgs,
+		RunE: func(*cobra.Command, []string) error {
+			if st, err := os.Stdin.Stat(); err == nil && st.Mode()&os.ModeCharDevice != 0 {
+				fmt.Fprintln(stderr, "gh-desk: config apply reads the file from standard input, as in: pbpaste | gh desk config apply")
+				return exitCode(1)
+			}
+			return exited(applyConfig(o.config, o.debug, os.Stdin, stdout, stderr))
+		},
+	}
+
 	cmd.AddCommand(
+		apply,
 		&cobra.Command{
 			Use:   "check [path]",
 			Short: "read the config file and print its mistakes and warnings, without starting; exits 1 when it has mistakes",
@@ -162,6 +182,117 @@ func checkConfig(path string, debug bool, stdout io.Writer) int {
 		return 0
 	}
 	fmt.Fprintf(stdout, "%s: no mistakes\n", shown)
+	return 0
+}
+
+// checkedFile writes src to the file tmp, or to a new temporary one, and
+// checks it as gh-desk checks a config file at start, telling of it as the
+// config file at path. It leaves tmp holding src. What comes back are the
+// warnings, and the mistakes as an error.
+func checkedFile(path string, src []byte, tmp string, debug bool) (string, error) {
+	if tmp == "" {
+		f, err := os.CreateTemp("", "gh-desk-config-*.toml")
+		if err != nil {
+			return "", err
+		}
+		tmp = f.Name()
+		defer os.Remove(tmp)
+		if err := f.Close(); err != nil {
+			return "", err
+		}
+	}
+	if err := writeSynced(tmp, src); err != nil {
+		return "", fmt.Errorf("cannot write %s: %w", config.TildePath(path), err)
+	}
+	said := strings.NewReplacer(config.TildePath(tmp), config.TildePath(path), tmp, config.TildePath(path))
+	_, _, warns, err := load(tmp, debug, new(slog.LevelVar))
+	if err != nil {
+		return "", errors.New(said.Replace(err.Error()))
+	}
+	if len(warns) > 0 {
+		return said.Replace(config.Report(tmp, warns).Error()), nil
+	}
+	return "", nil
+}
+
+func writeSynced(path string, src []byte) error {
+	f, err := os.OpenFile(path, os.O_WRONLY|os.O_TRUNC, 0)
+	if err != nil {
+		return err
+	}
+	_, werr := f.Write(src)
+	return errors.Join(werr, f.Sync(), f.Close())
+}
+
+// applyConfig replaces the config file at path with what in holds. It is
+// checked first, as a file of its own beside the config file, so that the
+// mistakes are found as gh-desk would find them, and the config file is
+// there, the old one or the new, at every moment.
+func applyConfig(path string, debug bool, in io.Reader, stdout, stderr io.Writer) int {
+	src, err := io.ReadAll(in)
+	if err != nil {
+		fmt.Fprintf(stderr, "gh-desk: %v\n", err)
+		return 1
+	}
+	// config ui closed without saving, or an empty clipboard: no file was
+	// given, so there is nothing to replace this one with.
+	if strings.TrimSpace(string(src)) == "" {
+		fmt.Fprintf(stderr, "nothing to apply; %s was not changed\n", config.TildePath(path))
+		return 0
+	}
+	// A link stays one: what it points to is replaced.
+	real := path
+	if r, err := filepath.EvalSymlinks(path); err == nil {
+		real = r
+	}
+	old, err := os.ReadFile(real)
+	if err != nil && !errors.Is(err, fs.ErrNotExist) {
+		fmt.Fprintf(stderr, "gh-desk: %v\n", err)
+		return 1
+	}
+	exists := err == nil
+
+	mode := fs.FileMode(0o644)
+	if st, err := os.Stat(real); err == nil {
+		mode = st.Mode().Perm()
+	}
+	if err := os.MkdirAll(filepath.Dir(real), 0o755); err != nil {
+		fmt.Fprintf(stderr, "gh-desk: %v\n", err)
+		return 1
+	}
+	tmp, err := os.CreateTemp(filepath.Dir(real), ".config-*.toml")
+	if err != nil {
+		fmt.Fprintf(stderr, "gh-desk: cannot write %s: %v\n", config.TildePath(real), err)
+		return 1
+	}
+	defer os.Remove(tmp.Name())
+	if err := errors.Join(tmp.Close(), os.Chmod(tmp.Name(), mode)); err != nil {
+		fmt.Fprintf(stderr, "gh-desk: cannot write %s: %v\n", config.TildePath(real), err)
+		return 1
+	}
+	warned, err := checkedFile(path, src, tmp.Name(), debug)
+	if err != nil {
+		fmt.Fprintln(stderr, err)
+		fmt.Fprintf(stderr, "\n%s was not changed\n", config.TildePath(path))
+		return 1
+	}
+	if warned != "" {
+		fmt.Fprintln(stdout, warned)
+	}
+	if exists {
+		if err := os.WriteFile(real+".bak", old, mode); err != nil {
+			fmt.Fprintf(stderr, "gh-desk: cannot keep the old file: %v\n", err)
+			return 1
+		}
+	}
+	if err := os.Rename(tmp.Name(), real); err != nil {
+		fmt.Fprintf(stderr, "gh-desk: cannot write %s: %v\n", config.TildePath(real), err)
+		return 1
+	}
+	fmt.Fprintf(stdout, "wrote %s\n", config.TildePath(path))
+	if exists {
+		fmt.Fprintf(stdout, "the old one is %s\n", config.TildePath(path+".bak"))
+	}
 	return 0
 }
 

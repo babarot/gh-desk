@@ -23,6 +23,7 @@ gh desk config check        # read it and print its mistakes, without starting
 gh desk config show --diff  # the settings that differ from the defaults
 gh desk config show         # every setting in effect
 gh desk config init         # write the file, if there is none
+gh desk config apply        # replace the file with one from standard input
 ```
 
 `gh desk config edit` opens `review.editor`, `$VISUAL` or `$EDITOR`. The first line of the file names its JSON Schema, so an editor that reads TOML with schemas (taplo, or VS Code with Even Better TOML) completes the keys and checks the values as you type; `gh desk config schema` prints it.
