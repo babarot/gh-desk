@@ -53,21 +53,39 @@ func TestTemplateLoadsAsDefault(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// The rules to start with are all the file holds (ADR-028, ADR-092);
-	// none of them is a default.
+	if !reflect.DeepEqual(ruleNames(cfg), []string{"small", "dependency bots", "approved", "recent", "lock files"}) {
+		t.Errorf("rules = %v", ruleNames(cfg))
+	}
+	if Show(cfg, true) != "" {
+		t.Errorf("differs from the defaults:\n%s", Show(cfg, true))
+	}
+}
+
+func ruleNames(f File) []string {
 	var names []string
-	for _, s := range cfg.Select {
+	for _, s := range f.Select {
 		names = append(names, s.Name)
 	}
-	if want := []string{"small", "dependency bots", "approved", "recent", "lock files"}; !reflect.DeepEqual(names, want) {
-		t.Errorf("rules = %v, want %v", names, want)
+	return names
+}
+
+func TestRulesWrittenReplaceTheDefault(t *testing.T) {
+	cfg, _, err := Load(write(t, "[[select]]\nname = \"mine\"\nmine = true\n"))
+	if err != nil || !reflect.DeepEqual(ruleNames(cfg), []string{"mine"}) {
+		t.Fatalf("rules = %v, %v", ruleNames(cfg), err)
 	}
-	if len(Default().Select) != 0 {
-		t.Errorf("Default() has rules: %+v", Default().Select)
+}
+
+func TestNoRulesAtAll(t *testing.T) {
+	cfg, _, err := Load(write(t, "select = []\n\n[list]\nrefresh = \"1m\"\n"))
+	if err != nil || len(cfg.Select) != 0 {
+		t.Fatalf("rules = %v, %v", ruleNames(cfg), err)
 	}
-	cfg.Select = nil
-	if !reflect.DeepEqual(cfg, Default()) {
-		t.Errorf("cfg = %+v\nwant %+v", cfg, Default())
+	for _, onlyDiff := range []bool{true, false} {
+		again, _, err := Load(write(t, Show(cfg, onlyDiff)))
+		if err != nil || len(again.Select) != 0 {
+			t.Errorf("Show(%v) reads back as %v, %v:\n%s", onlyDiff, ruleNames(again), err, Show(cfg, onlyDiff))
+		}
 	}
 }
 
@@ -78,8 +96,8 @@ func TestManualIsTheDefaults(t *testing.T) {
 	if err != nil || len(ps) > 0 {
 		t.Fatalf("%v %v", err, ps)
 	}
-	if !reflect.DeepEqual(cfg, Default()) {
-		t.Errorf("cfg = %+v\nwant %+v", cfg, Default())
+	if Show(cfg, true) != "" || !reflect.DeepEqual(ruleNames(cfg), ruleNames(Default())) {
+		t.Errorf("differs from the defaults:\n%s", Show(cfg, true))
 	}
 }
 

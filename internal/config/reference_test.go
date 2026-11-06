@@ -17,7 +17,7 @@ const referenceHead = `# Configuration
 
 <!-- Generated from internal/config by TestReferenceIsUpToDate. Do not edit; run go test ./internal/config -run TestReferenceIsUpToDate -update. -->
 
-The first launch writes ` + "`~/.config/gh-desk/config.toml`" + ` (or under ` + "`$XDG_CONFIG_HOME`" + `) with the rules to start with and nothing else. A setting left out takes its default; write the ones you change. A mistake in the file is reported with where it is, and ` + "`gh desk config check`" + ` reports them without starting.
+The first launch writes ` + "`~/.config/gh-desk/config.toml`" + ` (or under ` + "`$XDG_CONFIG_HOME`" + `) with no settings in it. A setting left out takes its default; write the ones you change. A mistake in the file is reported with where it is, and ` + "`gh desk config check`" + ` reports them without starting.
 
 ` + "```sh" + `
 gh desk config reference    # every setting, as this page lists them
@@ -43,8 +43,8 @@ func Reference() string {
 	writeElems(&b, "tabs")
 
 	b.WriteString("\n## [[select]]\n\n")
-	b.WriteString(mdText(`The rules S offers to select pull requests, besides the built-in "approved by me". A pull request matches a rule when it meets every key the rule gives. The file written on first run has these rules live, not commented out, as rules to start with:`) + "\n\n")
-	b.WriteString("```toml\n" + startingRules + "```\n")
+	b.WriteString(mdText(`The rules S offers to select pull requests, besides the built-in "approved by me". A pull request matches a rule when it meets every key the rule gives. These rules are the default; rules written in the file replace all of them, and `+"`select = []`"+` at the top of the file leaves none:`) + "\n\n")
+	b.WriteString("```toml\n" + defaultSelect + "```\n")
 	writeElems(&b, "select")
 
 	for _, t := range tables {

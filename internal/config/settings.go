@@ -634,13 +634,8 @@ const selectWords = `# Rules S offers to select pull requests, besides "approved
 # review of yours) are true to ask for that, and false for the opposite.
 `
 
-const startingRulesHead = `# The rules below are written to start with: S offers only the rules in this
-# file, so delete or comment out one you do not want.
-`
-
-// startingRules are the [[select]] rules of the file written on first run
-// (ADR-028).
-const startingRules = `[[select]]
+// defaultSelect are the rules a file with no [[select]] has.
+const defaultSelect = `[[select]]
 name = "small"
 max_lines = 300
 
@@ -700,12 +695,11 @@ const keysHead = `[keys]
 // file written on first run names it for editors that read it (taplo).
 const SchemaURL = "https://raw.githubusercontent.com/babarot/gh-desk/main/docs/config.schema.json"
 
-// Template is the config file written on first run: only what the file
-// must hold to work, the rules to start with (ADR-028). Everything else
-// takes its default until the user writes it, so a default changed later
-// still applies, and what each setting does is in the manual (ADR-092).
+// Template is the config file written on first run. It holds no setting:
+// what is left out takes its default, so a default changed later still
+// applies, and what each setting does is in the manual (ADR-092).
 func Template() string {
-	return "#:schema " + SchemaURL + "\n" + templateHead + "\n" + startingRulesHead + "\n" + startingRules
+	return "#:schema " + SchemaURL + "\n" + templateHead
 }
 
 // Mark says which settings are new since a version.
@@ -851,12 +845,12 @@ func settingText(s setting, def File, m Mark) string {
 	return comment(s.Doc) + m.line(s.Key) + "# " + key + " = " + v + "\n"
 }
 
-// selectManual is the words of [[select]] with the rules a file starts
-// with and an example, as comments.
+// selectManual is the words of [[select]] with the default rules and an
+// example, as comments.
 func selectManual() string {
 	var b strings.Builder
-	b.WriteString(selectWords + "#\n# The file written on first run starts with these rules:\n#\n")
-	for line := range strings.SplitSeq(strings.TrimRight(startingRules, "\n"), "\n") {
+	b.WriteString(selectWords + "#\n# The rules below are the default. Rules written here replace all of them;\n# to have none, write select = [] at the top of the file.\n#\n")
+	for line := range strings.SplitSeq(strings.TrimRight(defaultSelect, "\n"), "\n") {
 		b.WriteString(strings.TrimRight("# "+line, " ") + "\n")
 	}
 	return b.String() + "#\n" + selectExample
@@ -946,6 +940,10 @@ func described(s map[string]any, doc string) map[string]any {
 func Show(f File, onlyDiff bool) string {
 	def := Default()
 	var b strings.Builder
+	// Before any table, where it can only be the file's own key.
+	if len(f.Select) == 0 {
+		b.WriteString("select = []\n\n")
+	}
 	if !onlyDiff || !slices.EqualFunc(f.Tabs, def.Tabs, sameTab) {
 		for _, t := range f.Tabs {
 			b.WriteString("[[tabs]]\n")
@@ -970,11 +968,8 @@ func Show(f File, onlyDiff bool) string {
 			b.WriteString("\n")
 		}
 	}
-	for _, s := range f.Select {
-		b.WriteString("[[select]]\n")
-		fmt.Fprintf(&b, "name = %q\n", s.Name)
-		writeConditions(&b, s.Conditions)
-		b.WriteString("\n")
+	if !onlyDiff || rulesText(f.Select) != rulesText(def.Select) {
+		b.WriteString(rulesText(f.Select))
 	}
 	for _, e := range f.Exclude {
 		b.WriteString("[[exclude]]\n")
@@ -1002,6 +997,18 @@ func Show(f File, onlyDiff bool) string {
 		if len(lines) > 0 {
 			b.WriteString("[" + t.Name + "]\n" + strings.Join(lines, "\n") + "\n\n")
 		}
+	}
+	return b.String()
+}
+
+// rulesText is rules as the file takes them.
+func rulesText(rules []Select) string {
+	var b strings.Builder
+	for _, s := range rules {
+		b.WriteString("[[select]]\n")
+		fmt.Fprintf(&b, "name = %q\n", s.Name)
+		writeConditions(&b, s.Conditions)
+		b.WriteString("\n")
 	}
 	return b.String()
 }

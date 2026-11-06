@@ -45,7 +45,7 @@ Usage:
 Available Commands:
   check       read the config file and print its mistakes and warnings, without starting; exits 1 when it has mistakes
   edit        open the config file in review.editor, $VISUAL or $EDITOR, then check it
-  init        write the config file with the rules to start with, unless one is there
+  init        write the config file, which holds no settings yet, unless one is there
   reference   print every setting with what it does and its default, or those of a table or a key
   schema      print the JSON Schema of the config file
   show        print the settings in effect, or with --diff only those that differ from the defaults
@@ -95,7 +95,7 @@ Global Flags:
 ## gh desk config init
 
 ```
-write the config file with the rules to start with, unless one is there
+write the config file, which holds no settings yet, unless one is there
 
 Usage:
   gh desk config init [flags]

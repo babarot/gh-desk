@@ -170,7 +170,11 @@ func TestConfigReference(t *testing.T) {
 
 func TestConfigShowDiffIsAFileOfItsOwn(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "config.toml")
-	if err := os.WriteFile(path, []byte(config.Template()+`
+	if err := os.WriteFile(path, []byte(`
+[[select]]
+name = "mine"
+mine = true
+
 [list]
 refresh = "1m"
 home_owners = ["babarot"]
@@ -203,7 +207,7 @@ func TestConfigInitEditSchema(t *testing.T) {
 	if code, out, _ := runConfig(t, path, "init"); code != 0 || !strings.Contains(out, "wrote") {
 		t.Fatalf("init: code %d, out %q", code, out)
 	}
-	if b, err := os.ReadFile(path); err != nil || strings.Count(string(b), "\n") > 40 {
+	if b, err := os.ReadFile(path); err != nil || strings.Count(string(b), "\n") > 5 {
 		t.Errorf("the file written is %d bytes, err %v", len(b), err)
 	}
 	if code, out, _ := runConfig(t, path, "init"); code != 0 || !strings.Contains(out, "nothing was written") {

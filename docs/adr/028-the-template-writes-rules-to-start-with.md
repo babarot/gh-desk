@@ -2,8 +2,7 @@
 
 ## Status
 
-Accepted
-Partly replaced by ADR-092
+Superseded by ADR-092
 
 ## Context
 

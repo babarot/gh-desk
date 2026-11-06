@@ -73,7 +73,7 @@ $XDG_CONFIG_HOME/gh-desk/config.toml, or ~/.config/gh-desk/config.toml.`,
 		show,
 		&cobra.Command{
 			Use:   "init",
-			Short: "write the config file with the rules to start with, unless one is there",
+			Short: "write the config file, which holds no settings yet, unless one is there",
 			Args:  cobra.NoArgs,
 			RunE: func(*cobra.Command, []string) error {
 				switch err := config.WriteTemplate(o.config); {

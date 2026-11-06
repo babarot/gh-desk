@@ -4,7 +4,7 @@ Everything you can change lives in one file, `~/.config/gh-desk/config.toml` (or
 
 ## The file
 
-The first run writes a short file: the rules to start with, and nothing else. A setting left out takes its default, so write only what you change, and a default improved in a later version still reaches you.
+The first run writes a short file with no settings in it. A setting left out takes its default, so write only what you change, and a default improved in a later version still reaches you.
 
 `gh desk config reference` prints every setting with what it does and its default, from the version you run. Give it a table or a key to see only that:
 
