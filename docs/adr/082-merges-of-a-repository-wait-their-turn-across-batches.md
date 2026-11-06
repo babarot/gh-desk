@@ -1,4 +1,4 @@
-# ADR-081: Merges of a repository wait their turn across batches
+# ADR-082: Merges of a repository wait their turn across batches
 
 ## Status
 
