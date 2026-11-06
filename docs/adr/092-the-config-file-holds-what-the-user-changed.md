@@ -6,7 +6,7 @@ Accepted
 
 ## Context
 
-The file written on first run held every setting at its default, commented out, with its words above it: 391 lines by v0.10.0, for 55 settings and 67 keys. It held the `[[select]]` rules live as well, since ADR-028 kept them out of the defaults. It was the user's settings and the manual of every setting at once, and it was written once, so three things went wrong.
+The file written on first run held every setting at its default, commented out, with its words above it: 391 lines by v0.10.0, with 122 lines commented out, 67 of them keys. It held the `[[select]]` rules live as well, since ADR-028 kept them out of the defaults. It was the user's settings and the manual of every setting at once, and it was written once, so three things went wrong.
 
 A setting added by a later version took its default but never appeared in a file already written, so the only way to learn of it was the release notes. The words and the defaults in the comments stayed as written: a line left commented could show a default no longer in use, and uncommenting it fixed the old value. And what the user had changed was hard to find among what they had not.
 
