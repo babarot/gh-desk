@@ -230,7 +230,7 @@ func ForApprove(mi model.MergeInfo, pr model.PR, viewer string, includeFailing b
 	return d
 }
 
-// ForAutoApprove decides an approval a rule asked for (ADR-092): as
+// ForAutoApprove decides an approval a rule asked for (ADR-093): as
 // ForApprove, and besides it never approves a draft, nor a head on which
 // the viewer's approval was dismissed, which a person took back. An
 // approval dismissed by a push is on an older head and does not count.

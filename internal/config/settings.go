@@ -539,6 +539,8 @@ var arrayTables = []arrayTable{
 		Doc: `The rules S offers to select pull requests, besides the built-in "approved by me". A pull request matches a rule when it meets every key the rule gives. These rules are the default; rules written in the file replace all of them, and ` + "`select = []`" + ` at the top of the file leaves none:`},
 	{Name: "exclude", Words: func() string { return excludeWords },
 		Doc: "Rules that leave pull requests out of every tab, until a shows them. A pull request is left out when it meets every key of one of them. There are none by default."},
+	{Name: "auto_approve", Words: func() string { return autoApproveWords },
+		Doc: "Rules that approve, without a confirm, the pull requests they match while gh-desk runs. There are none by default: nothing is approved unless a rule is written. A pull request an `[[exclude]]` rule matches is never approved."},
 }
 
 // elems are the keys of the arrays of tables.
@@ -710,8 +712,9 @@ const excludeWords = `# Rules that leave pull requests out of every tab, until a
 #
 # [[exclude]]
 # labels = ["wip", "do-not-merge"]
+`
 
-# Rules that approve, without a confirm, the pull requests they match while
+const autoApproveWords = `# Rules that approve, without a confirm, the pull requests they match while
 # gh-desk runs. They take the keys of [[select]] but reasons, a query to find
 # the pull requests by (the open ones whose review is asked of you, without
 # it), and dry_run to only tell what they would approve. A pull request an

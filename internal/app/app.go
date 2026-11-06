@@ -201,7 +201,7 @@ func assemble(cfg config.File, warns []string, e env, log *slog.Logger) parts {
 	if store != nil {
 		rstore = store
 		set.CanWait = true
-		set.Resume = store.Pending()
+		set.Resume = resumable(store, log)
 		log.Info("pending merges", "count", len(set.Resume))
 	} else {
 		log.Info("another gh-desk holds the record of pending merges")
@@ -212,7 +212,7 @@ func assemble(cfg config.File, warns []string, e env, log *slog.Logger) parts {
 	var lock *pendingLock
 	if store == nil && err == nil {
 		// Taken over once the other gh-desk quits.
-		lock = &pendingLock{dir: e.stateDir, rn: rn}
+		lock = &pendingLock{dir: e.stateDir, rn: rn, log: log}
 		set.Lock = lock
 	}
 	opt := claude.Options{Bin: cfg.ClaudeCommand(), Model: cfg.Claude.Model, Tools: cfg.Claude.AllowedTools, Language: cfg.Claude.Language, Instructions: cfg.Claude.Instructions, Log: log}
@@ -240,6 +240,23 @@ func assemble(cfg config.File, warns []string, e env, log *slog.Logger) parts {
 }
 
 // runs are the directories of the running gh-desk, in the cache.
+// resumable are the pending merges and approvals to go on with. One a rule
+// asked for is forgotten: the rule may be gone from the file by now, and
+// reading the rules finds it again if it still matches (ADR-093).
+func resumable(s *state.Store, log *slog.Logger) []model.Pending {
+	var out []model.Pending
+	for _, p := range s.Pending() {
+		if !p.Auto {
+			out = append(out, p)
+			continue
+		}
+		if err := s.Remove(p.Key); err != nil {
+			log.Warn("could not forget a pending approval", logging.KeyOp, "auto_approve", logging.KeyPR, p.Key.String(), "err", err.Error())
+		}
+	}
+	return out
+}
+
 func runs(cfg config.File) state.Runs { return state.Runs{Dir: filepath.Join(cfg.CacheDir(), "runs")} }
 
 // absPath is p made absolute, as the MCP server runs in another directory;

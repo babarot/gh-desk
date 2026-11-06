@@ -65,7 +65,7 @@ type batchState struct {
 	resumed bool
 	// auto are the rules that asked for the approvals of a batch started
 	// without a confirm, by pull request; nil for a batch the user
-	// confirmed (ADR-092).
+	// confirmed (ADR-093).
 	auto    map[model.PRKey]string
 	goes    map[model.PRKey]bool
 	order   []model.PRKey

@@ -1,6 +1,7 @@
 package app
 
 import (
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
@@ -17,6 +18,8 @@ import (
 type pendingLock struct {
 	dir string
 	rn  *runner.Runner
+	log *slog.Logger
+
 	// mu guards store and closed: Take runs off the TUI's loop.
 	mu     sync.Mutex
 	store  *state.Store
@@ -38,7 +41,7 @@ func (l *pendingLock) Take() ([]model.Pending, bool, error) {
 	}
 	l.store = s
 	l.rn.Adopt(s)
-	return s.Pending(), true, nil
+	return resumable(s, l.log), true, nil
 }
 
 func (l *pendingLock) Holder() (int, string, bool) {

@@ -80,7 +80,7 @@ type File struct {
 	// of which a pull request must match to be left out.
 	Exclude []Exclude
 	// AutoApprove are the rules that approve the pull requests they match
-	// without a confirm (ADR-092).
+	// without a confirm (ADR-093).
 	AutoApprove []AutoApprove
 	Claude      Claude
 	Theme       Theme
@@ -228,7 +228,7 @@ type Exclude struct {
 
 // AutoApprove is a rule that approves the pull requests its search finds
 // and that meet every condition given, without a confirm, while gh-desk
-// runs (ADR-092).
+// runs (ADR-093).
 type AutoApprove struct {
 	// Name is the rule's name, "" when it has none and is named by its
 	// conditions.

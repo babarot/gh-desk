@@ -1,4 +1,4 @@
-# ADR-092: An auto-approve rule is the user's intent written ahead, and approves without a confirm
+# ADR-093: An auto-approve rule is the user's intent written ahead, and approves without a confirm
 
 ## Status
 
@@ -25,7 +25,7 @@ What a rule approves could be bounded by gh-desk: only bots, only pull requests 
   - A pull request that is not open, is a draft, is the viewer's own, or is already approved by the viewer is not approved. Neither is one whose latest review by the viewer was dismissed on the head it has now: a person took that approval back. An approval dismissed by a push is on an older head, and the new head is judged again.
   - It waits for the jobs at work on the head before it approves, as an approval may (ADR-069), and stops when one fails. A rule's `passing` includes no checks reported yet, so approving at once could approve a head CI never ran on.
   - A pull request that an `[[exclude]]` rule matches, or cannot tell yet, is not approved. An exclusion is written to leave a pull request alone, whatever it is hidden for (ADR-062), and it is how a rule's "not" is written: auto-approve rules, like every rule, have no operator for it (ADR-065).
-  - The draft, the dismissal and the exclusion are judged again right before the approval is sent, after a wait and after a resume, since they can change while the head stays.
+  - The draft, the dismissal and the exclusion are judged again right before the approval is sent, after a wait, since they can change while the head stays.
   - A head is tried once a session, so a failure is not repeated at every reading.
 - A rule reads its own search, apart from the tabs: what is shown or read in a tab does not change what is approved. A rule may give that search; without one, gh-desk searches for the open pull requests that are not drafts and whose review is requested of the viewer, narrowed by the rule's repositories only when each of them can be written as a search qualifier. A narrowing that drops what a rule's condition would match is not taken. A rule with neither a search nor a condition is reported as a mistake: it would approve every review requested of the user.
 - A rule can be set to only record what it would approve, without approving it.
@@ -44,5 +44,5 @@ What a rule approves could be bounded by gh-desk: only bots, only pull requests 
 
 - An `[[exclude]]` rule now also keeps pull requests from being approved by rules. A user who wants a pull request hidden but approved has no way to say so yet.
 - A new condition of a rule must say whether it can be written as a search qualifier without dropping what it would match, before it narrows the default search.
-- The record of pending approvals tells an approval made by a rule from one the user confirmed, so a resumed one is judged as it was started.
+- The record of pending approvals tells an approval made by a rule from one the user confirmed. A pending approval a rule asked for is not resumed: it is forgotten at start, and reading the rules finds it again if it still matches, so a rule taken out of the file stops what it had started.
 - How many pull requests a rule's search reads is a constant; a search that matches more is told once a session and asked to be narrowed.

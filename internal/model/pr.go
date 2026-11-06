@@ -346,7 +346,7 @@ type Pending struct {
 	// check failed: a job that fails while it waits does not stop it.
 	IncludeFailing bool `json:"include_failing,omitempty"`
 	// Auto is set on an approval a rule asked for, judged again as one
-	// when it goes on (ADR-092).
+	// when it goes on (ADR-093).
 	Auto bool `json:"auto,omitempty"`
 	// Body is the text of an approval that waits, kept only until it is
 	// sent; it is never logged.

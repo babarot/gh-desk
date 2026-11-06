@@ -12,7 +12,7 @@ import (
 
 // excludedBy is what the runner asks right before it sends an approval a
 // rule asked for: whether an [[exclude]] rule keeps the pull request from
-// it (ADR-092). The pull request is read again, as a label may have come
+// it (ADR-093). The pull request is read again, as a label may have come
 // while the approval waited, and judged with the checks of mi, which the
 // runner read with their details, so that checks waiting only for an
 // approval are told as the list tells them. A rule that cannot tell keeps
@@ -56,7 +56,7 @@ func ruleLabel(r plan.Rule) string {
 
 // defaultAutoQuery is the search a rule without a query reads: the open
 // pull requests that are not drafts and whose review is asked of the
-// viewer, which leave it once approved (ADR-092).
+// viewer, which leave it once approved (ADR-093).
 const defaultAutoQuery = "is:pr is:open draft:false review-requested:@me"
 
 // autoQuery is the search of a rule without one: the default search,

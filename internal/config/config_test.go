@@ -76,6 +76,22 @@ func TestRulesWrittenReplaceTheDefault(t *testing.T) {
 	}
 }
 
+func TestRulesThatApproveHaveNoDefault(t *testing.T) {
+	if len(Default().AutoApprove) != 0 {
+		t.Errorf("Default() approves: %+v", Default().AutoApprove)
+	}
+	for _, src := range []string{Template(), "select = []\n"} {
+		cfg, _, err := Load(write(t, src))
+		if err != nil || len(cfg.AutoApprove) != 0 {
+			t.Errorf("%q approves: %+v, %v", src, cfg.AutoApprove, err)
+		}
+	}
+	// The manual shows them, as comments.
+	if cfg, _, err := Load(write(t, Manual("", Mark{}))); err != nil || len(cfg.AutoApprove) != 0 {
+		t.Errorf("the manual approves: %+v, %v", cfg.AutoApprove, err)
+	}
+}
+
 func TestNoRulesAtAll(t *testing.T) {
 	cfg, _, err := Load(write(t, "select = []\n\n[list]\nrefresh = \"1m\"\n"))
 	if err != nil || len(cfg.Select) != 0 {
