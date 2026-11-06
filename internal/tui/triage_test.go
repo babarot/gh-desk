@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"context"
 	"strings"
 	"testing"
 
@@ -166,22 +167,6 @@ func TestTriageWithNothingToDo(t *testing.T) {
 	}
 }
 
-// esc while Claude thinks stops it and forgets the request.
-func TestTriageStop(t *testing.T) {
-	m, fc := startTriage(t, `{"reply":"","actions":[]}`)
-	stopped := false
-	tr := m.triage
-	tr.turns = append(tr.turns, triageTurn{request: "slow"})
-	tr.asking, tr.cancel = true, func() { stopped = true }
-	press(m, "esc")
-	if !stopped || tr.open || tr.asking || len(tr.turns) != 1 {
-		t.Errorf("stopped %v, open %v, turns %+v", stopped, tr.open, tr.turns)
-	}
-	if tr.session != fc.triaged[0].Session {
-		t.Error("a started session was dropped")
-	}
-}
-
 // Your own pull request cannot be approved, but can be merged.
 func TestTriageOwnPullRequests(t *testing.T) {
 	m, _ := startTriage(t, `{"reply":"","actions":[{"do":"approve","keys":["me/tool#3"]}]}`, "2")
@@ -192,6 +177,133 @@ func TestTriageOwnPullRequests(t *testing.T) {
 	press(m, "enter")
 	if m.bulk == nil || m.bulk.kind != runner.Merge || len(m.bulk.items) != 1 {
 		t.Errorf("bulk = %+v", m.bulk)
+	}
+}
+
+// waitingTriage is a triage with a second request on its way, and whether
+// it was stopped.
+func waitingTriage(t *testing.T) (*Model, *fakeClaude, *bool) {
+	t.Helper()
+	m, fc := startTriage(t, `{"reply":"","actions":[]}`)
+	stopped := new(bool)
+	tr := m.triage
+	tr.turns = append(tr.turns, triageTurn{request: "slow"})
+	tr.asked++
+	tr.asking, tr.cancel = true, func() { *stopped = true }
+	return m, fc, stopped
+}
+
+// esc while Claude thinks stops it. The request stays in the conversation,
+// and nothing can be sent until Claude Code has stopped.
+func TestTriageStop(t *testing.T) {
+	m, fc, stopped := waitingTriage(t)
+	tr := m.triage
+	press(m, "esc")
+	if !*stopped || !tr.open || !tr.asking || !tr.stopping || tr.typing {
+		t.Fatalf("stopped %v, open %v, asking %v, stopping %v, typing %v", *stopped, tr.open, tr.asking, tr.stopping, tr.typing)
+	}
+	if s := screen(m); !strings.Contains(s, "stopping…") {
+		t.Errorf("not shown as stopping:\n%s", s)
+	}
+	m.Update(triageMsg{asked: tr.asked, err: context.Canceled})
+	if tr.asking || tr.stopping || !tr.typing || !tr.turns[1].stopped {
+		t.Fatalf("after its end: asking %v, stopping %v, typing %v, turns %+v", tr.asking, tr.stopping, tr.typing, tr.turns)
+	}
+	if s := screen(m); !strings.Contains(s, "⏺ stopped") || !strings.Contains(s, "> slow") {
+		t.Errorf("the stopped request is not shown:\n%s", s)
+	}
+	if tr.session != fc.triaged[0].Session {
+		t.Error("a started session was dropped")
+	}
+}
+
+// A session Claude Code may have made before it stopped is not used again.
+func TestTriageStopBeforeTheSessionStarted(t *testing.T) {
+	m, fc, _ := waitingTriage(t)
+	tr := m.triage
+	tr.started = false
+	press(m, "esc")
+	m.Update(triageMsg{asked: tr.asked, err: context.Canceled})
+	if tr.session == fc.triaged[0].Session {
+		t.Error("the session was kept")
+	}
+}
+
+// The popup can be closed while Claude goes on. Opened again it shows the
+// request on its way, so nothing is sent twice, and then the plan.
+func TestTriageClosedWhileAsking(t *testing.T) {
+	m, fc, stopped := waitingTriage(t)
+	tr := m.triage
+	press(m, "backspace")
+	if tr.open || *stopped || !tr.asking {
+		t.Fatalf("open %v, stopped %v, asking %v", tr.open, *stopped, tr.asking)
+	}
+	press(m, "C")
+	if !tr.open || tr.typing {
+		t.Fatalf("opened again: open %v, typing %v", tr.open, tr.typing)
+	}
+	press(m, "h", "enter")
+	if len(fc.triaged) != 1 {
+		t.Fatalf("sent %d times", len(fc.triaged))
+	}
+	press(m, "backspace")
+	plan := `{"reply":"Selected.","actions":[{"do":"select","keys":["acme/api#30"]}]}`
+	m.Update(triageMsg{asked: tr.asked, answer: claude.Answer{Structured: []byte(plan)}})
+	if tr.open || len(tr.actions) != 1 || !strings.Contains(status(m), "claude is done") {
+		t.Fatalf("open %v, actions %+v, status %q", tr.open, tr.actions, status(m))
+	}
+	press(m, "C")
+	if tr.typing || !strings.Contains(screen(m), "select api#30") {
+		t.Fatalf("the plan is not shown:\n%s", screen(m))
+	}
+	press(m, "enter")
+	if !m.isSelected(key("acme", "api", 30)) {
+		t.Errorf("selected = %v", m.selected)
+	}
+}
+
+// A plan is about the tab it was asked on: elsewhere it is not applied.
+func TestTriagePlanAppliesOnItsTab(t *testing.T) {
+	m, _ := startTriage(t, `{"reply":"Filtered.","actions":[{"do":"filter","text":"bump"},{"do":"approve","keys":["acme/api#30"]}]}`)
+	tr := m.triage
+	m.closeTriage()
+	tr.actions = []claude.Action{{Do: claude.DoFilter, Text: "bump"}}
+	press(m, "2", "C")
+	s := screen(m)
+	if !strings.Contains(s, "claude · review") || !strings.Contains(s, "applies there") {
+		t.Errorf("on another tab:\n%s", s)
+	}
+	press(m, "enter")
+	if m.filter != "" || !tr.open {
+		t.Errorf("applied on another tab: filter %q, open %v", m.filter, tr.open)
+	}
+	press(m, "esc", "1")
+	tr.actions = []claude.Action{{Do: claude.DoFilter, Text: "bump"}}
+	press(m, "C", "enter")
+	if m.filter != "bump" {
+		t.Errorf("not applied on its tab: filter %q", m.filter)
+	}
+}
+
+// chat_restart, pressed twice, starts a conversation over in a new session.
+func TestTriageRestart(t *testing.T) {
+	m, fc := startTriage(t, `{"reply":"","actions":[]}`)
+	tr := m.triage
+	press(m, "i", "ctrl+l")
+	if len(tr.turns) != 1 {
+		t.Fatal("a first press started over")
+	}
+	press(m, "ctrl+l")
+	if len(tr.turns) != 0 || tr.session == fc.triaged[0].Session || tr.started {
+		t.Fatalf("turns %+v, session %q, started %v", tr.turns, tr.session, tr.started)
+	}
+	press(m, "x", "enter")
+	if r := fc.triaged[1]; !r.First || r.Session == fc.triaged[0].Session {
+		t.Errorf("next request %+v", r)
+	}
+	press(m, "esc", "C", "ctrl+l")
+	if !strings.Contains(status(m), "press") {
+		t.Errorf("status %q", status(m))
 	}
 }
 

@@ -36,11 +36,18 @@ type triage struct {
 	input   textarea.Model
 	typing  bool
 	// asking is set while a request is on its way, sent at since; cancel
-	// stops it, and asked tells its answer from that of one stopped.
-	asking bool
-	since  time.Time
-	cancel context.CancelFunc
-	asked  int
+	// stops it, and stopping is set once the user stopped it, until its
+	// end comes back. asked tells its answer from that of an earlier one.
+	asking   bool
+	stopping bool
+	since    time.Time
+	cancel   context.CancelFunc
+	asked    int
+	// tab is the tab the last request was about, by its place; a plan is
+	// applied there only.
+	tab int
+	// restart is set by a first press of chat_restart, until the next key.
+	restart bool
 	// seen are the pull requests as Claude was last given them.
 	seen map[model.PRKey]model.PR
 	// actions are the last plan's, until it is applied or closed.
@@ -59,6 +66,8 @@ type triageTurn struct {
 	request string
 	reply   string
 	err     bool
+	// stopped is set when the user stopped the request.
+	stopped bool
 	// cost is what the reply cost, and took how long it took.
 	cost float64
 	took time.Duration
@@ -83,7 +92,13 @@ func (m *Model) openTriage() tea.Cmd {
 		ta.SetHeight(3)
 		m.triage = &triage{session: claude.NewSession(), input: ta, follow: true}
 	}
-	m.triage.open = true
+	tr := m.triage
+	tr.open = true
+	// A request still on its way, or a plan that came while the popup was
+	// closed, is shown as it stands.
+	if tr.asking || len(tr.actions) > 0 {
+		return nil
+	}
 	return m.typeTriage()
 }
 
@@ -109,6 +124,8 @@ func (m *Model) triageKey(msg tea.KeyPressMsg) tea.Cmd {
 	is := func(a keymap.Action) bool { return m.keys.Matches(a, k) }
 	switch {
 	case tr.typing:
+		armed := tr.restart
+		tr.restart = false
 		switch {
 		case k == keymap.Back:
 			tr.typing = false
@@ -131,13 +148,27 @@ func (m *Model) triageKey(msg tea.KeyPressMsg) tea.Cmd {
 				tr.input.SetValue(s)
 			}
 			return nil
+		case is("chat_restart"):
+			switch {
+			case len(tr.turns) == 0:
+				m.refuse("nothing has been asked yet")
+			case !armed:
+				tr.restart = true
+				m.say(fmt.Sprintf("press %s again to start over", m.firstKey("chat_restart")))
+			default:
+				m.restartTriage()
+			}
+			return nil
 		}
 		var cmd tea.Cmd
 		tr.input, cmd = tr.input.Update(msg)
 		return cmd
 	case tr.asking:
-		if k == keymap.Back {
+		switch {
+		case k == keymap.Back && !tr.stopping:
 			m.stopTriage()
+		case k == keymap.Back, is("chat_close"):
+			m.closeTriage()
 		}
 	case k == keymap.Back:
 		m.closeTriage()
@@ -159,10 +190,13 @@ func (m *Model) triageKey(msg tea.KeyPressMsg) tea.Cmd {
 // askTriage sends a request with the lists as they are now.
 func (m *Model) askTriage(request string) tea.Cmd {
 	tr := m.triage
+	if tr.asking {
+		return nil
+	}
 	snap, seen := m.snapshot()
 	tr.turns = append(tr.turns, triageTurn{request: request})
-	tr.seen, tr.actions = seen, nil
-	tr.asking, tr.since = true, m.set.Now()
+	tr.seen, tr.actions, tr.tab = seen, nil, m.cur
+	tr.asking, tr.stopping, tr.since = true, false, m.set.Now()
 	tr.follow = true
 	tr.asked++
 	ctx, cancel := context.WithCancel(m.ctx)
@@ -177,48 +211,70 @@ func (m *Model) askTriage(request string) tea.Cmd {
 	}
 }
 
-// stopTriage stops the request on its way, forgets it, and closes the
-// popup.
+// stopTriage stops the request on its way. It is still asking until its
+// end comes back: Claude Code takes a moment to stop, and a request sent
+// meanwhile would resume the session it still holds.
 func (m *Model) stopTriage() {
 	tr := m.triage
+	tr.stopping = true
 	tr.cancel()
-	tr.asking, tr.cancel = false, nil
-	tr.turns = tr.turns[:len(tr.turns)-1]
-	if !tr.started {
-		// Claude Code may have made the session before it stopped; a
-		// session ID is taken once.
-		tr.session = claude.NewSession()
-	}
-	m.closeTriage()
+	m.log.Info("triage stopped", logging.KeyOp, "triage", logging.KeyClaude, tr.session)
 }
 
-func (m *Model) triageAnswered(msg triageMsg) {
+// restartTriage forgets the conversation and starts a session of its own.
+func (m *Model) restartTriage() {
+	tr := m.triage
+	tr.turns, tr.actions, tr.model = nil, nil, ""
+	tr.session, tr.started = claude.NewSession(), false
+	tr.top, tr.follow = 0, true
+}
+
+// triageAnswered takes in the end of a request, which may come while the
+// popup is closed.
+func (m *Model) triageAnswered(msg triageMsg) tea.Cmd {
 	tr := m.triage
 	if tr == nil || !tr.asking || msg.asked != tr.asked {
-		return
+		return nil
 	}
-	tr.asking, tr.cancel = false, nil
+	stopped := tr.stopping
+	tr.asking, tr.stopping, tr.cancel = false, false, nil
 	t := &tr.turns[len(tr.turns)-1]
 	t.took = m.set.Now().Sub(tr.since)
+	if stopped {
+		// Claude Code may have made the session before it stopped; a
+		// session ID is taken once.
+		if !tr.started {
+			tr.session = claude.NewSession()
+		}
+		t.stopped = true
+		if tr.open {
+			return m.typeTriage()
+		}
+		return nil
+	}
+	if !tr.open {
+		m.say(fmt.Sprintf("claude is done: %s shows it", m.firstKey("triage")))
+	}
 	if msg.err != nil {
 		if !tr.started {
 			tr.session = claude.NewSession()
 		}
 		t.reply, t.err = msg.err.Error(), true
-		return
+		return nil
 	}
 	// Claude Code keeps the session from the first answer on.
 	tr.started = true
 	p, err := claude.ParseTriage(msg.answer)
 	if err != nil {
 		t.reply, t.err = err.Error(), true
-		return
+		return nil
 	}
 	t.reply, t.cost, tr.actions = p.Reply, p.Cost, p.Actions
 	if p.Model != "" {
 		tr.model = p.Model
 	}
 	m.log.Debug("triage answered", logging.KeyOp, "triage", logging.KeyClaude, tr.session, "actions", len(p.Actions))
+	return nil
 }
 
 // snapshot is the tab shown as Claude is given it, and the pull requests
@@ -297,6 +353,9 @@ const noneLeft = "no pull request left"
 // an action is checked on the filter the ones before it leave.
 func (m *Model) checkPlan() []step {
 	tr, t := m.triage, m.tab()
+	if m.cur != tr.tab {
+		return nil
+	}
 	now := map[model.PRKey]model.PR{}
 	for _, r := range m.listed(t) {
 		now[r.pr.Key] = m.fullPR(r.pr)
@@ -472,8 +531,16 @@ func (m *Model) renderTriage() ([]string, int) {
 	var foot []string
 	switch {
 	case tr.asking:
-		body = append(body, spaces(chatMargin)+m.working(st.muted, "thinking…")+" "+st.dim.Render(elapsed(m.set.Now().Sub(tr.since))))
-		foot = append(foot, st.key.Render(keymap.Back)+" "+st.muted.Render("stop"))
+		what := "thinking…"
+		if tr.stopping {
+			what = "stopping…"
+		}
+		body = append(body, spaces(chatMargin)+m.working(st.muted, what)+" "+st.dim.Render(elapsed(m.set.Now().Sub(tr.since))))
+		back := "stop"
+		if tr.stopping {
+			back = "back"
+		}
+		foot = append(foot, m.footKeys([]keymap.Action{"chat_close"}, "", back))
 	case tr.typing:
 		foot = append(foot, strings.Split(tr.input.View(), "\n")...)
 		as := []keymap.Action{"accept"}
@@ -491,6 +558,9 @@ func (m *Model) renderTriage() ([]string, int) {
 				first, rest := treeLines(st, spaces(len(num)), j == len(left)-1)
 				body = append(body, hangWith(first, rest+"  ", l, inner)...)
 			}
+		}
+		if m.cur != tr.tab && len(tr.actions) > 0 {
+			body = append(body, st.red.Render("✗ this plan is for the "+m.tabs[tr.tab].name+" tab, and applies there"))
 		}
 		if len(tr.actions) > 0 {
 			body = append(body, "")
@@ -513,7 +583,11 @@ func (m *Model) renderTriage() ([]string, int) {
 	if !tr.typing && !tr.asking {
 		keys = m.scrollKeys()
 	}
-	title := "claude · " + m.tab().name
+	about := m.tab()
+	if tr.asking || len(tr.actions) > 0 {
+		about = m.tabs[tr.tab]
+	}
+	title := "claude · " + about.name
 	out, top := scrollBox(st, title, body, foot, w, m.popupHeight(), top, keepLines{}, keys)
 	info := "plan only"
 	if tr.model != "" {
@@ -541,12 +615,14 @@ func (m *Model) triageTurnLines(textW int) []string {
 			break
 		}
 		switch {
+		case t.stopped:
+			L = append(L, spaces(chatMargin)+m.st.dim.Render("⏺ stopped"))
 		case t.err:
 			L = append(L, m.failedLines(t.reply, textW)...)
 		case t.reply != "":
 			L = append(L, m.answerLines(t.reply, textW)...)
 		}
-		if info := turnInfo(chat.Turn{Cost: t.cost}, t.took); info != "" && !t.err {
+		if info := turnInfo(chat.Turn{Cost: t.cost}, t.took); info != "" && !t.err && !t.stopped {
 			L = append(L, "", spaces(chatIndent)+m.st.dim.Render(info))
 		}
 		L = append(L, "")
