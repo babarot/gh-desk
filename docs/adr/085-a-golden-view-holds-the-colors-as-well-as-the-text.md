@@ -26,4 +26,4 @@ gomi, another Bubble Tea v2 program, compares its golden views by the characters
 
 ## Not decided here
 
-- Which themes and which background, dark or light, the golden views are drawn on.
+- Which themes and which background, dark or light, the golden views are drawn on. ADR-086 decides it.
