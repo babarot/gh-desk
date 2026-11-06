@@ -5,7 +5,9 @@
 //
 // Pull requests of different repositories go side by side; those of one
 // repository go one at a time, since merging one can leave the next behind
-// its base or in conflict. Progress is reported as Events on a channel;
+// its base or in conflict. Merges of one repository wait their turn
+// across batches too, in the order they were started. Progress is
+// reported as Events on a channel;
 // the runner knows nothing of the TUI.
 package runner
 
@@ -273,6 +275,10 @@ type Runner struct {
 	// the same record.
 	mu   sync.Mutex
 	busy map[model.PRKey]bool
+	// lanes are, by repository, the merges waiting their turn, in the
+	// order their batches started; the first is the one at work. Guarded
+	// by mu.
+	lanes map[string][]*ticket
 	// wmu guards store and canWait, which Adopt sets after the start.
 	wmu     sync.Mutex
 	store   Store
@@ -297,20 +303,70 @@ func (r *Runner) waiting() (Store, bool) {
 	return r.store, r.canWait
 }
 
-func (r *Runner) claim(k model.PRKey) bool {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	if r.busy[k] {
-		return false
-	}
-	r.busy[k] = true
-	return true
-}
-
 func (r *Runner) release(k model.PRKey) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	delete(r.busy, k)
+}
+
+// ticket is a merge's place in the lane of its repository.
+type ticket struct {
+	key model.PRKey
+	// turn is closed when the ticket is first in its lane.
+	turn chan struct{}
+	left bool
+}
+
+// enter puts a merge at the end of its repository's lane and returns the
+// pull request ahead of it, if any. Called with mu held.
+func (r *Runner) enter(k model.PRKey) (*ticket, *model.PRKey) {
+	repo := k.Repository()
+	t := &ticket{key: k, turn: make(chan struct{})}
+	q := r.lanes[repo]
+	r.lanes[repo] = append(q, t)
+	if len(q) == 0 {
+		close(t.turn)
+		return t, nil
+	}
+	ahead := q[len(q)-1].key
+	return t, &ahead
+}
+
+// leave takes t out of its lane, at its end or when it gives up waiting,
+// and gives the turn to the next one.
+func (r *Runner) leave(t *ticket) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if t.left {
+		return
+	}
+	t.left = true
+	repo := t.key.Repository()
+	q := r.lanes[repo]
+	i := slices.Index(q, t)
+	if i < 0 {
+		return
+	}
+	q = slices.Delete(q, i, i+1)
+	if len(q) == 0 {
+		delete(r.lanes, repo)
+		return
+	}
+	r.lanes[repo] = q
+	if i == 0 {
+		close(q[0].turn)
+	}
+}
+
+// inLane reports whether a pull request of a batch waits its turn in its
+// repository's lane: a merge, or a recorded merge resumed, but not one
+// only watched on auto-merge or an approval that waits, which go aside.
+func inLane(kind Kind, resume map[model.PRKey]model.Pending, k model.PRKey) bool {
+	if kind != Merge {
+		return false
+	}
+	p, ok := resume[k]
+	return !ok || (p.Kind != model.PendingApprove && !p.Watching)
 }
 
 // Wait waits for every batch to end. After its context is canceled, a
@@ -319,7 +375,7 @@ func (r *Runner) Wait() { r.active.Wait() }
 
 // New returns a Runner.
 func New(gh GitHub, log *slog.Logger, opt Options) *Runner {
-	return &Runner{gh: gh, opt: opt.withDefaults(), log: log, busy: map[model.PRKey]bool{}, store: opt.Store, canWait: opt.CanWait}
+	return &Runner{gh: gh, opt: opt.withDefaults(), log: log, busy: map[model.PRKey]bool{}, lanes: map[string][]*ticket{}, store: opt.Store, canWait: opt.CanWait}
 }
 
 // StartReview runs a batch that sends rv to each pull request, as Start
@@ -393,15 +449,65 @@ func (r *Runner) run(ctx context.Context, kind Kind, items []Item, resume map[mo
 		case <-ctx.Done():
 		}
 	}
+	// Every pull request is claimed, and every merge takes its place in
+	// its repository's lane, before the batch is returned: a batch started
+	// later queues behind this one and cannot take what this one waits
+	// to act on.
+	type slot struct {
+		it      Item
+		claimed bool
+		started bool
+		t       *ticket
+		ahead   *model.PRKey
+	}
+	slots := map[string][]*slot{}
+	r.mu.Lock()
 	for _, repo := range repos {
-		its := byRepo[repo]
-		wg.Go(func() {
-			for i, it := range its[1:] {
-				emit(Event{Key: it.PR.Key, Text: fmt.Sprintf("after #%d", its[i].PR.Key.Number)})
+		for _, it := range byRepo[repo] {
+			s := &slot{it: it, claimed: !r.busy[it.PR.Key]}
+			if s.claimed {
+				r.busy[it.PR.Key] = true
+				if inLane(kind, resume, it.PR.Key) {
+					s.t, s.ahead = r.enter(it.PR.Key)
+				}
 			}
-			for _, it := range its {
+			slots[repo] = append(slots[repo], s)
+		}
+	}
+	r.mu.Unlock()
+	for _, repo := range repos {
+		ss := slots[repo]
+		wg.Go(func() {
+			defer func() {
+				// What was never reached gives up its claim and its place.
+				for _, s := range ss {
+					if s.t != nil {
+						r.leave(s.t)
+					}
+					if s.claimed && !s.started {
+						r.release(s.it.PR.Key)
+					}
+				}
+			}()
+			for i, s := range ss {
+				switch {
+				case s.ahead != nil:
+					emit(Event{Key: s.it.PR.Key, Text: fmt.Sprintf("after #%d", s.ahead.Number)})
+				case i > 0:
+					emit(Event{Key: s.it.PR.Key, Text: fmt.Sprintf("after #%d", ss[i-1].it.PR.Key.Number)})
+				}
+			}
+			for _, s := range ss {
+				it := s.it
 				if ctx.Err() != nil {
 					return
+				}
+				if s.t != nil {
+					select {
+					case <-s.t.turn:
+					case <-ctx.Done():
+						return
+					}
 				}
 				store, canWait := r.waiting()
 				j := &job{r: r, ctx: ctx, log: log.With(logging.KeyPR, it.PR.Key.String()), it: it, head: it.Head, emit: emit, wg: &wg,
@@ -413,12 +519,13 @@ func (r *Runner) run(ctx context.Context, kind Kind, items []Item, resume map[mo
 					// shown yet; when, is not recorded.
 					j.trigger.Always = true
 				}
-				if !r.claim(it.PR.Key) {
+				if !s.claimed {
 					// Its record belongs to the job already on it.
 					j.record = false
 					j.say(Skipped, "already being merged or watched")
 					continue
 				}
+				s.started = true
 				switch p, ok := resume[it.PR.Key]; {
 				case ok:
 					j.pend, j.approved = p, p.Approved
@@ -434,6 +541,11 @@ func (r *Runner) run(ctx context.Context, kind Kind, items []Item, resume map[mo
 				}
 				if !j.watching {
 					r.release(it.PR.Key)
+				}
+				// The lane goes on once the merge is done with: merged,
+				// given up, or handed to GitHub's auto-merge to watch.
+				if s.t != nil {
+					r.leave(s.t)
 				}
 			}
 		})
