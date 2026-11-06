@@ -207,7 +207,8 @@ func assemble(cfg config.File, warns []string, e env, log *slog.Logger) parts {
 		log.Info("another gh-desk holds the record of pending merges")
 	}
 	rn := runner.New(runnerGitHub{e.gh}, log, runner.Options{Settings: set.Plan, Viewer: e.viewer, Store: rstore, CanWait: rstore != nil,
-		WaitTimeout: cfg.Checks.WaitTimeout.D, BlockedTimeout: cfg.Merge.BlockedTimeout.D})
+		WaitTimeout: cfg.Checks.WaitTimeout.D, BlockedTimeout: cfg.Merge.BlockedTimeout.D,
+		Excluded: excludedBy(e.gh, set.Exclude, e.viewer, set.Plan, time.Now)})
 	var lock *pendingLock
 	if store == nil && err == nil {
 		// Taken over once the other gh-desk quits.
@@ -510,6 +511,13 @@ func Settings(cfg config.File) tui.Settings {
 	}
 	for _, e := range cfg.Exclude {
 		set.Exclude = append(set.Exclude, rule(e.Name, e.Conditions))
+	}
+	for _, a := range cfg.AutoApprove {
+		q := a.Query
+		if q == "" {
+			q = autoQuery(a.Repos)
+		}
+		set.AutoApprove = append(set.AutoApprove, tui.AutoApprove{Rule: rule(a.Name, a.Conditions), Query: q, DryRun: a.DryRun})
 	}
 	for _, m := range cfg.Merge.Methods {
 		set.Plan.Methods = append(set.Plan.Methods, model.MergeMethod(strings.ToUpper(m)))
