@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/babarot/gh-desk/internal/config"
+	"github.com/babarot/gh-desk/internal/release"
 )
 
 // runConfig runs gh desk --config path config args.
@@ -106,10 +107,108 @@ quit = ["q", "Q"]
 	}
 }
 
+func TestConfigReference(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("XDG_STATE_HOME", dir)
+	// The config file is not read, so a broken one does not matter.
+	path := filepath.Join(dir, "config.toml")
+	if err := os.WriteFile(path, []byte("not toml ["), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	code, all, _ := runConfig(t, path, "reference")
+	if code != 0 || !strings.Contains(all, "# refresh = ") || !strings.Contains(all, "# approve = ") || strings.Contains(all, "New since") {
+		t.Fatalf("reference: code %d\n%s", code, all)
+	}
+	for _, tt := range []struct{ name, want string }{
+		{"merge", "[merge]\n"},
+		{"claude", "[claude.mcp]\n"},
+		{"list.refresh", "[list]\n# Refresh the shown tab"},
+		{"select", "# [[select]]\n# name = \"small\""},
+		{"select.max_lines", "[[select]]\n# The most lines"},
+		{"exclude", "# [[exclude]]\n"},
+		{"tabs", "# [[tabs]]\n"},
+		{"keys", "[keys]\n"},
+		{"keys.approve", "[keys]\n# approve = \"A\"\n"},
+	} {
+		if code, out, _ := runConfig(t, path, "reference", tt.name); code != 0 || !strings.Contains(out, tt.want) {
+			t.Errorf("reference %s: code %d\n%s", tt.name, code, out)
+		}
+	}
+	if code, _, errb := runConfig(t, path, "reference", "lst"); code != 1 || !strings.Contains(errb, `did you mean "list"?`) {
+		t.Errorf("unknown name: code %d, err %q", code, errb)
+	}
+	if code, _, _ := runConfig(t, path, "reference", "a", "b"); code != 2 {
+		t.Errorf("two names: code %d", code)
+	}
+
+	// The settings an update found are marked, and those gone are left out.
+	if err := release.Open(filepath.Join(dir, "gh-desk")).Save(release.Record{New: []string{"list.bell", "gone.key"}, NewSince: "0.9.0"}); err != nil {
+		t.Fatal(err)
+	}
+	_, all, _ = runConfig(t, path, "reference")
+	if !strings.HasPrefix(all, "# New since v0.9.0: list.bell\n\n") || !strings.Contains(all, "# New since v0.9.0.\n# bell = ") {
+		t.Errorf("marks:\n%s", all[:200])
+	}
+	if strings.Count(all, "New since") != 2 {
+		t.Errorf("marks %d times", strings.Count(all, "New since"))
+	}
+	if _, out, _ := runConfig(t, path, "reference", "list.bell"); !strings.Contains(out, "# New since v0.9.0.\n") {
+		t.Errorf("list.bell:\n%s", out)
+	}
+	if _, out, _ := runConfig(t, path, "reference", "list.refresh"); strings.Contains(out, "New since") {
+		t.Errorf("list.refresh:\n%s", out)
+	}
+
+	// A record that cannot be read marks nothing.
+	if err := os.WriteFile(filepath.Join(dir, "gh-desk", "release.json"), []byte("{"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if code, out, _ := runConfig(t, path, "reference"); code != 0 || strings.Contains(out, "New since") {
+		t.Errorf("unreadable record: code %d", code)
+	}
+}
+
+func TestConfigShowDiffIsAFileOfItsOwn(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config.toml")
+	if err := os.WriteFile(path, []byte(`
+[[select]]
+name = "mine"
+mine = true
+
+[list]
+refresh = "1m"
+home_owners = ["babarot"]
+
+[merge]
+auto_merge = false
+
+[keys]
+approve = "ctrl+a"
+`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	code, diff, errb := runConfig(t, path, "show", "--diff")
+	if code != 0 || !strings.Contains(diff, `refresh = "1m"`) || !strings.Contains(diff, `approve = "ctrl+a"`) {
+		t.Fatalf("show --diff: code %d, err %q\n%s", code, errb, diff)
+	}
+	short := filepath.Join(t.TempDir(), "new.toml")
+	if err := os.WriteFile(short, []byte(diff), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	_, before, _ := runConfig(t, path, "show")
+	_, after, _ := runConfig(t, short, "show")
+	if before != after {
+		t.Errorf("settings changed:\n%s\n---\n%s", before, after)
+	}
+}
+
 func TestConfigInitEditSchema(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "gh-desk", "config.toml")
 	if code, out, _ := runConfig(t, path, "init"); code != 0 || !strings.Contains(out, "wrote") {
 		t.Fatalf("init: code %d, out %q", code, out)
+	}
+	if b, err := os.ReadFile(path); err != nil || strings.Count(string(b), "\n") > 5 {
+		t.Errorf("the file written is %d bytes, err %v", len(b), err)
 	}
 	if code, out, _ := runConfig(t, path, "init"); code != 0 || !strings.Contains(out, "nothing was written") {
 		t.Errorf("init again: code %d, out %q", code, out)

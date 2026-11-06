@@ -64,9 +64,9 @@ func sameSet(a, b []string) bool {
 	return slices.Equal(a, b)
 }
 
-// TestTemplateValuesAreTheDefaults uncomments every setting the template
+// TestManualValuesAreTheDefaults uncomments every setting the manual
 // writes at its default and reads them as the defaults.
-func TestTemplateValuesAreTheDefaults(t *testing.T) {
+func TestManualValuesAreTheDefaults(t *testing.T) {
 	examples := map[string]bool{}
 	for _, s := range settings {
 		if s.Example != "" {
@@ -77,13 +77,10 @@ func TestTemplateValuesAreTheDefaults(t *testing.T) {
 	var b strings.Builder
 	n := 0
 	inTables, inExample := false, false
-	for line := range strings.SplitSeq(Template(""), "\n") {
+	for line := range strings.SplitSeq(Manual("", Mark{}), "\n") {
 		switch {
 		case line == "[keys]":
 			inTables = false
-		case strings.HasPrefix(line, "[["):
-			// The [[select]] rules written live run to a blank line too.
-			inExample = true
 		case strings.HasPrefix(line, "["):
 			inTables = true
 			b.WriteString(line + "\n")

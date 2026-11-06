@@ -36,9 +36,8 @@ type table struct {
 	Name string
 	// Doc is what the template says under the table's header.
 	Doc string
-	// Before is written before the table's header, as the examples of an
-	// array of tables.
-	Before string
+	// Rules writes the arrays of tables of the rules before this table.
+	Rules bool
 }
 
 // elem is a key of an element of an array of tables ([[tabs]],
@@ -58,6 +57,50 @@ type kind interface {
 	toml(v any) string
 	// schema is the setting's JSON Schema, without its description.
 	schema() map[string]any
+}
+
+// kindName is what values a kind takes, in words.
+func kindName(k kind) string {
+	switch k := k.(type) {
+	case boolKind:
+		return "boolean"
+	case optBoolKind:
+		return "boolean, or left out"
+	case intKind:
+		if k.Max != 0 {
+			return fmt.Sprintf("integer, %d to %d", k.Min, k.Max)
+		}
+		return fmt.Sprintf("integer, %d or more", k.Min)
+	case stringKind:
+		return "string"
+	case enumKind:
+		return "one of " + codeList(k.Values)
+	case listKind:
+		if len(k.Values) > 0 {
+			return "list of " + codeList(k.Values)
+		}
+		return "list of strings"
+	case durationKind:
+		if k.Off {
+			return `duration or "off"`
+		}
+		return "duration"
+	case daysKind:
+		return `days or "off"`
+	case globsKind:
+		return "list of glob patterns"
+	case mcpServersKind:
+		return "table of MCP servers"
+	}
+	panic(fmt.Sprintf("config: no name for %T", k))
+}
+
+func codeList(vs []string) string {
+	q := make([]string, len(vs))
+	for i, v := range vs {
+		q[i] = "`" + v + "`"
+	}
+	return strings.Join(q, ", ")
 }
 
 // splitKey is a setting's key as its table and its name in the table: the
@@ -375,7 +418,7 @@ var tables = []table{
 	{Name: "checks"},
 	{Name: "review"},
 	{Name: "merge"},
-	{Name: "bulk", Before: selectExamples},
+	{Name: "bulk", Rules: true},
 	{Name: "claude", Doc: "C and i ask Claude Code (claude -p, with the account you are signed in with). i, or ask claude about it in the menu of enter, reviews the pull request under the cursor in a worktree of its head. C plans what to show and select in the tab shown, with no tools, and answers in the language you ask in; enter applies the plan, and an approve or a merge in it opens the confirm popup. Claude's own tools only read: no settings files are loaded, its file tools see only the worktree and the skills of plugins, and it has none that run commands. The conversation also takes the MCP servers of [claude.mcp] and the skills of plugins, which can do whatever they are made to."},
 	{Name: "claude.mcp", Doc: "The MCP servers of the conversation about a pull request: gh-desk's own, and yours."},
 	{Name: "theme"},
@@ -529,9 +572,12 @@ func checkSettings(f File) Problems {
 	return ps
 }
 
-const templateHead = `# gh-desk settings. Uncomment a line to change it.
+const templateHead = `# gh-desk settings. Only what you change goes here: a setting left out takes
+# its default, and follows it when a later version changes it.
+# gh desk config reference prints every setting with what it does.
+`
 
-# The tabs, in the order shown; the keys 1 to 9 go to them. Tabs given here
+const tabsWords = `# The tabs, in the order shown; the keys 1 to 9 go to them. Tabs given here
 # replace all four below, and one of them must be the inbox. A tab is a
 # GitHub search, or with kind = "inbox", the pull requests in your
 # notifications. groups splits a search tab by whom a review is requested
@@ -565,7 +611,7 @@ const templateHead = `# gh-desk settings. Uncomment a line to change it.
 # show_settled = false
 `
 
-const selectExamples = `# Rules S offers to select pull requests, besides "approved by me" (bot pull
+const selectWords = `# Rules S offers to select pull requests, besides "approved by me" (bot pull
 # requests you approved that are still open). A pull request matches when it
 # meets every key given: authors (the logins it may be by; bots without
 # app/), packages (the dependencies a renovate or dependabot pull request
@@ -586,11 +632,10 @@ const selectExamples = `# Rules S offers to select pull requests, besides "appro
 # The keys bot, mine (your own), draft, approved_by_me (a review of yours
 # approves it; a person's pull request matches too) and reviewed_by_me (any
 # review of yours) are true to ask for that, and false for the opposite.
-#
-# The rules below are written to start with, not commented out: S offers
-# only the rules in this file, so delete or comment out one you do not want.
+`
 
-[[select]]
+// defaultSelect are the rules a file with no [[select]] has.
+const defaultSelect = `[[select]]
 name = "small"
 max_lines = 300
 
@@ -611,16 +656,18 @@ updated_within_days = 90
 name = "lock files"
 authors = ["renovate"]
 title = "(?i)lock file maintenance"
+`
 
-# A rule on the packages a bot's pull request updates:
+const selectExample = `# A rule on the packages a bot's pull request updates:
 #
 # [[select]]
 # name = "safe renovate"
 # authors = ["renovate"]
 # packages = ["actions/checkout", "songmu/tagpr"]
 # checks = ["passing"]
+`
 
-# Rules that leave pull requests out of every tab, until a shows them. They
+const excludeWords = `# Rules that leave pull requests out of every tab, until a shows them. They
 # take the keys of [[select]] but packages, and name may be left out; a pull
 # request is left out when it meets every key of one of them. The inbox
 # leaves out its notifications on merged or closed pull requests too, unless
@@ -645,44 +692,171 @@ const keysHead = `[keys]
 `
 
 // SchemaURL is where the JSON Schema of the file is published; the
-// template names it for editors that read it (taplo).
+// file written on first run names it for editors that read it (taplo).
 const SchemaURL = "https://raw.githubusercontent.com/babarot/gh-desk/main/docs/config.schema.json"
 
-// Template is the config file written on first run: every setting at its
-// default, commented out, so a default changed later still applies until
-// the user picks a value. The [[select]] rules alone are written live, as
-// rules to start with that the user deletes or comments out (ADR-028).
-// keys is the [keys] part, every action with its default keys, which the
-// caller writes from the keymap.
-func Template(keys string) string {
-	def := Default()
+// Template is the config file written on first run. It holds no setting:
+// what is left out takes its default, so a default changed later still
+// applies, and what each setting does is in the manual (ADR-092).
+func Template() string {
+	return "#:schema " + SchemaURL + "\n" + templateHead
+}
+
+// Mark says which settings are new since a version.
+type Mark struct {
+	Names []string
+	Since string
+}
+
+func (m Mark) line(name string) string {
+	if !slices.Contains(m.Names, name) {
+		return ""
+	}
+	return "# New since " + m.Since + ".\n"
+}
+
+// head is the line naming the new settings there still are.
+func (m Mark) head() string {
+	known := Names()
+	var names []string
+	for _, n := range m.Names {
+		if slices.Contains(known, n) {
+			names = append(names, n)
+		}
+	}
+	if len(names) == 0 {
+		return ""
+	}
+	return "# New since " + m.Since + ": " + strings.Join(names, ", ") + "\n\n"
+}
+
+// Names are the settings by the name config reference takes: table.key,
+// and for an array of tables its name and the key. A new one is told of
+// after an update.
+func Names() []string {
+	var names []string
+	for _, s := range settings {
+		names = append(names, s.Key)
+	}
+	for _, t := range []string{"tabs", "select", "exclude"} {
+		for _, e := range elems[t] {
+			names = append(names, t+"."+e.Key)
+		}
+	}
+	return names
+}
+
+// Manual is every setting with what it does, all of it comments under the
+// headers of the tables, so that read as a file it is the defaults. It is
+// made from the table each time, so it is the running version's. keys is
+// the [keys] part, which the caller writes from the keymap.
+func Manual(keys string, m Mark) string {
 	var b strings.Builder
-	b.WriteString("#:schema " + SchemaURL + "\n")
-	b.WriteString(templateHead)
+	b.WriteString(m.head())
+	b.WriteString(tabsWords)
 	for _, t := range tables {
 		b.WriteString("\n")
-		if t.Before != "" {
-			b.WriteString(t.Before + "\n")
+		if t.Rules {
+			b.WriteString(selectManual() + "\n" + excludeWords + "\n")
 		}
-		b.WriteString("[" + t.Name + "]\n")
-		b.WriteString(comment(t.Doc))
-		for _, s := range settings {
-			table, key := splitKey(s.Key)
-			if table != t.Name {
-				continue
-			}
-			v := s.Example
-			if v == "" {
-				v = s.Kind.toml(s.Value(def))
-			}
-			b.WriteString(comment(s.Doc) + "# " + key + " = " + v + "\n")
-		}
+		writeTable(&b, t, m)
 	}
 	b.WriteString("\n" + keysHead + keys)
 	return b.String()
 }
 
-// comment is text as comment lines of the template, wrapped at 76
+// ManualOf is the part of the manual of name: a table, an array of tables,
+// keys, or one key of any of them. An unknown name is an error.
+func ManualOf(name, keys string, m Mark) (string, error) {
+	switch name {
+	case "tabs":
+		return tabsWords, nil
+	case "select":
+		return selectManual(), nil
+	case "exclude":
+		return excludeWords, nil
+	case "keys":
+		return keysHead + keys, nil
+	}
+	var b strings.Builder
+	for _, t := range tables {
+		if t.Name == name || strings.HasPrefix(t.Name, name+".") {
+			if b.Len() > 0 {
+				b.WriteString("\n")
+			}
+			writeTable(&b, t, m)
+		}
+	}
+	if b.Len() > 0 {
+		return b.String(), nil
+	}
+	if i := slices.IndexFunc(settings, func(s setting) bool { return s.Key == name }); i >= 0 {
+		table, _ := splitKey(name)
+		return "[" + table + "]\n" + settingText(settings[i], Default(), m), nil
+	}
+	table, key := splitKey(name)
+	if i := slices.IndexFunc(elems[table], func(e elem) bool { return e.Key == key }); i >= 0 {
+		e := elems[table][i]
+		return "[[" + table + "]]\n" + comment(e.Doc) + m.line(name) + "# " + key + ": " + kindName(e.Kind) + "\n", nil
+	}
+	if table == "keys" {
+		for line := range strings.SplitSeq(keys, "\n") {
+			if strings.HasPrefix(line, "# "+key+" = ") {
+				return "[keys]\n" + line + "\n", nil
+			}
+		}
+	}
+	return "", fmt.Errorf("no table or setting %q%s", name, didYouMean(name, manualNames(keys)))
+}
+
+// manualNames are the names ManualOf takes.
+func manualNames(keys string) []string {
+	names := append(Names(), "tabs", "select", "exclude", "keys")
+	for _, t := range tables {
+		names = append(names, t.Name)
+	}
+	for line := range strings.SplitSeq(keys, "\n") {
+		if key, _, ok := strings.Cut(strings.TrimPrefix(line, "# "), " = "); ok {
+			names = append(names, "keys."+key)
+		}
+	}
+	return names
+}
+
+// writeTable writes table t's header, words and settings.
+func writeTable(b *strings.Builder, t table, m Mark) {
+	def := Default()
+	b.WriteString("[" + t.Name + "]\n")
+	b.WriteString(comment(t.Doc))
+	for _, s := range settings {
+		if table, _ := splitKey(s.Key); table == t.Name {
+			b.WriteString(settingText(s, def, m))
+		}
+	}
+}
+
+// settingText is a setting as the manual writes it.
+func settingText(s setting, def File, m Mark) string {
+	_, key := splitKey(s.Key)
+	v := s.Example
+	if v == "" {
+		v = s.Kind.toml(s.Value(def))
+	}
+	return comment(s.Doc) + m.line(s.Key) + "# " + key + " = " + v + "\n"
+}
+
+// selectManual is the words of [[select]] with the default rules and an
+// example, as comments.
+func selectManual() string {
+	var b strings.Builder
+	b.WriteString(selectWords + "#\n# The rules below are the default. Rules written here replace all of them;\n# to have none, write select = [] at the top of the file.\n#\n")
+	for line := range strings.SplitSeq(strings.TrimRight(defaultSelect, "\n"), "\n") {
+		b.WriteString(strings.TrimRight("# "+line, " ") + "\n")
+	}
+	return b.String() + "#\n" + selectExample
+}
+
+// comment is text as comment lines of the manual, wrapped at 76
 // columns.
 func comment(text string) string {
 	if text == "" {
@@ -766,6 +940,10 @@ func described(s map[string]any, doc string) map[string]any {
 func Show(f File, onlyDiff bool) string {
 	def := Default()
 	var b strings.Builder
+	// Before any table, where it can only be the file's own key.
+	if len(f.Select) == 0 {
+		b.WriteString("select = []\n\n")
+	}
 	if !onlyDiff || !slices.EqualFunc(f.Tabs, def.Tabs, sameTab) {
 		for _, t := range f.Tabs {
 			b.WriteString("[[tabs]]\n")
@@ -790,11 +968,8 @@ func Show(f File, onlyDiff bool) string {
 			b.WriteString("\n")
 		}
 	}
-	for _, s := range f.Select {
-		b.WriteString("[[select]]\n")
-		fmt.Fprintf(&b, "name = %q\n", s.Name)
-		writeConditions(&b, s.Conditions)
-		b.WriteString("\n")
+	if !onlyDiff || rulesText(f.Select) != rulesText(def.Select) {
+		b.WriteString(rulesText(f.Select))
 	}
 	for _, e := range f.Exclude {
 		b.WriteString("[[exclude]]\n")
@@ -822,6 +997,18 @@ func Show(f File, onlyDiff bool) string {
 		if len(lines) > 0 {
 			b.WriteString("[" + t.Name + "]\n" + strings.Join(lines, "\n") + "\n\n")
 		}
+	}
+	return b.String()
+}
+
+// rulesText is rules as the file takes them.
+func rulesText(rules []Select) string {
+	var b strings.Builder
+	for _, s := range rules {
+		b.WriteString("[[select]]\n")
+		fmt.Fprintf(&b, "name = %q\n", s.Name)
+		writeConditions(&b, s.Conditions)
+		b.WriteString("\n")
 	}
 	return b.String()
 }

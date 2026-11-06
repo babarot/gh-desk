@@ -33,6 +33,9 @@ type Release struct {
 	// UpdatedFrom is the version the last run was, when it was older than
 	// Running; empty otherwise.
 	UpdatedFrom string
+	// NewSettings are the settings this version has that no version before
+	// it did on this install.
+	NewSettings []string
 	// Due reads the releases at start.
 	Due    bool
 	Source ReleaseSource
@@ -91,6 +94,9 @@ func (m *Model) releaseStart() tea.Cmd {
 			text += fmt.Sprintf(" · %s %s what's new", m.firstKey("help"), ks[0])
 		}
 		cmds = append(cmds, m.pushNote("✓", text, nil))
+	}
+	for _, name := range r.NewSettings {
+		cmds = append(cmds, m.pushNote("✓", fmt.Sprintf("new setting %s · gh desk config reference %s", name, name), nil))
 	}
 	cmds = append(cmds, m.tellRelease())
 	if r.Due {

@@ -3,6 +3,7 @@ package app
 import (
 	"os"
 	"path/filepath"
+	"slices"
 	"testing"
 	"time"
 
@@ -48,6 +49,49 @@ func TestReleaseOfABuildThatIsNotARelease(t *testing.T) {
 	}
 	if rec, _ := store.Load(); rec.LastRun != "0.1.0" {
 		t.Errorf("a build that is not a release kept %q", rec.LastRun)
+	}
+}
+
+func TestReleaseTellsOfNewSettings(t *testing.T) {
+	e, store := releaseEnv(t, "0.1.0")
+	// A record with none known finds none new.
+	if r := releaseOf(config.Default(), e, logging.Discard()); len(r.NewSettings) != 0 {
+		t.Errorf("first launch tells of %v", r.NewSettings)
+	}
+	rec, _ := store.Load()
+	if !slices.Equal(rec.Settings, config.Names()) {
+		t.Fatalf("known %v", rec.Settings)
+	}
+	// An update to a version with one more.
+	rec.Settings, rec.LastRun = slices.DeleteFunc(rec.Settings, func(n string) bool { return n == "list.bell" }), "0.1.0"
+	if err := store.Save(rec); err != nil {
+		t.Fatal(err)
+	}
+	r := releaseOf(config.Default(), e, logging.Discard())
+	if !slices.Equal(r.NewSettings, []string{"list.bell"}) {
+		t.Errorf("told of %v", r.NewSettings)
+	}
+	if rec, _ = store.Load(); !slices.Equal(rec.New, []string{"list.bell"}) || rec.NewSince != "0.1.0" || rec.LastRun != version.Version {
+		t.Errorf("record %+v", rec)
+	}
+	// It is told once, and kept for the manual.
+	if r := releaseOf(config.Default(), e, logging.Discard()); len(r.NewSettings) != 0 {
+		t.Errorf("second launch tells of %v", r.NewSettings)
+	}
+	if rec, _ = store.Load(); !slices.Equal(rec.New, []string{"list.bell"}) {
+		t.Errorf("record %+v", rec)
+	}
+}
+
+func TestReleaseKeepsSettingsWithoutTelling(t *testing.T) {
+	e, store := releaseEnv(t, "0.1.0")
+	cfg := config.Default()
+	cfg.Release.Check = false
+	if r := releaseOf(cfg, e, logging.Discard()); len(r.NewSettings) != 0 {
+		t.Errorf("told of %v", r.NewSettings)
+	}
+	if rec, _ := store.Load(); len(rec.Settings) == 0 {
+		t.Error("the settings were not kept")
 	}
 }
 
