@@ -1,0 +1,120 @@
+-- screen --
+desk // @me    1 review (3)   2 mine (1)   3 involved (0)   4 inbox (1)                           1 to you · 1 to a team · 1 bots
+    PR                        TITLE                                  AUTHOR          CI  REVIEW   WHY         SIZE          AGE
+  ▾ requested from you 1
+▎ ● api#12                    Add retries to the client              alice           ✓   ○        you         +40 −3         3h   
+  ▸ requested from a team 1
+  ▸ bots 1
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+╭ claude on acme/api#12 ───────────────────────────────────────── claude-opus-5-5 · at aaaaaaa · read-only · $0.40 · pgup/pgdown ╮
+│                                                                                                                                │
+│   ⏺ Answer 1: the retry loop has no limit.                                                                                     │
+│                                                                                                                                │
+│     1 tool · $0.40                                                                                                             │
+│                                                                                                                                │
+│ ╭ ask claude ──────────────────────────────────────────────────────────────────────────────────────╮                           │
+│ │ ┃ Ask Claude                                                                                     │                           │
+│ │ ┃                                                                                                │                           │
+│ │ ┃                                                                                                │                           │
+│ ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯                           │
+╰────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+
+enter accept · ctrl+r draft review · ctrl+o open in claude code · esc back
+-- styles --
+L1 0-4 fg=#2e7de9 bg=#c4c8da bold
+L1 5-7 fg=#848cb5
+L1 8-11 fg=#68709a
+L1 14-17 fg=#6172b0 bg=#b4c9e8
+L1 17-28 fg=#3760bf bg=#b4c9e8 bold
+L1 30-31 fg=#848cb5
+L1 32-36 fg=#6172b0
+L1 37-44 fg=#848cb5
+L1 45-53 fg=#6172b0
+L1 54-61 fg=#848cb5
+L1 62-67 fg=#6172b0
+L1 68-71 fg=#848cb5
+L1 98-129 fg=#6172b0
+L2 4-127 fg=#4c5a96 bold
+L3 4-22 fg=#6172b0 bold
+L3 23-24 fg=#848cb5
+L4 0-4 fg=#2e7de9 bg=#c4c8da
+L4 4-7 fg=#4c5a96 bg=#c4c8da
+L4 7-30 fg=#68709a bg=#c4c8da
+L4 30-69 fg=#3760bf bg=#c4c8da
+L4 69-85 fg=#6172b0 bg=#c4c8da
+L4 85-89 fg=#587539 bg=#c4c8da
+L4 89-98 fg=#68709a bg=#c4c8da
+L4 98-110 fg=#b15c00 bg=#c4c8da bold
+L4 110-114 fg=#587539 bg=#c4c8da
+L4 114-125 fg=#f52a65 bg=#c4c8da
+L4 125-130 fg=#68709a bg=#c4c8da
+L5 4-25 fg=#6172b0 bold
+L5 26-27 fg=#848cb5
+L6 4-8 fg=#6172b0 bold
+L6 9-10 fg=#848cb5
+L21 0-1 fg=#2e7de9
+L21 2-8 fg=#9854f1
+L21 9-11 fg=#68709a
+L21 12-23 fg=#4c5a96
+L21 24-65 fg=#2e7de9
+L21 66-128 fg=#848cb5
+L21 129-130 fg=#2e7de9
+L22 0-130 fg=#2e7de9
+L23 0-1 fg=#2e7de9
+L23 4-5 fg=#3760bf
+L23 6-44 fg=#4c5a96
+L23 129-130 fg=#2e7de9
+L24 0-130 fg=#2e7de9
+L25 0-1 fg=#2e7de9
+L25 6-20 fg=#848cb5
+L25 129-130 fg=#2e7de9
+L26 0-130 fg=#2e7de9
+L27 0-1 fg=#2e7de9
+L27 2-3 fg=#a8aecb
+L27 4-14 fg=#4c5a96 bold
+L27 15-102 fg=#a8aecb
+L27 129-130 fg=#2e7de9
+L28 0-1 fg=#2e7de9
+L28 2-3 fg=#a8aecb
+L28 4-6 fg=c7 bg=c255
+L28 6-100 fg=c240 bg=c255
+L28 101-102 fg=#a8aecb
+L28 129-130 fg=#2e7de9
+L29 0-1 fg=#2e7de9
+L29 2-3 fg=#a8aecb
+L29 4-5 fg=c7
+L29 101-102 fg=#a8aecb
+L29 129-130 fg=#2e7de9
+L30 0-1 fg=#2e7de9
+L30 2-3 fg=#a8aecb
+L30 4-5 fg=c7
+L30 101-102 fg=#a8aecb
+L30 129-130 fg=#2e7de9
+L31 0-1 fg=#2e7de9
+L31 2-102 fg=#a8aecb
+L31 129-130 fg=#2e7de9
+L32 0-130 fg=#2e7de9
+L34 0-5 fg=#2e7de9 bold
+L34 6-12 fg=#68709a
+L34 13-14 fg=#848cb5
+L34 15-21 fg=#2e7de9 bold
+L34 22-34 fg=#68709a
+L34 35-36 fg=#848cb5
+L34 37-43 fg=#2e7de9 bold
+L34 44-63 fg=#68709a
+L34 64-65 fg=#848cb5
+L34 66-69 fg=#2e7de9 bold
+L34 70-74 fg=#68709a

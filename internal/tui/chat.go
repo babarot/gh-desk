@@ -118,7 +118,7 @@ func (m *Model) openChat(p model.PR) tea.Cmd {
 	}
 	c, ok := m.chats[p.Key]
 	if !ok {
-		ta := newInput()
+		ta := newInput(m.st)
 		ta.Placeholder = "Ask Claude"
 		ta.ShowLineNumbers = false
 		ta.SetHeight(3)

@@ -1,0 +1,146 @@
+-- screen --
+desk // @me    1 review (3)   2 mine (1)   3 involved (0)   4 inbox (1)                           1 to you · 1 to a team · 1 bots
+    PR                        TITLE                                  AUTHOR          CI  REVIEW   WHY         SIZE          AGE
+  ▾ requested from you 1
+▎ ● api#12                    Add retries to the client              alice           ✓   ○        you         +40 −3         3h   
+  ▸ requested from a team 1
+  ▸ bots 1
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+╭  overview   diff (2)  ────────────────────────────────────────────────────────────────────────────────── acme/api#12 · J/K · v ╮
+│ #12 Add retries to the client                                                       alice │ status    open                     │
+│ ▾ description ─────────────────────────────────────────────────────────────────────────── │ requested me @core                 │
+│ │ What                                                                                    │ checks    ✓1                       │
+│ │ Retry failed requests.                                                                  │ size      +40 −3 · 2 files         │
+│ ╵                                                                                         │ branch    retries                  │
+│                                                                                           │           → main                   │
+│ ▾ checks (1)  ✓1 ──────────────────────────────────────────────────────────────────────── │ updated   3h ago                   │
+│ │ ✓ test                                                                                  │                                    │
+│ ╵                                                                                         │                                    │
+│                                                                                           │                                    │
+╰────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+
+enter actions · space select · S select by rule · C triage with claude · L log · / filter · ? keys
+-- styles --
+L1 0-4 fg=#1e66f5 bg=#ccd0da bold
+L1 5-7 fg=#9ca0b0
+L1 8-11 fg=#7c7f93
+L1 14-17 fg=#6c6f85 bg=#bbcef5
+L1 17-28 fg=#4c4f69 bg=#bbcef5 bold
+L1 30-31 fg=#9ca0b0
+L1 32-36 fg=#6c6f85
+L1 37-44 fg=#9ca0b0
+L1 45-53 fg=#6c6f85
+L1 54-61 fg=#9ca0b0
+L1 62-67 fg=#6c6f85
+L1 68-71 fg=#9ca0b0
+L1 98-129 fg=#6c6f85
+L2 4-127 fg=#5c5f77 bold
+L3 4-22 fg=#6c6f85 bold
+L3 23-24 fg=#9ca0b0
+L4 0-4 fg=#1e66f5 bg=#ccd0da
+L4 4-7 fg=#5c5f77 bg=#ccd0da
+L4 7-30 fg=#7c7f93 bg=#ccd0da
+L4 30-69 fg=#4c4f69 bg=#ccd0da
+L4 69-85 fg=#6c6f85 bg=#ccd0da
+L4 85-89 fg=#40a02b bg=#ccd0da
+L4 89-98 fg=#7c7f93 bg=#ccd0da
+L4 98-110 fg=#fe640b bg=#ccd0da bold
+L4 110-114 fg=#40a02b bg=#ccd0da
+L4 114-125 fg=#d20f39 bg=#ccd0da
+L4 125-130 fg=#7c7f93 bg=#ccd0da
+L5 4-25 fg=#6c6f85 bold
+L5 26-27 fg=#9ca0b0
+L6 4-8 fg=#6c6f85 bold
+L6 9-10 fg=#9ca0b0
+L21 0-1 fg=#bcc0cc
+L21 2-12 fg=#4c4f69 bg=#bbcef5 bold
+L21 14-22 fg=#6c6f85
+L21 24-106 fg=#bcc0cc
+L21 107-128 fg=#9ca0b0
+L21 129-130 fg=#bcc0cc
+L22 0-1 fg=#bcc0cc
+L22 2-5 fg=#9ca0b0
+L22 6-31 fg=#4c4f69 bold
+L22 86-91 fg=#6c6f85
+L22 92-93 fg=#bcc0cc
+L22 94-100 fg=#7c7f93
+L22 104-108 fg=#40a02b
+L22 129-130 fg=#bcc0cc
+L23 0-1 fg=#bcc0cc
+L23 2-3 fg=#1e66f5
+L23 4-15 fg=#1e66f5 bold
+L23 16-93 fg=#bcc0cc
+L23 94-103 fg=#7c7f93
+L23 104-106 fg=#6c6f85
+L23 107-112 fg=#179299
+L23 129-130 fg=#bcc0cc
+L24 0-3 fg=#bcc0cc
+L24 4-8 fg=#8839ef bold
+L24 92-93 fg=#bcc0cc
+L24 94-100 fg=#7c7f93
+L24 104-106 fg=#40a02b
+L24 129-130 fg=#bcc0cc
+L25 0-3 fg=#bcc0cc
+L25 4-26 fg=#5c5f77
+L25 92-93 fg=#bcc0cc
+L25 94-98 fg=#7c7f93
+L25 104-107 fg=#40a02b
+L25 108-110 fg=#d20f39
+L25 111-120 fg=#7c7f93
+L25 129-130 fg=#bcc0cc
+L26 0-93 fg=#bcc0cc
+L26 94-100 fg=#7c7f93
+L26 104-111 fg=#6c6f85
+L26 129-130 fg=#bcc0cc
+L27 0-93 fg=#bcc0cc
+L27 104-110 fg=#9ca0b0
+L27 129-130 fg=#bcc0cc
+L28 0-1 fg=#bcc0cc
+L28 2-3 fg=#1e66f5
+L28 4-10 fg=#1e66f5 bold
+L28 11-14 fg=#9ca0b0
+L28 16-18 fg=#40a02b
+L28 19-93 fg=#bcc0cc
+L28 94-101 fg=#7c7f93
+L28 104-110 fg=#6c6f85
+L28 129-130 fg=#bcc0cc
+L29 0-3 fg=#bcc0cc
+L29 4-5 fg=#40a02b
+L29 6-10 fg=#5c5f77
+L29 92-130 fg=#bcc0cc
+L30 0-130 fg=#bcc0cc
+L31 0-130 fg=#bcc0cc
+L32 0-130 fg=#bcc0cc
+L34 0-5 fg=#1e66f5 bold
+L34 6-13 fg=#7c7f93
+L34 14-15 fg=#9ca0b0
+L34 16-21 fg=#1e66f5 bold
+L34 22-28 fg=#7c7f93
+L34 29-30 fg=#9ca0b0
+L34 31-32 fg=#1e66f5 bold
+L34 33-47 fg=#7c7f93
+L34 48-49 fg=#9ca0b0
+L34 50-51 fg=#1e66f5 bold
+L34 52-70 fg=#7c7f93
+L34 71-72 fg=#9ca0b0
+L34 73-74 fg=#1e66f5 bold
+L34 75-78 fg=#7c7f93
+L34 79-80 fg=#9ca0b0
+L34 81-82 fg=#1e66f5 bold
+L34 83-89 fg=#7c7f93
+L34 90-91 fg=#9ca0b0
+L34 92-93 fg=#1e66f5 bold
+L34 94-98 fg=#7c7f93
