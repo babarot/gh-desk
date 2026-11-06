@@ -2,8 +2,10 @@ package tui
 
 import (
 	"errors"
+	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	tea "charm.land/bubbletea/v2"
 
@@ -98,5 +100,53 @@ func TestMascotKeepsClaudesColor(t *testing.T) {
 		if got := newStyles(p).mascot.GetForeground(); got != claudeOrange() {
 			t.Errorf("theme %s draws Clawd in %v", name, got)
 		}
+	}
+}
+
+// Clawd moves while the worktree is made, keeping its width so the text
+// beside it stays put, and stands still otherwise and when the spinner
+// chosen does not move.
+func TestMascotMovesWhileTheWorktreeIsMade(t *testing.T) {
+	width := func(s string) []int {
+		var w []int
+		for L := range strings.SplitSeq(s, "\n") {
+			w = append(w, len([]rune(L)))
+		}
+		return w
+	}
+	for i, p := range mascotPoses {
+		if got, want := width(p), width(mascot); !slices.Equal(got, want) {
+			t.Errorf("pose %d is %v wide, mascot %v", i, got, want)
+		}
+	}
+	for name, sp := range spinners {
+		if !sp.still && sp.every > mascotEvery {
+			t.Errorf("spinner %s steps slower than Clawd's poses, which it would skip", name)
+		}
+	}
+	m, _ := startWith(t, fixture(), keymap.Default())
+	press(m, "i")
+	c := m.chat()
+	now := time.Now()
+	poses := func() map[string]bool {
+		seen := map[string]bool{}
+		for i := range len(mascotPoses) {
+			at := now.Add(time.Duration(i) * mascotEvery)
+			m.set.Now = func() time.Time { return at }
+			seen[m.mascotNow(c)] = true
+		}
+		return seen
+	}
+	if got := poses(); len(got) != 1 || !got[mascot] {
+		t.Errorf("Clawd moves with the worktree made: %d poses", len(got))
+	}
+	c.preparing = true
+	m.spinStyle = spinner("dots")
+	if got := poses(); len(got) < 2 {
+		t.Errorf("Clawd stands still while the worktree is made")
+	}
+	m.spinStyle = spinner("off")
+	if got := poses(); len(got) != 1 || !got[mascot] {
+		t.Errorf("Clawd moves with the spinner off: %d poses", len(got))
 	}
 }

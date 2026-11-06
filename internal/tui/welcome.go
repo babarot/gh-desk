@@ -3,6 +3,7 @@ package tui
 import (
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/babarot/gh-desk/internal/model"
 )
@@ -10,6 +11,34 @@ import (
 // mascot is Clawd, Claude's mascot, drawn as Claude Code draws it: three lines,
 // each as wide as the others.
 const mascot = " ▐▛███▜▌ \n▝▜█████▛▘\n  ▘▘ ▝▝  "
+
+// mascotPoses are what Clawd does while the worktree is made, one pose
+// after another: it waves and blinks. Each pose is drawn as mascot is,
+// with lines as wide as mascot's, so the text beside it stays put.
+var mascotPoses = []string{
+	mascot,
+	mascot,
+	" ▐▛███▜▌ \n▗▜█████▛▖\n  ▘▘ ▝▝  ",
+	mascot,
+	" ▐▛███▜▌ \n▗▜█████▛▖\n  ▘▘ ▝▝  ",
+	mascot,
+	" ▐█████▌ \n▝▜█████▛▘\n  ▘▘ ▝▝  ",
+	mascot,
+}
+
+// mascotEvery is how long Clawd keeps a pose. It is longer than any
+// moving spinner's step, so the screen, drawn at the spinner's pace while
+// the worktree is made, never skips a pose.
+const mascotEvery = 250 * time.Millisecond
+
+// mascotNow is Clawd as it is drawn now: moving while c's worktree is
+// made, still otherwise and when the spinner chosen does not move.
+func (m *Model) mascotNow(c *chatScreen) string {
+	if !c.preparing || m.spinStyle.still {
+		return mascot
+	}
+	return mascotPoses[int(m.set.Now().UnixMilli()/mascotEvery.Milliseconds())%len(mascotPoses)]
+}
 
 // welcomeGap is the space between Clawd and the text beside it.
 const welcomeGap = 3
@@ -22,7 +51,7 @@ const welcomeGap = 3
 func (m *Model) welcomeLines(c *chatScreen, height int) []string {
 	st, p := m.st, c.PR()
 	margin := spaces(chatMargin)
-	art := strings.Split(mascot, "\n")
+	art := strings.Split(m.mascotNow(c), "\n")
 	beside := spaces(len([]rune(art[0])) + welcomeGap)
 	var right []string
 	right = append(right, st.title.Render(p.Key.String())+"  "+st.dim.Render(shownTitle(p.Title)))
