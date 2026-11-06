@@ -420,8 +420,13 @@ func press(m *Model, keys ...string) {
 
 func screen(m *Model) string { s, _ := m.render(); return ansi.Strip(s) }
 
-func golden(t *testing.T, name, got string) {
+// golden compares what m draws with testdata/name.golden: the characters on
+// the screen, then the colors and attributes of each run of them, so a change
+// of color fails as a change of text does.
+func golden(t *testing.T, name string, m *Model) {
 	t.Helper()
+	view, _ := m.render()
+	got := normalize(t, view)
 	path := filepath.Join("testdata", name+".golden")
 	if *update {
 		if err := os.MkdirAll("testdata", 0o755); err != nil {
@@ -436,16 +441,16 @@ func golden(t *testing.T, name, got string) {
 	if err != nil {
 		t.Fatalf("%v (run go test ./internal/tui -update)", err)
 	}
-	if got != string(want) {
-		t.Errorf("%s differs from %s:\n%s", name, path, got)
+	if !sameView(got, string(want)) {
+		t.Errorf("%s differs from %s (run go test ./internal/tui -update to accept):\n%s", name, path, got)
 	}
 }
 
 func TestReviewTab(t *testing.T) {
 	m := start(t, fixture(), keymap.Default())
-	golden(t, "review", screen(m))
+	golden(t, "review", m)
 	press(m, "b", "G")
-	golden(t, "review-bots", screen(m))
+	golden(t, "review-bots", m)
 }
 
 // groupHeads are the groups whose heads t's rows show, in order.
@@ -565,7 +570,7 @@ func TestGroupedTabWithoutRequests(t *testing.T) {
 func TestPreviewDiff(t *testing.T) {
 	m := start(t, fixture(), keymap.Default())
 	press(m, "v")
-	golden(t, "preview-diff", screen(m))
+	golden(t, "preview-diff", m)
 }
 
 func TestPreviewDiffFoldsFiles(t *testing.T) {
@@ -695,7 +700,7 @@ func TestActionMenu(t *testing.T) {
 	if m.menu == nil {
 		t.Fatal("enter did not open the menu")
 	}
-	golden(t, "action-menu", screen(m))
+	golden(t, "action-menu", m)
 	press(m, "esc")
 	if m.menu != nil {
 		t.Fatal("esc did not close the menu")
@@ -735,7 +740,7 @@ func TestActionMenuSelection(t *testing.T) {
 	m := start(t, fixture(), keymap.Default())
 	// space on #12, then on the team group under it, which selects #7.
 	press(m, "space", "space", "k", "enter")
-	golden(t, "action-menu-selection", screen(m))
+	golden(t, "action-menu-selection", m)
 	press(m, "i")
 	if m.menu == nil || len(m.chats) != 0 || func() bool { k, _ := m.shownStatus(); return k != statusline.Refusal }() {
 		t.Fatalf("asking claude on a selection ran: menu %v", m.menu)
@@ -754,7 +759,7 @@ func TestInbox(t *testing.T) {
 	f := fixture()
 	m := start(t, f, keymap.Default())
 	press(m, "4")
-	golden(t, "inbox", screen(m))
+	golden(t, "inbox", m)
 	// The tab counts the unread notifications its rows hold: the one on a
 	// merged pull request only while it is shown.
 	if s := screen(m); !strings.Contains(s, "inbox (1)") {
@@ -909,7 +914,7 @@ func TestReviewWithBody(t *testing.T) {
 	if m.bulk == nil || m.bulk.kind != runner.Review || m.bulk.review.Body != "Looks good, one question." {
 		t.Fatalf("the confirm popup did not open: %+v", m.bulk)
 	}
-	golden(t, "review-confirm", screen(m))
+	golden(t, "review-confirm", m)
 	press(m, "esc")
 	if m.bulk != nil || m.compose == nil || m.compose.ta.Value() != "Looks good, one question." {
 		t.Fatalf("esc lost the review: %+v", m.compose)
@@ -997,10 +1002,10 @@ func TestComposePopup(t *testing.T) {
 	m := start(t, fixture(), keymap.Default())
 	press(m, "c")
 	run(m, m.paste(tea.PasteMsg{Content: "Does this retry on a 429?"}))
-	golden(t, "comment", screen(m))
+	golden(t, "comment", m)
 	press(m, "esc", "R")
 	run(m, m.paste(tea.PasteMsg{Content: "Does this retry on a 429?"}))
-	golden(t, "compose", screen(m))
+	golden(t, "compose", m)
 	press(m, "esc")
 	if m.compose != nil {
 		t.Errorf("esc left compose %v", m.compose)
@@ -1079,7 +1084,7 @@ func TestBulkMerge(t *testing.T) {
 		t.Fatalf("selected = %v", m.selected)
 	}
 	press(m, "M")
-	golden(t, "bulk-merge", screen(m))
+	golden(t, "bulk-merge", m)
 	press(m, "y")
 	if len(r.items) != 1 || len(r.items[0]) != 1 || r.items[0][0].PR.Key != key("acme", "api", 12) {
 		t.Fatalf("batches = %+v", r.items)
@@ -1087,7 +1092,7 @@ func TestBulkMerge(t *testing.T) {
 	if len(m.selected) != 0 {
 		t.Errorf("selection left after merge: %v", m.selected)
 	}
-	golden(t, "bulk-progress", screen(m))
+	golden(t, "bulk-progress", m)
 	if m.unseen() != 1 || !strings.Contains(m.notes[0].title, "merged 1, 1 skipped") {
 		t.Errorf("notes = %+v", m.notes)
 	}
@@ -1223,7 +1228,7 @@ func TestFoldGroupByKey(t *testing.T) {
 func TestSelectByRule(t *testing.T) {
 	m := start(t, fixture(), keymap.Default())
 	press(m, "S")
-	golden(t, "select-rule", screen(m))
+	golden(t, "select-rule", m)
 	press(m, "j", "enter")
 	if len(m.selected) != 1 || m.selected[key("acme", "api", 30)] != byHand {
 		t.Fatalf("selected = %v", m.selected)
@@ -1639,7 +1644,7 @@ func TestClaudeConversation(t *testing.T) {
 	if !m.claudeShown() || len(fc.asked) != 0 || len(fc.prepared) != 1 {
 		t.Fatalf("claude shown %v, asked %d, prepared %d", m.claudeShown(), len(fc.asked), len(fc.prepared))
 	}
-	golden(t, "claude_empty", screen(m))
+	golden(t, "claude_empty", m)
 	press(m, "tab", "enter")
 	if len(fc.asked) != 1 {
 		t.Fatalf("asked %d", len(fc.asked))
@@ -1648,7 +1653,7 @@ func TestClaudeConversation(t *testing.T) {
 	if !first.First || !strings.Contains(first.Prompt, "<diff>") || !strings.HasSuffix(first.Prompt, "\n"+claude.ReviewQuestion) || first.Dir == "" {
 		t.Errorf("first request %+v", first)
 	}
-	golden(t, "claude", screen(m))
+	golden(t, "claude", m)
 
 	press(m, "w", "h", "y", "?", "enter")
 	if len(fc.asked) != 2 {
@@ -2285,7 +2290,7 @@ func TestClose(t *testing.T) {
 		}
 	}
 	openClose()
-	golden(t, "close-confirm", screen(m))
+	golden(t, "close-confirm", m)
 	// y is the popup's key while the box has no focus: typing it would
 	// confirm, so the test types with the focus in the box only.
 	press(m, "x", "i", "L", "G", "T", "M")
@@ -2295,7 +2300,7 @@ func TestClose(t *testing.T) {
 	if _, cur := m.render(); cur == nil {
 		t.Error("the text box with the focus gave the terminal no cursor")
 	}
-	golden(t, "close-writing", screen(m))
+	golden(t, "close-writing", m)
 	press(m, "esc")
 	if m.bulk == nil || m.bulk.close.editing {
 		t.Fatal("esc in the box did not give the keys back to the popup")

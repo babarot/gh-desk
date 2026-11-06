@@ -1,7 +1,8 @@
-desk // @me    1 review (3)   2 mine (1)   3 involved (0)   4 inbox (1)                           1 to you · 1 to a team · 1 bots 
+-- screen --
+desk // @me    1 review (3)   2 mine (1)   3 involved (0)   4 inbox (1)                           1 to you · 1 to a team · 1 bots
     PR                        TITLE                                  AUTHOR          CI  REVIEW   WHY         SIZE          AGE
   ▾╭ close ───────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
-▎ ●│ ✓ acme/api#12 Add retries to the client                                                                                  │   
+▎ ●│ ✓ acme/api#12 Add retries to the client                                                                                  │
   ▸│   └ close                                                                                                                │
   ▸│                                                                                                                          │
    │ A closed pull request can be reopened. Each acts only on the head shown when it was read.                                │
@@ -30,5 +31,85 @@ desk // @me    1 review (3)   2 mine (1)   3 involved (0)   4 inbox (1)         
 │ ╵                                                                                         │                                    │
 │                                                                                           │                                    │
 ╰────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
-                                                                                                                                  
-y yes · x delete branches · i write a comment · esc back                                                                          
+
+y yes · x delete branches · i write a comment · esc back
+-- styles --
+L1 0-129 fg=#706f87
+L2 4-127 fg=#706f87
+L3 2-3 fg=#706f87
+L3 3-4 fg=#96bfff
+L3 5-10 fg=#d0d6e8 bold
+L3 11-127 fg=#96bfff
+L4 0-3 fg=#706f87
+L4 3-4 fg=#96bfff
+L4 5-6 fg=#d4b0ff
+L4 7-15 fg=#d0d6e8
+L4 15-18 fg=#8888a4
+L4 19-44 fg=#d0d6e8
+L4 126-127 fg=#96bfff
+L5 2-3 fg=#706f87
+L5 3-4 fg=#96bfff
+L5 7-8 fg=#525270
+L5 9-14 fg=#b5f0b0
+L5 126-127 fg=#96bfff
+L6 2-3 fg=#706f87
+L6 3-127 fg=#96bfff
+L7 3-4 fg=#96bfff
+L7 5-94 fg=#706f87
+L7 126-127 fg=#96bfff
+L8 3-127 fg=#96bfff
+L9 3-4 fg=#96bfff
+L9 5-8 fg=#d4b0ff bold
+L9 9-33 fg=#e0e4f0
+L9 35-56 fg=#8888a4
+L9 126-127 fg=#96bfff
+L10 3-127 fg=#96bfff
+L11 3-4 fg=#96bfff
+L11 5-12 fg=#8888a4
+L11 13-23 fg=#706f87
+L11 126-127 fg=#96bfff
+L12 3-4 fg=#96bfff
+L12 5-10 fg=c7
+L12 11-37 fg=c240
+L12 126-127 fg=#96bfff
+L13 3-4 fg=#96bfff
+L13 5-6 fg=c7
+L13 7-8 fg=c0
+L13 126-127 fg=#96bfff
+L14 3-4 fg=#96bfff
+L14 5-6 fg=c7
+L14 7-8 fg=c0
+L14 126-127 fg=#96bfff
+L15 3-4 fg=#96bfff
+L15 5-6 fg=c7
+L15 7-8 fg=c0
+L15 126-127 fg=#96bfff
+L16 3-127 fg=#96bfff
+L17 3-4 fg=#96bfff
+L17 5-29 fg=#b0b8d1
+L17 30-31 fg=#96bfff bold
+L17 32-35 fg=#8888a4
+L17 36-37 fg=#706f87
+L17 38-39 fg=#96bfff bold
+L17 40-55 fg=#8888a4
+L17 56-57 fg=#706f87
+L17 58-59 fg=#96bfff bold
+L17 60-75 fg=#8888a4
+L17 76-77 fg=#706f87
+L17 78-81 fg=#96bfff bold
+L17 82-84 fg=#8888a4
+L17 126-127 fg=#96bfff
+L18 3-127 fg=#96bfff
+L21 0-130 fg=#706f87
+L22 0-130 fg=#706f87
+L23 0-130 fg=#706f87
+L24 0-130 fg=#706f87
+L25 0-130 fg=#706f87
+L26 0-130 fg=#706f87
+L27 0-130 fg=#706f87
+L28 0-130 fg=#706f87
+L29 0-130 fg=#706f87
+L30 0-130 fg=#706f87
+L31 0-130 fg=#706f87
+L32 0-130 fg=#706f87
+L34 0-56 fg=#706f87

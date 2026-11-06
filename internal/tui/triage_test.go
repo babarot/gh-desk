@@ -32,7 +32,7 @@ func TestTriagePlanApplied(t *testing.T) {
 	if !r.First || !strings.Contains(r.Prompt, "<request>\nbots\n</request>") || !strings.Contains(r.Prompt, "acme/api#30 head=ccccccc group=bots") {
 		t.Errorf("request %+v", r)
 	}
-	golden(t, "triage-plan", screen(m))
+	golden(t, "triage-plan", m)
 	if len(m.selected) != 0 || m.bulk != nil {
 		t.Fatal("the plan was applied before enter")
 	}
@@ -47,7 +47,7 @@ func TestTriagePlanApplied(t *testing.T) {
 	if m.bulk == nil || m.bulk.kind != runner.Review || len(m.bulk.items) != 1 || m.bulk.by != "bots" {
 		t.Fatalf("bulk = %+v", m.bulk)
 	}
-	golden(t, "triage-confirm", screen(m))
+	golden(t, "triage-confirm", m)
 
 	// The next request goes on in the same session.
 	press(m, "esc", "C", "m", "o", "r", "e", "enter")
