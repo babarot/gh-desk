@@ -457,7 +457,7 @@ func (m *Model) bulkKey(k string) tea.Cmd {
 }
 
 // runBulk starts the batch: the pull requests of the popup leave the
-// selection, whatever becomes of them (ADR-093). What it skips keeps its
+// selection, whatever becomes of them (ADR-094). What it skips keeps its
 // reason on its row; what it acts on shows its progress there.
 // A review being written under the popup is closed once its batch starts;
 // with nothing to do, it is left open.

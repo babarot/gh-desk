@@ -604,7 +604,7 @@ func (m *Model) handleData(msg tea.Msg) tea.Cmd {
 			return m.failNoted("could not read who you are on GitHub: "+msg.err.Error(), model.PRKey{})
 		}
 		m.viewer = msg.login
-		return tea.Batch(m.loadAll())
+		return tea.Batch(m.loadAll(), m.autoApprove())
 	case tabMsg:
 		return m.tabRead(msg)
 	case notifsMsg:

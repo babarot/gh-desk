@@ -1,5 +1,12 @@
 # Changelog
 
+## [v0.12.0](https://github.com/babarot/gh-desk/compare/v0.11.0...v0.12.0) - 2026-11-06
+### New Features
+- Write a short config file, and tell of new settings after an update by @babarot in https://github.com/babarot/gh-desk/pull/87
+- Approve pull requests that match [[auto_approve]] rules while gh-desk runs by @babarot in https://github.com/babarot/gh-desk/pull/86
+### Improvements
+- List the arrays of tables in one place, and tell of new settings as one by @babarot in https://github.com/babarot/gh-desk/pull/89
+
 ## [v0.11.0](https://github.com/babarot/gh-desk/compare/v0.10.0...v0.11.0) - 2026-11-06
 ### New Features
 - Let Clawd play a scene picked at random while the worktree is made by @babarot in https://github.com/babarot/gh-desk/pull/83

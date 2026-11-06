@@ -69,7 +69,7 @@ func (m *Model) onTheList(k model.PRKey) bool {
 
 // retry is an action that stopped on some of its pull requests, left to
 // try again. It is kept apart from the selection: it acts only when asked,
-// and on those alone (ADR-093).
+// and on those alone (ADR-094).
 type retry struct {
 	// open opens the confirm popup of the action again; nil for done.
 	open func() tea.Cmd

@@ -155,6 +155,13 @@ func TestConfigReference(t *testing.T) {
 	if _, out, _ := runConfig(t, path, "reference", "list.bell"); !strings.Contains(out, "# New since v0.9.0.\n") {
 		t.Errorf("list.bell:\n%s", out)
 	}
+	// A key of an array of tables is named at the array's words.
+	if err := release.Open(filepath.Join(dir, "gh-desk")).Save(release.Record{New: []string{"select.max_lines"}, NewSince: "0.9.0"}); err != nil {
+		t.Fatal(err)
+	}
+	if _, out, _ := runConfig(t, path, "reference", "select"); !strings.Contains(out, "# New since v0.9.0: select.max_lines\n") {
+		t.Errorf("select:\n%s", out)
+	}
 	if _, out, _ := runConfig(t, path, "reference", "list.refresh"); strings.Contains(out, "New since") {
 		t.Errorf("list.refresh:\n%s", out)
 	}

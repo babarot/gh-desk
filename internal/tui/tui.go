@@ -146,6 +146,9 @@ type Settings struct {
 	// until they are shown with a key; a pull request one of them says Yes
 	// of is left out.
 	Exclude []plan.Rule
+	// AutoApprove are the rules that approve what they match without a
+	// confirm (ADR-093).
+	AutoApprove []AutoApprove
 	// Resume are the merges an earlier run was waiting for.
 	Resume []model.Pending
 	// CanWait is whether this gh-desk holds the lock on the record of
@@ -265,7 +268,7 @@ type Model struct {
 
 	selected map[model.PRKey]selection
 	// lastSelected is the selection an action or the clear key took away,
-	// which u brings back (ADR-093).
+	// which u brings back (ADR-094).
 	lastSelected []model.PRKey
 	// retry is the action left to try again, nil when none is.
 	retry  *retry
@@ -276,6 +279,8 @@ type Model struct {
 	// its row until a refresh.
 	progress map[model.PRKey]progress
 	batches  map[string]*batchState
+	// auto is what auto-approve keeps for the session.
+	auto autoState
 	// batchOrder is the batches as they started.
 	batchOrder []string
 	notes      []*note
@@ -363,6 +368,7 @@ func New(src Source, run Runner, cl Claude, km keymap.Map, log *slog.Logger, set
 		m.pane.mode = paneDiff
 	}
 	m.cache = newCache()
+	m.auto = autoState{tried: map[autoTry]bool{}, toldMany: map[int]bool{}}
 	m.viewer = set.Viewer
 	m.loadCached()
 	m.chatState.LoadKeys()
@@ -395,7 +401,7 @@ func Run(ctx context.Context, src Source, run Runner, cl Claude, km keymap.Map, 
 
 // Init asks for the terminal's background, the viewer, and every tab.
 func (m *Model) Init() tea.Cmd {
-	cmds := []tea.Cmd{m.tick(), m.resume(), m.configNote(), m.releaseStart(), m.takeLock()}
+	cmds := []tea.Cmd{m.tick(), m.resume(), m.configNote(), m.releaseStart(), m.takeLock(), m.autoApprove()}
 	if m.viewer == "" {
 		cmds = append(cmds, m.loadViewer())
 	} else {
@@ -470,6 +476,10 @@ func (m *Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, m.logTick(msg)
 	case eventMsg:
 		return m, m.event(msg)
+	case autoReadMsg:
+		return m, m.autoRead(msg)
+	case autoInfoMsg:
+		return m, m.autoDecide(msg)
 	case lockMsg:
 		return m, m.tookLock(msg)
 	case releasesMsg:

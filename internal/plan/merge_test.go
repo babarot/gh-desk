@@ -241,6 +241,36 @@ func TestForApprove(t *testing.T) {
 	}
 }
 
+func TestForAutoApprove(t *testing.T) {
+	draft := info(model.MergeBlocked)
+	draft.Draft = true
+	dismissedHere := info(model.MergeBlocked)
+	dismissedHere.HeadOID = "h2"
+	dismissedHere.ViewerReview = &model.ViewerReview{State: model.ReviewDismissed, Commit: "h2"}
+	dismissedBefore := dismissedHere
+	dismissedBefore.ViewerReview = &model.ViewerReview{State: model.ReviewDismissed, Commit: "h1"}
+	approved := info(model.MergeBlocked)
+	approved.Reviews = []model.Review{{Author: "me", State: model.ReviewApproved}}
+	tests := []struct {
+		name    string
+		mi      model.MergeInfo
+		approve bool
+		reason  string
+	}{
+		{"approve", info(model.MergeBlocked), true, "approve"},
+		{"draft", draft, false, "draft"},
+		{"dismissed on this head", dismissedHere, false, "your approval was dismissed on this head"},
+		{"dismissed by a push", dismissedBefore, true, "approve"},
+		{"already", approved, false, "already approved"},
+	}
+	for _, tt := range tests {
+		d := ForAutoApprove(tt.mi, model.PR{Author: "a"}, "me", false, set)
+		if d.Approve != tt.approve || d.Reason != tt.reason || (d.Step == StepSkip) == tt.approve {
+			t.Errorf("%s: ForAutoApprove = %+v", tt.name, d)
+		}
+	}
+}
+
 func TestForReady(t *testing.T) {
 	draft := info(model.MergeDraft)
 	draft.Draft = true

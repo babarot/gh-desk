@@ -89,7 +89,7 @@ func (m *Model) tookLock(msg lockMsg) tea.Cmd {
 	}
 	// Kept in the notifications: it happens at a moment the user did
 	// nothing for.
-	return tea.Batch(cmd, m.pushNote("✓", text, nil))
+	return tea.Batch(cmd, m.pushNote("✓", text, nil), m.autoApprove())
 }
 
 // lockedBy names the gh-desk holding the lock, for a row.

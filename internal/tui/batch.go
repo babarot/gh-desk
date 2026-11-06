@@ -63,6 +63,10 @@ type batchState struct {
 	byClaude bool
 	// resumed is set on the merges the last run was waiting for.
 	resumed bool
+	// auto are the rules that asked for the approvals of a batch started
+	// without a confirm, by pull request; nil for a batch the user
+	// confirmed (ADR-093).
+	auto    map[model.PRKey]string
 	goes    map[model.PRKey]bool
 	order   []model.PRKey
 	done    map[model.PRKey]progress
@@ -313,7 +317,11 @@ func (m *Model) noteBatch(bs *batchState) tea.Cmd {
 	for _, k := range bs.order {
 		p := bs.done[k]
 		count[p.result]++
-		items = append(items, noteItem{key: k, text: p.text, result: p.result})
+		text := p.text
+		if r, ok := bs.auto[k]; ok {
+			text += " · " + r
+		}
+		items = append(items, noteItem{key: k, text: text, result: p.result})
 	}
 	items = append(items, bs.skipped...)
 	var parts []string
@@ -343,6 +351,11 @@ func (m *Model) noteBatch(bs *batchState) tea.Cmd {
 		icon = "✗"
 	}
 	title := kindVerb(bs.kind, bs.review.Event) + " done: " + strings.Join(parts, ", ")
+	if bs.auto != nil {
+		// A rule asked for it, and judges it again on its own, so nothing
+		// is left to try again.
+		return m.pushNote(icon, autoNoteTitle(parts), items)
+	}
 	if !bs.byClaude && m.retryBatch(bs) {
 		title += fmt.Sprintf(" · %s to try the stopped ones again", m.firstKey("retry"))
 	}

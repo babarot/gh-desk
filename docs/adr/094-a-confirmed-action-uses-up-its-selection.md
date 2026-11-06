@@ -1,4 +1,4 @@
-# ADR-093: A confirmed action uses up its selection
+# ADR-094: A confirmed action uses up its selection
 
 ## Status
 
@@ -19,7 +19,7 @@ The selection also carried two intents: the same set for the next action, and th
 - The last selection an action or the clear key took away can be brought back by the key that clears, when nothing is selected. It comes back without what left the list or was put away, so nothing out of sight comes back (ADR-042).
 - What failed or stopped never stays in, or comes back to, the selection. It is kept apart, with the action and its text, and a key opens that action again for those pull requests alone. Writes go through their confirm popup as ever; done has none (ADR-044). Keeping it apart means it acts only when asked and cannot join a selection made since.
 - Skipped pull requests are not tried again: a skip is a decision, not a failure.
-- A batch from Claude leaves nothing to try again: it acts on what its plan names, not on what the user chose.
+- A batch from Claude leaves nothing to try again: it acts on what its plan names, not on what the user chose. Nor does a batch of an auto-approve rule, which judges the pull request again on its own (ADR-093).
 - This replaces, in ADR-006, "Skipped pull requests leave the selection at once and keep their reason on their row; after an approve batch the approved ones stay selected, so `M` merges the same set next." with: skipped pull requests keep their reason on their row. It replaces, in ADR-043, "After a review sent to every pull request, approved ones stay selected, so `M` merges them next; the others leave the selection. When any was not sent, only those are left selected and the text is kept for the next review, so nothing is sent twice." It replaces, in ADR-044, "A selected pull request whose done failed is selected again. One that was not selected before is not: a failure does not make a selection that the next key would act on."
 - Rejected: keeping the selection after an approve, with a confirm on done of many. It leaves the partly done batch unsolved, and ADR-044 refused that confirm.
 - Rejected: offering "merge the approved ones" from a batch's result. It adds a third target besides the selection and the cursor; bringing the selection back lets the popup sort it as ever.

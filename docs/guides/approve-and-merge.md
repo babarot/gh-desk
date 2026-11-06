@@ -1,6 +1,6 @@
 # Approving and merging
 
-An approval or a merge cannot be taken back on GitHub, so every write goes through a confirm popup first. `A` approves, `M` merges, and `R` writes a review of any kind; each acts on the selection, or on the pull request under the cursor.
+An approval or a merge cannot be taken back on GitHub, so every write goes through a confirm popup first, but the approvals of the rules you write to approve, below. `A` approves, `M` merges, and `R` writes a review of any kind; each acts on the selection, or on the pull request under the cursor.
 
 ## The confirm popup
 
@@ -36,6 +36,29 @@ When some of the pull requests to approve have jobs at work, the approve popup w
 A confirmed action uses up its selection. To merge what you just approved, press `u` to bring the selection back and then `M`; `M` alone also approves what needs it, once the jobs passed.
 
 When a batch ends with pull requests failed or stopped, the notification says so and `.` opens the same action again for those alone, with its text. `.` is kept until it is used or another action fails, and skipped pull requests are not included.
+
+## Approving by rules
+
+Some pull requests you would approve without reading them, such as a bot's patch updates. An `[[auto_approve]]` rule in the config file approves what it matches while gh-desk runs, without a popup: the rule is what you would have confirmed. Together with the repository's auto-merge, they are merged without you.
+
+```toml
+[[auto_approve]]
+name = "renovate patches"
+authors = ["renovate"]
+title = '^chore\(deps\): update .* to v?\d+\.\d+\.\d+$'
+checks = ["passing"]
+```
+
+A rule takes the conditions of `[[select]]`. It reads its own search, whatever the tabs show: the open pull requests that are not drafts and whose review is asked of you, in the rule's `repos` when each of them can be searched, or the `query` you give it. Write a `query` for pull requests that do not ask you for a review, such as `is:pr is:open author:app/renovate org:acme`, and prefer one that a pull request leaves once approved. A rule with neither a query nor a condition is a mistake: it would approve every review asked of you.
+
+What a rule approves is yours to say, and who may approve what is the repository's: gh-desk does not limit a rule to bots, nor check who pushed to the branch. It approves only what the rule judged:
+
+- on the head the rule judged, after the jobs at work on it have finished; a job that fails stops it. `checks = ["passing"]` holds for a head with no checks reported yet too, which is why it waits
+- not a draft, not your own, not one you approved, and not one whose approval a person dismissed on the head it has now
+- not one an `[[exclude]]` rule matches, which is how to say "not this label": exclusions leave a pull request alone, in the tabs and from the rules. They are asked again right before the approval is sent
+- once for each head while gh-desk runs, so a new push is judged again
+
+Each approval is told in the notifications (`n`) with the rule that asked for it, and logged. `dry_run = true` only tells what a rule would approve. Rules are read with the automatic refresh, and at `r`; with `list.refresh = "off"`, at launch and at `r`. Only the gh-desk that holds the record of pending merges approves by rules, and another one says so once.
 
 ## Following a batch
 

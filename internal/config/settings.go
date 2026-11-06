@@ -516,6 +516,33 @@ var settings = []setting{
 		Doc: "Where gh-desk keeps its clones and the worktrees Claude reads, and the lists last read (lists.json, shown at once at the next launch) (~ is your home); by default $XDG_CACHE_HOME/gh-desk, or ~/.cache/gh-desk."},
 }
 
+// arrayTable is an array of tables of the file. Everything that lists them
+// reads them here; a test keeps this and elems in step. What reads the file
+// (Parse, Show) has each by hand, since their checks depend on one another.
+type arrayTable struct {
+	Name string
+	// First writes it first in the manual, as the tabs are; the others are
+	// written before the table with Rules.
+	First bool
+	// Words is what the manual says of it, as comments.
+	Words func() string
+	// Doc is what the configuration page says of it.
+	Doc string
+}
+
+func (a arrayTable) manual(m Mark) string { return a.Words() + m.arrayLine(a) }
+
+var arrayTables = []arrayTable{
+	{Name: "tabs", First: true, Words: func() string { return tabsWords },
+		Doc: fmt.Sprintf("The tabs, in the order shown; the keys 1 to 9 go to them. Tabs given replace the default four, and one of them must be the inbox. At most %d tabs.", MaxTabs)},
+	{Name: "select", Words: selectManual,
+		Doc: `The rules S offers to select pull requests, besides the built-in "approved by me". A pull request matches a rule when it meets every key the rule gives. These rules are the default; rules written in the file replace all of them, and ` + "`select = []`" + ` at the top of the file leaves none:`},
+	{Name: "exclude", Words: func() string { return excludeWords },
+		Doc: "Rules that leave pull requests out of every tab, until a shows them. A pull request is left out when it meets every key of one of them. There are none by default."},
+	{Name: "auto_approve", Words: func() string { return autoApproveWords },
+		Doc: "Rules that approve, without a confirm, the pull requests they match while gh-desk runs. There are none by default: nothing is approved unless a rule is written. A pull request an `[[exclude]]` rule matches is never approved."},
+}
+
 // elems are the keys of the arrays of tables.
 var elems = map[string][]elem{
 	"tabs": {
@@ -534,6 +561,11 @@ var elems = map[string][]elem{
 	"exclude": append([]elem{
 		{Key: "name", Kind: stringKind{}, Doc: "The rule's name, which a row it leaves out says; without one, the row says the rule's conditions."},
 	}, slices.DeleteFunc(slices.Clone(conditionElems), func(e elem) bool { return e.Key == "packages" })...),
+	"auto_approve": append([]elem{
+		{Key: "name", Kind: stringKind{}, Doc: "The rule's name, which the notifications say of what it approved; without one, they say the rule's conditions."},
+		{Key: "query", Kind: stringKind{NonEmpty: true}, Doc: "The GitHub search the pull requests are found by; without it, the open pull requests that are not drafts and whose review is asked of you, in the rule's repos when each can be searched. A rule with neither query nor a condition is a mistake."},
+		{Key: "dry_run", Kind: boolKind{}, Doc: "true: only tell, in the notifications, what the rule would approve."},
+	}, conditionElems...),
 }
 
 // conditionElems are the conditions of a rule, which [[select]] takes.
@@ -560,7 +592,7 @@ var conditionElems = []elem{
 	{Key: "approved_by_me", Kind: boolKind{}, Doc: "true: your latest review must approve it, a person's pull request too, unlike the built-in \"approved by me\"; false: none of yours does."},
 	{Key: "reviewed_by_me", Kind: boolKind{}, Doc: "true: you must have reviewed it, whatever the review said; false: you have not."},
 	{Key: "requested", Kind: listKind{NonEmpty: true}, Doc: `Whom a review must be asked of, one of them: "me", or a team as "@slug".`},
-	{Key: "reasons", Kind: listKind{Values: Reasons, NonEmpty: true}, Doc: "Reasons of a notification, one of which the row's must have; S has no notification, so [[select]] does not take it."},
+	{Key: "reasons", Kind: listKind{Values: Reasons, NonEmpty: true}, Doc: "Reasons of a notification, one of which the row's must have; S and a rule that approves judge a pull request without one, so [[select]] and [[auto_approve]] do not take it."},
 }
 
 // checkSettings checks every setting's value against its kind.
@@ -682,6 +714,20 @@ const excludeWords = `# Rules that leave pull requests out of every tab, until a
 # labels = ["wip", "do-not-merge"]
 `
 
+const autoApproveWords = `# Rules that approve, without a confirm, the pull requests they match while
+# gh-desk runs. They take the keys of [[select]] but reasons, a query to find
+# the pull requests by (the open ones whose review is asked of you, without
+# it), and dry_run to only tell what they would approve. A pull request an
+# [[exclude]] rule matches is never approved; the jobs on its head are waited
+# for first.
+#
+# [[auto_approve]]
+# name = "renovate patches"
+# authors = ["renovate"]
+# title = '^chore\(deps\): update .* to v?\d+\.\d+\.\d+$'
+# checks = ["passing"]
+`
+
 const keysHead = `[keys]
 # Which keys do what, by action: a key or a list of keys, replacing the
 # action's own, or [] to turn it off. A key given to an action is taken from
@@ -727,7 +773,64 @@ func (m Mark) head() string {
 	if len(names) == 0 {
 		return ""
 	}
-	return "# New since " + m.Since + ": " + strings.Join(names, ", ") + "\n\n"
+	return "# New since " + m.Since + ": " + strings.Join(Collapse(names), ", ") + "\n\n"
+}
+
+// arrayLine is the line naming the new keys of the array of tables a,
+// whose words are written as one, so a key has no place of its own.
+func (m Mark) arrayLine(a arrayTable) string {
+	var names []string
+	for _, e := range elems[a.Name] {
+		if name := a.Name + "." + e.Key; slices.Contains(m.Names, name) {
+			names = append(names, name)
+		}
+	}
+	if len(names) == 0 {
+		return ""
+	}
+	return "# New since " + m.Since + ": " + strings.Join(names, ", ") + "\n"
+}
+
+// Collapse gives a table or an array of tables by its name when names has
+// every setting of it, and the others as they are: a new one is told of
+// as one thing, not as each of its keys.
+func Collapse(names []string) []string {
+	var groups [][]string
+	var titles []string
+	for _, t := range tables {
+		var g []string
+		for _, s := range settings {
+			if table, _ := splitKey(s.Key); table == t.Name {
+				g = append(g, s.Key)
+			}
+		}
+		groups, titles = append(groups, g), append(titles, t.Name)
+	}
+	for _, a := range arrayTables {
+		var g []string
+		for _, e := range elems[a.Name] {
+			g = append(g, a.Name+"."+e.Key)
+		}
+		groups, titles = append(groups, g), append(titles, a.Name)
+	}
+	whole := map[string]string{}
+	for i, g := range groups {
+		if len(g) > 0 && !slices.ContainsFunc(g, func(n string) bool { return !slices.Contains(names, n) }) {
+			for _, n := range g {
+				whole[n] = titles[i]
+			}
+		}
+	}
+	var out []string
+	for _, n := range names {
+		if t, ok := whole[n]; ok {
+			n = t
+		}
+		if !slices.Contains(out, n) {
+			out = append(out, n)
+		}
+	}
+	return out
 }
 
 // Names are the settings by the name config reference takes: table.key,
@@ -738,9 +841,9 @@ func Names() []string {
 	for _, s := range settings {
 		names = append(names, s.Key)
 	}
-	for _, t := range []string{"tabs", "select", "exclude"} {
-		for _, e := range elems[t] {
-			names = append(names, t+"."+e.Key)
+	for _, a := range arrayTables {
+		for _, e := range elems[a.Name] {
+			names = append(names, a.Name+"."+e.Key)
 		}
 	}
 	return names
@@ -753,11 +856,19 @@ func Names() []string {
 func Manual(keys string, m Mark) string {
 	var b strings.Builder
 	b.WriteString(m.head())
-	b.WriteString(tabsWords)
+	for _, a := range arrayTables {
+		if a.First {
+			b.WriteString(a.manual(m))
+		}
+	}
 	for _, t := range tables {
 		b.WriteString("\n")
 		if t.Rules {
-			b.WriteString(selectManual() + "\n" + excludeWords + "\n")
+			for _, a := range arrayTables {
+				if !a.First {
+					b.WriteString(a.manual(m) + "\n")
+				}
+			}
 		}
 		writeTable(&b, t, m)
 	}
@@ -768,15 +879,11 @@ func Manual(keys string, m Mark) string {
 // ManualOf is the part of the manual of name: a table, an array of tables,
 // keys, or one key of any of them. An unknown name is an error.
 func ManualOf(name, keys string, m Mark) (string, error) {
-	switch name {
-	case "tabs":
-		return tabsWords, nil
-	case "select":
-		return selectManual(), nil
-	case "exclude":
-		return excludeWords, nil
-	case "keys":
+	if name == "keys" {
 		return keysHead + keys, nil
+	}
+	if i := slices.IndexFunc(arrayTables, func(a arrayTable) bool { return a.Name == name }); i >= 0 {
+		return arrayTables[i].manual(m), nil
 	}
 	var b strings.Builder
 	for _, t := range tables {
@@ -811,7 +918,10 @@ func ManualOf(name, keys string, m Mark) (string, error) {
 
 // manualNames are the names ManualOf takes.
 func manualNames(keys string) []string {
-	names := append(Names(), "tabs", "select", "exclude", "keys")
+	names := append(Names(), "keys")
+	for _, a := range arrayTables {
+		names = append(names, a.Name)
+	}
 	for _, t := range tables {
 		names = append(names, t.Name)
 	}
@@ -975,6 +1085,18 @@ func Show(f File, onlyDiff bool) string {
 		b.WriteString("[[exclude]]\n")
 		fmt.Fprintf(&b, "name = %q\n", e.Name)
 		writeConditions(&b, e.Conditions)
+		b.WriteString("\n")
+	}
+	for _, a := range f.AutoApprove {
+		b.WriteString("[[auto_approve]]\n")
+		fmt.Fprintf(&b, "name = %q\n", a.Name)
+		if a.Query != "" {
+			fmt.Fprintf(&b, "query = %q\n", a.Query)
+		}
+		if a.DryRun {
+			b.WriteString("dry_run = true\n")
+		}
+		writeConditions(&b, a.Conditions)
 		b.WriteString("\n")
 	}
 	for _, t := range tables {
