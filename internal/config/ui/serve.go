@@ -1,4 +1,4 @@
-package configui
+package ui
 
 import (
 	"context"

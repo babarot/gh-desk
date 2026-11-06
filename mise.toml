@@ -4,7 +4,7 @@
 
 [tools]
 golangci-lint = "2.15.0"
-# The checks of the page of config ui (internal/configui)
+# The checks of the page of config ui (internal/config/ui)
 node = "24"
 # The docs site (docs/site); extended, which the Hextra theme asks for
 "aqua:gohugoio/hugo/hugo-extended" = "0.168.0"
@@ -60,9 +60,9 @@ test -z "$(gofmt -l demo/site)" || { gofmt -l demo/site; echo "gofmt: the files 
 demo/site/build.sh
 '''
 
-[tasks."configui:test"]
+[tasks."config-ui:test"]
 description = "Check the page of gh desk config ui without a browser: its list against gh-desk's, and what it writes"
-run = "node internal/configui/check.mjs"
+run = "node internal/config/ui/check.mjs"
 
 [tasks."docs:build"]
 description = "Build the docs site (Hugo with Hextra) from docs/ into ./site"

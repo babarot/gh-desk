@@ -381,9 +381,9 @@ func TestConfigInitEditSchema(t *testing.T) {
 }
 
 // What scripts of the page read: the settings and the keys as a page has
-// them, written so that they run without Go (mise run configui:test).
+// them, written so that they run without Go (mise run config-ui:test).
 func TestConfigUIData(t *testing.T) {
-	const path = "../configui/testdata/data.json"
+	const path = "../config/ui/testdata/data.json"
 	want, err := json.MarshalIndent(map[string]any{"DATA": config.UI(), "KEYS": uiKeys()}, "", " ")
 	if err != nil {
 		t.Fatal(err)
@@ -401,7 +401,7 @@ func TestConfigUIData(t *testing.T) {
 
 // What the page's code writes reads back as gh-desk reads it at start.
 func TestConfigUIOutputLoads(t *testing.T) {
-	const path = "../configui/testdata/output.toml"
+	const path = "../config/ui/testdata/output.toml"
 	if _, _, _, err := load(path, false, new(slog.LevelVar)); err != nil {
 		t.Fatal(err)
 	}
@@ -412,7 +412,7 @@ func TestConfigUIOutputLoads(t *testing.T) {
 		t.Fatal(err)
 	}
 	var want map[string]any
-	if err := json.Unmarshal([]byte(read(t, "../configui/testdata/input.json")), &want); err != nil {
+	if err := json.Unmarshal([]byte(read(t, "../config/ui/testdata/input.json")), &want); err != nil {
 		t.Fatal(err)
 	}
 	g, _ := json.Marshal(got)

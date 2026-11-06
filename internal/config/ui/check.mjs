@@ -1,4 +1,4 @@
-// Checks the page of config ui without a browser (mise run configui:test):
+// Checks the page of config ui without a browser (mise run config-ui:test):
 // that it draws the list as gh-desk does, that it has a place for every
 // setting, and what its code writes. With --update, output.toml is written;
 // a Go test then reads it as gh-desk reads a config file.
@@ -52,6 +52,6 @@ const d = mod.load(file);
 if (mod.problems(d).length) fail('problems: ' + JSON.stringify(mod.problems(d)));
 const out = mod.genToml(d);
 if (process.argv.includes('--update')) writeFileSync(join(here, 'testdata/output.toml'), out);
-else if (out !== read('testdata/output.toml')) fail('testdata/output.toml is not what the page writes; run node internal/configui/check.mjs --update');
+else if (out !== read('testdata/output.toml')) fail('testdata/output.toml is not what the page writes; run node internal/config/ui/check.mjs --update');
 
 process.exit(failed ? 1 : 0);

@@ -20,7 +20,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/babarot/gh-desk/internal/config"
-	"github.com/babarot/gh-desk/internal/configui"
+	"github.com/babarot/gh-desk/internal/config/ui"
 	"github.com/babarot/gh-desk/internal/release"
 	"github.com/babarot/gh-desk/internal/state"
 	"github.com/babarot/gh-desk/internal/tui"
@@ -65,7 +65,7 @@ $XDG_CONFIG_HOME/gh-desk/config.toml, or ~/.config/gh-desk/config.toml.`,
 	}
 	show.Flags().BoolVar(&diff, "diff", false, "only the settings that differ from the defaults")
 
-	ui := &cobra.Command{
+	uiCmd := &cobra.Command{
 		Use:   "ui",
 		Short: "edit the settings on a page in the browser, and print how to apply them",
 		Long: `Open a page in the browser with the settings of the config file.
@@ -109,7 +109,7 @@ added to its name.`,
 
 	cmd.AddCommand(
 		apply,
-		ui,
+		uiCmd,
 		&cobra.Command{
 			Use:   "check [path]",
 			Short: "read the config file and print its mistakes and warnings, without starting; exits 1 when it has mistakes",
@@ -235,13 +235,13 @@ func uiConfig(ctx context.Context, path string, debug, tty bool, open func(strin
 			return 1
 		}
 	}
-	page, err := configui.Page(configui.Input{File: configui.File{Path: config.TildePath(path), Src: src}, Keys: uiKeys(),
+	page, err := ui.Page(ui.Input{File: ui.File{Path: config.TildePath(path), Src: src}, Keys: uiKeys(),
 		Themes: tui.Palettes(), Spinners: tui.Spinners()})
 	if err != nil {
 		fmt.Fprintf(stderr, "gh-desk: %v\n", err)
 		return 1
 	}
-	srv := &configui.Server{Page: page, Check: func(made []byte) error {
+	srv := &ui.Server{Page: page, Check: func(made []byte) error {
 		// What the file was read as is what the page changed.
 		now, err := os.ReadFile(path)
 		if err != nil && !errors.Is(err, fs.ErrNotExist) {
@@ -303,10 +303,10 @@ func clipboard(text []byte) bool {
 func openPage(url string) error { return browser.New("", io.Discard, io.Discard).Browse(url) }
 
 // uiKeys are the key actions with the words of their scope.
-func uiKeys() []configui.Key {
-	out := make([]configui.Key, len(keymap.Defaults))
+func uiKeys() []ui.Key {
+	out := make([]ui.Key, len(keymap.Defaults))
 	for i, d := range keymap.Defaults {
-		out[i] = configui.Key{Action: string(d.Action), Keys: d.Keys, Scope: string(d.Scope), ScopeWords: scopeWords[d.Scope]}
+		out[i] = ui.Key{Action: string(d.Action), Keys: d.Keys, Scope: string(d.Scope), ScopeWords: scopeWords[d.Scope]}
 	}
 	return out
 }

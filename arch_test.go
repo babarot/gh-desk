@@ -32,7 +32,7 @@ var layers = []layer{
 	{"internal/tui/statusline", 0, nil, nil, "What the status line shows: events for a moment, work in progress, the row's result"},
 	{"internal/config", 1, []string{"internal/near"}, []string{"github.com/pelletier/go-toml/v2"}, "Reading the config file and reporting its mistakes"},
 	{"internal/tui/keymap", 1, []string{"internal/near"}, nil, "Keys bound to actions by name"},
-	{"internal/configui", 2, []string{"internal/config"}, nil, "The page of gh desk config ui, one HTML file made from the settings, served on this machine"},
+	{"internal/config/ui", 2, []string{"internal/config"}, nil, "The page of gh desk config ui, one HTML file made from the settings, served on this machine"},
 	{"internal/plan", 1, []string{"internal/model"}, nil, "Deciding how to merge each pull request; selection rules"},
 	{"internal/diff", 1, nil, nil, "Reading patches and the words that changed"},
 	{"internal/github", 2, []string{"internal/model", "internal/logging"}, []string{"github.com/cli/go-gh/v2"}, "GitHub's GraphQL and REST APIs"},
@@ -45,7 +45,7 @@ var layers = []layer{
 	{"internal/tui", 4, []string{"internal/model", "internal/logging", "internal/plan", "internal/diff", "internal/tui/keymap", "internal/runner", "internal/claude", "internal/listcache", "internal/tui/statusline", "internal/tui/chat", "internal/tui/askbox", "internal/release"},
 		[]string{"charm.land/bubbletea/v2", "charm.land/bubbles/v2", "charm.land/lipgloss/v2", "github.com/charmbracelet/x/ansi", "golang.org/x/net/html", "github.com/kyokomi/emoji/v2"}, "The terminal UI"},
 	{"demo/internal/playground", 4, []string{"internal/model", "internal/claude", "internal/runner", "internal/tui/keymap"}, nil, "A made-up GitHub and Claude that the playground on the site runs against, and the scenarios that take it to a screen; never built into gh-desk"},
-	{"internal/app", 5, []string{"internal/model", "internal/logging", "internal/config", "internal/tui/keymap", "internal/plan", "internal/github", "internal/state", "internal/claude", "internal/listcache", "internal/runner", "internal/mcpserver", "internal/tui", "internal/tui/chat", "internal/tui/askbox", "internal/version", "internal/release", "internal/configui"}, []string{"github.com/spf13/cobra", "github.com/cli/go-gh/v2"}, "Putting it together: commands and flags, config, log, and starting the TUI"},
+	{"internal/app", 5, []string{"internal/model", "internal/logging", "internal/config", "internal/tui/keymap", "internal/plan", "internal/github", "internal/state", "internal/claude", "internal/listcache", "internal/runner", "internal/mcpserver", "internal/tui", "internal/tui/chat", "internal/tui/askbox", "internal/version", "internal/release", "internal/config/ui"}, []string{"github.com/spf13/cobra", "github.com/cli/go-gh/v2"}, "Putting it together: commands and flags, config, log, and starting the TUI"},
 	{"", 6, []string{"internal/app"}, nil, "Calls app.Run"},
 	{"demo/internal/recording", 6, []string{"internal/model", "internal/logging", "internal/config", "internal/tui/keymap", "internal/runner", "internal/claude", "internal/tui", "internal/app", "internal/version"}, nil, "A made-up GitHub and Claude that the TUI runs against for the recordings in the README"},
 	{"demo/recording", 7, []string{"demo/internal/recording"}, nil, "Runs the recordings' made-up world for VHS to record; never built into gh-desk"},
@@ -65,8 +65,8 @@ type layer struct {
 // reach are the parts of the standard library that reach outside the
 // process, and the packages allowed to use each.
 var reach = map[string][]string{
-	"net":      {"internal/configui", "internal/github"},
-	"net/http": {"internal/configui", "internal/github"},
+	"net":      {"internal/config/ui", "internal/github"},
+	"net/http": {"internal/config/ui", "internal/github"},
 	"os/exec":  {"demo/internal/playground", "demo/internal/recording", "internal/app", "internal/claude", "internal/github", "internal/tui"},
 	"syscall":  {"internal/state"},
 }

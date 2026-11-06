@@ -15,9 +15,9 @@ import (
 )
 
 // The page of config ui draws the list again in JavaScript. This writes
-// what gh-desk draws from the same pull requests, for scripts/configui.mjs
-// to compare the page's drawing with (mise run configui:test).
-const configuiGolden = "../configui/testdata/list.golden"
+// what gh-desk draws from the same pull requests, for scripts/ui.mjs
+// to compare the page's drawing with (mise run config-ui:test).
+const configuiGolden = "../config/ui/testdata/list.golden"
 
 type configuiPR struct {
 	Repo         string   `json:"repo"`
@@ -37,7 +37,7 @@ type configuiPR struct {
 
 func configuiFixture(t *testing.T) *fakeSource {
 	t.Helper()
-	b, err := os.ReadFile("../configui/web/prs.json")
+	b, err := os.ReadFile("../config/ui/web/prs.json")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -110,7 +110,7 @@ func TestConfigUIPopups(t *testing.T) {
 		press(m, s.keys...)
 		fmt.Fprintf(&b, "=== %s\n%s\n", s.name, popupOf(screen(m)))
 	}
-	const path = "../configui/testdata/scenes.golden"
+	const path = "../config/ui/testdata/scenes.golden"
 	if *update {
 		if err := os.WriteFile(path, []byte(b.String()), 0o644); err != nil {
 			t.Fatal(err)

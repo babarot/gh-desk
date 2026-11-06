@@ -15,7 +15,7 @@ ADR-047 runs gh-desk itself in the browser, compiled to WebAssembly, and rejects
 - `gh desk config ui` serves one HTML page on 127.0.0.1 for as long as it runs, and opens it. Nothing comes from outside: the code is embedded with `go:embed`, so no build step is added.
 - Saving on the page checks the file with the same function gh-desk starts with, shows what is wrong on the page, and otherwise writes the file to standard output and ends. Only the file goes to standard output, so that `gh desk config ui | gh desk config apply` works; the command writes nothing itself (ADR-099). On a terminal the file also goes to the clipboard.
 - A request must carry a random token from the URL and name this host in `Host`, and saving must come with this origin in `Origin`, since what is saved can reach the config file, and a setting can name a command. A file is taken once. A file that changed while the page was open is refused, as saving would lose the change.
-- The page draws the list and its popups again in JavaScript, in a pure function of the settings, apart from the page's own code, on a grid of cells with box lines drawn by the stylesheet, as gomi's site does: a terminal's columns hold whatever the browser's font does. It is checked against gh-desk: a test writes what the TUI draws from the page's pull requests, and `mise run configui:test` compares the page's text with it. A change to either side that the other does not follow fails.
+- The page draws the list and its popups again in JavaScript, in a pure function of the settings, apart from the page's own code, on a grid of cells with box lines drawn by the stylesheet, as gomi's site does: a terminal's columns hold whatever the browser's font does. It is checked against gh-desk: a test writes what the TUI draws from the page's pull requests, and `mise run config-ui:test` compares the page's text with it. A change to either side that the other does not follow fails.
 - Closing the page, with its button or by closing the tab, ends the command and writes nothing. Writing the settings as they are would make `config apply` drop the comments of a file nobody changed. A reload also tells the tab went, so the command waits a moment for it to come back.
 - What is compared is the list, the menu of enter, the review box and the confirm of a merge. The other scenes (the keys, the popup of S, the panes) follow gh-desk by hand, and colors are not compared.
 - The checks on the page help with typing; what decides is the check on saving. They are the ones a value can be judged by alone.
@@ -25,6 +25,6 @@ ADR-047 runs gh-desk itself in the browser, compiled to WebAssembly, and rejects
 
 ## Consequences
 
-- A change to the list that the page does not follow fails `mise run configui:test`, and is fixed in `internal/configui/web/tui.js`.
+- A change to the list that the page does not follow fails `mise run config-ui:test`, and is fixed in `internal/config/ui/web/tui.js`.
 - A new setting needs words on the page; the same check fails without them.
 - A broken GitHub search cannot be told on the page; a tab has a link to try it.
