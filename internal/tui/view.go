@@ -288,7 +288,10 @@ func (m *Model) tabLabel(i int) string {
 	// A count read is shown while the rest of the tab is read: the status
 	// line tells how far the reading is (ADR-050).
 	count := "…"
+	narrowed := false
 	switch {
+	case t.loaded && (t.inbox || t.err == nil) && m.narrowed(t):
+		count, narrowed = fmt.Sprint(m.narrowedCount(t)), true
 	case t.inbox && t.loaded:
 		count = fmt.Sprint(m.unreadShown(t))
 	case t.loaded && t.err == nil:
@@ -306,10 +309,20 @@ func (m *Model) tabLabel(i int) string {
 	if ks := m.keys.Keys(keymap.Action(fmt.Sprintf("tab_%d", i+1))); len(ks) > 0 {
 		key = " " + ks[0]
 	}
+	// A count of rows narrowed is in the filter line's yellow, so that it
+	// reads as the filter's and not as the tab's whole.
 	if i == m.cur {
-		return st.tabKeyOn.Render(key) + st.tabOn.Render(" "+t.name+" ("+count+") ")
+		c := st.tabOn.Render("(" + count + ")")
+		if narrowed {
+			c = st.tabOn.Foreground(st.p.yellow).Render("(" + count + ")")
+		}
+		return st.tabKeyOn.Render(key) + st.tabOn.Render(" "+t.name+" ") + c + st.tabOn.Render(" ")
 	}
-	return st.dim.Render(key) + st.tabOff.Render(" "+t.name+" ") + st.dim.Render("("+count+")") + " "
+	c := st.dim.Render("(" + count + ")")
+	if narrowed {
+		c = st.yellow.Render("(" + count + ")")
+	}
+	return st.dim.Render(key) + st.tabOff.Render(" "+t.name+" ") + c + " "
 }
 
 func (m *Model) headerRight() string {

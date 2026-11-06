@@ -9,6 +9,7 @@ import (
 	"github.com/charmbracelet/x/ansi"
 
 	"github.com/babarot/gh-desk/internal/model"
+	"github.com/babarot/gh-desk/internal/plan"
 	"github.com/babarot/gh-desk/internal/tui/keymap"
 )
 
@@ -228,5 +229,48 @@ func TestFilterLineFitsANarrowScreen(t *testing.T) {
 		if l := strings.Split(s, "\n")[1]; lipgloss.Width(l) > m.width {
 			t.Errorf("filter line of %q is %d wide on %d: %q", f, lipgloss.Width(l), m.width, ansi.Strip(l))
 		}
+	}
+}
+
+// While the rows are narrowed, every tab's count is what its rows hold: the
+// filter typed narrows them all, the rules of S only the tab they narrow,
+// and the inbox counts the unread among its rows. Clearing brings the whole
+// counts back.
+func TestNarrowedTabsCountTheirRows(t *testing.T) {
+	m := startSource(t, withCarol(), excluding(plan.Rule{Name: "carol's", Authors: []string{"carol"}}))
+	whole := headerLine(m)
+	for _, want := range []string{"1 review (3)", "2 mine (1)", "4 inbox (1)"} {
+		if !strings.Contains(whole, want) {
+			t.Fatalf("header %q has no %q", whole, want)
+		}
+	}
+
+	m.filter = "retries"
+	for _, want := range []string{"1 review (1)", "2 mine (0)", "3 involved (0)", "4 inbox (1)"} {
+		if got := headerLine(m); !strings.Contains(got, want) {
+			t.Errorf("filtered header %q has no %q", got, want)
+		}
+	}
+	// The excluded are counted only while a shows them, filtered or not.
+	m.filter = "slow"
+	if got := headerLine(m); !strings.Contains(got, "1 review (0)") {
+		t.Errorf("the count has the excluded the filter matches: %q", got)
+	}
+	press(m, "a")
+	if got := headerLine(m); !strings.Contains(got, "1 review (1)") {
+		t.Errorf("the count leaves out the excluded a shows: %q", got)
+	}
+	press(m, "a")
+
+	m.filter = ""
+	m.tab().ruleFilter = []plan.Rule{{Authors: []string{"renovate"}}}
+	for _, want := range []string{"1 review (1)", "2 mine (1)", "4 inbox (1)"} {
+		if got := headerLine(m); !strings.Contains(got, want) {
+			t.Errorf("header narrowed by rules %q has no %q", got, want)
+		}
+	}
+	m.tab().ruleFilter = nil
+	if got := headerLine(m); got != whole {
+		t.Errorf("clearing does not bring the counts back: %q, want %q", got, whole)
 	}
 }
