@@ -161,11 +161,11 @@ func (m *Model) triageKey(msg tea.KeyPressMsg) tea.Cmd {
 			return nil
 		case is("history_search"):
 			return m.openSearch(&tr.search, &tr.input, tr.history)
-		case is("fill_suggestion"):
-			if s := nextSuggestion(claude.TriageQuestions(), tr.input.Value()); s != "" {
-				tr.input.SetValue(s)
-				tr.recall.Leave()
-			}
+		case is("complete"):
+			completeAsk(&tr.recall, &tr.input, claude.TriageQuestions(), tr.history)
+			return nil
+		case is("expand") && msg.Text == "" && askGhost(&tr.input, &tr.recall, claude.TriageQuestions(), tr.history) != "":
+			completeAsk(&tr.recall, &tr.input, claude.TriageQuestions(), tr.history)
 			return nil
 		case is("chat_restart"):
 			switch {
@@ -565,10 +565,11 @@ func (m *Model) renderTriage() ([]string, int) {
 		foot = append(foot, m.searchLines(tr.search, tr.history, inner, searchRows(m.popupHeight()-3, triageSearchRows))...)
 		foot = append(foot, m.footKeys([]keymap.Action{"accept", "history_search"}, "fill in", "cancel"))
 	case tr.typing:
-		foot = append(foot, strings.Split(tr.input.View(), "\n")...)
+		ghost := askGhost(&tr.input, &tr.recall, claude.TriageQuestions(), tr.history)
+		foot = append(foot, m.askLines(&tr.input, ghost)...)
 		as := []keymap.Action{"accept"}
-		if nextSuggestion(claude.TriageQuestions(), tr.input.Value()) != "" {
-			as = append(as, "fill_suggestion")
+		if ghost != "" || nextSuggestion(claude.TriageQuestions(), tr.input.Value()) != "" {
+			as = append(as, "complete")
 		}
 		if len(tr.history) > 0 {
 			as = append(as, "history_search")
@@ -662,7 +663,7 @@ func (m *Model) triageTurnLines(textW int) []string {
 
 // triageWelcome is what the popup shows while nothing has been asked, in at
 // most height lines: Clawd beside what the tab holds, and the questions
-// fill_suggestion puts in the text box. The questions give way first; when
+// complete puts in the text box. The questions give way first; when
 // even Clawd does not fit, nothing is shown.
 func (m *Model) triageWelcome(height int) []string {
 	st, t := m.st, m.tab()

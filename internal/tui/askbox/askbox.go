@@ -52,6 +52,34 @@ func Unique(list []Entry) []Entry {
 	return out
 }
 
+// Ghost is what follows typed in the first of try and then list that starts
+// with it, ignoring case; empty when none does. It goes by rune, as lower
+// case keeps the runes of a text but not always its bytes.
+func Ghost(typed string, try []string, list []Entry) string {
+	if typed == "" {
+		return ""
+	}
+	want := []rune(strings.ToLower(typed))
+	rest := func(q string) string {
+		rs, low := []rune(q), []rune(strings.ToLower(q))
+		if len(low) != len(rs) || len(low) <= len(want) || !slices.Equal(low[:len(want)], want) {
+			return ""
+		}
+		return string(rs[len(want):])
+	}
+	for _, q := range try {
+		if s := rest(q); s != "" {
+			return s
+		}
+	}
+	for _, e := range list {
+		if s := rest(e.Question); s != "" {
+			return s
+		}
+	}
+	return ""
+}
+
 // Hits are the questions of list that hold q, ignoring case.
 func Hits(list []Entry, q string) []Entry {
 	q = strings.ToLower(q)

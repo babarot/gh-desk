@@ -420,7 +420,7 @@ var ready = map[keymap.Action]bool{
 	"preview_down": true, "preview_up": true, "preview_grow": true, "preview_shrink": true, "next_file": true, "prev_file": true, "preview_tab": true, "fold": true, "preview": true,
 	"confirm": true, "next_kind": true, "post": true, "editor": true, "accept": true, "complete": true, "erase": true, "erase_word": true,
 	"log": true, "log_this_pr": true,
-	"triage": true, "triage_apply": true, "triage_more": true, "ask_claude": true, "fill_suggestion": true, "history_prev": true, "history_next": true, "history_search": true, "draft_review": true, "open_claude": true, "chat_close": true,
+	"triage": true, "triage_apply": true, "triage_more": true, "ask_claude": true, "history_prev": true, "history_next": true, "history_search": true, "draft_review": true, "open_claude": true, "chat_close": true,
 }
 
 // hints is the key line of what has the focus. It holds the ways in (the
@@ -455,8 +455,8 @@ func (m *Model) hints() string {
 		switch {
 		case m.triage.typing:
 			as = []keymap.Action{"accept"}
-			if nextSuggestion(claude.TriageQuestions(), m.triage.input.Value()) != "" {
-				as = append(as, "fill_suggestion")
+			if tr := m.triage; nextSuggestion(claude.TriageQuestions(), tr.input.Value()) != "" || askGhost(&tr.input, &tr.recall, claude.TriageQuestions(), tr.history) != "" {
+				as = append(as, "complete")
 			}
 			recall = m.recallHint(&m.triage.recall, m.triage.history)
 			if m.triage.search != nil {
@@ -481,8 +481,8 @@ func (m *Model) hints() string {
 		}
 	case m.typingChat():
 		as = []keymap.Action{"accept"}
-		if c := m.chat(); nextSuggestion(suggestions(c), c.input.Value()) != "" {
-			as = append(as, "fill_suggestion")
+		if c := m.chat(); nextSuggestion(suggestions(c), c.input.Value()) != "" || askGhost(&c.input, &c.recall, suggestions(c), chatHistory(c)) != "" {
+			as = append(as, "complete")
 		}
 		if len(chatHistory(m.chat())) > 0 {
 			as = append(as, "history_search")

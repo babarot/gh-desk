@@ -1705,13 +1705,13 @@ func TestClaudeConversation(t *testing.T) {
 	}
 }
 
-// The text box offers a review until one is asked, and tab fills it in
-// only into an empty box.
+// The text box offers a review until one is asked, and tab leaves text
+// that no question starts with.
 func TestClaudeSuggestsAReview(t *testing.T) {
 	m, _ := startWith(t, fixture(), keymap.Default())
 	fc := fakeClaudeOf(t, m)
-	press(m, "i", "w", "tab")
-	if c := m.chat(); !m.typingChat() || c.input.Value() != "w" {
+	press(m, "i", "x", "tab")
+	if c := m.chat(); !m.typingChat() || c.input.Value() != "x" {
 		t.Fatalf("typing %v, box %q", m.typingChat(), c.input.Value())
 	}
 	press(m, "backspace", "tab", "enter")

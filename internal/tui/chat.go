@@ -179,7 +179,7 @@ func suggestions(c *chatScreen) []string {
 	return []string{claude.ReviewQuestion}
 }
 
-// nextSuggestion is which of the suggestions ss fill_suggestion puts in a
+// nextSuggestion is which of the suggestions ss complete puts in a
 // text box holding v: the first when it is empty, the one after when it
 // holds a suggestion, and "" when it holds text of the user's own or there
 // is none.
@@ -539,11 +539,11 @@ func (m *Model) chatTyping(msg tea.KeyPressMsg) tea.Cmd {
 		return nil
 	case is("history_search"):
 		return m.openSearch(&c.search, &c.input, chatHistory(c))
-	case is("fill_suggestion"):
-		if s := nextSuggestion(suggestions(c), c.input.Value()); s != "" {
-			c.input.SetValue(s)
-			c.recall.Leave()
-		}
+	case is("complete"):
+		completeAsk(&c.recall, &c.input, suggestions(c), chatHistory(c))
+		return nil
+	case is("expand") && msg.Text == "" && askGhost(&c.input, &c.recall, suggestions(c), chatHistory(c)) != "":
+		completeAsk(&c.recall, &c.input, suggestions(c), chatHistory(c))
 		return nil
 	case is("accept"):
 		q := strings.TrimSpace(c.input.Value())
@@ -990,7 +990,7 @@ func (m *Model) renderClaude(b *strings.Builder, height int) *tea.Cursor {
 			lines = append(lines, m.searchLines(c.search, chatHistory(c), w-4, searchRows(room, chatSearchRows))...)
 			ask = box(plain, "history · "+c.PR().Key.String(), lines[:min(len(lines), room)], w)
 		} else {
-			ask = box(plain, "ask claude", strings.Split(c.input.View(), "\n"), w)
+			ask = box(plain, "ask claude", m.askLines(&c.input, askGhost(&c.input, &c.recall, suggestions(c), chatHistory(c))), w)
 		}
 	}
 	bodyH := max(height-2-len(ask), 1)

@@ -679,3 +679,41 @@ func TestSearchOnALowScreen(t *testing.T) {
 		}
 	}
 }
+
+// What is typed is followed, faint, by the rest of a question, and tab or
+// right fills it in. The cursor stays after the typed text.
+func TestAskGhost(t *testing.T) {
+	h := &memoryHistory{entries: []askbox.Entry{{Question: "先週から動いていないものは？"}}}
+	m := withHistory(t, h)
+	press(m, "C", "b", "o")
+	tr := m.triage
+	s, cur := m.render()
+	if !strings.Contains(ansi.Strip(s), "┃ bots with passing checks") {
+		t.Fatalf("no ghost:\n%s", ansi.Strip(s))
+	}
+	if !strings.Contains(ansi.Strip(s), "tab complete") {
+		t.Errorf("no key told:\n%s", ansi.Strip(s))
+	}
+	lines := strings.Split(ansi.Strip(s), "\n")
+	if got := ansi.Cut(lines[cur.Y], 0, cur.X); !strings.HasSuffix(got, "┃ bo") {
+		t.Errorf("cursor after %q", got)
+	}
+	press(m, "tab")
+	if tr.input.Value() != "bots with passing checks" {
+		t.Errorf("tab gave %q", tr.input.Value())
+	}
+	tr.input.Reset()
+	press(m, "先", "right")
+	if tr.input.Value() != "先週から動いていないものは？" {
+		t.Errorf("right gave %q", tr.input.Value())
+	}
+	tr.input.SetValue("bo")
+	press(m, "left")
+	if got := screen(m); strings.Contains(got, "┃ bots with") {
+		t.Errorf("a ghost with the cursor inside the text:\n%s", got)
+	}
+	press(m, "right")
+	if tr.input.Value() != "bo" {
+		t.Errorf("right inside the text filled in %q", tr.input.Value())
+	}
+}

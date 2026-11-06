@@ -57,6 +57,24 @@ func TestRecallOfNothing(t *testing.T) {
 	}
 }
 
+func TestGhost(t *testing.T) {
+	try := []string{"bots with passing checks"}
+	list := entries("Bots again", "先週から動いていないものは？", "the same")
+	for _, tc := range []struct{ typed, want string }{
+		{"", ""},
+		{"BO", "ts with passing checks"},
+		{"bots a", "gain"},
+		{"先週", "から動いていないものは？"},
+		{"the same", ""},
+		{"nothing", ""},
+		{"\u212a", ""},
+	} {
+		if got := Ghost(tc.typed, try, list); got != tc.want {
+			t.Errorf("Ghost(%q) = %q, want %q", tc.typed, got, tc.want)
+		}
+	}
+}
+
 func TestHits(t *testing.T) {
 	got := Hits(entries("Bots with passing checks", "先週から動いていないものは？", "bots again"), "BOTS")
 	if len(got) != 2 {

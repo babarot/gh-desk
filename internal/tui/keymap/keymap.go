@@ -45,6 +45,7 @@ const (
 // their keys are checked against its own.
 var borrowed = map[Scope][]Action{
 	ScopeHelp: {"fold"},
+	ScopeChat: {"complete"},
 }
 
 // Def is an action with its default keys and the words the key hints show.
@@ -138,7 +139,6 @@ var Defaults = []Def{
 
 	// The text box has the focus while nothing is on its way, so these
 	// keys are not ones it types.
-	{"fill_suggestion", ScopeChat, []string{"tab"}, "fill in the suggestion"},
 	{"draft_review", ScopeChat, []string{"ctrl+x"}, "draft review"},
 	{"open_claude", ScopeChat, []string{"ctrl+o"}, "open in claude code"},
 	{"chat_restart", ScopeChat, []string{"ctrl+l"}, "start over"},
@@ -166,19 +166,20 @@ var Defaults = []Def{
 // entry under an old name is a mistake that names the new one; the old name
 // is not read (ADR-023).
 var renamed = map[string]Action{
-	"open":          "menu",
-	"claude":        "triage",
-	"pr_claude":     "ask_claude",
-	"unfold":        "fold",
-	"toggle_bots":   "fold_bots",
-	"toggle_pane":   "preview",
-	"show_settled":  "show_excluded",
-	"pane_tab":      "preview_tab",
-	"pane_grow":     "preview_grow",
-	"pane_shrink":   "preview_shrink",
-	"pane_down":     "preview_down",
-	"pane_up":       "preview_up",
-	"notifications": "events",
+	"open":            "menu",
+	"fill_suggestion": "complete",
+	"claude":          "triage",
+	"pr_claude":       "ask_claude",
+	"unfold":          "fold",
+	"toggle_bots":     "fold_bots",
+	"toggle_pane":     "preview",
+	"show_settled":    "show_excluded",
+	"pane_tab":        "preview_tab",
+	"pane_grow":       "preview_grow",
+	"pane_shrink":     "preview_shrink",
+	"pane_down":       "preview_down",
+	"pane_up":         "preview_up",
+	"notifications":   "events",
 }
 
 // The fixed keys are read before any action and cannot be bound.

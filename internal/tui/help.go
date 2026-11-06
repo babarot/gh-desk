@@ -33,7 +33,7 @@ var helpScopes = []struct {
 	{keymap.ScopeGlobal, "anywhere"}, {keymap.ScopeNav, "moving"}, {keymap.ScopeList, "the list and its preview"},
 	{keymap.ScopePopup, "a menu or a list popup"}, {keymap.ScopeConfirm, "a confirm popup"},
 	{keymap.ScopeTriage, "claude on the list"}, {keymap.ScopeLog, "the log"}, {keymap.ScopeChat, "asking claude"},
-	{keymap.ScopeCompose, "writing a review"}, {keymap.ScopeHelp, "this list"},
+	{keymap.ScopeCompose, "writing a review"}, {keymap.ScopeInput, "a text box"}, {keymap.ScopeHelp, "this list"},
 }
 
 const helpKeyWidth = 16
@@ -97,6 +97,9 @@ func (m *Model) helpSections() []helpSection {
 		return rows
 	}
 	works := func(s keymap.Scope) bool {
+		if s == keymap.ScopeInput {
+			return here == keymap.ScopeChat || here == keymap.ScopeTriage
+		}
 		return s == here || s == keymap.ScopeGlobal || s == keymap.ScopeNav || s == keymap.ScopeHelp
 	}
 	var out []helpSection

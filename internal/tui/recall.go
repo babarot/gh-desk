@@ -8,6 +8,7 @@ import (
 	"charm.land/bubbles/v2/textarea"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
+	"github.com/charmbracelet/x/ansi"
 
 	"github.com/babarot/gh-desk/internal/claude"
 	"github.com/babarot/gh-desk/internal/logging"
@@ -301,3 +302,52 @@ func (m *Model) markHit(text, q string, style lipgloss.Style) string {
 // searchRows is how many hits fit in rows lines of a search's box, beside its
 // text box and the line of the answer.
 func searchRows(lines, most int) int { return max(min(most, lines-2), 1) }
+
+// askGhost is what would complete the text box in, shown after its cursor:
+// nothing while a question is recalled, or with the cursor not at the end,
+// where it would cover what is typed.
+func askGhost(in *textarea.Model, r *askbox.Recall, try []string, list []askbox.Entry) string {
+	v := in.Value()
+	if r.Active() || v == "" || in.Line() != in.LineCount()-1 {
+		return ""
+	}
+	last := v[strings.LastIndexByte(v, '\n')+1:]
+	if in.Column() != len([]rune(last)) {
+		return ""
+	}
+	return askbox.Ghost(v, try, list)
+}
+
+// completeAsk fills in the text box: a suggestion, the next one while it
+// holds one, or else what its ghost offers.
+func completeAsk(r *askbox.Recall, in *textarea.Model, try []string, list []askbox.Entry) {
+	v := in.Value()
+	s := nextSuggestion(try, v)
+	if g := askGhost(in, r, try, list); s == "" && g != "" {
+		s = v + g
+	}
+	if s != "" {
+		in.SetValue(s)
+		r.Leave()
+	}
+}
+
+// askLines are the lines of the text box in, with ghost faint after its
+// cursor, cut to the box. The cursor stays where the text ends, for an input
+// method to show the text being composed there.
+func (m *Model) askLines(in *textarea.Model, ghost string) []string {
+	lines := strings.Split(in.View(), "\n")
+	cur := in.Cursor()
+	if ghost == "" || cur == nil || cur.Y >= len(lines) {
+		return lines
+	}
+	line := lines[cur.Y]
+	w := ansi.StringWidth(line)
+	if cur.X >= w {
+		return lines
+	}
+	bg := in.Styles().Focused.CursorLine.GetBackground()
+	g := ansi.Truncate(ghost, w-cur.X, "")
+	lines[cur.Y] = ansi.Cut(line, 0, cur.X) + m.st.dim.Background(bg).Render(g) + ansi.Cut(line, cur.X+ansi.StringWidth(g), w)
+	return lines
+}
