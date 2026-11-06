@@ -648,6 +648,7 @@ var scopeWords = map[keymap.Scope]string{
 	keymap.ScopeChat:    "The Claude screen",
 	keymap.ScopeCompose: "Writing a review",
 	keymap.ScopeInput:   "Typing in the filter",
+	keymap.ScopeHelp:    "The ? list of keys",
 }
 
 // keysValue writes keys as TOML: a string for one key, an array otherwise.

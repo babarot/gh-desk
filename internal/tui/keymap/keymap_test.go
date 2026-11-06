@@ -157,3 +157,16 @@ func TestRenamed(t *testing.T) {
 		}
 	}
 }
+
+// The ? list also reads the list's fold, so a key both are set to is a
+// mistake, and fold set to the key of the release notes takes it from
+// them.
+func TestHelpBorrowsFold(t *testing.T) {
+	if _, ps := Apply(Default(), map[string][]string{"fold": {"w"}, "release_notes": {"w"}}); len(ps) != 1 {
+		t.Errorf("problems %+v", ps)
+	}
+	m, ps := Apply(Default(), map[string][]string{"fold": {"w"}})
+	if len(ps) != 0 || len(m.Keys("release_notes")) != 0 || !m.Matches("fold", "w") {
+		t.Errorf("problems %+v, release_notes %v", ps, m.Keys("release_notes"))
+	}
+}

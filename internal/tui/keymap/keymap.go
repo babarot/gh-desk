@@ -36,7 +36,16 @@ const (
 	ScopeChat    Scope = "chat"
 	ScopeCompose Scope = "compose"
 	ScopeInput   Scope = "input"
+	// ScopeHelp is read while the ? list is open, which also reads the
+	// list's fold (see borrowed).
+	ScopeHelp Scope = "help"
 )
+
+// borrowed are the actions of other scopes a scope also reads, so that
+// their keys are checked against its own.
+var borrowed = map[Scope][]Action{
+	ScopeHelp: {"fold"},
+}
 
 // Def is an action with its default keys and the words the key hints show.
 type Def struct {
@@ -142,6 +151,8 @@ var Defaults = []Def{
 	{"complete", ScopeInput, []string{"tab"}, "complete"},
 	{"erase", ScopeInput, []string{"backspace"}, "erase"},
 	{"erase_word", ScopeInput, []string{"ctrl+w"}, "erase word"},
+
+	{"release_notes", ScopeHelp, []string{"w"}, "release notes"},
 }
 
 // renamed are the actions that were renamed, by their old name. A [keys]
@@ -304,13 +315,19 @@ func meets(a, b Scope) bool {
 	return a == b || wide(a) || wide(b)
 }
 
+// meet reports whether the keys of a and b can be read at the same time:
+// their scopes meet, or the scope of one reads the other.
+func meet(a, b Def) bool {
+	return meets(a.Scope, b.Scope) || slices.Contains(borrowed[a.Scope], b.Action) || slices.Contains(borrowed[b.Scope], a.Action)
+}
+
 // conflicts are the keys two actions share where they meet, in the order of
 // Defaults.
 func (m Map) conflicts() []conflict {
 	var cs []conflict
 	for i, a := range Defaults {
 		for _, b := range Defaults[i+1:] {
-			if !meets(a.Scope, b.Scope) {
+			if !meet(a, b) {
 				continue
 			}
 			for _, k := range m.keys[a.Action] {

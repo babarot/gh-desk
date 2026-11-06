@@ -10,6 +10,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -176,4 +177,24 @@ func (s *Store) Save(r Record) error {
 		return err
 	}
 	return nil
+}
+
+var (
+	notesComment = regexp.MustCompile(`(?m)^<!--.*-->[ \t]*\n?`)
+	notesHeading = regexp.MustCompile(`(?m)^## What's Changed[ \t]*\n?`)
+	notesFull    = regexp.MustCompile(`(?m)^\*\*Full Changelog\*\*.*$`)
+	notesBy      = regexp.MustCompile(` by @[\w-]+(?:\[bot\])? in https://github\.com/[\w.-]+/[\w.-]+/pull/(\d+)`)
+)
+
+// Notes is a release's notes as GitHub generated them, shortened to what a
+// reader of gh-desk wants: the comment, the "What's Changed" heading and
+// the link to the full changelog go, and "by @user in <pull request URL>"
+// becomes the pull request's number.
+func Notes(body string) string {
+	body = strings.ReplaceAll(body, "\r\n", "\n")
+	body = notesComment.ReplaceAllString(body, "")
+	body = notesHeading.ReplaceAllString(body, "")
+	body = notesFull.ReplaceAllString(body, "")
+	body = notesBy.ReplaceAllString(body, " (#$1)")
+	return strings.TrimSpace(body)
 }

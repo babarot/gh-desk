@@ -33,7 +33,7 @@ var helpScopes = []struct {
 	{keymap.ScopeGlobal, "anywhere"}, {keymap.ScopeNav, "moving"}, {keymap.ScopeList, "the list and its preview"},
 	{keymap.ScopePopup, "a menu or a list popup"}, {keymap.ScopeConfirm, "a confirm popup"},
 	{keymap.ScopeTriage, "claude on the list"}, {keymap.ScopeLog, "the log"}, {keymap.ScopeChat, "claude on a pull request"},
-	{keymap.ScopeCompose, "writing a review"},
+	{keymap.ScopeCompose, "writing a review"}, {keymap.ScopeHelp, "this list"},
 }
 
 const helpKeyWidth = 16
@@ -97,7 +97,7 @@ func (m *Model) helpSections() []helpSection {
 		return rows
 	}
 	works := func(s keymap.Scope) bool {
-		return s == here || s == keymap.ScopeGlobal || s == keymap.ScopeNav
+		return s == here || s == keymap.ScopeGlobal || s == keymap.ScopeNav || s == keymap.ScopeHelp
 	}
 	var out []helpSection
 	for _, sc := range helpScopes {
@@ -134,8 +134,8 @@ func (m *Model) openHelp() {
 // the section each header line is of ("" for the other lines). A section
 // whose keys work on the screen ? was opened from is drawn in color and
 // says so; the others are grayed. The first lines, before a blank one,
-// tell the version and the homepage, and a newer release with how to
-// update to it, to the right.
+// tell the version and the homepage, a newer release with how to update
+// to it, and the key of the release notes, to the right.
 func (m *Model) helpLines(w int) ([]string, []string) {
 	st := m.st
 	about := st.dim.Render(fmt.Sprintf("gh-desk %s · %s", cmp.Or(m.set.Version, "dev"), homepage))
@@ -143,6 +143,12 @@ func (m *Model) helpLines(w int) ([]string, []string) {
 	if v := m.newerRelease(); v != "" {
 		out := st.green.Render(v+" is out") + st.dim.Render(" · ") + st.key.Render(m.set.Release.How)
 		lines = append(lines, strings.Repeat(" ", max(w-lipgloss.Width(out), 0))+out)
+	}
+	if m.set.Release != nil {
+		if ks := m.keys.Keys("release_notes"); len(ks) > 0 {
+			out := st.key.Render(ks[0]) + st.muted.Render(" release notes")
+			lines = append(lines, strings.Repeat(" ", max(w-lipgloss.Width(out), 0))+out)
+		}
 	}
 	lines = append(lines, "")
 	heads := make([]string, len(lines))
@@ -234,7 +240,7 @@ func (m *Model) helpKey(k string) {
 	page := max(h-1, 1)
 	switch {
 	case k == keymap.Back || m.keys.Matches("help", k) || m.keys.Matches("quit", k):
-		m.help = false
+		m.help, m.relBox = false, nil
 	case m.keys.Matches("fold", k):
 		m.foldHelp()
 	case m.keys.Matches("down", k):

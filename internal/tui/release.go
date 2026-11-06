@@ -3,12 +3,14 @@ package tui
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/babarot/gh-desk/internal/logging"
 	"github.com/babarot/gh-desk/internal/model"
 	"github.com/babarot/gh-desk/internal/release"
+	"github.com/babarot/gh-desk/internal/tui/keymap"
 )
 
 // Release is what gh-desk knows of its own releases at start, where it
@@ -17,6 +19,9 @@ type Release struct {
 	// Running is the version running, and How says how this install is
 	// updated.
 	Running, How string
+	// Tell tells of a newer release and of an update. Without it, the
+	// releases are read only when their notes are opened.
+	Tell bool
 	// Latest is the newest release a reading before this run found, and
 	// Told the newest one already told of.
 	Latest, Told string
@@ -46,8 +51,17 @@ type releases struct {
 	// latest is the newest release known, told the newest told of.
 	latest, told string
 	// list is the releases read in this run, newest first; nil until
-	// they are.
-	list []model.Release
+	// they are. loading is set while they are read, and err is why the
+	// last reading failed.
+	list    []model.Release
+	loading bool
+	err     error
+}
+
+// releaseBox is the box of release notes, opened from the ? list; top is
+// its first line shown.
+type releaseBox struct {
+	top int
 }
 
 type releasesMsg struct {
@@ -60,30 +74,54 @@ type releasesMsg struct {
 // reading never holds up the first frame.
 func (m *Model) releaseStart() tea.Cmd {
 	r := m.set.Release
-	if r == nil {
+	if r == nil || !r.Tell {
 		return nil
 	}
-	m.rel = releases{latest: r.Latest, told: r.Told}
+	m.rel.latest, m.rel.told = r.Latest, r.Told
 	var cmds []tea.Cmd
 	if r.UpdatedFrom != "" {
 		m.log.Info("updated", logging.KeyOp, "release", logging.KeyVersion, r.Running, "from", r.UpdatedFrom)
-		cmds = append(cmds, m.pushNote("✓", fmt.Sprintf("gh-desk updated to %s from %s", r.Running, r.UpdatedFrom), nil))
+		text := fmt.Sprintf("gh-desk updated to %s from %s", r.Running, r.UpdatedFrom)
+		if ks := m.keys.Keys("release_notes"); len(ks) > 0 {
+			text += fmt.Sprintf(" · %s %s what's new", m.firstKey("help"), ks[0])
+		}
+		cmds = append(cmds, m.pushNote("✓", text, nil))
 	}
 	cmds = append(cmds, m.tellRelease())
 	if r.Due {
-		src := r.Source
-		cmds = append(cmds, func() tea.Msg {
-			list, err := src.Releases(m.ctx)
-			return releasesMsg{list, err}
-		})
+		cmds = append(cmds, m.readReleases())
 	}
 	return tea.Batch(cmds...)
+}
+
+// readReleases reads the releases unless they are read or being read.
+func (m *Model) readReleases() tea.Cmd {
+	r := m.set.Release
+	if r == nil || m.rel.list != nil || m.rel.loading {
+		return nil
+	}
+	m.rel.loading, m.rel.err = true, nil
+	src := r.Source
+	return func() tea.Msg {
+		list, err := src.Releases(m.ctx)
+		return releasesMsg{list, err}
+	}
+}
+
+// prefetchReleases reads the release notes as ? opens, when there is
+// something new to read in them: a newer release, or an update. Otherwise
+// they are read when opened, since ? is opened often to look up a key.
+func (m *Model) prefetchReleases() tea.Cmd {
+	if r := m.set.Release; r == nil || !r.Tell || m.newerRelease() == "" && r.UpdatedFrom == "" {
+		return nil
+	}
+	return m.readReleases()
 }
 
 // newerRelease is the newest release known that is newer than the one
 // running, or empty.
 func (m *Model) newerRelease() string {
-	if r := m.set.Release; r != nil && release.Newer(m.rel.latest, r.Running) {
+	if r := m.set.Release; r != nil && r.Tell && release.Newer(m.rel.latest, r.Running) {
 		return m.rel.latest
 	}
 	return ""
@@ -104,25 +142,140 @@ func (m *Model) tellRelease() tea.Cmd {
 }
 
 // gotReleases takes in a reading of the releases. A failed one is told of
-// nowhere but the log: the release is not the user's work.
+// nowhere but the log and the box of release notes: the release is not
+// the user's work.
 func (m *Model) gotReleases(msg releasesMsg) tea.Cmd {
+	m.rel.loading = false
 	latest := ""
 	if msg.err != nil {
+		m.rel.err = msg.err
 		m.log.Debug("releases not read", logging.KeyOp, "release", "err", msg.err.Error())
 	} else {
 		m.rel.list = msg.list
+		if m.rel.list == nil {
+			m.rel.list = []model.Release{}
+		}
 		for _, r := range msg.list {
 			if latest == "" || release.Newer(r.Version, latest) {
 				latest = r.Version
 			}
 		}
 		m.log.Debug("releases read", logging.KeyOp, "release", "count", len(msg.list), "latest", latest)
-		if latest != "" {
-			m.rel.latest = latest
-		}
+	}
+	if !m.set.Release.Tell {
+		return nil
+	}
+	if latest != "" {
+		m.rel.latest = latest
 	}
 	if err := m.set.Release.Source.Checked(latest); err != nil {
 		m.log.Warn("could not keep when the releases were read", logging.KeyOp, "release", "err", err.Error())
 	}
 	return m.tellRelease()
+}
+
+// openReleaseNotes opens the box of release notes over the ? list, reading the
+// releases when they are not read yet, or again after a failed reading.
+func (m *Model) openReleaseNotes() tea.Cmd {
+	if m.set.Release == nil {
+		return nil
+	}
+	m.relBox = &releaseBox{}
+	return m.readReleases()
+}
+
+// releaseBoxKey is a key pressed with the box of release notes open: it
+// scrolls the box, goes back to the ? list, or closes both.
+func (m *Model) releaseBoxKey(k string) {
+	page := max(m.releaseNotesHeight()-1, 1)
+	switch {
+	case k == keymap.Back || m.keys.Matches("release_notes", k):
+		m.relBox = nil
+	case m.keys.Matches("help", k) || m.keys.Matches("quit", k):
+		m.relBox, m.help = nil, false
+	case m.keys.Matches("down", k):
+		m.scrollReleaseNotes(1)
+	case m.keys.Matches("up", k):
+		m.scrollReleaseNotes(-1)
+	case m.keys.Matches("page_down", k):
+		m.scrollReleaseNotes(page)
+	case m.keys.Matches("page_up", k):
+		m.scrollReleaseNotes(-page)
+	case m.keys.Matches("bottom", k):
+		m.scrollReleaseNotes(1 << 20)
+	case m.keys.Matches("top", k):
+		m.scrollReleaseNotes(-(1 << 20))
+	}
+}
+
+// scrollReleaseNotes moves the box of release notes by d lines, within its lines.
+func (m *Model) scrollReleaseNotes(d int) {
+	n := len(m.releaseNotesLines(m.releaseNotesWidth() - 4))
+	m.relBox.top = max(min(m.relBox.top+d, n-m.releaseNotesHeight()), 0)
+}
+
+// releaseNotesWidth is the width of the box of release notes.
+func (m *Model) releaseNotesWidth() int { return min(max(m.width-8, 30), 100) }
+
+// releaseNotesHeight is how many lines of notes the box shows.
+func (m *Model) releaseNotesHeight() int { return max(m.height-6, 3) }
+
+// releaseNotesLines are the lines of the box of release notes, inner cells wide:
+// every release read, newest first, with the one running marked installed
+// and a newer one not installed with how to update, then its notes.
+func (m *Model) releaseNotesLines(inner int) []string {
+	st := m.st
+	r := m.rel
+	switch {
+	case r.list == nil && r.err != nil:
+		return []string{
+			st.red.Render(fit("could not read the releases: "+r.err.Error(), inner)),
+			"",
+			st.muted.Render("they are at ") + st.blue.Render(release.Page),
+		}
+	case r.list == nil:
+		return []string{m.working(st.muted, "reading the releases…")}
+	case len(r.list) == 0:
+		return []string{st.muted.Render("no releases yet")}
+	}
+	running := m.set.Release.Running
+	var out []string
+	for i, rel := range r.list {
+		if i > 0 {
+			out = append(out, "")
+		}
+		head := st.title.Render(rel.Version)
+		if !rel.Published.IsZero() {
+			head += "  " + st.dim.Render(rel.Published.Format("2006-01-02"))
+		}
+		switch c, err := release.Compare(rel.Version, running); {
+		case err != nil:
+		case c == 0:
+			head += "  " + st.green.Render("installed")
+		case c > 0:
+			head += "  " + st.yellow.Render("not installed") + st.dim.Render(" · ") + st.key.Render(m.set.Release.How)
+		}
+		out = append(out, head)
+		for _, l := range m.markdownLines(release.Notes(rel.Body), inner) {
+			out = append(out, l.text)
+		}
+	}
+	return out
+}
+
+// renderReleaseNotes draws the box of release notes over lines. It takes the
+// keys while it is open, so its frame is in the focus color (ADR-079).
+func (m *Model) renderReleaseNotes(lines []string) []string {
+	st := m.st
+	w := m.releaseNotesWidth()
+	all := m.releaseNotesLines(w - 4)
+	h := min(len(all), m.releaseNotesHeight())
+	top := max(min(m.relBox.top, len(all)-h), 0)
+	m.relBox.top = top
+	title := strings.Join([]string{"release notes", m.scrollKeys() + " scroll", m.firstKey("release_notes") + " " + keymap.Back + " back"}, " · ")
+	b := box(st, title, all[top:top+h], w)
+	if len(all) > h {
+		b[len(b)-1] = scrollEdge(st, w, top, len(all)-top-h, m.scrollKeys()+" wheel")
+	}
+	return m.overlay(lines, b, max((len(lines)-len(b))/2, 0), m.width)
 }

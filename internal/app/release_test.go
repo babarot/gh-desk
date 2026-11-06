@@ -43,7 +43,7 @@ func releaseEnv(t *testing.T, lastRun string) (env, *release.Store) {
 func TestReleaseOfABuildThatIsNotARelease(t *testing.T) {
 	e, store := releaseEnv(t, "0.1.0")
 	e.release = false
-	if r := releaseOf(config.Default(), e, logging.Discard()); r != nil {
+	if r := releaseOf(config.Default(), e, logging.Discard()); r == nil || r.Tell || r.How != release.Page || r.Running != version.Version {
 		t.Errorf("release = %+v", r)
 	}
 	if rec, _ := store.Load(); rec.LastRun != "0.1.0" {
@@ -57,14 +57,14 @@ func TestReleaseOfAReleaseBuild(t *testing.T) {
 	if r == nil {
 		t.Fatal("no release")
 	}
-	if r.Running != version.Version || r.UpdatedFrom != "0.1.0" || !r.Due || r.How != "gh extension upgrade desk" {
+	if !r.Tell || r.Running != version.Version || r.UpdatedFrom != "0.1.0" || !r.Due || r.How != "gh extension upgrade desk" {
 		t.Errorf("release = %+v", r)
 	}
 	if rec, _ := store.Load(); rec.LastRun != version.Version {
 		t.Errorf("last run kept %q", rec.LastRun)
 	}
 	// The next launch was not updated.
-	if r := releaseOf(config.Default(), e, logging.Discard()); r == nil || r.UpdatedFrom != "" {
+	if r := releaseOf(config.Default(), e, logging.Discard()); r == nil || !r.Tell || r.UpdatedFrom != "" {
 		t.Errorf("second launch = %+v", r)
 	}
 
@@ -89,8 +89,9 @@ func TestReleaseOfAReleaseBuild(t *testing.T) {
 	}
 }
 
-// Turned off, nothing is read or told, but the version that ran is kept, so
-// turning it on later does not tell of an update long past.
+// Turned off, nothing is told and nothing is read until the notes are
+// opened, but the version that ran is kept, so turning it on later does
+// not tell of an update long past.
 func TestReleaseOfTurnedOff(t *testing.T) {
 	for name, off := range map[string]func(*config.File, *env){
 		"release.check": func(c *config.File, _ *env) { c.Release.Check = false },
@@ -100,7 +101,8 @@ func TestReleaseOfTurnedOff(t *testing.T) {
 			e, store := releaseEnv(t, "0.1.0")
 			cfg := config.Default()
 			off(&cfg, &e)
-			if r := releaseOf(cfg, e, logging.Discard()); r != nil {
+			r := releaseOf(cfg, e, logging.Discard())
+			if r == nil || r.Tell || r.UpdatedFrom != "" || r.Due || r.How != "gh extension upgrade desk" {
 				t.Errorf("release = %+v", r)
 			}
 			if rec, _ := store.Load(); rec.LastRun != version.Version {

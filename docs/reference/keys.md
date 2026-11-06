@@ -130,6 +130,11 @@ browse = []
 | `ctrl+s` | `post` | post |
 | `ctrl+e` | `editor` | $EDITOR |
 
+## This list
+
+| Key | Action | Does |
+|---|---|---|
+
 ## Mouse
 
 | | |
