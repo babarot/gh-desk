@@ -70,7 +70,7 @@ func (m *Model) openTriage() tea.Cmd {
 		return nil
 	}
 	if m.triage == nil {
-		ta := newInput()
+		ta := newInput(m.st)
 		ta.Placeholder = "Ask Claude to find or select pull requests"
 		ta.ShowLineNumbers = false
 		ta.SetHeight(3)

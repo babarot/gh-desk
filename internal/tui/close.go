@@ -78,7 +78,7 @@ func (m *Model) startClose() tea.Cmd {
 	if m.bulk == nil || m.bulk.kind != runner.Close {
 		return cmd
 	}
-	f := &closeForm{ta: newInput()}
+	f := &closeForm{ta: newInput(m.st)}
 	f.ta.ShowLineNumbers = true
 	f.ta.EndOfBufferCharacter = '~'
 	f.ta.Placeholder = "Leave a comment (markdown)"
