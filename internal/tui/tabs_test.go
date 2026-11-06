@@ -156,3 +156,27 @@ func TestConfigWarningsAtStart(t *testing.T) {
 		t.Error("notes still open")
 	}
 }
+
+// The cursor and the mark stay at the start of the line, wherever the
+// columns are, and a click on the name still finds it.
+func TestTheCursorStaysAtTheStartOfTheLine(t *testing.T) {
+	set := testSettings()
+	set.Columns = []string{"title", "pr", "author"}
+	m := startSource(t, fixture(), set)
+	var row string
+	for l := range strings.SplitSeq(screen(m), "\n") {
+		if strings.HasPrefix(l, "▎") {
+			row = l
+		}
+	}
+	if !strings.Contains(row, "Add retries") || strings.Index(row, "api#12") < strings.Index(row, "Add retries") {
+		t.Fatalf("row %q", row)
+	}
+	if strings.Count(row, "▎") != 1 {
+		t.Errorf("row %q", row)
+	}
+	at := strings.Index(row, "api#12")
+	if s, ok := m.linkAt(m.tab().sel, len([]rune(row[:at]))); !ok || !strings.HasSuffix(s.url, "/pull/12") {
+		t.Errorf("link %+v, %v", s, ok)
+	}
+}
