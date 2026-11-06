@@ -17,7 +17,7 @@ checks    = ["passing"]
 max_lines = 50
 ```
 
-The first run writes a few rules to start with, live, not commented out: `small`, `dependency bots`, `approved`, `recent` and `lock files`. Besides them, the built-in "approved by me" picks the bots' pull requests you approved that are still open.
+Five rules are there by default: `small`, `dependency bots`, `approved`, `recent` and `lock files`. Rules you write replace all five, as tabs do; copy the ones you want to keep from `gh desk config reference select`, or write `select = []` at the top of the file to have none. Besides them, the built-in "approved by me" picks the bots' pull requests you approved that are still open.
 
 ## The popup of S
 

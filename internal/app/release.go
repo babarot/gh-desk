@@ -18,8 +18,8 @@ import (
 // can open their notes from ?, which reads them then. A release build also
 // tells of a newer release and of an update, unless release.check is off
 // or GH_NO_EXTENSION_UPDATE_NOTIFIER is set; it keeps the version that ran
-// whether or not it tells, so turning the check on later does not tell of
-// an update long past. A build that is not a release is told the releases
+// and the settings it knows whether or not it tells, so turning the check
+// on later does not tell of an update long past. A build that is not a release is told the releases
 // page as the way to update: whoever built it updates it.
 func releaseOf(cfg config.File, e env, log *slog.Logger) *tui.Release {
 	store := release.Open(e.stateDir)
@@ -37,7 +37,9 @@ func releaseOf(cfg config.File, e env, log *slog.Logger) *tui.Release {
 	if rec.LastRun != "" && release.Newer(r.Running, rec.LastRun) {
 		from = rec.LastRun
 	}
-	if rec.LastRun != r.Running {
+	known := len(rec.Settings)
+	rec, added := rec.Note(config.Names())
+	if rec.LastRun != r.Running || len(rec.Settings) != known {
 		rec.LastRun = r.Running
 		if err := store.Save(rec); err != nil {
 			log.Warn("could not keep the version that ran", logging.KeyOp, "release", "err", err.Error())
@@ -49,7 +51,7 @@ func releaseOf(cfg config.File, e env, log *slog.Logger) *tui.Release {
 		log.Debug("releases are not told of", logging.KeyOp, "release", "check", cfg.Release.Check, "notify", e.notify)
 		return r
 	}
-	r.Tell, r.Latest, r.Told, r.UpdatedFrom, r.Due = true, rec.Latest, rec.Told, from, rec.Due(time.Now())
+	r.Tell, r.Latest, r.Told, r.UpdatedFrom, r.NewSettings, r.Due = true, rec.Latest, rec.Told, from, config.Collapse(added), rec.Due(time.Now())
 	return r
 }
 

@@ -27,7 +27,7 @@ var layers = []layer{
 	{"internal/logging", 0, nil, nil, "The slog logger and the log file"},
 	{"internal/version", 0, nil, nil, "The release version, which tagpr updates"},
 	{"internal/near", 0, nil, nil, "The closest of a few names to one mistyped, for a did-you-mean"},
-	{"internal/release", 0, nil, nil, "Whether a newer release of gh-desk is out, how this install is updated, and what was found kept between launches"},
+	{"internal/release", 0, nil, nil, "Whether a newer release of gh-desk is out, how this install is updated, and what was found and the settings known kept between launches"},
 	{"internal/tui/statusline", 0, nil, nil, "What the status line shows: events for a moment, work in progress, the row's result"},
 	{"internal/config", 1, []string{"internal/near"}, []string{"github.com/pelletier/go-toml/v2"}, "Reading the config file and reporting its mistakes"},
 	{"internal/tui/keymap", 1, []string{"internal/near"}, nil, "Keys bound to actions by name"},

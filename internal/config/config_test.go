@@ -43,40 +43,120 @@ func TestLoadMissingFileIsDefault(t *testing.T) {
 
 func TestTemplateLoadsAsDefault(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "gh-desk", "config.toml")
-	if err := WriteTemplate(path, "# approve = \"A\"\n"); err != nil {
+	if err := WriteTemplate(path); err != nil {
 		t.Fatal(err)
 	}
-	if err := WriteTemplate(path, ""); err == nil {
+	if err := WriteTemplate(path); err == nil {
 		t.Error("WriteTemplate overwrote an existing file")
 	}
 	cfg, _, err := Load(path)
 	if err != nil {
 		t.Fatal(err)
 	}
-	// The rules to start with are the only part written live (ADR-028);
-	// none of them is a default.
-	var names []string
-	for _, s := range cfg.Select {
-		names = append(names, s.Name)
+	if !reflect.DeepEqual(ruleNames(cfg), []string{"small", "dependency bots", "approved", "recent", "lock files"}) {
+		t.Errorf("rules = %v", ruleNames(cfg))
 	}
-	if want := []string{"small", "dependency bots", "approved", "recent", "lock files"}; !reflect.DeepEqual(names, want) {
-		t.Errorf("rules = %v, want %v", names, want)
-	}
-	if len(Default().Select) != 0 {
-		t.Errorf("Default() has rules: %+v", Default().Select)
-	}
-	cfg.Select = nil
-	if !reflect.DeepEqual(cfg, Default()) {
-		t.Errorf("cfg = %+v\nwant %+v", cfg, Default())
+	if Show(cfg, true) != "" {
+		t.Errorf("differs from the defaults:\n%s", Show(cfg, true))
 	}
 }
 
-// TestTemplateTabsAreTheDefault uncomments the tabs the template shows and
+func ruleNames(f File) []string {
+	var names []string
+	for _, s := range f.Select {
+		names = append(names, s.Name)
+	}
+	return names
+}
+
+func TestRulesWrittenReplaceTheDefault(t *testing.T) {
+	cfg, _, err := Load(write(t, "[[select]]\nname = \"mine\"\nmine = true\n"))
+	if err != nil || !reflect.DeepEqual(ruleNames(cfg), []string{"mine"}) {
+		t.Fatalf("rules = %v, %v", ruleNames(cfg), err)
+	}
+}
+
+func TestNoRulesAtAll(t *testing.T) {
+	cfg, _, err := Load(write(t, "select = []\n\n[list]\nrefresh = \"1m\"\n"))
+	if err != nil || len(cfg.Select) != 0 {
+		t.Fatalf("rules = %v, %v", ruleNames(cfg), err)
+	}
+	for _, onlyDiff := range []bool{true, false} {
+		again, _, err := Load(write(t, Show(cfg, onlyDiff)))
+		if err != nil || len(again.Select) != 0 {
+			t.Errorf("Show(%v) reads back as %v, %v:\n%s", onlyDiff, ruleNames(again), err, Show(cfg, onlyDiff))
+		}
+	}
+}
+
+// TestManualIsTheDefaults reads the manual as a file: all of it is comments
+// under the headers.
+func TestManualIsTheDefaults(t *testing.T) {
+	cfg, ps, err := Load(write(t, Manual("# approve = \"A\"\n", Mark{})))
+	if err != nil || len(ps) > 0 {
+		t.Fatalf("%v %v", err, ps)
+	}
+	if Show(cfg, true) != "" || !reflect.DeepEqual(ruleNames(cfg), ruleNames(Default())) {
+		t.Errorf("differs from the defaults:\n%s", Show(cfg, true))
+	}
+}
+
+func TestEveryArrayTableIsListed(t *testing.T) {
+	if len(arrayTables) != len(elems) {
+		t.Errorf("%d arrays of tables listed, %d in elems", len(arrayTables), len(elems))
+	}
+	for _, a := range arrayTables {
+		if len(elems[a.Name]) == 0 || a.Words == nil || a.Doc == "" {
+			t.Errorf("%s is not complete", a.Name)
+		}
+		if _, err := ManualOf(a.Name, "", Mark{}); err != nil {
+			t.Error(err)
+		}
+	}
+}
+
+func TestCollapse(t *testing.T) {
+	var whole []string
+	for _, e := range elems["exclude"] {
+		whole = append(whole, "exclude."+e.Key)
+	}
+	for _, tt := range []struct {
+		name string
+		in   []string
+		want []string
+	}{
+		{"a key", []string{"list.bell"}, []string{"list.bell"}},
+		{"a key of an array", []string{"select.max_lines", "exclude.max_lines"}, []string{"select.max_lines", "exclude.max_lines"}},
+		{"a whole array", append(slices.Clone(whole), "list.bell"), []string{"exclude", "list.bell"}},
+		{"a whole table", []string{"menu.actions"}, []string{"menu"}},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := Collapse(tt.in); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("Collapse = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestEveryNameHasAManual(t *testing.T) {
+	for _, name := range Names() {
+		if _, err := ManualOf(name, "", Mark{}); err != nil {
+			t.Error(err)
+		}
+	}
+	for _, tb := range tables {
+		if _, err := ManualOf(tb.Name, "", Mark{}); err != nil {
+			t.Error(err)
+		}
+	}
+}
+
+// TestManualTabsAreTheDefault uncomments the tabs the manual shows and
 // reads them as the default tabs.
-func TestTemplateTabsAreTheDefault(t *testing.T) {
+func TestManualTabsAreTheDefault(t *testing.T) {
 	var b strings.Builder
 	in := false
-	for line := range strings.SplitSeq(Template(""), "\n") {
+	for line := range strings.SplitSeq(Manual("", Mark{}), "\n") {
 		switch {
 		case line == "# [[tabs]]":
 			in = true

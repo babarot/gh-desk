@@ -17,9 +17,10 @@ const referenceHead = `# Configuration
 
 <!-- Generated from internal/config by TestReferenceIsUpToDate. Do not edit; run go test ./internal/config -run TestReferenceIsUpToDate -update. -->
 
-The first launch writes ` + "`~/.config/gh-desk/config.toml`" + ` (or under ` + "`$XDG_CONFIG_HOME`" + `) with every setting below at its default, commented out. Uncomment a line to change it. A mistake in the file is reported with where it is, and ` + "`gh desk config check`" + ` reports them without starting.
+The first launch writes ` + "`~/.config/gh-desk/config.toml`" + ` (or under ` + "`$XDG_CONFIG_HOME`" + `) with no settings in it. A setting left out takes its default; write the ones you change. A mistake in the file is reported with where it is, and ` + "`gh desk config check`" + ` reports them without starting.
 
 ` + "```sh" + `
+gh desk config reference    # every setting, as this page lists them
 gh desk config check        # read the file and print its mistakes
 gh desk config show --diff  # the settings that differ from the defaults
 gh desk config edit         # open it in $EDITOR, then check it
@@ -36,15 +37,14 @@ func Reference() string {
 	var b strings.Builder
 	b.WriteString(referenceHead)
 
-	b.WriteString("\n## [[tabs]]\n\n")
-	b.WriteString(mdText("The tabs, in the order shown; the keys 1 to 9 go to them. Tabs given replace the default four, and one of them must be the inbox. At most "+fmt.Sprint(MaxTabs)+" tabs.") + "\n\n")
-	b.WriteString("```toml\n" + defaultTabs + "```\n")
-	writeElems(&b, "tabs")
-
-	b.WriteString("\n## [[select]]\n\n")
-	b.WriteString(mdText(`The rules S offers to select pull requests, besides the built-in "approved by me". A pull request matches a rule when it meets every key the rule gives. The file written on first run has these rules live, not commented out, as rules to start with:`) + "\n\n")
-	b.WriteString("```toml\n" + startingRules() + "```\n")
-	writeElems(&b, "select")
+	for _, a := range arrayTables {
+		fmt.Fprintf(&b, "\n## [[%s]]\n\n", a.Name)
+		b.WriteString(mdText(a.Doc) + "\n")
+		if code := pageCode[a.Name]; code != "" {
+			b.WriteString("\n```toml\n" + code + "```\n")
+		}
+		writeElems(&b, a.Name)
+	}
 
 	for _, t := range tables {
 		fmt.Fprintf(&b, "\n## [%s]\n", t.Name)
@@ -71,6 +71,9 @@ func Reference() string {
 	return b.String()
 }
 
+// pageCode are the defaults the page shows of an array of tables.
+var pageCode = map[string]string{"tabs": defaultTabs, "select": defaultSelect}
+
 func writeElems(b *strings.Builder, name string) {
 	b.WriteString("\n| Key | Type | |\n|---|---|---|\n")
 	for _, e := range elems[name] {
@@ -80,7 +83,7 @@ func writeElems(b *strings.Builder, name string) {
 
 // defaultTabs are the tabs of the template, uncommented.
 var defaultTabs = func() string {
-	_, tabs, _ := strings.Cut(templateHead, "#\n# [[tabs]]")
+	_, tabs, _ := strings.Cut(tabsWords, "#\n# [[tabs]]")
 	var b strings.Builder
 	b.WriteString("[[tabs]]")
 	for line := range strings.SplitSeq(tabs, "\n") {
@@ -88,62 +91,6 @@ var defaultTabs = func() string {
 	}
 	return strings.TrimLeft(strings.TrimRight(b.String(), "\n"), "\n") + "\n"
 }()
-
-// startingRules are the live [[select]] rules of the template.
-func startingRules() string {
-	var b strings.Builder
-	for line := range strings.SplitSeq(selectExamples, "\n") {
-		if strings.HasPrefix(line, "#") {
-			continue
-		}
-		b.WriteString(line + "\n")
-	}
-	return strings.TrimSpace(b.String()) + "\n"
-}
-
-// kindName is what values a kind takes, in words.
-func kindName(k kind) string {
-	switch k := k.(type) {
-	case boolKind:
-		return "boolean"
-	case optBoolKind:
-		return "boolean, or left out"
-	case intKind:
-		if k.Max != 0 {
-			return fmt.Sprintf("integer, %d to %d", k.Min, k.Max)
-		}
-		return fmt.Sprintf("integer, %d or more", k.Min)
-	case stringKind:
-		return "string"
-	case enumKind:
-		return "one of " + codeList(k.Values)
-	case listKind:
-		if len(k.Values) > 0 {
-			return "list of " + codeList(k.Values)
-		}
-		return "list of strings"
-	case durationKind:
-		if k.Off {
-			return `duration or "off"`
-		}
-		return "duration"
-	case daysKind:
-		return `days or "off"`
-	case globsKind:
-		return "list of glob patterns"
-	case mcpServersKind:
-		return "table of MCP servers"
-	}
-	panic(fmt.Sprintf("config: no name for %T", k))
-}
-
-func codeList(vs []string) string {
-	q := make([]string, len(vs))
-	for i, v := range vs {
-		q[i] = "`" + v + "`"
-	}
-	return strings.Join(q, ", ")
-}
 
 // mdText is a setting's words as Markdown text: the words are written for
 // a comment, so an angle bracket is a placeholder, not HTML.

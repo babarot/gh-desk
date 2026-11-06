@@ -33,6 +33,9 @@ type Release struct {
 	// UpdatedFrom is the version the last run was, when it was older than
 	// Running; empty otherwise.
 	UpdatedFrom string
+	// NewSettings are the settings this version has that no version before
+	// it did on this install, a table new as a whole by its name.
+	NewSettings []string
 	// Due reads the releases at start.
 	Due    bool
 	Source ReleaseSource
@@ -92,11 +95,31 @@ func (m *Model) releaseStart() tea.Cmd {
 		}
 		cmds = append(cmds, m.pushNote("✓", text, nil))
 	}
+	if cmd := m.tellNewSettings(r.NewSettings); cmd != nil {
+		cmds = append(cmds, cmd)
+	}
 	cmds = append(cmds, m.tellRelease())
 	if r.Due {
 		cmds = append(cmds, m.readReleases())
 	}
 	return tea.Batch(cmds...)
+}
+
+// tellNewSettings tells of the new settings as one notification, which
+// lists them when they are more than one: a toast shows only the last one
+// pushed.
+func (m *Model) tellNewSettings(names []string) tea.Cmd {
+	switch len(names) {
+	case 0:
+		return nil
+	case 1:
+		return m.pushNote("✓", fmt.Sprintf("new setting %s · gh desk config reference %s", names[0], names[0]), nil)
+	}
+	items := make([]noteItem, len(names))
+	for i, n := range names {
+		items[i] = noteItem{text: n}
+	}
+	return m.pushNote("✓", fmt.Sprintf("%d new settings · gh desk config reference", len(names)), items)
 }
 
 // readReleases reads the releases unless they are read or being read.

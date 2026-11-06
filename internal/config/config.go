@@ -461,6 +461,22 @@ type KeyList struct {
 	Err  error
 }
 
+// defaultRules are the rules of S that a file with no [[select]] has, read
+// from what the manual shows of them.
+func defaultRules() []Select {
+	var d struct {
+		Select []selectDoc `toml:"select"`
+	}
+	if err := toml.Unmarshal([]byte(defaultSelect), &d); err != nil {
+		panic(err)
+	}
+	rules, ps := selectFrom(d.Select)
+	if len(ps) > 0 {
+		panic(ps)
+	}
+	return rules
+}
+
 // Default is the config with every setting at its default.
 func Default() File {
 	return File{
@@ -480,6 +496,7 @@ func Default() File {
 		Review:      Review{MarkDone: true},
 		Merge: Merge{Methods: []string{"merge", "squash", "rebase"}, AutoMerge: true,
 			BlockedTimeout: dur("30m"), UpdateBranch: "humans"},
+		Select:  defaultRules(),
 		Bulk:    Bulk{AttentionPaths: globs(".github/workflows/*", "CODEOWNERS", ".github/CODEOWNERS", "docs/CODEOWNERS")},
 		Claude:  Claude{Command: "claude", Model: "opus", AllowedTools: []string{"Read", "Grep", "Glob"}, Language: "English", ReleaseNotesCheck: true},
 		Theme:   Theme{Dark: "default", Light: "latte", Spinner: "dots", Shimmer: true},
@@ -506,9 +523,8 @@ func FilePath() string {
 	return filepath.Join(dir, "gh-desk", "config.toml")
 }
 
-// WriteTemplate writes Template(keys) to path unless a file is already
-// there.
-func WriteTemplate(path, keys string) error {
+// WriteTemplate writes Template to path unless a file is already there.
+func WriteTemplate(path string) error {
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return err
 	}
@@ -516,7 +532,7 @@ func WriteTemplate(path, keys string) error {
 	if err != nil {
 		return err
 	}
-	if _, err := f.WriteString(Template(keys)); err != nil {
+	if _, err := f.WriteString(Template()); err != nil {
 		f.Close()
 		return err
 	}
@@ -697,8 +713,12 @@ func Parse(path string, src []byte) (File, Problems, error) {
 	cfg.Claude, cfg.Theme, cfg.Release, cfg.Log, cfg.Cache = d.Claude, d.Theme, d.Release, d.Log, d.Cache
 	cfg.Keys = keysFrom(d.Keys)
 	var sps Problems
-	cfg.Select, sps = selectFrom(d.Select)
-	ps = append(ps, sps...)
+	// Rules written replace the default ones, as tabs do, and select = []
+	// leaves none, which a file with none cannot say.
+	if d.Select != nil {
+		cfg.Select, sps = selectFrom(d.Select)
+		ps = append(ps, sps...)
+	}
 	cfg.Exclude, sps = excludeFrom(d.Exclude)
 	ps = append(ps, sps...)
 	cfg.AutoApprove, sps = autoApproveFrom(d.AutoApprove)

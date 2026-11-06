@@ -4,9 +4,20 @@ Everything you can change lives in one file, `~/.config/gh-desk/config.toml` (or
 
 ## The file
 
-The first run writes the file with every setting at its default, commented out, and the words of each setting above it. Uncomment a line to change it. A setting left commented keeps following the default, so a default improved in a later version still reaches you.
+The first run writes a short file with no settings in it. A setting left out takes its default, so write only what you change, and a default improved in a later version still reaches you.
+
+`gh desk config reference` prints every setting with what it does and its default, from the version you run. Give it a table or a key to see only that:
+
+```console
+$ gh desk config reference list.refresh
+[list]
+# Refresh the shown tab this often, as a Go duration such as "3m" or "90s";
+# "off" refreshes only when r is pressed.
+# refresh = "3m"
+```
 
 ```sh
+gh desk config reference    # every setting; pipe it to less
 gh desk config edit         # open it in your editor, then check it when you close it
 gh desk config check        # read it and print its mistakes, without starting
 gh desk config show --diff  # the settings that differ from the defaults
@@ -27,6 +38,16 @@ $ gh desk config check
 ```
 
 A warning (something that is likely not what you meant, but does not stop gh-desk) is shown the same way, and gh-desk starts anyway.
+
+## After an update
+
+When an update brings settings this install has not had, gh-desk says so in the notifications, one line for each, with the command that explains it. `gh desk config reference` then lists them at its top and marks them, until an update brings others. The file is never changed for you.
+
+A file written by an earlier version, with every setting commented out, goes on working. To make it short, keep only what differs from the defaults; your own comments do not carry over:
+
+```sh
+gh desk config show --diff > new.toml
+```
 
 ## A tab for your repository
 

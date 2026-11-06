@@ -3,6 +3,8 @@ package release
 import (
 	"os"
 	"path/filepath"
+	"reflect"
+	"slices"
 	"testing"
 	"time"
 )
@@ -77,14 +79,14 @@ func TestStore(t *testing.T) {
 	dir := filepath.Join(t.TempDir(), "state")
 	s := Open(dir)
 	r, err := s.Load()
-	if err != nil || r != (Record{}) {
+	if err != nil || !reflect.DeepEqual(r, Record{}) {
 		t.Fatalf("Load with no file = %+v, %v", r, err)
 	}
 	want := Record{Checked: time.Date(2026, 11, 6, 12, 0, 0, 0, time.UTC), Latest: "0.8.0", Told: "0.8.0", LastRun: "0.7.0"}
 	if err := s.Save(want); err != nil {
 		t.Fatal(err)
 	}
-	if got, err := s.Load(); err != nil || got != want {
+	if got, err := s.Load(); err != nil || !reflect.DeepEqual(got, want) {
 		t.Errorf("Load = %+v, %v", got, err)
 	}
 	if err := os.WriteFile(filepath.Join(dir, "release.json"), []byte("{"), 0o600); err != nil {
@@ -115,5 +117,34 @@ func TestNotes(t *testing.T) {
 	}
 	if got := Notes("Written by hand, by @alice."); got != "Written by hand, by @alice." {
 		t.Errorf("Notes changed a hand-written body: %q", got)
+	}
+}
+
+func TestNote(t *testing.T) {
+	for _, tt := range []struct {
+		name      string
+		rec       Record
+		names     []string
+		wantNew   []string
+		wantSince string
+		wantAdded []string
+		wantKnown []string
+	}{
+		{name: "none known takes them as known", rec: Record{LastRun: "0.9.0"}, names: []string{"a", "b"}, wantKnown: []string{"a", "b"}},
+		{name: "nothing new", rec: Record{LastRun: "0.9.0", Settings: []string{"a"}}, names: []string{"a"}, wantKnown: []string{"a"}},
+		{name: "new ones", rec: Record{LastRun: "0.9.0", Settings: []string{"a"}}, names: []string{"a", "b"},
+			wantNew: []string{"b"}, wantSince: "0.9.0", wantAdded: []string{"b"}, wantKnown: []string{"a", "b"}},
+		{name: "new ones replace the last", rec: Record{LastRun: "0.9.0", Settings: []string{"a"}, New: []string{"a"}, NewSince: "0.8.0"}, names: []string{"a", "b"},
+			wantNew: []string{"b"}, wantSince: "0.9.0", wantAdded: []string{"b"}, wantKnown: []string{"a", "b"}},
+		{name: "nothing new keeps the last", rec: Record{LastRun: "0.9.0", Settings: []string{"a"}, New: []string{"a"}, NewSince: "0.8.0"}, names: []string{"a"},
+			wantNew: []string{"a"}, wantSince: "0.8.0", wantKnown: []string{"a"}},
+		{name: "a version back keeps what it does not have", rec: Record{LastRun: "0.9.0", Settings: []string{"a", "b"}}, names: []string{"a"}, wantKnown: []string{"a", "b"}},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			got, added := tt.rec.Note(tt.names)
+			if !slices.Equal(added, tt.wantAdded) || !slices.Equal(got.New, tt.wantNew) || got.NewSince != tt.wantSince || !slices.Equal(got.Settings, tt.wantKnown) {
+				t.Errorf("record %+v, added %v", got, added)
+			}
+		})
 	}
 }

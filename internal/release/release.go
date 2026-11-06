@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -110,13 +111,41 @@ func (m Method) How() string {
 }
 
 // Record is what is kept between launches: when the releases were last
-// read and the newest found, the newest one told of, and the version that
-// ran last.
+// read and the newest found, the newest one told of, the version that ran
+// last, the settings this install has known, and those the last update
+// to add any added with the version it updated from.
 type Record struct {
-	Checked time.Time `json:"checked"`
-	Latest  string    `json:"latest,omitempty"`
-	Told    string    `json:"told,omitempty"`
-	LastRun string    `json:"last_run,omitempty"`
+	Checked  time.Time `json:"checked"`
+	Latest   string    `json:"latest,omitempty"`
+	Told     string    `json:"told,omitempty"`
+	LastRun  string    `json:"last_run,omitempty"`
+	Settings []string  `json:"settings,omitempty"`
+	New      []string  `json:"new,omitempty"`
+	NewSince string    `json:"new_since,omitempty"`
+}
+
+// Note compares names, the settings of the version running, with the ones
+// known, and returns the record with them known and those that are new. It
+// is called before LastRun is replaced. A record with none known takes
+// names as known and finds none new: a new install, or the first version
+// to keep them. Known names stay known, so that going back a version and
+// forward again tells of nothing twice.
+func (r Record) Note(names []string) (Record, []string) {
+	var added []string
+	for _, n := range names {
+		if !slices.Contains(r.Settings, n) {
+			added = append(added, n)
+		}
+	}
+	first := len(r.Settings) == 0
+	r.Settings = append(slices.Clone(r.Settings), added...)
+	if first {
+		return r, nil
+	}
+	if len(added) > 0 {
+		r.New, r.NewSince = added, r.LastRun
+	}
+	return r, added
 }
 
 // Due reports whether the releases are read again at now.

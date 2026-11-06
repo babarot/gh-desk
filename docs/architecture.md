@@ -9,7 +9,7 @@ gh-desk is split into packages by layer. A package imports only packages of lowe
 | 0 | `internal/logging` | The slog logger and the log file | - | - |
 | 0 | `internal/version` | The release version, which tagpr updates | - | - |
 | 0 | `internal/near` | The closest of a few names to one mistyped, for a did-you-mean | - | - |
-| 0 | `internal/release` | Whether a newer release of gh-desk is out, how this install is updated, and what was found kept between launches | - | - |
+| 0 | `internal/release` | Whether a newer release of gh-desk is out, how this install is updated, and what was found and the settings known kept between launches | - | - |
 | 0 | `internal/tui/statusline` | What the status line shows: events for a moment, work in progress, the row's result | - | - |
 | 1 | `internal/config` | Reading the config file and reporting its mistakes | `internal/near` | `github.com/pelletier/go-toml/v2` |
 | 1 | `internal/tui/keymap` | Keys bound to actions by name | `internal/near` | - |
