@@ -1,4 +1,5 @@
-desk // @me    1 review (3)   2 mine (1)   3 involved (0)   4 inbox (1)                           1 to you · 1 to a team · 1 bots 
+-- screen --
+desk // @me    1 review (3)   2 mine (1)   3 involved (0)   4 inbox (1)                           1 to you · 1 to a team · 1 bots
     PR                        TITLE                                  AUTHOR          CI  REVIEW   WHY         SIZE          AGE
   ▾ requested from you 1
 ▎ ● api#12                    Add retries to the client              alice           ✓   ○        you         +40 −3         3h   
@@ -30,5 +31,116 @@ desk // @me    1 review (3)   2 mine (1)   3 involved (0)   4 inbox (1)         
 │ ╵                                                                                         │                                    │
 │                                                                                           │                                    │
 ╰────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
-                                                                                                                                  
-enter actions · space select · S select by rule · C triage with claude · L log · / filter · ? keys                                
+
+enter actions · space select · S select by rule · C triage with claude · L log · / filter · ? keys
+-- styles --
+L1 0-4 fg=#96bfff bg=#3b3b52 bold
+L1 5-7 fg=#706f87
+L1 8-11 fg=#8888a4
+L1 14-17 fg=#b0b8d1 bg=#485677
+L1 17-28 fg=#e0e4f0 bg=#485677 bold
+L1 30-31 fg=#706f87
+L1 32-36 fg=#b0b8d1
+L1 37-44 fg=#706f87
+L1 45-53 fg=#b0b8d1
+L1 54-61 fg=#706f87
+L1 62-67 fg=#b0b8d1
+L1 68-71 fg=#706f87
+L1 98-129 fg=#b0b8d1
+L2 4-127 fg=#d0d6e8 bold
+L3 4-22 fg=#b0b8d1 bold
+L3 23-24 fg=#706f87
+L4 0-4 fg=#96bfff bg=#3b3b52
+L4 4-7 fg=#d0d6e8 bg=#3b3b52
+L4 7-30 fg=#8888a4 bg=#3b3b52
+L4 30-69 fg=#e0e4f0 bg=#3b3b52
+L4 69-85 fg=#b0b8d1 bg=#3b3b52
+L4 85-89 fg=#b5f0b0 bg=#3b3b52
+L4 89-98 fg=#8888a4 bg=#3b3b52
+L4 98-110 fg=#ffc49a bg=#3b3b52 bold
+L4 110-114 fg=#b5f0b0 bg=#3b3b52
+L4 114-125 fg=#f5a3b5 bg=#3b3b52
+L4 125-130 fg=#8888a4 bg=#3b3b52
+L5 4-25 fg=#b0b8d1 bold
+L5 26-27 fg=#706f87
+L6 4-8 fg=#b0b8d1 bold
+L6 9-10 fg=#706f87
+L21 0-1 fg=#525270
+L21 2-12 fg=#e0e4f0 bg=#485677 bold
+L21 14-22 fg=#b0b8d1
+L21 24-106 fg=#525270
+L21 107-128 fg=#706f87
+L21 129-130 fg=#525270
+L22 0-1 fg=#525270
+L22 2-5 fg=#706f87
+L22 6-31 fg=#e0e4f0 bold
+L22 86-91 fg=#b0b8d1
+L22 92-93 fg=#525270
+L22 94-100 fg=#8888a4
+L22 104-108 fg=#b5f0b0
+L22 129-130 fg=#525270
+L23 0-1 fg=#525270
+L23 2-3 fg=#96bfff
+L23 4-15 fg=#96bfff bold
+L23 16-93 fg=#525270
+L23 94-103 fg=#8888a4
+L23 104-106 fg=#b0b8d1
+L23 107-112 fg=#94e2d5
+L23 129-130 fg=#525270
+L24 0-3 fg=#525270
+L24 4-8 fg=#d4b0ff bold
+L24 92-93 fg=#525270
+L24 94-100 fg=#8888a4
+L24 104-106 fg=#b5f0b0
+L24 129-130 fg=#525270
+L25 0-3 fg=#525270
+L25 4-26 fg=#d0d6e8
+L25 92-93 fg=#525270
+L25 94-98 fg=#8888a4
+L25 104-107 fg=#b5f0b0
+L25 108-110 fg=#f5a3b5
+L25 111-120 fg=#8888a4
+L25 129-130 fg=#525270
+L26 0-93 fg=#525270
+L26 94-100 fg=#8888a4
+L26 104-111 fg=#b0b8d1
+L26 129-130 fg=#525270
+L27 0-93 fg=#525270
+L27 104-110 fg=#706f87
+L27 129-130 fg=#525270
+L28 0-1 fg=#525270
+L28 2-3 fg=#96bfff
+L28 4-10 fg=#96bfff bold
+L28 11-14 fg=#706f87
+L28 16-18 fg=#b5f0b0
+L28 19-93 fg=#525270
+L28 94-101 fg=#8888a4
+L28 104-110 fg=#b0b8d1
+L28 129-130 fg=#525270
+L29 0-3 fg=#525270
+L29 4-5 fg=#b5f0b0
+L29 6-10 fg=#d0d6e8
+L29 92-130 fg=#525270
+L30 0-130 fg=#525270
+L31 0-130 fg=#525270
+L32 0-130 fg=#525270
+L34 0-5 fg=#96bfff bold
+L34 6-13 fg=#8888a4
+L34 14-15 fg=#706f87
+L34 16-21 fg=#96bfff bold
+L34 22-28 fg=#8888a4
+L34 29-30 fg=#706f87
+L34 31-32 fg=#96bfff bold
+L34 33-47 fg=#8888a4
+L34 48-49 fg=#706f87
+L34 50-51 fg=#96bfff bold
+L34 52-70 fg=#8888a4
+L34 71-72 fg=#706f87
+L34 73-74 fg=#96bfff bold
+L34 75-78 fg=#8888a4
+L34 79-80 fg=#706f87
+L34 81-82 fg=#96bfff bold
+L34 83-89 fg=#8888a4
+L34 90-91 fg=#706f87
+L34 92-93 fg=#96bfff bold
+L34 94-98 fg=#8888a4

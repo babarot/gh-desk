@@ -1,7 +1,8 @@
-desk // @me    1 review (3)   2 mine (1)   3 involved (0)   4 inbox (1)                           1 to you · 1 to a team · 1 bots 
+-- screen --
+desk // @me    1 review (3)   2 mine (1)   3 involved (0)   4 inbox (1)                           1 to you · 1 to a team · 1 bots
     PR                        TITLE                                  AUTHOR          CI  REVIEW   WHY         SIZE          AGE
   ▾ requested f╭ acme/api#12 · comment ───────────────────────────────────────────────────────────────────────────╮
-▎ ● api#12     │ Add retries to the client                                                                        │3         3h   
+▎ ● api#12     │ Add retries to the client                                                                        │3         3h
   ▸ requested f│                                                                                                  │
   ▸ bots 1     │ ┃ Does this retry on a 429?                                                                      │
                │ ┃                                                                                                │
@@ -30,5 +31,76 @@ desk // @me    1 review (3)   2 mine (1)   3 involved (0)   4 inbox (1)         
 │ ╵                                                                                         │                                    │
 │                                                                                           │                                    │
 ╰────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
-                                                                                                                                  
-tab kind · ctrl+s post · ctrl+e $EDITOR · esc back                                                                                
+
+tab kind · ctrl+s post · ctrl+e $EDITOR · esc back
+-- styles --
+L1 0-129 fg=#706f87
+L2 4-127 fg=#706f87
+L3 2-15 fg=#706f87
+L3 15-16 fg=#96bfff
+L3 17-38 fg=#d0d6e8 bold
+L3 39-115 fg=#96bfff
+L4 0-10 fg=#706f87
+L4 15-16 fg=#96bfff
+L4 17-42 fg=#8888a4
+L4 114-115 fg=#96bfff
+L4 115-127 fg=#706f87
+L5 2-15 fg=#706f87
+L5 15-115 fg=#96bfff
+L6 2-10 fg=#706f87
+L6 15-16 fg=#96bfff
+L6 17-19 fg=c7 bg=c0
+L6 19-113 bg=c0
+L6 114-115 fg=#96bfff
+L7 15-16 fg=#96bfff
+L7 17-18 fg=c7
+L7 114-115 fg=#96bfff
+L8 15-16 fg=#96bfff
+L8 17-18 fg=c7
+L8 114-115 fg=#96bfff
+L9 15-16 fg=#96bfff
+L9 17-18 fg=c7
+L9 114-115 fg=#96bfff
+L10 15-16 fg=#96bfff
+L10 17-18 fg=c7
+L10 114-115 fg=#96bfff
+L11 15-16 fg=#96bfff
+L11 17-18 fg=c7
+L11 114-115 fg=#96bfff
+L12 15-16 fg=#96bfff
+L12 17-18 fg=c7
+L12 114-115 fg=#96bfff
+L13 15-16 fg=#96bfff
+L13 17-18 fg=c7
+L13 114-115 fg=#96bfff
+L14 15-16 fg=#96bfff
+L14 17-18 fg=c7
+L14 114-115 fg=#96bfff
+L15 15-16 fg=#96bfff
+L15 17-18 fg=c7
+L15 114-115 fg=#96bfff
+L16 15-115 fg=#96bfff
+L17 15-16 fg=#96bfff
+L17 17-23 fg=#96bfff bold
+L17 24-28 fg=#8888a4
+L17 29-30 fg=#706f87
+L17 31-37 fg=#96bfff bold
+L17 38-45 fg=#8888a4
+L17 46-47 fg=#706f87
+L17 48-51 fg=#96bfff bold
+L17 52-59 fg=#8888a4
+L17 114-115 fg=#96bfff
+L18 15-115 fg=#96bfff
+L21 0-130 fg=#706f87
+L22 0-130 fg=#706f87
+L23 0-130 fg=#706f87
+L24 0-130 fg=#706f87
+L25 0-130 fg=#706f87
+L26 0-130 fg=#706f87
+L27 0-130 fg=#706f87
+L28 0-130 fg=#706f87
+L29 0-130 fg=#706f87
+L30 0-130 fg=#706f87
+L31 0-130 fg=#706f87
+L32 0-130 fg=#706f87
+L34 0-50 fg=#706f87
