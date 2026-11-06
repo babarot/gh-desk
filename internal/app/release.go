@@ -14,42 +14,43 @@ import (
 	"github.com/babarot/gh-desk/internal/version"
 )
 
-// releaseOf is what the TUI tells of gh-desk's own releases, or nil when
-// it tells of none: a build that is not a release, release.check off, or
-// GH_NO_EXTENSION_UPDATE_NOTIFIER set. A release build keeps the version
-// that ran whether or not it tells, so turning the check on later does not
-// tell of an update long past.
+// releaseOf is what the TUI knows of gh-desk's own releases. Every build
+// can open their notes from ?, which reads them then. A release build also
+// tells of a newer release and of an update, unless release.check is off
+// or GH_NO_EXTENSION_UPDATE_NOTIFIER is set; it keeps the version that ran
+// whether or not it tells, so turning the check on later does not tell of
+// an update long past. A build that is not a release is told the releases
+// page as the way to update: whoever built it updates it.
 func releaseOf(cfg config.File, e env, log *slog.Logger) *tui.Release {
-	if !e.release {
-		return nil
-	}
 	store := release.Open(e.stateDir)
+	src := &releases{gh: e.gh, store: store, now: time.Now}
+	r := &tui.Release{Running: version.Version, How: release.Page, FromSource: !e.release, Source: src}
+	if !e.release {
+		return r
+	}
 	rec, err := store.Load()
 	if err != nil {
 		log.Warn("could not read what was found of the releases", logging.KeyOp, "release", "err", err.Error())
 		rec = release.Record{}
 	}
-	running := version.Version
 	from := ""
-	if rec.LastRun != "" && release.Newer(running, rec.LastRun) {
+	if rec.LastRun != "" && release.Newer(r.Running, rec.LastRun) {
 		from = rec.LastRun
 	}
-	if rec.LastRun != running {
-		rec.LastRun = running
+	if rec.LastRun != r.Running {
+		rec.LastRun = r.Running
 		if err := store.Save(rec); err != nil {
 			log.Warn("could not keep the version that ran", logging.KeyOp, "release", "err", err.Error())
 		}
 	}
+	src.rec = rec
+	r.How = release.MethodOf(realPath(e.exe), realPath(e.extensions)).How()
 	if !cfg.Release.Check || !e.notify {
-		log.Debug("releases are not read", logging.KeyOp, "release", "check", cfg.Release.Check, "notify", e.notify)
-		return nil
+		log.Debug("releases are not told of", logging.KeyOp, "release", "check", cfg.Release.Check, "notify", e.notify)
+		return r
 	}
-	now := time.Now()
-	return &tui.Release{
-		Running: running, How: release.MethodOf(realPath(e.exe), realPath(e.extensions)).How(),
-		Latest: rec.Latest, Told: rec.Told, UpdatedFrom: from, Due: rec.Due(now),
-		Source: &releases{gh: e.gh, store: store, rec: rec, now: time.Now},
-	}
+	r.Tell, r.Latest, r.Told, r.UpdatedFrom, r.Due = true, rec.Latest, rec.Told, from, rec.Due(time.Now())
+	return r
 }
 
 // realPath is p with its symbolic links followed, or p as it is when that

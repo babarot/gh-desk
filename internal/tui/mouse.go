@@ -518,6 +518,15 @@ func (m *Model) popupMouse(msg tea.MouseMsg) (cmd tea.Cmd, ok bool) {
 		} else if tr.top != top {
 			tr.follow = false
 		}
+	case m.help && m.relBox != nil:
+		if msg, ok := msg.(tea.MouseWheelMsg); ok {
+			switch msg.Button {
+			case tea.MouseWheelDown:
+				m.scrollReleaseNotes(wheelLines)
+			case tea.MouseWheelUp:
+				m.scrollReleaseNotes(-wheelLines)
+			}
+		}
 	case m.help:
 		switch msg := msg.(type) {
 		case tea.MouseClickMsg:

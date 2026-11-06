@@ -112,7 +112,11 @@ func (m *Model) render() (string, *tea.Cursor) {
 		}
 	case m.help:
 		cur = nil
-		lines = m.renderHelp(lines)
+		if m.relBox != nil {
+			lines = m.renderReleaseNotes(lines)
+		} else {
+			lines = m.renderHelp(lines)
+		}
 	case m.toast != nil && len(lines) > 3:
 		toast := m.st.border.Render("╭ ") + m.noteIcon(m.toast.icon) + " " + m.st.sub1.Render(m.toast.title) + " " +
 			m.st.dim.Render("· "+m.firstKey("events")+" to see") + m.st.border.Render(" ╮")

@@ -198,10 +198,12 @@ type Model struct {
 	keys   keymap.Map
 	log    *slog.Logger
 	set    Settings
-	// rel is what this run knows of gh-desk's releases.
-	rel releases
-	ctx context.Context
-	st  styles
+	// rel is what this run knows of gh-desk's releases, and relBox the
+	// box of their notes while it is open over the ? list.
+	rel    releases
+	relBox *releaseBox
+	ctx    context.Context
+	st     styles
 
 	viewer string
 	tabs   []*tab
@@ -513,7 +515,13 @@ func (m *Model) key(msg tea.KeyPressMsg) tea.Cmd {
 		return m.confirmKey(k)
 	case m.triage != nil && m.triage.open:
 		return m.triageKey(msg)
+	case m.help && m.relBox != nil:
+		m.releaseBoxKey(k)
+		return nil
 	case m.help:
+		if m.set.Release != nil && m.keys.Matches("release_notes", k) {
+			return m.openReleaseNotes()
+		}
 		m.helpKey(k)
 		return nil
 	case m.filtering:
@@ -525,7 +533,7 @@ func (m *Model) key(msg tea.KeyPressMsg) tea.Cmd {
 	}
 	if m.keys.Matches("help", k) {
 		m.openHelp()
-		return nil
+		return m.prefetchReleases()
 	}
 	if m.logv != nil {
 		return m.logKey(k)

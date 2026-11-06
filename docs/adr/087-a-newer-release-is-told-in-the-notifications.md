@@ -3,6 +3,7 @@
 ## Status
 
 Accepted
+Partly replaced by ADR-088
 
 ## Context
 
@@ -29,4 +30,4 @@ Here the status line is for the moment (ADR-025): what must be found again goes 
 
 ## Not decided here
 
-- How the release notes are read inside gh-desk.
+- How the release notes are read inside gh-desk. ADR-088 decides it.
