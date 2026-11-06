@@ -92,11 +92,11 @@ func TestClaudeWelcomeWorktreeFailed(t *testing.T) {
 	}
 }
 
-// The mascot is drawn in Claude's color on every theme (ADR-081).
+// Clawd is drawn in Claude's color on every theme (ADR-081).
 func TestMascotKeepsClaudesColor(t *testing.T) {
 	for name, p := range themes {
 		if got := newStyles(p).mascot.GetForeground(); got != claudeOrange() {
-			t.Errorf("theme %s draws the mascot in %v", name, got)
+			t.Errorf("theme %s draws Clawd in %v", name, got)
 		}
 	}
 }

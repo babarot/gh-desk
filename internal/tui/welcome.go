@@ -7,15 +7,15 @@ import (
 	"github.com/babarot/gh-desk/internal/model"
 )
 
-// mascot is Claude's mascot, drawn as Claude Code draws it: three lines,
+// mascot is Clawd, Claude's mascot, drawn as Claude Code draws it: three lines,
 // each as wide as the others.
 const mascot = " ▐▛███▜▌ \n▝▜█████▛▘\n  ▘▘ ▝▝  "
 
-// welcomeGap is the space between the mascot and the text beside it.
+// welcomeGap is the space between Clawd and the text beside it.
 const welcomeGap = 3
 
 // welcomeLines are what the claude pane shows of c while nothing has been
-// asked, in at most height lines: Claude's mascot beside the pull request,
+// asked, in at most height lines: Clawd beside the pull request,
 // the worktree being made, and the questions fill_suggestion puts in the
 // text box. The questions give way first, then the worktree; when even the
 // pull request does not fit, nothing is shown.

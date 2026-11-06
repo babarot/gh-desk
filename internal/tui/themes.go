@@ -8,7 +8,7 @@ import (
 	"charm.land/lipgloss/v2"
 )
 
-// claudeOrange is Claude's own orange, which its mascot keeps on every
+// claudeOrange is Claude's own orange, which its mascot Clawd keeps on every
 // theme: the color is Claude's, not the theme's (ADR-081).
 func claudeOrange() color.Color { return lipgloss.Color("#d97757") }
 

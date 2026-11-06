@@ -86,7 +86,7 @@ type styles struct {
 	code, block, blockLang lipgloss.Style
 	// band is the background of a question in the chat.
 	band lipgloss.Style
-	// mascot is Claude's mascot, in Claude's color on every theme.
+	// mascot is Clawd, Claude's mascot, in Claude's color on every theme.
 	mascot lipgloss.Style
 }
 
