@@ -29,6 +29,11 @@ type setting struct {
 	// Example is written in the template in place of the default, when the
 	// default is not a value to write (none, or worked out at run time).
 	Example string
+	// Display is true of a setting that changes only how things are drawn:
+	// it cannot make gh-desk run anything, write to GitHub, read something
+	// else, or put another action under a key. The settings page saves
+	// these without asking in the terminal (ADR-101).
+	Display bool
 }
 
 // table is a table of the file, in the order the template writes them.
@@ -431,27 +436,27 @@ var tables = []table{
 var settings = []setting{
 	{Key: "list.refresh", Kind: durationKind{Off: true}, Value: func(f File) any { return f.List.Refresh },
 		Doc: `Refresh the shown tab this often, as a Go duration such as "3m" or "90s"; "off" refreshes only when r is pressed.`},
-	{Key: "list.stale_days", Kind: daysKind{}, Value: func(f File) any { return f.List.StaleDays },
+	{Key: "list.stale_days", Display: true, Kind: daysKind{}, Value: func(f File) any { return f.List.StaleDays },
 		Doc: `Mark AGE when a pull request has not been updated for this many days, or "off".`},
 	{Key: "list.home_owners", Kind: listKind{}, Value: func(f File) any { return f.List.HomeOwners },
 		Doc: "Owners whose name is left out of the PR column, such as your company."},
-	{Key: "list.columns", Kind: listKind{Values: Columns, NonEmpty: true}, Value: func(f File) any { return f.List.Columns },
+	{Key: "list.columns", Display: true, Kind: listKind{Values: Columns, NonEmpty: true}, Value: func(f File) any { return f.List.Columns },
 		Doc: `The columns shown, in the order given; "pr" and "title" are needed. WHY shows on grouped tabs and the inbox only, and AUTHOR not on a tab of your own pull requests. On a narrow terminal SIZE goes first, then AUTHOR.`},
-	{Key: "list.bell", Kind: boolKind{}, Value: func(f File) any { return f.List.Bell },
+	{Key: "list.bell", Display: true, Kind: boolKind{}, Value: func(f File) any { return f.List.Bell },
 		Doc: "Ring the terminal's bell when a reading of the inbox finds a notification newly unread: new, read before, or updated since. The first reading after start does not ring it, nor one of the excluded. The terminal rings, flashes or stays quiet as it is set to."},
 
 	{Key: "menu.actions", Kind: listKind{Values: MenuActions, NonEmpty: true}, Value: func(f File) any { return f.Menu.Actions },
 		Doc: `The actions the menu of enter offers, in the order given. One left out is not in the menu; its key still runs it from the list.`},
 
-	{Key: "preview.height", Kind: intKind{Min: 0}, Value: func(f File) any { return f.Preview.Height },
+	{Key: "preview.height", Display: true, Kind: intKind{Min: 0}, Value: func(f File) any { return f.Preview.Height },
 		Doc: "Lines of the preview pane under the list; 0 hides it until it is shown with a key. Dragging the pane's top edge, or + and -, changes them, and the lines set that way are kept over this one."},
-	{Key: "preview.tab", Kind: enumKind{PaneTabs}, Value: func(f File) any { return f.Preview.Tab },
+	{Key: "preview.tab", Display: true, Kind: enumKind{PaneTabs}, Value: func(f File) any { return f.Preview.Tab },
 		Doc: `The tab the pane opens on: "overview" (default), the description beside a column of facts, or "diff".`},
 
-	{Key: "description.style", Kind: enumKind{DescriptionStyles}, Value: func(f File) any { return f.Description.Style },
+	{Key: "description.style", Display: true, Kind: enumKind{DescriptionStyles}, Value: func(f File) any { return f.Description.Style },
 		Doc: `How a description and its comments are drawn in the pane: "rendered" (default) draws headings, lists, code, quotes and tables; "plain" shows the Markdown as written.`},
 
-	{Key: "diff.collapse", Kind: globsKind{}, Value: func(f File) any { return f.Diff.Collapse },
+	{Key: "diff.collapse", Display: true, Kind: globsKind{}, Value: func(f File) any { return f.Diff.Collapse },
 		Doc: "Files shown folded, as their name and line counts, until unfolded: glob patterns, matched against the base name unless they have a slash."},
 
 	{Key: "checks.approval", Kind: globsKind{}, Value: func(f File) any { return f.Checks.Approval },
@@ -497,13 +502,13 @@ var settings = []setting{
 	{Key: "claude.plugins", Kind: listKind{}, Value: func(f File) any { return f.Claude.Plugins },
 		Example: `["~/.claude/plugins/cache/<marketplace>/<plugin>/<version>"]`,
 		Doc:     "Plugins whose skills the conversation about a pull request takes, as their directories (~ is your home). Only the skills are taken, copied when gh-desk starts, as gh-desk:<name>; the rest of a plugin (hooks, MCP servers, language servers, commands) is not. A skill whose allowed-tools grants a tool outside allowed_tools, Skill and the tools of the MCP servers is a mistake."},
-	{Key: "theme.dark", Kind: enumKind{Themes}, Value: func(f File) any { return f.Theme.Dark },
+	{Key: "theme.dark", Display: true, Kind: enumKind{Themes}, Value: func(f File) any { return f.Theme.Dark },
 		Doc: `The color scheme on a dark terminal, and on one that does not tell its background.`},
-	{Key: "theme.light", Kind: enumKind{Themes}, Value: func(f File) any { return f.Theme.Light },
+	{Key: "theme.light", Display: true, Kind: enumKind{Themes}, Value: func(f File) any { return f.Theme.Light },
 		Doc: `The color scheme on a light terminal. Write the same theme as theme.dark to use it on any terminal.`},
-	{Key: "theme.spinner", Kind: enumKind{Spinners}, Value: func(f File) any { return f.Theme.Spinner },
+	{Key: "theme.spinner", Display: true, Kind: enumKind{Spinners}, Value: func(f File) any { return f.Theme.Spinner },
 		Doc: `The spinner shown while something is read: "dots" (default) ⠋⠙⠹, "dense" ⣾⣽⣻, "bounce" ⠁⠂⠄, "snake" ⠉⠙⠚, "jump" ⢄⢂⢁, "fill" ⣀⣤⣶, "sand" ⡀⣀⣤, "line" |/-\, "arc" ◜◠◝, "quarter" ◴◷◶, "block" ▖▘▝, "star" ✶✸✹, or "off", a ⋯ that does not move and is left out before a line that says what is going on. The progress pane of the log viewer turns a spinner and marks of its own, which "off" stops too.`},
-	{Key: "theme.shimmer", Kind: boolKind{}, Value: func(f File) any { return f.Theme.Shimmer },
+	{Key: "theme.shimmer", Display: true, Kind: boolKind{}, Value: func(f File) any { return f.Theme.Shimmer },
 		Doc: "Run a light over the text that says what is going on, such as refreshing… or thinking…; the screen is drawn more often while something is read."},
 
 	{Key: "release.check", Kind: boolKind{}, Value: func(f File) any { return f.Release.Check },

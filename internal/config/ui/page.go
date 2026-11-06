@@ -1,4 +1,4 @@
-// Package ui makes the page of gh desk config ui, one HTML file that
+// Package ui makes the settings page, one HTML file that
 // holds the settings, the config file as it was read, and the code, and
 // serves it on this machine until it gives a file back. Nothing here writes
 // the config file: gh desk config apply does (ADR-099).

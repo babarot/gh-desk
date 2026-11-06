@@ -14,7 +14,7 @@ import (
 	"github.com/babarot/gh-desk/internal/model"
 )
 
-// The page of config ui draws the list again in JavaScript. This writes
+// the settings page draws the list again in JavaScript. This writes
 // what gh-desk draws from the same pull requests, for scripts/ui.mjs
 // to compare the page's drawing with (mise run config-ui:test).
 const configuiGolden = "../config/ui/testdata/list.golden"

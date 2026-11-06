@@ -7,7 +7,7 @@ import (
 	"github.com/pelletier/go-toml/v2"
 )
 
-// UIKind is a kind of setting as the page of config ui takes it. Type is
+// UIKind is a kind of setting as the settings page takes it. Type is
 // the kind's Go type, as it is the only name the kinds have.
 type UIKind struct {
 	Type     string   `json:"type"`
@@ -44,7 +44,7 @@ type UINamed struct {
 	Doc  string `json:"doc"`
 }
 
-// UIData is the table of settings, for the page of config ui.
+// UIData is the table of settings, for the settings page.
 type UIData struct {
 	Settings     []UISetting         `json:"settings"`
 	Tables       []UINamed           `json:"tables"`
@@ -55,7 +55,7 @@ type UIData struct {
 	Schema       string              `json:"schema"`
 }
 
-// UI is the table of settings as the page of config ui takes it.
+// UI is the table of settings as the settings page takes it.
 func UI() UIData {
 	def := Default()
 	d := UIData{Elems: map[string][]UIElem{}, Schema: SchemaURL, DefaultRules: tomlTables(defaultSelect, "select"), DefaultTabs: tomlTables(uncommented(tabsWords), "tabs")}

@@ -6,7 +6,7 @@ import (
 	"slices"
 )
 
-// SpinnerFrames is a spinner as the page of config ui draws it.
+// SpinnerFrames is a spinner as the settings page draws it.
 type SpinnerFrames struct {
 	Frames []string `json:"f"`
 	Every  int      `json:"t"`

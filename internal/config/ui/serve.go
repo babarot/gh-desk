@@ -6,6 +6,7 @@ import (
 	"crypto/subtle"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -22,43 +23,51 @@ const maxFile = 1 << 20
 // does when it is reloaded, before the command ends.
 const closeGrace = 3 * time.Second
 
-// Server serves one page, on this machine only, until it gives a file back.
-// A setting can name a command, so what a page sends must come from this
-// page and no other: the token in the URL is known only to the page, and
-// Host and Origin are checked, which keeps out a site that renames itself
-// to 127.0.0.1 in DNS (ADR-100).
+// Server serves one page, on this machine only, until it saves a file.
+// A setting can name a command, so a web site open in the browser must not
+// reach it: a site cannot read the token in the URL, and Host and Origin
+// are checked, which keeps out one that renames itself to 127.0.0.1 in DNS.
+// Another program of this user is not kept out: it can read the URL, and
+// write the config file without any page. See ADR-101.
 type Server struct {
 	Page []byte
-	// Check says what is wrong with a file sent; nil takes it. The error
-	// is shown on the page, which stays open to fix it.
-	Check func(src []byte) error
+	// Save takes a file sent, and puts it in place. Its error is shown on
+	// the page, which stays open to fix it. It may wait for an answer in
+	// the terminal, until ctx is canceled; one runs at a time.
+	Save func(ctx context.Context, src []byte) error
 
 	token string
 	host  string
+	ctx   context.Context
 
-	mu    sync.Mutex
-	saved bool
-	done  chan []byte
+	mu sync.Mutex
+	// ended is true once done has its value.
+	ended bool
+	done  chan bool
+	// saving is true during Save, and left that the page went meanwhile,
+	// so that it ends once Save has not saved.
+	saving bool
+	left   bool
 	// loads counts the times the page was read, and grace is how
 	// long a page that went away has to be read again.
 	loads int
 	grace time.Duration
 }
 
-// Serve shows the page, calling open with its URL, and returns the file
-// sent from it, or nil when the page was closed without one. Canceling ctx
+// Serve shows the page, calling open with its URL, and says whether a file
+// was saved, or false when the page was closed without one. Canceling ctx
 // stops it, and returns ctx's error.
-func (s *Server) Serve(ctx context.Context, open func(url string)) ([]byte, error) {
+func (s *Server) Serve(ctx context.Context, open func(url string)) (bool, error) {
 	l, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
-		return nil, err
+		return false, err
 	}
 	b := make([]byte, 32)
 	if _, err := rand.Read(b); err != nil {
 		l.Close()
-		return nil, err
+		return false, err
 	}
-	s.token, s.host, s.done = hex.EncodeToString(b), l.Addr().String(), make(chan []byte, 1)
+	s.token, s.host, s.ctx, s.done = hex.EncodeToString(b), l.Addr().String(), ctx, make(chan bool, 1)
 	if s.grace == 0 {
 		s.grace = closeGrace
 	}
@@ -66,9 +75,9 @@ func (s *Server) Serve(ctx context.Context, open func(url string)) ([]byte, erro
 	go func() { _ = srv.Serve(l) }()
 	open("http://" + s.host + "/" + s.token + "/")
 
-	var src []byte
+	var saved bool
 	select {
-	case src = <-s.done:
+	case saved = <-s.done:
 	case <-ctx.Done():
 		err = ctx.Err()
 	}
@@ -76,7 +85,17 @@ func (s *Server) Serve(ctx context.Context, open func(url string)) ([]byte, erro
 	stop, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 	_ = srv.Shutdown(stop)
-	return src, err
+	// Canceled while a save was finishing: it is saved all the same.
+	if err != nil {
+		select {
+		case saved = <-s.done:
+			if saved {
+				err = nil
+			}
+		default:
+		}
+	}
+	return saved, err
 }
 
 // ServeHTTP answers only the page's own two requests.
@@ -96,9 +115,11 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		h := w.Header()
 		h.Set("Content-Type", "text/html; charset=utf-8")
 		h.Set("Cache-Control", "no-store")
-		h.Set("Content-Security-Policy", "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src 'self'; img-src data:")
+		h.Set("Content-Security-Policy", "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src 'self'; img-src data:; frame-ancestors 'none'; base-uri 'none'; form-action 'none'")
+		h.Set("Referrer-Policy", "no-referrer")
 		s.mu.Lock()
 		s.loads++
+		s.left = false
 		s.mu.Unlock()
 		_, _ = w.Write(s.Page)
 	case r.Method == http.MethodPost && rest == "save":
@@ -120,12 +141,22 @@ func (s *Server) ownOrigin(w http.ResponseWriter, r *http.Request) bool {
 	return true
 }
 
-// finish ends Serve with src, once.
-func (s *Server) finish(src []byte) {
-	if !s.saved {
-		s.saved = true
-		s.done <- src
+// finish ends Serve, once.
+func (s *Server) finish(saved bool) {
+	if !s.ended {
+		s.ended = true
+		s.done <- saved
 	}
+}
+
+// leave ends Serve with nothing, or after Save if one is waiting: the
+// terminal may still be asking, and an answer there is still an answer.
+func (s *Server) leave() {
+	if s.saving {
+		s.left = true
+		return
+	}
+	s.finish(false)
 }
 
 // closePage ends it with nothing, as the page's Close asks.
@@ -135,7 +166,7 @@ func (s *Server) closePage(w http.ResponseWriter, r *http.Request) {
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.finish(nil)
+	s.leave()
 }
 
 // pageGone is told when the tab goes. A reload does that too, so it ends
@@ -151,11 +182,13 @@ func (s *Server) pageGone(w http.ResponseWriter, r *http.Request) {
 		s.mu.Lock()
 		defer s.mu.Unlock()
 		if s.loads == seen {
-			s.finish(nil)
+			s.leave()
 		}
 	})
 }
 
+// save holds no lock during Save, which can wait for the terminal for as
+// long as the user takes: the page must still be able to go.
 func (s *Server) save(w http.ResponseWriter, r *http.Request) {
 	if !s.ownOrigin(w, r) {
 		return
@@ -166,17 +199,34 @@ func (s *Server) save(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.mu.Lock()
+	if s.ended || s.saving {
+		s.mu.Unlock()
+		refuse(w, http.StatusConflict, errors.New("a file is being saved already"))
+		return
+	}
+	s.saving = true
+	ctx := s.ctx
+	s.mu.Unlock()
+
+	err = s.Save(ctx, src)
+
+	s.mu.Lock()
 	defer s.mu.Unlock()
-	if s.saved {
-		http.Error(w, "already saved", http.StatusConflict)
+	s.saving = false
+	if err != nil {
+		if s.left {
+			s.finish(false)
+		}
+		refuse(w, http.StatusUnprocessableEntity, err)
 		return
 	}
-	if err := s.Check(src); err != nil {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusUnprocessableEntity)
-		_ = json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
-		return
-	}
-	s.finish(src)
+	s.finish(true)
 	fmt.Fprintln(w, "ok")
+}
+
+// refuse tells the page why, in words it shows.
+func refuse(w http.ResponseWriter, code int, err error) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(code)
+	_ = json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
 }

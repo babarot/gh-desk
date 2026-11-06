@@ -1,4 +1,4 @@
-// Checks the page of config ui without a browser (mise run config-ui:test):
+// Checks the settings page without a browser (mise run config-ui:test):
 // that it draws the list as gh-desk does, that it has a place for every
 // setting, and what its code writes. With --update, output.toml is written;
 // a Go test then reads it as gh-desk reads a config file.

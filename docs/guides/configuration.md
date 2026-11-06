@@ -19,6 +19,7 @@ $ gh desk config reference list.refresh
 ```sh
 gh desk config reference    # every setting; pipe it to less
 gh desk config edit         # open it in your editor, then check it when you close it
+gh desk config edit --ui    # edit the settings on a page instead
 gh desk config check        # read it and print its mistakes, without starting
 gh desk config show --diff  # the settings that differ from the defaults
 gh desk config show         # every setting in effect
@@ -42,15 +43,24 @@ A warning (something that is likely not what you meant, but does not stop gh-des
 
 ## On a page
 
-`gh desk config ui` opens a page in your browser with the settings of the file, and gh-desk drawn above them as they change. Rules, tabs, keys and themes are easier to try there.
+`gh desk config edit --ui` opens a page in your browser with the settings of the file, and gh-desk drawn above them as they change. Rules, tabs, keys and themes are easier to try there.
 
-```sh
-gh desk config ui | gh desk config apply
+Saving on the page checks the file as gh-desk does at start and replaces it, keeping the old file beside the new one as `config.toml.bak`. Settings you did not touch stay as they are, even where they match the default; your comments do not carry over.
+
+A change to anything but how things are drawn is listed in the terminal first, and saved only if you answer `y` there:
+
+```console
+the page asks to save:
+
+  claude.command: "claude" -> "my-claude"
+  and 1 that change only how things are drawn
+
+save them to ~/.config/gh-desk/config.toml? [y/N]
 ```
 
-Saving on the page checks the file as gh-desk does at start, writes it to standard output, and ends the command; `config apply` then puts it in place. Run alone, `gh desk config ui` prints the new file and puts it on the clipboard too. Closing the page, with its Close button or by closing the tab, leaves without saving and writes nothing, so `config apply` leaves the file as it is.
+Any other answer leaves the file as it is and the page open. Secrets are not printed: the values of an MCP server's `env` and `headers` show as `(hidden)`. Without a terminal such a change is not saved; the page says so.
 
-The page is served on this machine for as long as the command runs, and it writes nothing itself. Settings you did not touch stay as they are, even where they match the default; your comments do not carry over, but the old file is kept beside the new one as `config.toml.bak`. Do not redirect the output onto the config file: the shell empties the file before gh-desk reads it.
+Closing the page, with its Close button or by closing the tab, leaves without saving, as does ctrl+c. The page is served on this machine for as long as the command runs. When the file cannot be written, as one from the Nix store, the page says so and shows the new file under New file.
 
 MCP servers are shown and removed there; to add or change one, edit the file.
 

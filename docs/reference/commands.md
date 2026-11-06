@@ -45,12 +45,11 @@ Usage:
 Available Commands:
   apply       replace the config file with the one read from standard input, if it has no mistakes
   check       read the config file and print its mistakes and warnings, without starting; exits 1 when it has mistakes
-  edit        open the config file in review.editor, $VISUAL or $EDITOR, then check it
+  edit        open the config file in review.editor, $VISUAL or $EDITOR, then check it; with --ui, on a page in the browser
   init        write the config file, which holds no settings yet, unless one is there
   reference   print every setting with what it does and its default, or those of a table or a key
   schema      print the JSON Schema of the config file
   show        print the settings in effect, or with --diff only those that differ from the defaults
-  ui          edit the settings on a page in the browser, and print how to apply them
 
 Flags:
   -h, --help   help for config
@@ -101,13 +100,23 @@ Global Flags:
 ## gh desk config edit
 
 ```
-open the config file in review.editor, $VISUAL or $EDITOR, then check it
+Open the config file in review.editor, $VISUAL or $EDITOR, then check it.
+
+With --ui, open a page in the browser instead, with the settings of the
+file and gh-desk drawn as they change. It is served on this machine for as
+long as this runs. Saving on the page checks the file as gh-desk checks it
+at start and replaces it, keeping the old one beside it, with .bak added to
+its name. Comments do not carry over. A change to anything but how things
+are drawn is listed here first, and saved only if it is answered with y.
+
+Closing the page, or ctrl+c, leaves without saving, and writes nothing.
 
 Usage:
   gh desk config edit [flags]
 
 Flags:
   -h, --help   help for edit
+      --ui     edit the settings on a page in the browser
 
 Global Flags:
       --config string   the config file (default "~/.config/gh-desk/config.toml")
@@ -177,30 +186,6 @@ Usage:
 Flags:
       --diff   only the settings that differ from the defaults
   -h, --help   help for show
-
-Global Flags:
-      --config string   the config file (default "~/.config/gh-desk/config.toml")
-      --debug           log at debug level
-```
-
-## gh desk config ui
-
-```
-Open a page in the browser with the settings of the config file.
-
-The page shows gh-desk with the settings as they are changed. It is served
-on this machine for as long as this runs, and writes nothing. Saving on the
-page writes the new file to standard output, so that it can be applied:
-
-    gh desk config ui | gh desk config apply
-
-Closing the page, or ctrl+c, leaves without saving, and writes nothing.
-
-Usage:
-  gh desk config ui [flags]
-
-Flags:
-  -h, --help   help for ui
 
 Global Flags:
       --config string   the config file (default "~/.config/gh-desk/config.toml")
