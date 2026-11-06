@@ -1144,6 +1144,57 @@ func TestClose(t *testing.T) {
 	}
 }
 
+// A comment batch reads each pull request again, writes the comment and
+// says once that it was taken.
+func TestComment(t *testing.T) {
+	mi, it := closable("1", "api", 1)
+	f := newFake(mi)
+	evs := runWith(t, f, func(ctx context.Context, r *Runner) <-chan Event {
+		_, ch := r.StartComment(ctx, "Please rebase.", []Item{it})
+		return ch
+	})
+	if want := "comment acme/api#1"; strings.Join(f.calls, ",") != want {
+		t.Errorf("calls = %v", f.calls)
+	}
+	if e := last(evs[it.PR.Key]); e.Result != CommentSent {
+		t.Errorf("last event = %+v", e)
+	}
+	n := 0
+	for _, e := range evs[it.PR.Key] {
+		if e.Commented {
+			n++
+		}
+	}
+	if n != 1 {
+		t.Errorf("%d events say the comment was taken", n)
+	}
+}
+
+// A comment on an open pull request whose head moved stops, as any write
+// does; one merged since still goes, since the head is no longer at stake.
+func TestCommentReadsAgain(t *testing.T) {
+	mi, it := closable("1", "api", 1)
+	mi.HeadOID = "moved"
+	f := newFake(mi)
+	evs := runWith(t, f, func(ctx context.Context, r *Runner) <-chan Event {
+		_, ch := r.StartComment(ctx, "Please rebase.", []Item{it})
+		return ch
+	})
+	if e := last(evs[it.PR.Key]); e.Result != Stopped || len(f.calls) != 0 {
+		t.Errorf("last event = %+v, calls = %v", e, f.calls)
+	}
+	mi, it = closable("2", "api", 2)
+	mi.State = model.StateMerged
+	f = newFake(mi)
+	evs = runWith(t, f, func(ctx context.Context, r *Runner) <-chan Event {
+		_, ch := r.StartComment(ctx, "Thanks!", []Item{it})
+		return ch
+	})
+	if e := last(evs[it.PR.Key]); e.Result != CommentSent {
+		t.Errorf("last event = %+v", e)
+	}
+}
+
 // A branch that cannot be deleted is kept, and the pull request is still
 // closed; one not open, or that the viewer cannot close, is skipped.
 func TestCloseKeepsBranches(t *testing.T) {

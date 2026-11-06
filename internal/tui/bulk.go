@@ -162,9 +162,6 @@ const (
 // selected pull requests, or for the one under the cursor when none is
 // selected.
 func (m *Model) startBulk(kind runner.Kind) tea.Cmd {
-	if m.busy() {
-		return nil
-	}
 	if kind == runner.Merge {
 		// The gh-desk holding the record may have quit since.
 		return tea.Batch(m.takeLock(), m.startBulkOf(kind, runner.ReviewText{}))
@@ -175,9 +172,6 @@ func (m *Model) startBulk(kind runner.Kind) tea.Cmd {
 // startApprove opens the popup of an approval with no body: a review
 // written by A, which skips the text.
 func (m *Model) startApprove() tea.Cmd {
-	if m.busy() {
-		return nil
-	}
 	return m.startBulkOf(runner.Review, runner.ReviewText{Event: model.EventApprove})
 }
 
@@ -407,6 +401,8 @@ func (m *Model) decideBulk() {
 			}
 		case runner.Ready:
 			it.d = plan.ForReady(it.mi)
+		case runner.Comment:
+			it.d = plan.ForComment(it.mi)
 		case runner.Close:
 			it.closing = b.close.decide(it.mi)
 			it.d = plan.Decision{Reason: it.closing.Reason, Notes: it.closing.Notes}
@@ -516,6 +512,10 @@ func (m *Model) runBulk() tea.Cmd {
 	case b.kind == runner.Review:
 		m.compose = nil
 		id, ch = m.run.StartReview(m.ctx, b.review, items)
+	case b.kind == runner.Comment:
+		m.compose = nil
+		bs.comment = b.review.Body
+		id, ch = m.run.StartComment(m.ctx, b.review.Body, items)
 	case b.close != nil:
 		ct := b.close.text()
 		bs.comment, bs.deleteBranch = ct.Body, ct.DeleteBranch
@@ -596,7 +596,7 @@ func (m *Model) renderBulk() []string {
 		case it.goes():
 			mark, title = st.mauve.Render("✓"), st.sub1.Render(shownTitle(it.pr.Title))
 			switch b.kind {
-			case runner.Review, runner.Ready:
+			case runner.Review, runner.Ready, runner.Comment:
 				style := st.green
 				if it.d.Step == plan.StepWait {
 					style = m.stepStyle(it.d.Step)
@@ -705,6 +705,8 @@ func (m *Model) renderBulk() []string {
 		prose(st.dim, "Its reviewers are asked for a review once it is ready. Each acts only on the head shown when it was read.")
 	case b.close != nil:
 		prose(st.dim, m.closeProse())
+	case b.kind == runner.Comment:
+		prose(st.dim, "Adds the comment to each conversation; a review asked of you stays asked.")
 	case b.kind == runner.Review && !b.approves():
 		prose(st.dim, "GitHub cannot take a review back. Each is sent on the head shown when it was read.")
 	default:
@@ -913,7 +915,7 @@ func (m *Model) bulkName(pr model.PR, w int) string {
 func bulkNumber(pr model.PR) string { return fmt.Sprintf("#%d", pr.Key.Number) }
 
 // bulkVerbs name what a popup of each kind does, in its title and question.
-var bulkVerbs = map[runner.Kind]string{runner.Merge: "merge", runner.Ready: "mark ready", runner.Close: "close"}
+var bulkVerbs = map[runner.Kind]string{runner.Merge: "merge", runner.Ready: "mark ready", runner.Close: "close", runner.Comment: "comment"}
 
 func (m *Model) stepStyle(s plan.Step) styleFn {
 	switch s {

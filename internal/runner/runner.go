@@ -136,6 +136,9 @@ const (
 	// Close closes pull requests, with the comment and the deletion of
 	// their branches StartClose is given.
 	Close
+	// Comment adds the text StartComment is given to each pull request's
+	// conversation.
+	Comment
 )
 
 // CloseText is what a Close batch does besides closing: the comment it
@@ -191,6 +194,8 @@ const (
 	// Closed is a pull request closed; its Text says what became of its
 	// branch.
 	Closed
+	// CommentSent is a comment GitHub took on a Comment batch.
+	CommentSent
 	Skipped
 	Stopped
 	Failed
@@ -399,6 +404,12 @@ func (r *Runner) StartClose(ctx context.Context, ct CloseText, items []Item) (st
 	return r.run(ctx, Close, items, nil, ReviewText{}, ct)
 }
 
+// StartComment runs a batch that adds body to each pull request's
+// conversation, as Start does a batch of another kind.
+func (r *Runner) StartComment(ctx context.Context, body string, items []Item) (string, <-chan Event) {
+	return r.run(ctx, Comment, items, nil, ReviewText{}, CloseText{Body: body})
+}
+
 // Start runs a batch of a merge or a ready for review and returns its ID
 // and its events. The channel is
 // closed when every pull request has a final result and every auto-merge
@@ -434,7 +445,7 @@ func (r *Runner) run(ctx context.Context, kind Kind, items []Item, resume map[mo
 		}
 		byRepo[repo] = append(byRepo[repo], it)
 	}
-	verb := map[Kind]string{Review: "review", Merge: "merge", Ready: "ready", Close: "close"}[kind]
+	verb := map[Kind]string{Review: "review", Merge: "merge", Ready: "ready", Close: "close", Comment: "comment"}[kind]
 	if resume != nil {
 		verb = "resume"
 	}
@@ -545,6 +556,8 @@ func (r *Runner) run(ctx context.Context, kind Kind, items []Item, resume map[mo
 					j.markReady()
 				case kind == Close:
 					j.closePR(ct)
+				case kind == Comment:
+					j.comment(ct.Body)
 				default:
 					j.merge()
 				}
@@ -880,7 +893,7 @@ func approvedBy(mi model.MergeInfo, login string) bool {
 	return false
 }
 
-var resultWord = map[Result]string{Running: "running", Approved: "approved", Merged: "merged", AutoMergeOn: "auto-merge-on", Readied: "readied", Reviewed: "reviewed", Closed: "closed",
+var resultWord = map[Result]string{Running: "running", Approved: "approved", Merged: "merged", AutoMergeOn: "auto-merge-on", Readied: "readied", Reviewed: "reviewed", Closed: "closed", CommentSent: "comment-sent",
 	Skipped: "skipped", Stopped: "stopped", Failed: "failed"}
 
 // read reads the pull request and checks its head is the one confirmed.
@@ -1606,6 +1619,25 @@ func short(err error) string {
 		s = s[:79] + "…"
 	}
 	return s
+}
+
+// comment adds body to the conversation, after reading the pull request
+// again as every write does. A comment is not tied to a head, but what the
+// user confirmed is: one that moved is stopped as it is for any write.
+func (j *job) comment(body string) {
+	if _, ok := j.read(false); !ok {
+		return
+	}
+	j.forecast([]Step{StepComment})
+	j.step(StepComment, "commenting")
+	pr := j.it.PR
+	pr.HeadOID = j.head
+	if err := j.r.gh.PostComment(j.ctx, pr, body); err != nil {
+		j.say(Failed, "comment failed: "+short(err))
+		return
+	}
+	j.emit(Event{Key: j.it.PR.Key, Result: Running, Text: "commented", Commented: true})
+	j.say(CommentSent, "commented")
 }
 
 // closePR writes the comment, closes the pull request and deletes its head

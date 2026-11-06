@@ -71,9 +71,6 @@ const closeInputLines = 4
 // pull request under the cursor. A comment written in a popup closed
 // without confirming comes back.
 func (m *Model) startClose() tea.Cmd {
-	if m.busy() {
-		return nil
-	}
 	cmd := m.startBulkOf(runner.Close, runner.ReviewText{})
 	if m.bulk == nil || m.bulk.kind != runner.Close {
 		return cmd

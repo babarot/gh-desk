@@ -16,7 +16,7 @@ import (
 // batchWords names what a batch does while it runs. A merge is named by
 // its goal: whether it marks a pull request ready or approves it first
 // differs between pull requests and is shown on their lanes.
-var batchWords = map[runner.Kind]string{runner.Merge: "merging", runner.Ready: "marking ready", runner.Close: "closing"}
+var batchWords = map[runner.Kind]string{runner.Merge: "merging", runner.Ready: "marking ready", runner.Close: "closing", runner.Comment: "commenting"}
 
 // reviewingWords say what a batch of reviews of each kind is doing.
 var reviewingWords = map[model.ReviewEvent]string{model.EventApprove: "approving", model.EventComment: "sending review comments",
@@ -98,7 +98,7 @@ func (m *Model) activities() []string {
 // tab.
 func (m *Model) workActivities() []string {
 	var out []string
-	for _, f := range []func() string{m.postingActivity, m.batchActivity, m.claudeActivity, m.refreshActivity} {
+	for _, f := range []func() string{m.batchActivity, m.claudeActivity, m.refreshActivity} {
 		if s := f(); s != "" {
 			out = append(out, s)
 		}

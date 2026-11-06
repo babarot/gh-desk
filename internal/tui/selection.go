@@ -106,17 +106,6 @@ func (m *Model) retryBatch(bs *batchState) bool {
 	return true
 }
 
-// retryComment keeps a comment that failed on some of its pull requests.
-func (m *Model) retryComment(p *posting) {
-	left, body := prKeys(p.failed), p.body
-	m.retry = &retry{open: func() tea.Cmd {
-		if prs := m.knownPRs(left); len(prs) > 0 {
-			m.confirm = &confirm{pr: prs[0], prs: prs, body: body, retry: true}
-		}
-		return nil
-	}}
-}
-
 // retryDone keeps a notification that could not be marked done, with
 // the others that failed the same way.
 func (m *Model) retryDone(n model.Notification) {
@@ -134,11 +123,9 @@ func (m *Model) tryAgain() tea.Cmd {
 	case r == nil:
 		m.say("nothing to try again")
 		return nil
-	case m.busy():
-		return nil
 	case r.open != nil:
 		cmd := r.open()
-		if m.bulk == nil && m.confirm == nil {
+		if m.bulk == nil {
 			m.retry = nil
 			m.say("nothing to try again: they have left the list")
 		}
@@ -168,12 +155,4 @@ func (m *Model) knownPRs(ks []model.PRKey) []model.PR {
 		}
 	}
 	return prs
-}
-
-func prKeys(prs []model.PR) []model.PRKey {
-	ks := make([]model.PRKey, len(prs))
-	for i, p := range prs {
-		ks[i] = p.Key
-	}
-	return ks
 }

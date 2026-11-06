@@ -106,7 +106,7 @@ func TestCommentSentNoted(t *testing.T) {
 	press(m, "c", "tab")
 	run(m, m.paste(tea.PasteMsg{Content: "Does this retry on a 429?"}))
 	press(m, "ctrl+s", "y")
-	if notesWith(m, "comment sent to") != 1 || m.notes[0].icon != "✓" || m.notes[0].items[0].key != key("acme", "api", 12) {
+	if notesWith(m, "commented 1") != 1 || m.notes[0].icon != "✓" || m.notes[0].items[0].key != key("acme", "api", 12) {
 		t.Errorf("notes = %+v", m.notes)
 	}
 }

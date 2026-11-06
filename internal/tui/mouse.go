@@ -503,10 +503,6 @@ func (m *Model) popupMouse(msg tea.MouseMsg) (cmd tea.Cmd, ok bool) {
 		}
 	case m.menu != nil:
 		return m.menuMouse(msg), true
-	case m.confirm != nil:
-		if m.scrollMouse(msg, &m.confirm.top) {
-			return m.confirmKey(keymap.Back), true
-		}
 	case m.triage != nil && m.triage.open:
 		tr := m.triage
 		top := tr.top

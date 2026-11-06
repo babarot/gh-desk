@@ -72,8 +72,8 @@ type batchState struct {
 	done    map[model.PRKey]progress
 	skipped []noteItem
 	noted   bool
-	// comment is what a close batch writes before closing, shown in the
-	// pane once GitHub took it (ADR-067).
+	// comment is what a close batch writes before closing, or a comment
+	// batch writes, shown in the pane once GitHub took it (ADR-067).
 	comment string
 	// deleteBranch is set when a close batch deletes the head branches.
 	deleteBranch bool
@@ -334,6 +334,8 @@ func (m *Model) noteBatch(bs *batchState) tea.Cmd {
 		parts = append(parts, fmt.Sprintf("marked ready %d", count[runner.Readied]))
 	case bs.kind == runner.Close:
 		parts = append(parts, fmt.Sprintf("closed %d", count[runner.Closed]))
+	case bs.kind == runner.Comment:
+		parts = append(parts, fmt.Sprintf("commented %d", count[runner.CommentSent]))
 	default:
 		parts = append(parts, fmt.Sprintf("merged %d", count[runner.Merged]))
 		if n := count[runner.AutoMergeOn]; n > 0 {
@@ -651,7 +653,7 @@ func (m *Model) noteIcon(icon string) string {
 
 func (m *Model) resultStyle(r runner.Result) lipgloss.Style {
 	switch r {
-	case runner.Merged, runner.Approved, runner.Readied, runner.Closed:
+	case runner.Merged, runner.Approved, runner.Readied, runner.Closed, runner.CommentSent:
 		return m.st.green
 	case runner.AutoMergeOn:
 		return m.st.teal
@@ -663,7 +665,7 @@ func (m *Model) resultStyle(r runner.Result) lipgloss.Style {
 
 // progressText is a row's progress, short enough for the cells it takes.
 func (m *Model) progressText(p progress) string {
-	icon := map[runner.Result]string{runner.Running: "◌", runner.Approved: "✓", runner.Merged: "✓", runner.Readied: "✓", runner.Closed: "✓", runner.AutoMergeOn: "⧗",
+	icon := map[runner.Result]string{runner.Running: "◌", runner.Approved: "✓", runner.Merged: "✓", runner.Readied: "✓", runner.Closed: "✓", runner.CommentSent: "✓", runner.AutoMergeOn: "⧗",
 		runner.Skipped: "–", runner.Stopped: "✗", runner.Failed: "✗"}[p.result]
 	text := p.text
 	if after, ok := strings.CutPrefix(text, "– "); ok {
@@ -723,7 +725,9 @@ func (m *Model) fadeResults() {
 }
 
 // fades reports whether a result is put away by the automatic refresh.
-func fades(r runner.Result) bool { return r == runner.Approved || r == runner.Reviewed }
+func fades(r runner.Result) bool {
+	return r == runner.Approved || r == runner.Reviewed || r == runner.CommentSent
+}
 
 // tally is the header's count of results on rows.
 func (m *Model) tally() string {
@@ -735,7 +739,7 @@ func (m *Model) tally() string {
 		count[p.result]++
 	}
 	var parts []string
-	for _, r := range []runner.Result{runner.Merged, runner.Approved, runner.Readied, runner.Closed, runner.AutoMergeOn, runner.Running, runner.Skipped, runner.Stopped, runner.Failed} {
+	for _, r := range []runner.Result{runner.Merged, runner.Approved, runner.Readied, runner.Closed, runner.CommentSent, runner.AutoMergeOn, runner.Running, runner.Skipped, runner.Stopped, runner.Failed} {
 		if count[r] == 0 {
 			continue
 		}
@@ -745,7 +749,7 @@ func (m *Model) tally() string {
 }
 
 func (m *Model) progressTextIcon(r runner.Result, n int) string {
-	icon := map[runner.Result]string{runner.Running: "◌", runner.Approved: "✓", runner.Merged: "✓", runner.Readied: "✓", runner.Closed: "✓", runner.AutoMergeOn: "⧗",
+	icon := map[runner.Result]string{runner.Running: "◌", runner.Approved: "✓", runner.Merged: "✓", runner.Readied: "✓", runner.Closed: "✓", runner.CommentSent: "✓", runner.AutoMergeOn: "⧗",
 		runner.Skipped: "–", runner.Stopped: "✗", runner.Failed: "✗"}[r]
 	return m.resultStyle(r).Render(fmt.Sprintf("%s%d", icon, n))
 }

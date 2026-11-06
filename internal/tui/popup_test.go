@@ -115,7 +115,7 @@ func TestPopupsOnASmallScreen(t *testing.T) {
 		body := "First line of a comment that is long enough to be wrapped in the popup, then more.\nsecond line"
 		run(m, m.paste(tea.PasteMsg{Content: body}))
 		press(m, "ctrl+s")
-		text := readPopup(t, m, m.renderConfirm, "yes", "j")
+		text := readPopup(t, m, m.renderBulk, "yes", "j")
 		has(t, text, "First line of a comment that is long enough to be wrapped in the popup, then more.")
 		has(t, text, "Adds the comment to each conversation; a review asked of you stays asked.")
 		has(t, text, "more")
