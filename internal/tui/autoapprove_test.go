@@ -194,3 +194,31 @@ func TestAutoApproveTellsOfTooManyOnce(t *testing.T) {
 		t.Errorf("notifications:\n%s", titles)
 	}
 }
+
+// A rule that cannot tell until the checks are read, and then does not
+// match, leaves the pull request to the next rule. A check that waits for
+// the approval stays pending until it is given, so the first rule would
+// otherwise hold it for good.
+func TestAutoApproveAsksTheNextRule(t *testing.T) {
+	p := bump("a", 41)
+	p.Checks = model.CheckPending
+	pendingOnes := AutoApprove{Rule: plan.Rule{Name: "pending ones", Authors: []string{"renovate"}, Checks: []plan.Checks{plan.ChecksPending}}, Query: "auto"}
+	passing := AutoApprove{Rule: plan.Rule{Name: "passing ones", Authors: []string{"renovate"}, Checks: []plan.Checks{plan.ChecksPassing}}, Query: "auto"}
+	f := fixture()
+	f.searches["auto"] = []model.PR{p}
+	f.info = map[model.PRKey]func(*model.MergeInfo){p.Key: func(mi *model.MergeInfo) {
+		mi.Checks = []model.Check{{Name: "policy-bot: main", State: model.CheckPending}}
+	}}
+	set := testSettings()
+	set.AutoApprove = []AutoApprove{pendingOnes, passing}
+	set.Plan.ApprovalChecks = []string{"policy-bot*"}
+	r := &fakeRunner{results: map[model.PRKey]runner.Event{}}
+	m := New(f, r, &fakeClaude{}, keymap.Default(), nil, set)
+	run(m, m.Init())
+	if got := approvedKeys(r); len(got) != 1 || got[0] != "acme/api#41" {
+		t.Fatalf("approved %v; want acme/api#41 by the second rule", got)
+	}
+	if n := m.notes[0]; len(n.items) != 1 || !strings.Contains(n.items[0].text, "passing ones") {
+		t.Errorf("note items = %+v; want the second rule named", n.items)
+	}
+}

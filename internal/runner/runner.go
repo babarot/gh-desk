@@ -840,11 +840,13 @@ func (j *job) approveAfterJobs() {
 }
 
 // forApprove decides approving the pull request read as mi: as a rule's
-// approval when the item is one. Failing checks are let through here: the
-// popup, or the rule, already left them out.
+// approval when the item is one. A confirmed approval lets failing checks
+// through here, as the popup already left them out unless the user let
+// them in. A rule's is judged on them at every read, since a required
+// status that fails while it waits is not a job, which the wait stops on.
 func (j *job) forApprove(mi model.MergeInfo) plan.Decision {
 	if j.it.Auto {
-		return plan.ForAutoApprove(mi, j.it.PR, j.r.opt.Viewer, true, j.r.opt.Settings)
+		return plan.ForAutoApprove(mi, j.it.PR, j.r.opt.Viewer, j.it.IncludeFailing, j.r.opt.Settings)
 	}
 	return plan.ForApprove(mi, j.it.PR, j.r.opt.Viewer, true, j.r.opt.Settings)
 }

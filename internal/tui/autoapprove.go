@@ -71,12 +71,14 @@ type autoInfoMsg struct {
 	err   error
 }
 
-// autoCand is a pull request a rule may approve, with the first rule
-// that matches it.
+// autoCand is a pull request rules may approve, with each rule that
+// says Yes or cannot tell yet, in the order written: one that cannot tell
+// may say No once the checks are read with their details, and the next
+// one is asked then.
 type autoCand struct {
-	pr   model.PR
-	rule int
-	// body is its description, when the rule reads it.
+	pr    model.PR
+	rules []int
+	// body is its description, when a rule reads it.
 	body string
 }
 
@@ -177,7 +179,7 @@ func (m *Model) autoRead(msg autoReadMsg) tea.Cmd {
 	}
 	var cmds []tea.Cmd
 	now := m.set.Now()
-	seen := map[model.PRKey]bool{}
+	at := map[model.PRKey]int{}
 	var cands []autoCand
 	for i, f := range msg.found {
 		r := m.set.AutoApprove[i]
@@ -186,7 +188,7 @@ func (m *Model) autoRead(msg autoReadMsg) tea.Cmd {
 			cmds = append(cmds, m.pushNote("⚠", fmt.Sprintf("auto-approve %q: its search finds %d, and only the first %d are judged; narrow its query", ruleName(r.Rule), f.total, autoMax), nil))
 		}
 		for _, p := range f.prs {
-			if seen[p.Key] || m.auto.tried[autoTry{p.Key, p.HeadOID}] {
+			if m.auto.tried[autoTry{p.Key, p.HeadOID}] {
 				continue
 			}
 			body, known := msg.bodies[p.ID]
@@ -198,8 +200,16 @@ func (m *Model) autoRead(msg autoReadMsg) tea.Cmd {
 			}
 			switch r.Rule.Judge(p, m.viewer, facts) {
 			case plan.Yes, plan.Pending:
-				seen[p.Key] = true
-				cands = append(cands, autoCand{pr: p, rule: i, body: body})
+				j, ok := at[p.Key]
+				if !ok {
+					j = len(cands)
+					at[p.Key] = j
+					cands = append(cands, autoCand{pr: p})
+				}
+				cands[j].rules = append(cands[j].rules, i)
+				if known {
+					cands[j].body = body
+				}
 			}
 		}
 	}
@@ -232,13 +242,22 @@ func (m *Model) autoDecide(msg autoInfoMsg) tea.Cmd {
 	var dry []noteItem
 	rules := map[model.PRKey]string{}
 	for _, c := range msg.cands {
-		p, r := c.pr, m.set.AutoApprove[c.rule]
-		log := m.log.With(logging.KeyOp, "auto_approve", logging.KeyPR, p.Key.String(), logging.KeyRule, ruleName(r.Rule), logging.KeyHead, p.HeadOID)
+		p := c.pr
 		mi, ok := msg.info[p.ID]
 		if !ok {
 			continue
 		}
-		if why := m.autoHeld(p, c.body, mi, r, now); why != "" {
+		// The first rule that matches on what was read again approves.
+		var r AutoApprove
+		var why string
+		for _, i := range c.rules {
+			r = m.set.AutoApprove[i]
+			if why = m.autoHeld(p, c.body, mi, r, now); why != notMatched {
+				break
+			}
+		}
+		log := m.log.With(logging.KeyOp, "auto_approve", logging.KeyPR, p.Key.String(), logging.KeyRule, ruleName(r.Rule), logging.KeyHead, p.HeadOID)
+		if why != "" {
 			log.Debug("auto-approve passed over", "why", why)
 			continue
 		}
@@ -288,7 +307,7 @@ func (m *Model) autoHeld(p model.PR, body string, mi model.MergeInfo, r AutoAppr
 	}
 	facts := plan.Facts{Body: body, BodyKnown: true, Now: now, ApprovalKnown: true, AwaitingApproval: plan.AwaitingApproval(mi.Checks, m.set.Plan.ApprovalChecks)}
 	if r.Rule.Judge(p, m.viewer, facts) != plan.Yes {
-		return "the rule does not match"
+		return notMatched
 	}
 	if n, ok := m.unread[p.Key]; ok {
 		facts.Reason = n.Reason
@@ -307,6 +326,10 @@ func (m *Model) autoHeld(p model.PR, body string, mi model.MergeInfo, r AutoAppr
 	}
 	return ""
 }
+
+// notMatched is why a rule passes over a pull request it no longer
+// matches, when the next rule that may is asked.
+const notMatched = "the rule does not match"
 
 // autoNoteTitle is the title of the notification of a batch of approvals
 // rules asked for.

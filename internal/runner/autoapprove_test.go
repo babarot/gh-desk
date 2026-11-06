@@ -58,6 +58,9 @@ func TestAutoApprovalJudgedAgainBeforeItIsSent(t *testing.T) {
 		{name: "dismissed", change: func(mi *model.MergeInfo) {
 			mi.ViewerReview = &model.ViewerReview{State: model.ReviewDismissed, Commit: mi.HeadOID}
 		}, why: "dismissed on this head"},
+		{name: "status failed", change: func(mi *model.MergeInfo) {
+			mi.Checks = append(mi.Checks, model.Check{Name: "ci/external", State: model.CheckFailure, Kind: model.KindStatus, Required: true})
+		}, why: "checks failing"},
 		{name: "labeled", excluded: func(_ context.Context, _ model.PR, mi model.MergeInfo) (string, error) {
 			if len(mi.Checks) > 0 && mi.Checks[0].Run == model.RunCompleted {
 				return "hold", nil
