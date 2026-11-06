@@ -37,15 +37,14 @@ func Reference() string {
 	var b strings.Builder
 	b.WriteString(referenceHead)
 
-	b.WriteString("\n## [[tabs]]\n\n")
-	b.WriteString(mdText("The tabs, in the order shown; the keys 1 to 9 go to them. Tabs given replace the default four, and one of them must be the inbox. At most "+fmt.Sprint(MaxTabs)+" tabs.") + "\n\n")
-	b.WriteString("```toml\n" + defaultTabs + "```\n")
-	writeElems(&b, "tabs")
-
-	b.WriteString("\n## [[select]]\n\n")
-	b.WriteString(mdText(`The rules S offers to select pull requests, besides the built-in "approved by me". A pull request matches a rule when it meets every key the rule gives. These rules are the default; rules written in the file replace all of them, and `+"`select = []`"+` at the top of the file leaves none:`) + "\n\n")
-	b.WriteString("```toml\n" + defaultSelect + "```\n")
-	writeElems(&b, "select")
+	for _, a := range arrayTables {
+		fmt.Fprintf(&b, "\n## [[%s]]\n\n", a.Name)
+		b.WriteString(mdText(a.Doc) + "\n")
+		if code := pageCode[a.Name]; code != "" {
+			b.WriteString("\n```toml\n" + code + "```\n")
+		}
+		writeElems(&b, a.Name)
+	}
 
 	for _, t := range tables {
 		fmt.Fprintf(&b, "\n## [%s]\n", t.Name)
@@ -71,6 +70,9 @@ func Reference() string {
 	}
 	return b.String()
 }
+
+// pageCode are the defaults the page shows of an array of tables.
+var pageCode = map[string]string{"tabs": defaultTabs, "select": defaultSelect}
 
 func writeElems(b *strings.Builder, name string) {
 	b.WriteString("\n| Key | Type | |\n|---|---|---|\n")
