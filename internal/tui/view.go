@@ -10,6 +10,7 @@ import (
 	"github.com/charmbracelet/x/ansi"
 
 	"github.com/babarot/gh-desk/internal/claude"
+	"github.com/babarot/gh-desk/internal/model"
 	"github.com/babarot/gh-desk/internal/plan"
 	"github.com/babarot/gh-desk/internal/tui/keymap"
 )
@@ -378,7 +379,7 @@ func (m *Model) headerParts() []string {
 	if len(m.progress) > 0 {
 		return parts
 	}
-	parts = append(parts, m.groupCounts(t)...)
+	parts = append(parts, m.groupCounts(t, t.prs)...)
 	if t.loaded && t.total > len(t.prs) && !t.inbox {
 		parts = append(parts, fmt.Sprintf("showing %d of %d", len(t.prs), t.total))
 	}
@@ -388,14 +389,14 @@ func (m *Model) headerParts() []string {
 	return parts
 }
 
-// groupCounts count the pull requests of t by group, a group with none left
-// out as in the list; none when t has no groups or is not read yet.
-func (m *Model) groupCounts(t *tab) []string {
+// groupCounts count prs of t by group, a group with none left out as in the
+// list; none when t has no groups or is not read yet.
+func (m *Model) groupCounts(t *tab, prs []model.PR) []string {
 	if !t.grouped || !t.loaded {
 		return nil
 	}
 	n := map[plan.Group]int{}
-	for _, p := range t.prs {
+	for _, p := range prs {
 		n[plan.GroupOf(p, m.viewer)]++
 	}
 	var parts []string

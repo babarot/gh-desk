@@ -677,9 +677,15 @@ func (m *Model) triageWelcome(height int) []string {
 	if p, _, ok := m.currentPR(); ok {
 		where += sep + st.dim.Render("cursor ") + st.muted.Render(fmt.Sprintf("%s#%d", m.repoName(p), p.Key.Number))
 	}
+	// What a triage is given, as it counts it: without what the tab leaves
+	// out.
+	var prs []model.PR
+	for _, r := range m.listed(t) {
+		prs = append(prs, r.pr)
+	}
 	right := []string{
-		st.title.Render(t.name) + "  " + st.dim.Render(pullRequests(len(m.listed(t)))),
-		st.dim.Render(strings.Join(m.groupCounts(t), " · ")),
+		st.title.Render(t.name) + "  " + st.dim.Render(pullRequests(len(prs))),
+		st.dim.Render(strings.Join(m.groupCounts(t, prs), " · ")),
 		where,
 	}
 	top, head := m.clawdBeside(stand(pDefault), clawdW, right)

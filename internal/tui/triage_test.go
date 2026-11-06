@@ -11,6 +11,7 @@ import (
 	"github.com/charmbracelet/x/ansi"
 
 	"github.com/babarot/gh-desk/internal/claude"
+	"github.com/babarot/gh-desk/internal/model"
 	"github.com/babarot/gh-desk/internal/runner"
 	"github.com/babarot/gh-desk/internal/tui/askbox"
 	"github.com/babarot/gh-desk/internal/tui/keymap"
@@ -715,5 +716,26 @@ func TestAskGhost(t *testing.T) {
 	press(m, "right")
 	if tr.input.Value() != "bo" {
 		t.Errorf("right inside the text filled in %q", tr.input.Value())
+	}
+}
+
+// The welcome counts what a triage is given, by group as a whole.
+func TestTriageWelcomeCountsTheSameRows(t *testing.T) {
+	m, _ := startWith(t, fixture(), keymap.Default())
+	fakeClaudeOf(t, m)
+	tab := m.tab()
+	listed := m.listed(tab)
+	tab.prs = append(tab.prs, tab.prs...)
+	if len(m.listed(tab)) == 0 || len(listed) == 0 {
+		t.Fatal("nothing listed")
+	}
+	press(m, "C")
+	var prs []model.PR
+	for _, r := range m.listed(tab) {
+		prs = append(prs, r.pr)
+	}
+	s := screen(m)
+	if !strings.Contains(s, pullRequests(len(prs))) || !strings.Contains(s, strings.Join(m.groupCounts(tab, prs), " · ")) {
+		t.Errorf("counts differ:\n%s", s)
 	}
 }
