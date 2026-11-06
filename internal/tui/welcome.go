@@ -8,38 +8,6 @@ import (
 	"github.com/babarot/gh-desk/internal/model"
 )
 
-// mascot is Clawd, Claude's mascot, drawn as Claude Code draws it: three lines,
-// each as wide as the others.
-const mascot = " ▐▛███▜▌ \n▝▜█████▛▘\n  ▘▘ ▝▝  "
-
-// mascotPoses are what Clawd does while the worktree is made, one pose
-// after another: it waves and blinks. Each pose is drawn as mascot is,
-// with lines as wide as mascot's, so the text beside it stays put.
-var mascotPoses = []string{
-	mascot,
-	mascot,
-	" ▐▛███▜▌ \n▗▜█████▛▖\n  ▘▘ ▝▝  ",
-	mascot,
-	" ▐▛███▜▌ \n▗▜█████▛▖\n  ▘▘ ▝▝  ",
-	mascot,
-	" ▐█████▌ \n▝▜█████▛▘\n  ▘▘ ▝▝  ",
-	mascot,
-}
-
-// mascotEvery is how long Clawd keeps a pose. It is longer than any
-// moving spinner's step, so the screen, drawn at the spinner's pace while
-// the worktree is made, never skips a pose.
-const mascotEvery = 250 * time.Millisecond
-
-// mascotNow is Clawd as it is drawn now: moving while c's worktree is
-// made, still otherwise and when the spinner chosen does not move.
-func (m *Model) mascotNow(c *chatScreen) string {
-	if !c.preparing || m.spinStyle.still {
-		return mascot
-	}
-	return mascotPoses[int(m.set.Now().UnixMilli()/mascotEvery.Milliseconds())%len(mascotPoses)]
-}
-
 // welcomeGap is the space between Clawd and the text beside it.
 const welcomeGap = 3
 
@@ -51,8 +19,14 @@ const welcomeGap = 3
 func (m *Model) welcomeLines(c *chatScreen, height int) []string {
 	st, p := m.st, c.PR()
 	margin := spaces(chatMargin)
-	art := strings.Split(m.mascotNow(c), "\n")
-	beside := spaces(len([]rune(art[0])) + welcomeGap)
+	f, _ := m.clawdNow(c)
+	w := clawdW
+	if c.scene != nil {
+		w = c.scene.width()
+	}
+	clawd := st.clawdLines(f, w)
+	above, art := clawd[0], clawd[1:]
+	beside := spaces(w + welcomeGap)
 	var right []string
 	right = append(right, st.title.Render(p.Key.String())+"  "+st.dim.Render(shownTitle(p.Title)))
 	who := st.dim.Render(p.Author+" wants to merge ") + st.muted.Render(p.HeadRef) + st.dim.Render(" into ") + st.muted.Render(p.BaseRef)
@@ -62,7 +36,7 @@ func (m *Model) welcomeLines(c *chatScreen, height int) []string {
 	right = append(right, who, m.welcomeFacts(p))
 	var head []string
 	for i, a := range art {
-		head = append(head, margin+st.mascot.Render(a)+spaces(welcomeGap)+right[i])
+		head = append(head, margin+a+spaces(welcomeGap)+right[i])
 	}
 	var worktree []string
 	switch {
@@ -87,11 +61,15 @@ func (m *Model) welcomeLines(c *chatScreen, height int) []string {
 		}
 	}
 	// A line is left above, as a conversation leaves one under the
-	// pane's top edge.
+	// pane's top edge; what Clawd holds up is drawn in it.
+	top := ""
+	if strings.TrimSpace(above) != "" {
+		top = margin + above
+	}
 	for _, L := range [][]string{
-		append(append(append([]string{""}, head...), worktree...), asks...),
-		append(append([]string{""}, head...), worktree...),
-		append([]string{""}, head...),
+		append(append(append([]string{top}, head...), worktree...), asks...),
+		append(append([]string{top}, head...), worktree...),
+		append([]string{top}, head...),
 	} {
 		if len(L) <= height {
 			return L
@@ -150,4 +128,55 @@ func decisionWord(d model.ReviewDecision) string {
 		return "review required"
 	}
 	return ""
+}
+
+// clawdNow is the frame Clawd is drawn in for c now, and whether it is
+// moving. It plays c's scene from when the worktree began to be made;
+// with no scene, or with the spinner chosen still, it stands still, in
+// the frame its scene ends in once the worktree's end came.
+func (m *Model) clawdNow(c *chatScreen) (clawdFrame, bool) {
+	s := c.scene
+	if s == nil {
+		return stand(pDefault), false
+	}
+	ended := time.Duration(-1)
+	if !c.endedAt.IsZero() {
+		ended = c.endedAt.Sub(c.sceneAt)
+	}
+	ok := c.prepareErr == ""
+	if m.spinStyle.still {
+		switch {
+		case ended < 0:
+			return stand(pDefault), false
+		case ok:
+			return s.readyRest, false
+		}
+		return s.failRest, false
+	}
+	return s.at(m.set.Now().Sub(c.sceneAt), ended, ok)
+}
+
+// clawdMoving reports whether Clawd moves in the claude pane shown.
+func (m *Model) clawdMoving() bool {
+	c := m.chat()
+	if !m.claudeShown() || c == nil || busy(c) || c.Started() {
+		return false
+	}
+	_, moving := m.clawdNow(c)
+	return moving
+}
+
+// pickScene picks one of Clawd's themes for a worktree being made, not
+// the one picked last, and its parts.
+func (m *Model) pickScene() *clawdScene {
+	ts := clawdThemes()
+	i := m.set.Pick(len(ts))
+	if m.lastTheme >= 0 && len(ts) > 1 {
+		i = m.set.Pick(len(ts) - 1)
+		if i >= m.lastTheme {
+			i++
+		}
+	}
+	m.lastTheme = i
+	return newScene(ts[i], m.set.Pick)
 }

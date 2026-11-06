@@ -2,7 +2,6 @@ package tui
 
 import (
 	"errors"
-	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -20,8 +19,10 @@ func TestClaudeWelcome(t *testing.T) {
 	m.Update(tea.WindowSizeMsg{Width: 130, Height: 60})
 	m.pane.height = 30
 	press(m, "i")
+	// Clawd's scene is over a minute on.
+	m.set.Now = func() time.Time { return now.Add(time.Minute) }
 	s := screen(m)
-	for _, want := range []string{"▐▛███▜▌", "acme/api#12  Add retries to the client", "alice wants to merge", "worktree ready at", "try"} {
+	for _, want := range []string{"▝▜██████▀", "acme/api#12  Add retries to the client", "alice wants to merge", "worktree ready at", "try"} {
 		if !strings.Contains(s, want) {
 			t.Errorf("welcome lacks %q:\n%s", want, s)
 		}
@@ -49,7 +50,7 @@ func TestClaudeWelcome(t *testing.T) {
 		t.Errorf("tab replaced the user's text with %q", c.input.Value())
 	}
 	press(m, "enter")
-	if s := screen(m); strings.Contains(s, "▐▛███▜▌") || strings.Contains(s, qs[2]) {
+	if s := screen(m); strings.Contains(s, "▝▜██████▀") || strings.Contains(s, qs[2]) {
 		t.Errorf("the welcome stays after a question:\n%s", s)
 	}
 }
@@ -100,53 +101,5 @@ func TestMascotKeepsClaudesColor(t *testing.T) {
 		if got := newStyles(p).mascot.GetForeground(); got != claudeOrange() {
 			t.Errorf("theme %s draws Clawd in %v", name, got)
 		}
-	}
-}
-
-// Clawd moves while the worktree is made, keeping its width so the text
-// beside it stays put, and stands still otherwise and when the spinner
-// chosen does not move.
-func TestMascotMovesWhileTheWorktreeIsMade(t *testing.T) {
-	width := func(s string) []int {
-		var w []int
-		for L := range strings.SplitSeq(s, "\n") {
-			w = append(w, len([]rune(L)))
-		}
-		return w
-	}
-	for i, p := range mascotPoses {
-		if got, want := width(p), width(mascot); !slices.Equal(got, want) {
-			t.Errorf("pose %d is %v wide, mascot %v", i, got, want)
-		}
-	}
-	for name, sp := range spinners {
-		if !sp.still && sp.every > mascotEvery {
-			t.Errorf("spinner %s steps slower than Clawd's poses, which it would skip", name)
-		}
-	}
-	m, _ := startWith(t, fixture(), keymap.Default())
-	press(m, "i")
-	c := m.chat()
-	now := time.Now()
-	poses := func() map[string]bool {
-		seen := map[string]bool{}
-		for i := range len(mascotPoses) {
-			at := now.Add(time.Duration(i) * mascotEvery)
-			m.set.Now = func() time.Time { return at }
-			seen[m.mascotNow(c)] = true
-		}
-		return seen
-	}
-	if got := poses(); len(got) != 1 || !got[mascot] {
-		t.Errorf("Clawd moves with the worktree made: %d poses", len(got))
-	}
-	c.preparing = true
-	m.spinStyle = spinner("dots")
-	if got := poses(); len(got) < 2 {
-		t.Errorf("Clawd stands still while the worktree is made")
-	}
-	m.spinStyle = spinner("off")
-	if got := poses(); len(got) != 1 || !got[mascot] {
-		t.Errorf("Clawd moves with the spinner off: %d poses", len(got))
 	}
 }

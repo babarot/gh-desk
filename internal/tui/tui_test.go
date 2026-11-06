@@ -357,6 +357,8 @@ func testSettings() Settings {
 			AttentionPaths: []string{".github/workflows/*"}},
 		Rules:   []plan.Rule{{Name: "octo bumps", Authors: []string{"renovate"}, Packages: []string{"octo/app"}}},
 		CanWait: true, Language: "English",
+		// Clawd's scenes are the first theme's, with the first of each part.
+		Pick: func(int) int { return 0 },
 		// Ticks only redraw; tests read the screen when they like.
 		Tick: func(time.Duration, tea.Msg) tea.Cmd { return nil },
 	}

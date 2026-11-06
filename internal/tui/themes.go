@@ -12,6 +12,10 @@ import (
 // theme: the color is Claude's, not the theme's (ADR-081).
 func claudeOrange() color.Color { return lipgloss.Color("#d97757") }
 
+// clawdBlack is the black Clawd's eyes are drawn in, as Claude Code draws
+// them on every theme (ADR-090).
+func clawdBlack() color.Color { return lipgloss.Color("#000000") }
+
 // themes are the color schemes that can be chosen by name.
 var themes = map[string]palette{
 	// default is gh-desk's own: Catppuccin Mocha made lighter, so that

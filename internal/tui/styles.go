@@ -86,8 +86,12 @@ type styles struct {
 	code, block, blockLang lipgloss.Style
 	// band is the background of a question in the chat.
 	band lipgloss.Style
-	// mascot is Clawd, Claude's mascot, in Claude's color on every theme.
-	mascot lipgloss.Style
+	// mascot is Clawd, Claude's mascot, in Claude's color on every theme;
+	// mascotEye is the orange over Clawd's black, where its eyes are, and
+	// mascotLid the black over the orange, an eye shut (ADR-090).
+	mascot, mascotEye, mascotLid lipgloss.Style
+	// cloth is a flag's checked cloth that Clawd holds.
+	cloth lipgloss.Style
 }
 
 func newStyles(p palette) styles {
@@ -137,6 +141,9 @@ func newStyles(p palette) styles {
 		blockLang: lipgloss.NewStyle().Background(p.surface0).Foreground(p.overlay),
 		band:      lipgloss.NewStyle().Background(p.surface0),
 		mascot:    fg(claudeOrange()),
+		mascotEye: fg(claudeOrange()).Background(clawdBlack()),
+		mascotLid: fg(clawdBlack()).Background(claudeOrange()),
+		cloth:     fg(p.text).Background(p.surface1),
 	}
 }
 

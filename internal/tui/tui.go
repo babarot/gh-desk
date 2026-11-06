@@ -7,6 +7,7 @@ import (
 	"cmp"
 	"context"
 	"log/slog"
+	"math/rand/v2"
 	"time"
 
 	tea "charm.land/bubbletea/v2"
@@ -173,6 +174,9 @@ type Settings struct {
 	Refresh time.Duration
 	// Now is the clock, for tests; nil is time.Now.
 	Now func() time.Time
+	// Pick gives a number below n at random, for tests; nil is
+	// rand.IntN.
+	Pick func(n int) int
 	// Tick asks for msg after d, for tests; nil is tea.Tick.
 	Tick func(d time.Duration, msg tea.Msg) tea.Cmd
 	// LogRecords are the records written to the log while gh-desk runs;
@@ -318,6 +322,8 @@ type Model struct {
 	spinning bool
 	// spinStyle is the spinner of Settings.Spinner.
 	spinStyle spinnerStyle
+	// lastTheme is the theme of Clawd's last scene, -1 before the first.
+	lastTheme int
 	// fresh are the rows a reading again added or changed, marked until
 	// the time given; freshGen tells the last mark's end from earlier ones.
 	fresh    map[model.PRKey]time.Time
@@ -330,12 +336,15 @@ func New(src Source, run Runner, cl Claude, km keymap.Map, log *slog.Logger, set
 	if set.Now == nil {
 		set.Now = time.Now
 	}
+	if set.Pick == nil {
+		set.Pick = rand.IntN
+	}
 	if log == nil {
 		log = logging.Discard()
 	}
 	m := &Model{src: src, run: run, claude: cl, cautions: map[string]string{}, fresh: map[model.PRKey]time.Time{}, keys: km, log: log, set: set, ctx: context.Background(), unread: map[model.PRKey]model.Notification{},
 		selected: map[model.PRKey]selection{}, progress: map[model.PRKey]progress{}, batches: map[string]*batchState{},
-		merged: map[model.PRKey]bool{}, held: map[model.PRKey]heldSort{}, refreshed: map[int]time.Time{}}
+		merged: map[model.PRKey]bool{}, held: map[model.PRKey]heldSort{}, refreshed: map[int]time.Time{}, lastTheme: -1}
 	m.chats = map[model.PRKey]*chatScreen{}
 	m.chatState = chat.NewState(set.Chats, log, set.Now, chatStatus{m})
 	m.st = newStyles(theme(set.ThemeDark))
