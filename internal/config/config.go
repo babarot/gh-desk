@@ -123,6 +123,9 @@ type List struct {
 	// Columns are the columns shown, in their order; pr and title among
 	// them.
 	Columns []string
+	// Bell rings the terminal's bell when a notification in the inbox is
+	// newly unread.
+	Bell bool
 }
 
 // Menu configures the menu of enter.
@@ -541,6 +544,7 @@ type (
 		StaleDays  *Days     `toml:"stale_days"`
 		HomeOwners *[]string `toml:"home_owners"`
 		Columns    *[]string `toml:"columns"`
+		Bell       *bool     `toml:"bell"`
 	}
 	menuDoc struct {
 		Actions *[]string `toml:"actions"`
@@ -649,6 +653,7 @@ func Parse(path string, src []byte) (File, Problems, error) {
 	set(&cfg.List.StaleDays, d.List.StaleDays)
 	set(&cfg.List.HomeOwners, d.List.HomeOwners)
 	set(&cfg.List.Columns, d.List.Columns)
+	set(&cfg.List.Bell, d.List.Bell)
 	set(&cfg.Menu.Actions, d.Menu.Actions)
 	set(&cfg.Preview.Height, d.Preview.Height)
 	set(&cfg.Preview.Tab, d.Preview.Tab)

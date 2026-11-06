@@ -131,6 +131,12 @@ list of `pr`, `title`, `author`, `ci`, `review`, `why`, `size`, `age` · Default
 
 The columns shown, in the order given; "pr" and "title" are needed. WHY shows on grouped tabs and the inbox only, and AUTHOR not on a tab of your own pull requests. On a narrow terminal SIZE goes first, then AUTHOR.
 
+### list.bell
+
+boolean · Default: `false`
+
+Ring the terminal's bell when a reading of the inbox finds a notification newly unread: new, read before, or updated since. The first reading after start does not ring it, nor one of the excluded. The terminal rings, flashes or stays quiet as it is set to.
+
 ## [menu]
 
 ### menu.actions
