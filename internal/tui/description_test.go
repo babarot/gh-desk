@@ -46,9 +46,10 @@ func TestMarkdownLines(t *testing.T) {
 }
 
 // A line does not start with the comma after code, nor with a Japanese
-// full stop; each goes down with what comes before it, and the lines of
-// a list item stay under its text.
-func TestWrapKeepsWhatMayNotStartALine(t *testing.T) {
+// full stop; each goes down with what comes before it. A line does not
+// end with an opening bracket; it goes down with what comes after it. The
+// lines of a list item stay under its text.
+func TestWrapKeepsWhatMayNotStartOrEndALine(t *testing.T) {
 	m := start(t, fixture(), keymap.Default())
 	for _, tc := range []struct {
 		body  string
@@ -57,6 +58,8 @@ func TestWrapKeepsWhatMayNotStartALine(t *testing.T) {
 	}{
 		{"through `validator.ts`, then `open.ts`", 20, []string{"through", "validator.ts, then", "open.ts"}},
 		{"読み込みを直しました。", 20, []string{"読み込みを直しまし", "た。"}},
+		{"あいうえ（かき）", 10, []string{"あいうえ", "（かき）"}},
+		{"あいうえ「かき」", 10, []string{"あいうえ", "「かき」"}},
 		{"1. see `a.go`, `b.go`, and `c.go`", 11, []string{"1. see", "   a.go,", "   b.go,", "   and c.go"}},
 	} {
 		var got []string
@@ -65,6 +68,38 @@ func TestWrapKeepsWhatMayNotStartALine(t *testing.T) {
 		}
 		if strings.Join(got, "\n") != strings.Join(tc.want, "\n") {
 			t.Errorf("%q at %d:\n%s\nwant:\n%s", tc.body, tc.width, strings.Join(got, "\n"), strings.Join(tc.want, "\n"))
+		}
+	}
+}
+
+// A table wider than the pane narrows its widest column, so that every
+// column shows; what does not fit in a cell is cut with "…". A column is
+// not narrowed below minColumn, and what is still too wide is cut at the
+// edge.
+func TestTableNarrowsItsWidestColumn(t *testing.T) {
+	m := start(t, fixture(), keymap.Default())
+	body := "| step | note | done |\n|---|---|---|\n| 1 | " + strings.Repeat("long text ", 6) + "| yes |"
+	for _, tc := range []struct {
+		width int
+		want  []string
+	}{
+		{30, []string{
+			"step │ note             │ done",
+			"─────┼──────────────────┼─────",
+			"1    │ long text long … │ yes",
+		}},
+		{20, []string{
+			"step │ note       │…",
+			"─────┼────────────┼…",
+			"1    │ long text… │…",
+		}},
+	} {
+		var got []string
+		for _, l := range m.markdownLines(body, tc.width) {
+			got = append(got, strings.TrimRight(ansi.Strip(l.text), " "))
+		}
+		if strings.Join(got, "\n") != strings.Join(tc.want, "\n") {
+			t.Errorf("at %d:\n%s\nwant:\n%s", tc.width, strings.Join(got, "\n"), strings.Join(tc.want, "\n"))
 		}
 	}
 }
