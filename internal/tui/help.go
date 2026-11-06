@@ -133,13 +133,19 @@ func (m *Model) openHelp() {
 // helpLines are the lines of the ? popup w cells wide, with the title of
 // the section each header line is of ("" for the other lines). A section
 // whose keys work on the screen ? was opened from is drawn in color and
-// says so; the others are grayed. The first line, before a blank one,
-// tells the version and the homepage, to the right.
+// says so; the others are grayed. The first lines, before a blank one,
+// tell the version and the homepage, and a newer release with how to
+// update to it, to the right.
 func (m *Model) helpLines(w int) ([]string, []string) {
 	st := m.st
 	about := st.dim.Render(fmt.Sprintf("gh-desk %s · %s", cmp.Or(m.set.Version, "dev"), homepage))
-	lines := []string{strings.Repeat(" ", max(w-lipgloss.Width(about), 0)) + about, ""}
-	heads := []string{"", ""}
+	lines := []string{strings.Repeat(" ", max(w-lipgloss.Width(about), 0)) + about}
+	if v := m.newerRelease(); v != "" {
+		out := st.green.Render(v+" is out") + st.dim.Render(" · ") + st.key.Render(m.set.Release.How)
+		lines = append(lines, strings.Repeat(" ", max(w-lipgloss.Width(out), 0))+out)
+	}
+	lines = append(lines, "")
+	heads := make([]string, len(lines))
 	for _, s := range m.helpSections() {
 		mark, title, key, what := st.blue, st.blue.Bold(true), st.key, st.muted
 		if !s.works {

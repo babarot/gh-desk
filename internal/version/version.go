@@ -9,6 +9,14 @@ import (
 // Version is the current release.
 const Version = "0.8.0"
 
+// Source is "release" in the builds the release workflow makes, set at link
+// time by GoReleaser, and empty in any other build. It is not state: no
+// code writes it. Only a release build looks for newer releases.
+var Source string
+
+// IsRelease reports whether this build is one the release workflow made.
+func IsRelease() bool { return Source == "release" }
+
 // String is the version with the commit it was built from, when the build
 // knows it: a build in a clone does. go install does not, but it tells the
 // version of the module installed, a tag or one naming the commit.

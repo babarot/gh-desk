@@ -60,6 +60,10 @@ A few keys to start with:
 
 Nothing is written to GitHub without a confirm popup that lists what will be done to each pull request.
 
+## Update
+
+Installed as a gh extension or with Nix, gh-desk reads its releases on GitHub once a day and tells in the notifications (`n`) when a newer one is out, with how to update this install: `gh extension upgrade desk`, or Nix for a Nix install. The `?` list says so too, under the version. The first launch after an update tells of the update. `release.check = false` in the config file, or `GH_NO_EXTENSION_UPDATE_NOTIFIER` set as for gh, turns it off; a build with `go install` or from a clone never reads them.
+
 ## Next
 
 - [Tabs and groups](guides/tabs.md), to make the tabs your own

@@ -178,6 +178,9 @@ type Settings struct {
 	// LogRecords are the records written to the log while gh-desk runs;
 	// nil has none.
 	LogRecords LogRecords
+	// Release has gh-desk tell of its own releases; nil tells of none, as
+	// for a build that is not a release or with release.check off.
+	Release *Release
 }
 
 // LogRecords are the latest records of the log, the same the log file
@@ -195,8 +198,10 @@ type Model struct {
 	keys   keymap.Map
 	log    *slog.Logger
 	set    Settings
-	ctx    context.Context
-	st     styles
+	// rel is what this run knows of gh-desk's releases.
+	rel releases
+	ctx context.Context
+	st  styles
 
 	viewer string
 	tabs   []*tab
@@ -376,7 +381,7 @@ func Run(ctx context.Context, src Source, run Runner, cl Claude, km keymap.Map, 
 
 // Init asks for the terminal's background, the viewer, and every tab.
 func (m *Model) Init() tea.Cmd {
-	cmds := []tea.Cmd{m.tick(), m.resume(), m.configNote(), m.takeLock()}
+	cmds := []tea.Cmd{m.tick(), m.resume(), m.configNote(), m.releaseStart(), m.takeLock()}
 	if m.viewer == "" {
 		cmds = append(cmds, m.loadViewer())
 	} else {
@@ -453,6 +458,8 @@ func (m *Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, m.event(msg)
 	case lockMsg:
 		return m, m.tookLock(msg)
+	case releasesMsg:
+		return m, m.gotReleases(msg)
 	case toastMsg:
 		if m.toast == msg.n {
 			m.toast = nil

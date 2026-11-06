@@ -496,6 +496,16 @@
       },
       "type": "object"
     },
+    "release": {
+      "additionalProperties": false,
+      "properties": {
+        "check": {
+          "description": "Read gh-desk's releases on GitHub once a day, and tell in the notifications of a newer release and, after an update, of the update. Only the builds of a release read them; GH_NO_EXTENSION_UPDATE_NOTIFIER turns it off too.",
+          "type": "boolean"
+        }
+      },
+      "type": "object"
+    },
     "review": {
       "additionalProperties": false,
       "properties": {

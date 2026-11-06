@@ -319,6 +319,14 @@ boolean · Default: `true`
 
 Run a light over the text that says what is going on, such as refreshing… or thinking…; the screen is drawn more often while something is read.
 
+## [release]
+
+### release.check
+
+boolean · Default: `true`
+
+Read gh-desk's releases on GitHub once a day, and tell in the notifications of a newer release and, after an update, of the update. Only the builds of a release read them; GH_NO_EXTENSION_UPDATE_NOTIFIER turns it off too.
+
 ## [log]
 
 ### log.level

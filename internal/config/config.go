@@ -81,6 +81,7 @@ type File struct {
 	Exclude []Exclude
 	Claude  Claude
 	Theme   Theme
+	Release Release
 	Log     Log
 	Cache   Cache
 	// Keys is [keys] as written; the keymap package checks it.
@@ -376,6 +377,13 @@ type Theme struct {
 	Shimmer bool `toml:"shimmer"`
 }
 
+// Release configures what gh-desk tells of its own releases.
+type Release struct {
+	// Check reads gh-desk's releases now and then, and tells of a newer
+	// one and of an update. Only a release build reads them.
+	Check bool `toml:"check"`
+}
+
 // Log configures the log file.
 type Log struct {
 	// Level is debug, info, warn or error; --debug and GH_DESK_LOG_LEVEL
@@ -451,11 +459,12 @@ func Default() File {
 		Review:      Review{MarkDone: true},
 		Merge: Merge{Methods: []string{"merge", "squash", "rebase"}, AutoMerge: true,
 			BlockedTimeout: dur("30m"), UpdateBranch: "humans"},
-		Bulk:   Bulk{AttentionPaths: globs(".github/workflows/*", "CODEOWNERS", ".github/CODEOWNERS", "docs/CODEOWNERS")},
-		Claude: Claude{Command: "claude", Model: "opus", AllowedTools: []string{"Read", "Grep", "Glob"}, Language: "English", ReleaseNotesCheck: true},
-		Theme:  Theme{Dark: "default", Light: "latte", Spinner: "dots", Shimmer: true},
-		Log:    Log{Level: "info"},
-		Cache:  Cache{Dir: defaultCacheDir()},
+		Bulk:    Bulk{AttentionPaths: globs(".github/workflows/*", "CODEOWNERS", ".github/CODEOWNERS", "docs/CODEOWNERS")},
+		Claude:  Claude{Command: "claude", Model: "opus", AllowedTools: []string{"Read", "Grep", "Glob"}, Language: "English", ReleaseNotesCheck: true},
+		Theme:   Theme{Dark: "default", Light: "latte", Spinner: "dots", Shimmer: true},
+		Release: Release{Check: true},
+		Log:     Log{Level: "info"},
+		Cache:   Cache{Dir: defaultCacheDir()},
 	}
 }
 
@@ -512,6 +521,7 @@ type (
 		Exclude     []excludeDoc   `toml:"exclude"`
 		Claude      Claude         `toml:"claude"`
 		Theme       Theme          `toml:"theme"`
+		Release     Release        `toml:"release"`
 		Log         Log            `toml:"log"`
 		Cache       Cache          `toml:"cache"`
 		Keys        map[string]any `toml:"keys"`
@@ -624,7 +634,7 @@ func Load(path string) (File, Problems, error) {
 // the file in the problems reported.
 func Parse(path string, src []byte) (File, Problems, error) {
 	cfg := Default()
-	d := doc{Claude: cfg.Claude, Theme: cfg.Theme, Log: cfg.Log, Cache: cfg.Cache}
+	d := doc{Claude: cfg.Claude, Theme: cfg.Theme, Release: cfg.Release, Log: cfg.Log, Cache: cfg.Cache}
 	if err := toml.NewDecoder(bytes.NewReader(src)).DisallowUnknownFields().Decode(&d); err != nil {
 		return File{}, nil, Report(path, decodeProblems(err))
 	}
@@ -653,7 +663,7 @@ func Parse(path string, src []byte) (File, Problems, error) {
 	set(&cfg.Merge.BlockedTimeout, d.Merge.BlockedTimeout)
 	set(&cfg.Merge.UpdateBranch, d.Merge.UpdateBranch)
 	set(&cfg.Bulk.AttentionPaths, d.Bulk.AttentionPaths)
-	cfg.Claude, cfg.Theme, cfg.Log, cfg.Cache = d.Claude, d.Theme, d.Log, d.Cache
+	cfg.Claude, cfg.Theme, cfg.Release, cfg.Log, cfg.Cache = d.Claude, d.Theme, d.Release, d.Log, d.Cache
 	cfg.Keys = keysFrom(d.Keys)
 	var sps Problems
 	cfg.Select, sps = selectFrom(d.Select)

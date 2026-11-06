@@ -1,0 +1,151 @@
+-- screen --
+desk // @me    1 review (3)   2 mine (1)   3 involved (0)   4 inbox (1)                           1 to you · 1 to a team · 1 bots
+    PR                        TITLE                                  AUTHOR          CI  REVIEW   WHY         SIZE          AGE
+  ▾ requested from you 1
+▎ ● api#12                    Add retries to the client              alice           ✓   ○        you         +40 −3         3h
+  ▸ requested from a team 1
+  ▸ bots 1                       ╭ keys · z fold · ? esc close ─────────────────────────────────╮
+                                 │           gh-desk 0.7.0 · https://github.com/babarot/gh-desk │
+                                 │                     0.8.0 is out · gh extension upgrade desk │
+                                 │                                                              │
+                                 │ ▾ the list and its preview · works here ──────────────────── │
+                                 │   tab             next tab                                   │
+                                 │   shift+tab       previous tab                               │
+                                 │   1 2 3 4         tab 1 to 4                                 │
+                                 │   enter           actions                                    │
+                                 │   l right         unfold group / next pane tab               │
+                                 │   h left          fold group / previous pane tab             │
+                                 │   space           select                                     │
+                                 │   V               select shown                               │
+                                 │   S               select by rule                             │
+                                 │   u               clear selection                            │
+╭  overview   diff (2)  ─────────│   A               approve                                    │───────── acme/api#12 · J/K · v ╮
+│ #12 Add retries to the client  │   M               merge                                      │tus    open                     │
+│ ▾ description ─────────────────│   D               ready for review                           │uested me @core                 │
+│ │ What                         │   c               comment                                    │cks    ✓1                       │
+│ │ Retry failed requests.       │   R               review                                     │e      +40 −3 · 2 files         │
+│ ╵                              │   C               triage with claude                         │nch    retries                  │
+│                                │   i               ask claude about it                        │       → main                   │
+│ ▾ checks (1)  ✓1 ──────────────╰─────────────────────────────────────────── ↓ 24 · j k wheel ─╯ated   3h ago                   │
+│ │ ✓ test                                                                                  │                                    │
+│ ╵                                                                                         │                                    │
+│                                                                                           │                                    │
+╰────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+
+enter actions · space select · S select by rule · C triage with claude · L log · / filter · ? keys
+-- styles --
+L1 0-129 fg=#706f87
+L2 4-127 fg=#706f87
+L3 2-24 fg=#706f87
+L4 0-127 fg=#706f87
+L5 2-27 fg=#706f87
+L6 2-10 fg=#706f87
+L6 33-34 fg=#96bfff
+L6 35-62 fg=#d0d6e8 bold
+L6 63-97 fg=#96bfff
+L7 33-34 fg=#96bfff
+L7 45-95 fg=#706f87
+L7 96-97 fg=#96bfff
+L8 33-34 fg=#96bfff
+L8 55-67 fg=#b5f0b0
+L8 68-69 fg=#706f87
+L8 70-95 fg=#96bfff bold
+L8 96-97 fg=#96bfff
+L9 33-97 fg=#96bfff
+L10 33-36 fg=#96bfff
+L10 37-61 fg=#96bfff bold
+L10 62-74 fg=#706f87
+L10 75-95 fg=#525270
+L10 96-97 fg=#96bfff
+L11 33-34 fg=#96bfff
+L11 37-40 fg=#96bfff bold
+L11 53-61 fg=#8888a4
+L11 96-97 fg=#96bfff
+L12 33-34 fg=#96bfff
+L12 37-46 fg=#96bfff bold
+L12 53-65 fg=#8888a4
+L12 96-97 fg=#96bfff
+L13 33-34 fg=#96bfff
+L13 37-44 fg=#96bfff bold
+L13 53-63 fg=#8888a4
+L13 96-97 fg=#96bfff
+L14 33-34 fg=#96bfff
+L14 37-42 fg=#96bfff bold
+L14 53-60 fg=#8888a4
+L14 96-97 fg=#96bfff
+L15 33-34 fg=#96bfff
+L15 37-44 fg=#96bfff bold
+L15 53-81 fg=#8888a4
+L15 96-97 fg=#96bfff
+L16 33-34 fg=#96bfff
+L16 37-43 fg=#96bfff bold
+L16 53-83 fg=#8888a4
+L16 96-97 fg=#96bfff
+L17 33-34 fg=#96bfff
+L17 37-42 fg=#96bfff bold
+L17 53-59 fg=#8888a4
+L17 96-97 fg=#96bfff
+L18 33-34 fg=#96bfff
+L18 37-38 fg=#96bfff bold
+L18 53-65 fg=#8888a4
+L18 96-97 fg=#96bfff
+L19 33-34 fg=#96bfff
+L19 37-38 fg=#96bfff bold
+L19 53-67 fg=#8888a4
+L19 96-97 fg=#96bfff
+L20 33-34 fg=#96bfff
+L20 37-38 fg=#96bfff bold
+L20 53-68 fg=#8888a4
+L20 96-97 fg=#96bfff
+L21 0-33 fg=#706f87
+L21 33-34 fg=#96bfff
+L21 37-38 fg=#96bfff bold
+L21 53-60 fg=#8888a4
+L21 96-97 fg=#96bfff
+L21 97-130 fg=#706f87
+L22 0-31 fg=#706f87
+L22 33-34 fg=#96bfff
+L22 37-38 fg=#96bfff bold
+L22 53-58 fg=#8888a4
+L22 96-97 fg=#96bfff
+L22 97-130 fg=#706f87
+L23 0-33 fg=#706f87
+L23 33-34 fg=#96bfff
+L23 37-38 fg=#96bfff bold
+L23 53-69 fg=#8888a4
+L23 96-97 fg=#96bfff
+L23 97-130 fg=#706f87
+L24 0-8 fg=#706f87
+L24 33-34 fg=#96bfff
+L24 37-38 fg=#96bfff bold
+L24 53-60 fg=#8888a4
+L24 96-97 fg=#96bfff
+L24 97-130 fg=#706f87
+L25 0-26 fg=#706f87
+L25 33-34 fg=#96bfff
+L25 37-38 fg=#96bfff bold
+L25 53-59 fg=#8888a4
+L25 96-97 fg=#96bfff
+L25 97-130 fg=#706f87
+L26 0-3 fg=#706f87
+L26 33-34 fg=#96bfff
+L26 37-38 fg=#96bfff bold
+L26 53-71 fg=#8888a4
+L26 96-97 fg=#96bfff
+L26 97-130 fg=#706f87
+L27 0-1 fg=#706f87
+L27 33-34 fg=#96bfff
+L27 37-38 fg=#96bfff bold
+L27 53-72 fg=#8888a4
+L27 96-97 fg=#96bfff
+L27 104-130 fg=#706f87
+L28 0-33 fg=#706f87
+L28 33-77 fg=#96bfff
+L28 78-94 fg=#706f87
+L28 95-97 fg=#96bfff
+L28 97-130 fg=#706f87
+L29 0-130 fg=#706f87
+L30 0-130 fg=#706f87
+L31 0-130 fg=#706f87
+L32 0-130 fg=#706f87
+L34 0-98 fg=#706f87

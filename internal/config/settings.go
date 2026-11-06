@@ -379,6 +379,7 @@ var tables = []table{
 	{Name: "claude", Doc: "C and i ask Claude Code (claude -p, with the account you are signed in with). i, or ask claude about it in the menu of enter, reviews the pull request under the cursor in a worktree of its head. C plans what to show and select in the tab shown, with no tools, and answers in the language you ask in; enter applies the plan, and an approve or a merge in it opens the confirm popup. Claude's own tools only read: no settings files are loaded, its file tools see only the worktree and the skills of plugins, and it has none that run commands. The conversation also takes the MCP servers of [claude.mcp] and the skills of plugins, which can do whatever they are made to."},
 	{Name: "claude.mcp", Doc: "The MCP servers of the conversation about a pull request: gh-desk's own, and yours."},
 	{Name: "theme"},
+	{Name: "release"},
 	{Name: "log"},
 	{Name: "cache"},
 }
@@ -459,6 +460,9 @@ var settings = []setting{
 		Doc: `The spinner shown while something is read: "dots" (default) ⠋⠙⠹, "dense" ⣾⣽⣻, "bounce" ⠁⠂⠄, "snake" ⠉⠙⠚, "jump" ⢄⢂⢁, "fill" ⣀⣤⣶, "sand" ⡀⣀⣤, "line" |/-\, "arc" ◜◠◝, "quarter" ◴◷◶, "block" ▖▘▝, "star" ✶✸✹, or "off", a ⋯ that does not move and is left out before a line that says what is going on. The progress pane of the log viewer turns a spinner and marks of its own, which "off" stops too.`},
 	{Key: "theme.shimmer", Kind: boolKind{}, Value: func(f File) any { return f.Theme.Shimmer },
 		Doc: "Run a light over the text that says what is going on, such as refreshing… or thinking…; the screen is drawn more often while something is read."},
+
+	{Key: "release.check", Kind: boolKind{}, Value: func(f File) any { return f.Release.Check },
+		Doc: "Read gh-desk's releases on GitHub once a day, and tell in the notifications of a newer release and, after an update, of the update. Only the builds of a release read them; GH_NO_EXTENSION_UPDATE_NOTIFIER turns it off too."},
 
 	{Key: "log.level", Kind: stringKind{}, Value: func(f File) any { return f.Log.Level },
 		Doc: `How much goes to the log file: "debug", "info" (default), "warn" or "error". --debug and GH_DESK_LOG_LEVEL take precedence. gh desk log prints where the file is.`},
