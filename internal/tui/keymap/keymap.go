@@ -142,6 +142,10 @@ var Defaults = []Def{
 	{"draft_review", ScopeChat, []string{"ctrl+r"}, "draft review"},
 	{"open_claude", ScopeChat, []string{"ctrl+o"}, "open in claude code"},
 	{"chat_restart", ScopeChat, []string{"ctrl+l"}, "start over"},
+	// up and down recall questions too, as nav's own keys cannot be set
+	// here; these are the keys that do nothing else in a text box.
+	{"history_prev", ScopeChat, []string{"ctrl+p"}, "previous question"},
+	{"history_next", ScopeChat, []string{"ctrl+n"}, "next question"},
 	// Read while Claude answers, when there is no text box.
 	{"chat_close", ScopeChat, []string{"backspace"}, "back, claude goes on"},
 

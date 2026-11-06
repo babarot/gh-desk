@@ -17,6 +17,7 @@ import (
 	"github.com/babarot/gh-desk/internal/model"
 	"github.com/babarot/gh-desk/internal/plan"
 	"github.com/babarot/gh-desk/internal/runner"
+	"github.com/babarot/gh-desk/internal/tui/askbox"
 	"github.com/babarot/gh-desk/internal/tui/chat"
 	"github.com/babarot/gh-desk/internal/tui/keymap"
 )
@@ -59,6 +60,13 @@ type triage struct {
 	follow bool
 	// model is the model of the last answer.
 	model string
+	// history are the questions asked, the newest first, and recall the
+	// place among them. askedID is the ID of the last question, and kept
+	// closes once it is written.
+	history []askbox.Entry
+	recall  askbox.Recall
+	askedID string
+	kept    chan struct{}
 }
 
 // triageTurn is a request and Claude's reply, or why there is none.
@@ -81,6 +89,7 @@ type triageMsg struct {
 
 // openTriage opens the popup, ready for a request.
 func (m *Model) openTriage() tea.Cmd {
+	var load tea.Cmd
 	if m.claude == nil {
 		m.refuse("Claude is not available")
 		return nil
@@ -91,15 +100,16 @@ func (m *Model) openTriage() tea.Cmd {
 		ta.ShowLineNumbers = false
 		ta.SetHeight(3)
 		m.triage = &triage{session: claude.NewSession(), input: ta, follow: true}
+		load = m.loadHistory()
 	}
 	tr := m.triage
 	tr.open = true
 	// A request still on its way, or a plan that came while the popup was
 	// closed, is shown as it stands.
 	if tr.asking || len(tr.actions) > 0 {
-		return nil
+		return load
 	}
-	return m.typeTriage()
+	return tea.Batch(load, m.typeTriage())
 }
 
 func (m *Model) typeTriage() tea.Cmd {
@@ -140,12 +150,16 @@ func (m *Model) triageKey(msg tea.KeyPressMsg) tea.Cmd {
 				return nil
 			}
 			tr.input.Reset()
+			tr.recall.Leave()
 			tr.typing = false
 			tr.input.Blur()
 			return m.askTriage(q)
+		case m.recallKey(&tr.recall, &tr.input, tr.history, msg):
+			return nil
 		case is("fill_suggestion"):
 			if s := nextSuggestion(claude.TriageQuestions(), tr.input.Value()); s != "" {
 				tr.input.SetValue(s)
+				tr.recall.Leave()
 			}
 			return nil
 		case is("chat_restart"):
@@ -160,9 +174,7 @@ func (m *Model) triageKey(msg tea.KeyPressMsg) tea.Cmd {
 			}
 			return nil
 		}
-		var cmd tea.Cmd
-		tr.input, cmd = tr.input.Update(msg)
-		return cmd
+		return editAsk(&tr.recall, &tr.input, msg)
 	case tr.asking:
 		switch {
 		case k == keymap.Back && !tr.stopping:
@@ -204,11 +216,12 @@ func (m *Model) askTriage(request string) tea.Cmd {
 	r := claude.Request{Session: tr.session, First: !tr.started, Prompt: claude.TriagePrompt(snap, request)}
 	n := tr.asked
 	m.log.Debug("triage asked", logging.KeyOp, "triage", logging.KeyClaude, tr.session, "rows", len(seen))
-	return func() tea.Msg {
+	ask := func() tea.Msg {
 		defer cancel()
 		a, err := m.claude.Triage(ctx, r)
 		return triageMsg{asked: n, answer: a, err: err}
 	}
+	return tea.Batch(ask, m.keepQuestion(request))
 }
 
 // stopTriage stops the request on its way. It is still asking until its
@@ -273,8 +286,9 @@ func (m *Model) triageAnswered(msg triageMsg) tea.Cmd {
 	if p.Model != "" {
 		tr.model = p.Model
 	}
+	keep := m.keepReply(p.Reply)
 	m.log.Debug("triage answered", logging.KeyOp, "triage", logging.KeyClaude, tr.session, "actions", len(p.Actions))
-	return nil
+	return keep
 }
 
 // snapshot is the tab shown as Claude is given it, and the pull requests
@@ -547,7 +561,11 @@ func (m *Model) renderTriage() ([]string, int) {
 		if nextSuggestion(claude.TriageQuestions(), tr.input.Value()) != "" {
 			as = append(as, "fill_suggestion")
 		}
-		foot = append(foot, m.footKeys(as, "send", "back"))
+		keys := m.footKeys(as, "send", "back")
+		if hint := m.recallHint(&tr.recall, tr.history); hint != "" {
+			keys = hint + st.dim.Render(" · ") + keys
+		}
+		foot = append(foot, keys)
 	default:
 		for i, s := range m.checkPlan() {
 			num := fmt.Sprintf("%d ", i+1)

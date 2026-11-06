@@ -416,7 +416,7 @@ var ready = map[keymap.Action]bool{
 	"preview_down": true, "preview_up": true, "preview_grow": true, "preview_shrink": true, "next_file": true, "prev_file": true, "preview_tab": true, "fold": true, "preview": true,
 	"confirm": true, "next_kind": true, "post": true, "editor": true, "accept": true, "complete": true, "erase": true, "erase_word": true,
 	"log": true, "log_this_pr": true,
-	"triage": true, "triage_apply": true, "triage_more": true, "ask_claude": true, "fill_suggestion": true, "draft_review": true, "open_claude": true, "chat_close": true,
+	"triage": true, "triage_apply": true, "triage_more": true, "ask_claude": true, "fill_suggestion": true, "history_prev": true, "history_next": true, "draft_review": true, "open_claude": true, "chat_close": true,
 }
 
 // hints is the key line of what has the focus. It holds the ways in (the
@@ -428,6 +428,7 @@ func (m *Model) hints() string {
 	// esc is told where it steps back; on the list it clears a selection or
 	// a filter, and is not told when it would quit.
 	back := "back"
+	recall := ""
 	switch {
 	case m.bulk != nil && m.bulk.approves():
 		as = []keymap.Action{"confirm", "include_failing"}
@@ -453,6 +454,7 @@ func (m *Model) hints() string {
 			if nextSuggestion(claude.TriageQuestions(), m.triage.input.Value()) != "" {
 				as = append(as, "fill_suggestion")
 			}
+			recall = m.recallHint(&m.triage.recall, m.triage.history)
 		case m.triage.asking:
 			as = []keymap.Action{"chat_close"}
 			if !m.triage.stopping {
@@ -474,6 +476,7 @@ func (m *Model) hints() string {
 			as = append(as, "fill_suggestion")
 		}
 		as = append(as, "draft_review", "open_claude")
+		recall = m.recallHint(&m.chat().recall, chatHistory(m.chat()))
 	case m.logv != nil:
 		as = []keymap.Action{"log_this_pr", "bottom", "log", "help"}
 		back = "close"
@@ -524,6 +527,9 @@ func (m *Model) hints() string {
 		} else {
 			head = append(head, part)
 		}
+	}
+	if recall != "" {
+		head = slices.Insert(head, min(1, len(head)), recall)
 	}
 	if back != "" {
 		tail = append(tail, m.st.key.Render(keymap.Back)+" "+m.st.muted.Render(back))

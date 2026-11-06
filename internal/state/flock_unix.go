@@ -8,6 +8,16 @@ import (
 	"syscall"
 )
 
+// waitLock waits for the lock of f, which goes when f is closed.
+func waitLock(f *os.File) error {
+	for {
+		err := syscall.Flock(int(f.Fd()), syscall.LOCK_EX)
+		if !errors.Is(err, syscall.EINTR) {
+			return err
+		}
+	}
+}
+
 // locks is whether a lock held here is seen by another process.
 const locks = true
 
