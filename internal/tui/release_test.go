@@ -112,14 +112,21 @@ func TestAnUpdateIsToldAtStart(t *testing.T) {
 	}
 }
 
-func TestNewSettingsAreToldOneByOne(t *testing.T) {
-	f := &fakeReleases{}
-	m := startReleases(t, &Release{Tell: true, Running: "0.8.0", Latest: "0.8.0", Told: "0.8.0", UpdatedFrom: "0.6.0", NewSettings: []string{"list.bell", "merge.x"}, Source: f})
-	got := strings.Join(noteTitles(m), "\n")
-	for _, want := range []string{"new setting list.bell · gh desk config reference list.bell", "new setting merge.x · gh desk config reference merge.x"} {
-		if !strings.Contains(got, want) {
-			t.Errorf("notes %q, want %q", got, want)
-		}
+func TestNewSettingsAreToldInOneNotification(t *testing.T) {
+	m := startReleases(t, &Release{Tell: true, Running: "0.8.0", Latest: "0.8.0", Told: "0.8.0", NewSettings: []string{"list.bell", "auto_approve"}, Source: &fakeReleases{}})
+	got := noteTitles(m)
+	if len(got) != 1 || got[0] != "✓ 2 new settings · gh desk config reference" {
+		t.Fatalf("notes %q", got)
+	}
+	if items := m.notes[0].items; len(items) != 2 || items[0].text != "list.bell" || items[1].text != "auto_approve" {
+		t.Errorf("items %+v", items)
+	}
+}
+
+func TestOneNewSettingNamesItsCommand(t *testing.T) {
+	m := startReleases(t, &Release{Tell: true, Running: "0.8.0", Latest: "0.8.0", Told: "0.8.0", NewSettings: []string{"list.bell"}, Source: &fakeReleases{}})
+	if got := noteTitles(m); len(got) != 1 || got[0] != "✓ new setting list.bell · gh desk config reference list.bell" {
+		t.Errorf("notes %q", got)
 	}
 }
 

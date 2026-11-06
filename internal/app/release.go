@@ -51,7 +51,7 @@ func releaseOf(cfg config.File, e env, log *slog.Logger) *tui.Release {
 		log.Debug("releases are not told of", logging.KeyOp, "release", "check", cfg.Release.Check, "notify", e.notify)
 		return r
 	}
-	r.Tell, r.Latest, r.Told, r.UpdatedFrom, r.NewSettings, r.Due = true, rec.Latest, rec.Told, from, added, rec.Due(time.Now())
+	r.Tell, r.Latest, r.Told, r.UpdatedFrom, r.NewSettings, r.Due = true, rec.Latest, rec.Told, from, config.Collapse(added), rec.Due(time.Now())
 	return r
 }
 

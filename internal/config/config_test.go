@@ -101,6 +101,43 @@ func TestManualIsTheDefaults(t *testing.T) {
 	}
 }
 
+func TestEveryArrayTableIsListed(t *testing.T) {
+	if len(arrayTables) != len(elems) {
+		t.Errorf("%d arrays of tables listed, %d in elems", len(arrayTables), len(elems))
+	}
+	for _, a := range arrayTables {
+		if len(elems[a.Name]) == 0 || a.Words == nil || a.Doc == "" {
+			t.Errorf("%s is not complete", a.Name)
+		}
+		if _, err := ManualOf(a.Name, "", Mark{}); err != nil {
+			t.Error(err)
+		}
+	}
+}
+
+func TestCollapse(t *testing.T) {
+	var whole []string
+	for _, e := range elems["exclude"] {
+		whole = append(whole, "exclude."+e.Key)
+	}
+	for _, tt := range []struct {
+		name string
+		in   []string
+		want []string
+	}{
+		{"a key", []string{"list.bell"}, []string{"list.bell"}},
+		{"a key of an array", []string{"select.max_lines", "exclude.max_lines"}, []string{"select.max_lines", "exclude.max_lines"}},
+		{"a whole array", append(slices.Clone(whole), "list.bell"), []string{"exclude", "list.bell"}},
+		{"a whole table", []string{"menu.actions"}, []string{"menu"}},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := Collapse(tt.in); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("Collapse = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestEveryNameHasAManual(t *testing.T) {
 	for _, name := range Names() {
 		if _, err := ManualOf(name, "", Mark{}); err != nil {

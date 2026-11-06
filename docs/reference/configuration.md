@@ -106,6 +106,36 @@ title = "(?i)lock file maintenance"
 | `requested` | list of strings | Whom a review must be asked of, one of them: "me", or a team as "@slug". |
 | `reasons` | list of `approval_requested`, `assign`, `author`, `ci_activity`, `comment`, `invitation`, `manual`, `member_feature_requested`, `mention`, `review_requested`, `security_advisory_credit`, `security_alert`, `state_change`, `subscribed`, `team_mention` | Reasons of a notification, one of which the row's must have; S has no notification, so [[select]] does not take it. |
 
+## [[exclude]]
+
+Rules that leave pull requests out of every tab, until a shows them. A pull request is left out when it meets every key of one of them. There are none by default.
+
+| Key | Type | |
+|---|---|---|
+| `name` | string | The rule's name, which a row it leaves out says; without one, the row says the rule's conditions. |
+| `repos` | list of strings | owner/repo globs the repository must match one of; * matches any part of the owner or the name. |
+| `authors` | list of strings | The logins the author must be one of; bots without app/. |
+| `title` | string | A regular expression the title must match, as written: a shortcode such as `:arrow_up:` is matched as itself, not as its emoji. |
+| `max_files` | integer, 1 or more | The most files it may change. |
+| `max_lines` | integer, 1 or more | The most lines it may add and delete together: the sum of the two numbers SIZE shows. |
+| `min_files` | integer, 1 or more | The least files it may change. |
+| `min_lines` | integer, 1 or more | The least lines it may add and delete together. |
+| `updated_within_days` | integer, 1 to 36500 | The most days, of 24 hours, since it was last updated: a label or a bot's comment updates it too. An old pull request updated lately matches. |
+| `created_within_days` | integer, 1 to 36500 | The most days, of 24 hours, since it was created. |
+| `updated_before_days` | integer, 1 to 36500 | The least days, of 24 hours, since it was last updated, as AGE counts them in a search tab. |
+| `created_before_days` | integer, 1 to 36500 | The least days, of 24 hours, since it was created. |
+| `bot` | boolean | true: the author must be a bot; false: a person. |
+| `mine` | boolean | true: it must be your own pull request; false: someone else's. |
+| `draft` | boolean | true: it must be a draft, which S never selects, so [[select]] does not take true; false: ready for review. |
+| `state` | list of `open`, `merged`, `closed` | The states it must be in one of: "open", "merged" or "closed"; S selects open ones only, so [[select]] takes "open" alone. |
+| `checks` | list of `passing`, `failing`, `pending` | The states its checks must be in one of: "passing" (passed, none at all, or only checks.approval pending), "failing" or "pending" (still running). |
+| `decision` | list of `approved`, `changes_requested`, `review_required`, `none` | The review decisions REVIEW shows, one of which it must have; "none" is none, as in a repository that requires no review. |
+| `labels` | list of strings | Labels one of which it must have. |
+| `approved_by_me` | boolean | true: your latest review must approve it, a person's pull request too, unlike the built-in "approved by me"; false: none of yours does. |
+| `reviewed_by_me` | boolean | true: you must have reviewed it, whatever the review said; false: you have not. |
+| `requested` | list of strings | Whom a review must be asked of, one of them: "me", or a team as "@slug". |
+| `reasons` | list of `approval_requested`, `assign`, `author`, `ci_activity`, `comment`, `invitation`, `manual`, `member_feature_requested`, `mention`, `review_requested`, `security_advisory_credit`, `security_alert`, `state_change`, `subscribed`, `team_mention` | Reasons of a notification, one of which the row's must have; S has no notification, so [[select]] does not take it. |
+
 ## [list]
 
 ### list.refresh
