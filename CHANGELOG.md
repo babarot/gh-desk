@@ -1,5 +1,9 @@
 # Changelog
 
+## [v0.9.0](https://github.com/babarot/gh-desk/compare/v0.8.0...v0.9.0) - 2026-11-06
+### New Features
+- Tell of a newer release and of an update in the notifications by @babarot in https://github.com/babarot/gh-desk/pull/79
+
 ## [v0.8.0](https://github.com/babarot/gh-desk/compare/v0.7.0...v0.8.0) - 2026-11-06
 ### New Features
 - Give Claude read-only tools over the pull request's repository by @babarot in https://github.com/babarot/gh-desk/pull/70
