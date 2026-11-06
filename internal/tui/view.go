@@ -460,7 +460,9 @@ func (m *Model) hints() string {
 				as = append(as, "complete")
 			}
 			recall = m.recallHint(&m.triage.recall, m.triage.history)
-			if m.triage.search != nil {
+			if len(m.askMenu()) > 0 {
+				as, recall, back = []keymap.Action{"accept", "complete"}, "", "close"
+			} else if m.triage.search != nil {
 				as, recall, back = []keymap.Action{"accept", "history_search"}, "", "cancel"
 			} else if len(m.triage.history) > 0 {
 				as = append(as, "history_search")

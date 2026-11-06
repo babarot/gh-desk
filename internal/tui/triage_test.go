@@ -739,3 +739,41 @@ func TestTriageWelcomeCountsTheSameRows(t *testing.T) {
 		t.Errorf("counts differ:\n%s", s)
 	}
 }
+
+// # and @ open a menu of what the tab holds, which fills in the word typed.
+func TestTriageMenu(t *testing.T) {
+	m := withHistory(t, nil)
+	press(m, "C", "a", "space", "#")
+	tr := m.triage
+	s := screen(m)
+	if !strings.Contains(s, "› api#12  Add retries to the client") || !strings.Contains(s, "close") {
+		t.Fatalf("no menu:\n%s", s)
+	}
+	press(m, "3", "enter")
+	if got := tr.input.Value(); got != "a api#30 " || len(tr.turns) != 0 {
+		t.Fatalf("value %q, turns %d", got, len(tr.turns))
+	}
+	press(m, "@", "ctrl+n", "tab")
+	if got := tr.input.Value(); !strings.HasPrefix(got, "a api#30 @") || !strings.HasSuffix(got, " ") || got == "a api#30 @" {
+		t.Fatalf("value %q", got)
+	}
+	tr.input.SetValue("#")
+	press(m, "esc")
+	if !tr.open || !tr.typing || !tr.menu.Closed() || strings.Contains(screen(m), "› api#12") {
+		t.Errorf("esc: open %v, typing %v, closed %v", tr.open, tr.typing, tr.menu.Closed())
+	}
+	press(m, "enter")
+	if len(tr.turns) != 1 {
+		t.Errorf("enter with the menu closed sent %d", len(tr.turns))
+	}
+}
+
+// i has no menu: # is typed as any character.
+func TestChatHasNoMenu(t *testing.T) {
+	m, _ := startWith(t, fixture(), keymap.Default())
+	fakeClaudeOf(t, m)
+	press(m, "i", "#", "1")
+	if s := screen(m); strings.Contains(s, "› api#12") {
+		t.Errorf("a menu in i:\n%s", s)
+	}
+}

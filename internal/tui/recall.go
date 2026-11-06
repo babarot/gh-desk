@@ -308,11 +308,7 @@ func searchRows(lines, most int) int { return max(min(most, lines-2), 1) }
 // where it would cover what is typed.
 func askGhost(in *textarea.Model, r *askbox.Recall, try []string, list []askbox.Entry) string {
 	v := in.Value()
-	if r.Active() || v == "" || in.Line() != in.LineCount()-1 {
-		return ""
-	}
-	last := v[strings.LastIndexByte(v, '\n')+1:]
-	if in.Column() != len([]rune(last)) {
+	if r.Active() || v == "" || cursorInside(in, v) {
 		return ""
 	}
 	return askbox.Ghost(v, try, list)
@@ -350,4 +346,88 @@ func (m *Model) askLines(in *textarea.Model, ghost string) []string {
 	g := ansi.Truncate(ghost, w-cur.X, "")
 	lines[cur.Y] = ansi.Cut(line, 0, cur.X) + m.st.dim.Background(bg).Render(g) + ansi.Cut(line, cur.X+ansi.StringWidth(g), w)
 	return lines
+}
+
+// askMenu are the choices for the word at the end of the text box of a
+// triage: the pull requests of the tab after #, its authors after @. They are
+// what Claude is given, so a question can name them; a conversation about
+// one pull request is not given the others, and has no menu.
+func (m *Model) askMenu() []askbox.Item {
+	tr := m.triage
+	v := tr.input.Value()
+	if tr.search != nil || tr.recall.Active() || tr.menu.For(v).Closed() || cursorInside(&tr.input, v) {
+		return nil
+	}
+	head, word := askbox.LastWord(v)
+	if len(word) == 0 {
+		return nil
+	}
+	q := strings.ToLower(word[1:])
+	var out []askbox.Item
+	seen := map[string]bool{}
+	for _, r := range m.listed(m.tab()) {
+		p := r.pr
+		switch word[0] {
+		case '#':
+			name := fmt.Sprintf("%s#%d", m.repoName(p), p.Key.Number)
+			title := safeLine(shownTitle(p.Title))
+			if strings.Contains(strings.ToLower(name), q) || strings.Contains(strings.ToLower(title), q) {
+				out = append(out, askbox.Item{Text: head + name + " ", Note: title})
+			}
+		case '@':
+			who := strings.TrimPrefix(p.Author, "app/")
+			if !seen[who] && strings.HasPrefix(strings.ToLower(who), q) {
+				seen[who] = true
+				out = append(out, askbox.Item{Text: head + "@" + who + " "})
+			}
+		}
+	}
+	return out
+}
+
+// cursorInside reports whether the cursor of in is anywhere but at the end of v.
+func cursorInside(in *textarea.Model, v string) bool {
+	last := v[strings.LastIndexByte(v, '\n')+1:]
+	return in.Line() != in.LineCount()-1 || in.Column() != len([]rune(last))
+}
+
+// askMenuKey handles a key while the menu is shown: it takes the keys that
+// choose, and any other goes to the text box.
+func (m *Model) askMenuKey(msg tea.KeyPressMsg) tea.Cmd {
+	tr, k := m.triage, msg.String()
+	is := func(a keymap.Action) bool { return m.keys.Matches(a, k) }
+	items := m.askMenu()
+	menu := tr.menu.For(tr.input.Value())
+	switch {
+	case k == keymap.Back:
+		menu.Close()
+	case is("accept"), is("complete"):
+		tr.input.SetValue(items[menu.At(len(items))].Text)
+	case is("history_next"), is("down") && msg.Text == "":
+		menu.Next(len(items))
+	case is("history_prev"), is("up") && msg.Text == "":
+		menu.Prev(len(items))
+	default:
+		return editAsk(&tr.recall, &tr.input, msg)
+	}
+	return nil
+}
+
+// menuLines are at most askbox.MenuRows of items, the one chosen among them
+// and marked, in width.
+func (m *Model) menuLines(items []askbox.Item, width int) []string {
+	st := m.st
+	at := m.triage.menu.At(len(items))
+	from, to := askbox.Shown(at, len(items), askbox.MenuRows)
+	var out []string
+	for i := from; i < to; i++ {
+		_, word := askbox.LastWord(strings.TrimRight(items[i].Text, " "))
+		line := strings.TrimRight(word+"  "+items[i].Note, " ")
+		if i == at {
+			out = append(out, st.mauve.Render("›")+" "+st.sub1.Render(ansi.Truncate(line, width-2, "…")))
+		} else {
+			out = append(out, "  "+st.dim.Render(ansi.Truncate(line, width-2, "…")))
+		}
+	}
+	return out
 }

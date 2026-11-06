@@ -66,6 +66,7 @@ type triage struct {
 	history []askbox.Entry
 	recall  askbox.Recall
 	search  *search
+	menu    askbox.Menu
 	askedID string
 	kept    chan struct{}
 }
@@ -136,6 +137,8 @@ func (m *Model) triageKey(msg tea.KeyPressMsg) tea.Cmd {
 	switch {
 	case tr.typing && tr.search != nil:
 		return m.searchKey(&tr.search, &tr.input, &tr.recall, tr.history, msg)
+	case tr.typing && len(m.askMenu()) > 0:
+		return m.askMenuKey(msg)
 	case tr.typing:
 		armed := tr.restart
 		tr.restart = false
@@ -565,8 +568,17 @@ func (m *Model) renderTriage() ([]string, int) {
 		foot = append(foot, m.searchLines(tr.search, tr.history, inner, searchRows(m.popupHeight()-3, triageSearchRows))...)
 		foot = append(foot, m.footKeys([]keymap.Action{"accept", "history_search"}, "fill in", "cancel"))
 	case tr.typing:
+		menu := m.askMenu()
 		ghost := askGhost(&tr.input, &tr.recall, claude.TriageQuestions(), tr.history)
+		if len(menu) > 0 {
+			ghost = ""
+		}
 		foot = append(foot, m.askLines(&tr.input, ghost)...)
+		if len(menu) > 0 {
+			foot = append(foot, m.menuLines(menu, inner)...)
+			foot = append(foot, m.footKeys([]keymap.Action{"accept"}, "fill in", "close"))
+			break
+		}
 		as := []keymap.Action{"accept"}
 		if ghost != "" || nextSuggestion(claude.TriageQuestions(), tr.input.Value()) != "" {
 			as = append(as, "complete")
