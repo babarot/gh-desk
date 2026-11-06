@@ -1248,3 +1248,116 @@ func TestCloseKeepsBranchGitHubDoesNotOffer(t *testing.T) {
 		t.Errorf("last event = %+v", e)
 	}
 }
+
+// pending makes a pull request wait for a required check until it was
+// read more than reads times.
+func pending(f *fakeGH, mi *model.MergeInfo, reads int) {
+	mi.MergeState = model.MergeBlocked
+	mi.Checks = []model.Check{{Name: "build", State: model.CheckPending, Required: true}}
+	prev := f.onRead
+	f.onRead = func(id string, m *model.MergeInfo, n int) {
+		if prev != nil {
+			prev(id, m, n)
+		}
+		if id == mi.ID && n > reads {
+			m.Checks[0].State, m.MergeState = model.CheckSuccess, model.MergeClean
+		}
+	}
+}
+
+// The merges of a repository wait their turn across batches, in the order
+// the batches started; other repositories and approvals go on aside.
+func TestOneRepositoryAtATimeAcrossBatches(t *testing.T) {
+	a, ia := pr("1", "api", 1, "alice")
+	b, ib := pr("2", "api", 2, "alice")
+	c, ic := pr("3", "api", 3, "alice")
+	d, id := pr("4", "web", 4, "alice")
+	e, ie := pr("5", "api", 5, "alice")
+	f := newFake(a, b, c, d, e)
+	pending(f, f.prs["1"], 8)
+	r := newRunner(f, newStore())
+	ctx := context.Background()
+	_, first := r.Start(ctx, Merge, []Item{ia, ib})
+	_, second := r.Start(ctx, Merge, []Item{ic, id})
+	_, third := r.StartReview(ctx, ReviewText{Event: model.EventApprove}, []Item{ie})
+	var mu sync.Mutex
+	evs := map[model.PRKey][]Event{}
+	var wg sync.WaitGroup
+	for _, ch := range []<-chan Event{first, second, third} {
+		wg.Go(func() {
+			for _, ev := range drain(t, ch) {
+				mu.Lock()
+				evs[ev.Key] = append(evs[ev.Key], ev)
+				mu.Unlock()
+			}
+		})
+	}
+	wg.Wait()
+	for _, k := range []model.PRKey{ia.PR.Key, ib.PR.Key, ic.PR.Key, id.PR.Key} {
+		if last(evs[k]).Result != Merged {
+			t.Errorf("%s: %+v", k, evs[k])
+		}
+	}
+	if last(evs[ie.PR.Key]).Result != Approved {
+		t.Errorf("api#5: %+v", evs[ie.PR.Key])
+	}
+	if evs[ic.PR.Key][0].Text != "after #2" {
+		t.Errorf("api#3 did not queue behind the first batch: %+v", evs[ic.PR.Key][0])
+	}
+	pos := func(s string) int {
+		return slices.IndexFunc(f.calls, func(c string) bool { return strings.HasPrefix(c, s) })
+	}
+	if pos("merge acme/api#1") > pos("review acme/api#2") || pos("merge acme/api#2") > pos("review acme/api#3") {
+		t.Errorf("api merges overlapped: %v", f.calls)
+	}
+	if pos("merge acme/web#4") > pos("merge acme/api#1") {
+		t.Errorf("web#4 waited for api: %v", f.calls)
+	}
+	if pos("review acme/api#5") > pos("merge acme/api#1") {
+		t.Errorf("the approval of api#5 waited for the merges: %v", f.calls)
+	}
+}
+
+// A pull request queued in one batch is not taken by another, and a batch
+// stopped while queued gives up its place.
+func TestQueuedIsClaimedAndCanceledLeaves(t *testing.T) {
+	a, ia := pr("1", "api", 1, "alice")
+	b, ib := pr("2", "api", 2, "alice")
+	c, ic := pr("3", "api", 3, "alice")
+	f := newFake(a, b, c)
+	pending(f, f.prs["1"], 1<<30)
+	r := newRunner(f, newStore())
+	ctxA, cancelA := context.WithCancel(context.Background())
+	defer cancelA()
+	_, first := r.Start(ctxA, Merge, []Item{ia})
+	ctxB, cancelB := context.WithCancel(context.Background())
+	_, second := r.Start(ctxB, Merge, []Item{ib})
+	// api#2 is queued behind api#1: a third batch cannot take it.
+	_, third := r.Start(context.Background(), Merge, []Item{ib, ic})
+	go func() {
+		time.Sleep(30 * time.Millisecond)
+		cancelB()
+		time.Sleep(30 * time.Millisecond)
+		cancelA()
+	}()
+	go func() {
+		for range first {
+		}
+	}()
+	go func() {
+		for range second {
+		}
+	}()
+	es := drain(t, third)
+	var skipped2, merged3 bool
+	for _, e := range es {
+		skipped2 = skipped2 || (e.Key == ib.PR.Key && e.Result == Skipped)
+		merged3 = merged3 || (e.Key == ic.PR.Key && e.Result == Merged)
+	}
+	if !skipped2 || !merged3 {
+		t.Errorf("events %+v (calls %v)", es, f.calls)
+	}
+	if slices.ContainsFunc(f.calls, func(c string) bool { return strings.Contains(c, "api#2") }) {
+		t.Errorf("api#2 was acted on: %v", f.calls)
+	}
+}

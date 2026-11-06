@@ -1,4 +1,4 @@
-# ADR-080: Claude's mascot keeps Claude's orange on every theme
+# ADR-081: Claude's mascot keeps Claude's orange on every theme
 
 ## Status
 
