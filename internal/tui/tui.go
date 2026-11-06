@@ -16,6 +16,7 @@ import (
 	"github.com/babarot/gh-desk/internal/model"
 	"github.com/babarot/gh-desk/internal/plan"
 	"github.com/babarot/gh-desk/internal/runner"
+	"github.com/babarot/gh-desk/internal/tui/askbox"
 	"github.com/babarot/gh-desk/internal/tui/chat"
 	"github.com/babarot/gh-desk/internal/tui/keymap"
 	"github.com/babarot/gh-desk/internal/tui/statusline"
@@ -176,6 +177,9 @@ type Settings struct {
 	// Chats keep the conversations with Claude; nil keeps them only while
 	// gh-desk runs.
 	Chats chat.Store
+	// History keeps the questions of a triage; nil keeps them only while
+	// gh-desk runs.
+	History askbox.Store
 	// Refresh is how often the shown tab is read again; zero turns it off.
 	Refresh time.Duration
 	// Now is the clock, for tests; nil is time.Now.
@@ -502,6 +506,12 @@ func (m *Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, m.heavyRead(msg)
 	case triageMsg:
 		return m, m.triageAnswered(msg)
+	case historyFailedMsg:
+		m.historyFailed("kept", msg.err)
+		return m, nil
+	case historyMsg:
+		m.historyLoaded(msg)
+		return m, nil
 	case tea.PasteMsg:
 		return m, m.paste(msg)
 	case tea.MouseMsg:
@@ -568,16 +578,12 @@ func (m *Model) paste(msg tea.PasteMsg) tea.Cmd {
 		m.cycle = filterCycle{}
 		m.tab().sel, m.tab().offset = 0, 0
 	case m.triage != nil && m.triage.typing:
-		var cmd tea.Cmd
-		m.triage.input, cmd = m.triage.input.Update(msg)
-		return cmd
+		return editAsk(&m.triage.recall, &m.triage.input, msg)
 	case m.compose != nil:
 		return m.compose.update(msg)
 	case m.typingChat():
 		c := m.chat()
-		var cmd tea.Cmd
-		c.input, cmd = c.input.Update(msg)
-		return cmd
+		return editAsk(&c.recall, &c.input, msg)
 	}
 	return nil
 }

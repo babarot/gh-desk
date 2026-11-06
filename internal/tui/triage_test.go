@@ -2,13 +2,16 @@ package tui
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"testing"
+	"time"
 
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/babarot/gh-desk/internal/claude"
 	"github.com/babarot/gh-desk/internal/runner"
+	"github.com/babarot/gh-desk/internal/tui/askbox"
 	"github.com/babarot/gh-desk/internal/tui/keymap"
 )
 
@@ -332,4 +335,223 @@ func fakeClaudeOf(t *testing.T, m *Model) *fakeClaude {
 		t.Fatalf("m.claude is %T, not *fakeClaude", m.claude)
 	}
 	return fc
+}
+
+// memoryHistory is a history kept in memory.
+type memoryHistory struct {
+	entries []askbox.Entry
+	replies map[string]string
+	err     error
+}
+
+func (h *memoryHistory) Load() ([]askbox.Entry, error) { return h.entries, h.err }
+func (h *memoryHistory) Add(e askbox.Entry) error {
+	h.entries = append([]askbox.Entry{e}, h.entries...)
+	return h.err
+}
+func (h *memoryHistory) Reply(id, text string) error {
+	if h.replies == nil {
+		h.replies = map[string]string{}
+	}
+	h.replies[id] = text
+	return h.err
+}
+
+func withHistory(t *testing.T, h askbox.Store) *Model {
+	t.Helper()
+	m, _ := startWith(t, fixture(), keymap.Default())
+	fakeClaudeOf(t, m).plan = `{"reply":"**Two** of them.\nMore.","actions":[]}`
+	m.set.History = h
+	return m
+}
+
+// up goes back through the questions kept, down comes back to what was
+// typed, and a key that types still types.
+func TestTriageRecall(t *testing.T) {
+	now := time.Now()
+	h := &memoryHistory{entries: []askbox.Entry{{Question: "newest", Tab: "mine", At: now.Add(-48 * time.Hour)}, {Question: "oldest"}}}
+	m := withHistory(t, h)
+	press(m, "C", "k", "j")
+	tr := m.triage
+	if got := tr.input.Value(); got != "kj" {
+		t.Fatalf("typed %q", got)
+	}
+	if !strings.Contains(screen(m), "up history 2") {
+		t.Errorf("no hint:\n%s", screen(m))
+	}
+	press(m, "up")
+	if got := tr.input.Value(); got != "newest" {
+		t.Fatalf("up gave %q", got)
+	}
+	if s := screen(m); !strings.Contains(s, "history 1/2") || !strings.Contains(s, "mine") {
+		t.Errorf("no place:\n%s", s)
+	}
+	press(m, "ctrl+p", "ctrl+p")
+	if got := tr.input.Value(); got != "oldest" {
+		t.Fatalf("ctrl+p gave %q", got)
+	}
+	press(m, "ctrl+n", "down")
+	if got := tr.input.Value(); got != "kj" || tr.recall.Active() {
+		t.Fatalf("back to %q, active %v", got, tr.recall.Active())
+	}
+	press(m, "up", "x")
+	if tr.recall.Active() || tr.input.Value() != "newestx" {
+		t.Errorf("after editing: %q, active %v", tr.input.Value(), tr.recall.Active())
+	}
+	press(m, "down")
+	if tr.input.Value() != "newestx" {
+		t.Errorf("down left the questions and changed %q", tr.input.Value())
+	}
+}
+
+// A question goes into the history as it is sent, and its first line of
+// answer after; one stopped stays, and a later launch reads them.
+func TestTriageKeepsQuestions(t *testing.T) {
+	h := &memoryHistory{}
+	m := withHistory(t, h)
+	press(m, "C", "b", "o", "t", "s", "enter")
+	if len(h.entries) != 1 || h.entries[0].Question != "bots" || h.entries[0].Tab != "review" {
+		t.Fatalf("entries %+v", h.entries)
+	}
+	if got := h.replies[h.entries[0].ID]; got != "Two of them." {
+		t.Errorf("reply %q", got)
+	}
+	if got := m.triage.history[0].Reply; got != "Two of them." {
+		t.Errorf("reply in memory %q", got)
+	}
+	press(m, "i", "b", "o", "t", "s", "enter")
+	if len(m.triage.history) != 1 {
+		t.Errorf("the same question twice: %+v", m.triage.history)
+	}
+	n := withHistory(t, h)
+	press(n, "C", "up")
+	if got := n.triage.input.Value(); got != "bots" {
+		t.Errorf("a later launch recalled %q", got)
+	}
+}
+
+// The line of an answer is written after its question, however late that
+// comes.
+func TestTriageKeepsTheAnswerAfterItsQuestion(t *testing.T) {
+	h := &slowHistory{added: make(chan struct{}), release: make(chan struct{}), replied: make(chan string, 1)}
+	m := withHistory(t, h)
+	press(m, "C", "a")
+	tr := m.triage
+	ask := m.keepQuestion("a")
+	reply := m.keepReply("the answer")
+	go reply()
+	go ask()
+	<-h.added
+	select {
+	case <-h.replied:
+		t.Fatal("the answer went before its question")
+	case <-time.After(20 * time.Millisecond):
+	}
+	close(h.release)
+	if got := <-h.replied; got != tr.askedID {
+		t.Errorf("replied to %q", got)
+	}
+}
+
+// slowHistory holds Add until release is closed.
+type slowHistory struct {
+	added, release chan struct{}
+	replied        chan string
+}
+
+func (h *slowHistory) Load() ([]askbox.Entry, error) { return nil, nil }
+func (h *slowHistory) Add(askbox.Entry) error {
+	close(h.added)
+	<-h.release
+	return nil
+}
+func (h *slowHistory) Reply(id, _ string) error {
+	h.replied <- id
+	return nil
+}
+
+// Questions asked while the history is read stay, before those read.
+func TestTriageHistoryReadLate(t *testing.T) {
+	m := withHistory(t, nil)
+	press(m, "C", "n", "e", "w", "enter")
+	m.Update(historyMsg{entries: []askbox.Entry{{Question: "old"}, {Question: "new"}}})
+	h := m.triage.history
+	if len(h) != 2 || h[0].Question != "new" || h[1].Question != "old" {
+		t.Errorf("history %+v", h)
+	}
+}
+
+// Starting over leaves the questions.
+func TestChatRestartLeavesTheQuestions(t *testing.T) {
+	m, _ := startWith(t, fixture(), keymap.Default())
+	fakeClaudeOf(t, m)
+	press(m, "i", "o", "n", "e", "enter")
+	c := m.chat()
+	press(m, "up", "ctrl+l", "ctrl+l")
+	if c.recall.Active() {
+		t.Error("still among the questions")
+	}
+	press(m, "down")
+}
+
+// A history that fails is told, and asking goes on.
+func TestTriageHistoryFails(t *testing.T) {
+	h := &memoryHistory{err: errors.New("disk full")}
+	m := withHistory(t, h)
+	press(m, "C")
+	if !strings.Contains(status(m), "could not be read") {
+		t.Errorf("status %q", status(m))
+	}
+	press(m, "a", "enter")
+	if !strings.Contains(status(m), "could not be kept") || len(m.triage.turns) != 1 {
+		t.Errorf("status %q, turns %d", status(m), len(m.triage.turns))
+	}
+}
+
+// i recalls the questions of its pull request, but not a drafted review,
+// whose prompt is not the text shown.
+func TestChatRecall(t *testing.T) {
+	m, _ := startWith(t, fixture(), keymap.Default())
+	fakeClaudeOf(t, m)
+	press(m, "i", "o", "n", "e", "enter")
+	c := m.chat()
+	press(m, "t", "w", "o", "enter", "ctrl+r")
+	press(m, "esc")
+	press(m, "i")
+	press(m, "up")
+	if got := c.input.Value(); got != "two" {
+		t.Fatalf("up gave %q", got)
+	}
+	press(m, "up", "up")
+	if got := c.input.Value(); got != "one" {
+		t.Fatalf("then %q", got)
+	}
+}
+
+// On a question over several rows, up and ctrl+p move the cursor until it
+// is on the first.
+func TestRecallOnlyFromTheEdges(t *testing.T) {
+	long := strings.Repeat("a long question ", 20)
+	h := &memoryHistory{entries: []askbox.Entry{{Question: "newest"}, {Question: "older"}}}
+	m := withHistory(t, h)
+	press(m, "C")
+	tr := m.triage
+	m.Update(tea.PasteMsg{Content: long})
+	press(m, "up")
+	if tr.recall.Active() {
+		t.Fatal("up recalled from the last row")
+	}
+	for range 30 {
+		press(m, "up")
+		if tr.recall.Active() {
+			break
+		}
+	}
+	if !tr.recall.Active() || tr.input.Value() != "newest" {
+		t.Errorf("value %q", tr.input.Value())
+	}
+	press(m, "down")
+	if tr.input.Value() != long {
+		t.Errorf("typed text not back: %q", tr.input.Value())
+	}
 }

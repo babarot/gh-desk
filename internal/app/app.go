@@ -30,6 +30,7 @@ import (
 	"github.com/babarot/gh-desk/internal/runner"
 	"github.com/babarot/gh-desk/internal/state"
 	"github.com/babarot/gh-desk/internal/tui"
+	"github.com/babarot/gh-desk/internal/tui/askbox"
 	"github.com/babarot/gh-desk/internal/tui/chat"
 	"github.com/babarot/gh-desk/internal/tui/keymap"
 	"github.com/babarot/gh-desk/internal/version"
@@ -179,6 +180,7 @@ func assemble(cfg config.File, warns []string, e env, log *slog.Logger) parts {
 	set.Version = version.String()
 	set.Host = e.host
 	set.Chats = chatStore{state.OpenChats(e.stateDir, e.host)}
+	set.History = historyStore{state.OpenHistory(e.stateDir, e.host)}
 	if !e.noCache {
 		set.Lists = openLists(cfg, e.host, e.viewer, log)
 	}
@@ -425,6 +427,20 @@ func gc(ctx context.Context, ws *claude.Workspace, chats *state.Chats, rs state.
 	return nil
 }
 
+// historyStore is the questions kept as the TUI asks for them.
+type historyStore struct{ *state.History }
+
+func (h historyStore) Load() ([]askbox.Entry, error) {
+	es, err := h.History.Load()
+	var out []askbox.Entry
+	for _, e := range es {
+		out = append(out, askbox.Entry(e))
+	}
+	return out, err
+}
+
+func (h historyStore) Add(e askbox.Entry) error { return h.History.Add(state.HistoryEntry(e)) }
+
 // chatStore is the conversations kept as the TUI asks for them.
 type chatStore struct{ *state.Chats }
 
@@ -670,7 +686,7 @@ var scopeWords = map[keymap.Scope]string{
 	keymap.ScopeConfirm: "A confirm popup",
 	keymap.ScopeTriage:  "The list, while Claude's plan is shown",
 	keymap.ScopeLog:     "The log viewer",
-	keymap.ScopeChat:    "The Claude screen",
+	keymap.ScopeChat:    "Asking Claude",
 	keymap.ScopeCompose: "Writing a review",
 	keymap.ScopeInput:   "Typing in the filter",
 	keymap.ScopeHelp:    "The ? list of keys",

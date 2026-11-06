@@ -16,6 +16,7 @@ import (
 	"github.com/babarot/gh-desk/internal/claude"
 	"github.com/babarot/gh-desk/internal/logging"
 	"github.com/babarot/gh-desk/internal/model"
+	"github.com/babarot/gh-desk/internal/tui/askbox"
 	"github.com/babarot/gh-desk/internal/tui/chat"
 	"github.com/babarot/gh-desk/internal/tui/keymap"
 )
@@ -50,8 +51,10 @@ type chatScreen struct {
 	// draft is a review drafted while the screen was elsewhere, opened
 	// when it is shown again.
 	draft *claude.Draft
-	// input is the text box, shown while nothing is on its way.
-	input textarea.Model
+	// input is the text box, shown while nothing is on its way, and
+	// recall the place among the questions asked in it.
+	input  textarea.Model
+	recall askbox.Recall
 	// cancel stops the question on its way, nil when none is; stopping is
 	// set once the user stopped it, until its end comes back.
 	cancel   context.CancelFunc
@@ -527,9 +530,12 @@ func (m *Model) chatTyping(msg tea.KeyPressMsg) tea.Cmd {
 	case is("page_down"):
 		c.scroll = max(0, c.scroll-m.pane.height/2)
 		return nil
+	case m.recallKey(&c.recall, &c.input, chatHistory(c), msg):
+		return nil
 	case is("fill_suggestion"):
 		if s := nextSuggestion(suggestions(c), c.input.Value()); s != "" {
 			c.input.SetValue(s)
+			c.recall.Leave()
 		}
 		return nil
 	case is("accept"):
@@ -538,11 +544,12 @@ func (m *Model) chatTyping(msg tea.KeyPressMsg) tea.Cmd {
 			return nil
 		}
 		c.input.Reset()
+		c.recall.Leave()
 		c.input.Blur()
 		return m.ask(c, q, q, false)
 	case is("draft_review"):
 		c.input.Blur()
-		return m.ask(c, "Draft the review.", claude.DraftPrompt, true)
+		return m.ask(c, draftShown, claude.DraftPrompt, true)
 	case is("chat_restart"):
 		switch {
 		case len(c.Turns()) == 0:
@@ -579,9 +586,22 @@ func (m *Model) chatTyping(msg tea.KeyPressMsg) tea.Cmd {
 	if !c.input.Focused() {
 		cmd = m.focusChat(c)
 	}
-	var typed tea.Cmd
-	c.input, typed = c.input.Update(msg)
-	return tea.Batch(cmd, typed)
+	return tea.Batch(cmd, editAsk(&c.recall, &c.input, msg))
+}
+
+// draftShown is what a draft of the review shows as its question. It is
+// not recalled: the prompt sent is another text, which this does not ask for.
+const draftShown = "Draft the review."
+
+// chatHistory are the questions asked in c, the newest first.
+func chatHistory(c *chatScreen) []askbox.Entry {
+	var out []askbox.Entry
+	for _, t := range slices.Backward(c.Turns()) {
+		if t.You && t.Text != draftShown {
+			out = append(out, askbox.Entry{Question: t.Text, At: t.At})
+		}
+	}
+	return askbox.Unique(out)
 }
 
 // chatWaiting handles a key while the claude pane shows a question on its
@@ -629,6 +649,7 @@ func (m *Model) restartChat(c *chatScreen) tea.Cmd {
 		return nil
 	}
 	c.draft, c.scroll = nil, 0
+	c.recall.Leave()
 	return nil
 }
 

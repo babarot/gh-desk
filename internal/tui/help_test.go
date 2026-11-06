@@ -45,7 +45,7 @@ func TestHelpUnfoldsTheScreenItWasOpenedFrom(t *testing.T) {
 	press(m, "esc", "i")
 	chat.NewState(nil, logging.Discard(), func() time.Time { return now }, noStatus{}).Begin(m.chat().Conversation, "And then?")
 	press(m, "?")
-	if s := helpText(m); !strings.HasPrefix(s, "▾ claude on a pull request · works here") || !strings.Contains(s, "▸ the list and its preview (32) ─") {
+	if s := helpText(m); !strings.HasPrefix(s, "▾ asking claude · works here") || !strings.Contains(s, "▸ the list and its preview (32) ─") {
 		t.Errorf("the Claude screen's section is not first and unfolded:\n%s", s)
 	}
 }
