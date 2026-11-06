@@ -192,3 +192,16 @@ func answering(t *testing.T, dir, question string, since time.Time, steps ...cla
 	}
 	return &chatScreen{Conversation: c}
 }
+
+func TestToolNameOfAnMCPServer(t *testing.T) {
+	for in, want := range map[string]string{
+		"mcp__gh-desk__read_issue":   "gh-desk:read_issue",
+		"mcp__recall__recall_search": "recall:recall_search",
+		"Read":                       "Read",
+		"mcp__broken":                "mcp__broken",
+	} {
+		if got := toolName(in); got != want {
+			t.Errorf("toolName(%q) = %q, want %q", in, got, want)
+		}
+	}
+}

@@ -89,6 +89,10 @@ type Options struct {
 	// MaxSize and Keep control rotation at startup; the defaults when zero.
 	MaxSize int64
 	Keep    int
+	// NoRotate leaves the file as it is: for a process that writes to the
+	// log beside the one that rotates it, such as gh desk mcp beside the
+	// TUI, so that two never move the file aside at once.
+	NoRotate bool
 	// Records, when set, keeps what is written to the file in memory too,
 	// at the same level.
 	Records *Records
@@ -110,8 +114,10 @@ func Open(o Options) (*slog.Logger, io.Closer, error) {
 	if err := os.MkdirAll(filepath.Dir(o.Path), 0o755); err != nil {
 		return nil, nil, err
 	}
-	if err := rotate(o.Path, o.MaxSize, o.Keep); err != nil {
-		return nil, nil, err
+	if !o.NoRotate {
+		if err := rotate(o.Path, o.MaxSize, o.Keep); err != nil {
+			return nil, nil, err
+		}
 	}
 	f, err := os.OpenFile(o.Path, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0o600)
 	if err != nil {

@@ -27,16 +27,32 @@ Claude reads a worktree of the pull request at the head you saw, made from gh-de
 - no settings files are loaded, so a pull request's hooks and permissions never run
 - its file tools see only the worktree, not your other files
 - its tools are among `Read`, `Grep`, `Glob` and `WebFetch` (`claude.allowed_tools`); none runs a command or writes a file
+- it reaches GitHub only through gh-desk's own tools, below
 - the pull request's text is given as data, not as instructions
 
 A plan about the tab is made with no tools at all.
 
+## Reading the repository on GitHub
+
+gh-desk gives the conversation tools of its own that read the pull request's repository, and nothing else:
+
+- `checks`: the checks of the pull request's head and, once it is merged, of its merge commit, read when asked; or those of a branch or commit of the repository
+- `check_run_log`: what a check run says, its annotations and, for a GitHub Actions job, the lines of its log around errors and its end
+- `search_issues` and `read_issue`: the repository's issues and pull requests, their comments, reviews and review threads
+
+So Claude can answer "the CI failed after I merged it, why?" or "was this discussed in an issue?". The tools only read, and only what anyone who can see the pull request can see; whatever GitHub returns from another repository, and your reviews not sent yet, are left out.
+
+They are on unless `claude.mcp.builtin = false`. When `WebFetch` is allowed or you give servers of your own, write `builtin = true` or `false` yourself: the pull request's text could have Claude send what the tools read out through them.
+
 ## MCP servers and skills
 
-MCP servers of your own can be given to the conversation in `claude.mcp_servers`, and the skills of your plugins in `claude.plugins`. With [claude-recall](https://github.com/babarot/claude-recall), Claude searches your past Claude Code sessions while it reviews, held to the pull request's repository:
+MCP servers of your own can be given to the conversation in `[claude.mcp]`, and the skills of your plugins in `claude.plugins`. With [claude-recall](https://github.com/babarot/claude-recall), Claude searches your past Claude Code sessions while it reviews, held to the pull request's repository:
 
 ```toml
-[claude.mcp_servers.recall]
+[claude.mcp]
+builtin = true
+
+[claude.mcp.servers.recall]
 command = "recall"
 args    = ["mcp", "--repo", "${GH_DESK_URL}"]  # the pull request's repository
 tools   = ["recall_search", "recall_list", "recall_export"]

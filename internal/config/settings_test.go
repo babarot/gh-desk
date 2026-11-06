@@ -16,14 +16,23 @@ const schemaPath = "../../docs/config.schema.json"
 func TestSettingsAreTheFilesKeys(t *testing.T) {
 	var names []string
 	for _, tb := range tables {
-		names = append(names, tb.Name)
+		parent, _ := splitKey(tb.Name)
+		if parent == "" {
+			names = append(names, tb.Name)
+		}
 		var keys []string
 		for _, s := range settings {
-			if table, key, _ := strings.Cut(s.Key, "."); table == tb.Name {
+			if table, key := splitKey(s.Key); table == tb.Name {
 				keys = append(keys, key)
 			}
 		}
-		if got := settingsIn([]string{tb.Name}); !sameSet(keys, got) {
+		// A table in this one is one of its keys.
+		for _, sub := range tables {
+			if p, n := splitKey(sub.Name); p == tb.Name {
+				keys = append(keys, n)
+			}
+		}
+		if got := settingsIn(strings.Split(tb.Name, ".")); !sameSet(keys, got) {
 			t.Errorf("[%s]: the table has %v, doc has %v", tb.Name, keys, got)
 		}
 	}
@@ -61,7 +70,7 @@ func TestTemplateValuesAreTheDefaults(t *testing.T) {
 	examples := map[string]bool{}
 	for _, s := range settings {
 		if s.Example != "" {
-			_, key, _ := strings.Cut(s.Key, ".")
+			_, key := splitKey(s.Key)
 			examples[key] = true
 		}
 	}

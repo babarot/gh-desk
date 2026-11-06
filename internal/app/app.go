@@ -24,6 +24,7 @@ import (
 	"github.com/babarot/gh-desk/internal/github"
 	"github.com/babarot/gh-desk/internal/listcache"
 	"github.com/babarot/gh-desk/internal/logging"
+	"github.com/babarot/gh-desk/internal/mcpserver"
 	"github.com/babarot/gh-desk/internal/model"
 	"github.com/babarot/gh-desk/internal/plan"
 	"github.com/babarot/gh-desk/internal/runner"
@@ -102,8 +103,12 @@ func start(o *options, gcOnly bool, stdout, stderr io.Writer) int {
 		fmt.Fprintf(stderr, "gh-desk: could not read who you are on GitHub: %v\n", err)
 		return 1
 	}
+	exe, err := os.Executable()
+	if err != nil {
+		log.Warn("gh-desk's own MCP server is left out: where this program is is unknown", "err", err.Error())
+	}
 	p := assemble(cfg, warns, env{gh: gh, host: github.DefaultHost(), viewer: viewer, stateDir: state.DefaultDir(),
-		borrow: claude.GhqRoots(ctx), noCache: o.noCache}, log)
+		borrow: claude.GhqRoots(ctx), noCache: o.noCache, config: absPath(o.config), exe: exe, debug: o.debug}, log)
 	p.set.LogRecords = recs
 	start := time.Now()
 	err = tui.Run(ctx, source{gh}, p.rn, p.cl, km, log, p.set)
@@ -137,6 +142,12 @@ type env struct {
 	stateDir string
 	borrow   []string
 	noCache  bool
+	// config is the config file read, and exe this program, which gh-desk's
+	// own MCP server is started as, logging at debug with debug; with exe
+	// empty it is not given.
+	config string
+	exe    string
+	debug  bool
 }
 
 // parts are what the TUI runs with. store and lock, when set, are closed
@@ -197,16 +208,18 @@ func assemble(cfg config.File, warns []string, e env, log *slog.Logger) parts {
 	}
 	opt := claude.Options{Bin: cfg.ClaudeCommand(), Model: cfg.Claude.Model, Tools: cfg.Claude.AllowedTools, Language: cfg.Claude.Language, Instructions: cfg.Claude.Instructions, Log: log}
 	release := func() {}
-	if len(cfg.Claude.MCPServers) > 0 || len(cfg.Claude.Plugins) > 0 {
+	if servers := mcpServers(cfg, e.config, e.exe, e.debug); len(servers) > 0 || len(cfg.Claude.Plugins) > 0 {
 		var err error
-		release, err = conversationFiles(cfg, &opt)
+		release, err = conversationFiles(cfg, servers, &opt)
 		if err != nil {
 			log.Warn("could not write the MCP servers and skills for Claude", "err", err.Error())
-			set.ConfigWarnings = append(set.ConfigWarnings, "claude.mcp_servers and claude.plugins are left out: "+err.Error())
+			set.ConfigWarnings = append(set.ConfigWarnings, "claude.mcp and claude.plugins are left out: "+err.Error())
 			opt.MCPConfig, opt.MCPTools, opt.PluginDir = "", nil, ""
 			release = func() {}
 		} else {
-			log.Debug("given to Claude", "servers", slices.Sorted(maps.Keys(cfg.Claude.MCPServers)), "tools", opt.MCPTools,
+			_, opt.GitHub = servers[mcpserver.Name]
+			opt.Label = mcpserver.Label
+			log.Debug("given to Claude", "servers", slices.Sorted(maps.Keys(servers)), "tools", opt.MCPTools,
 				"plugins", cfg.PluginDirs(), "plugin", opt.PluginDir)
 		}
 	}
@@ -220,16 +233,49 @@ func assemble(cfg config.File, warns []string, e env, log *slog.Logger) parts {
 // runs are the directories of the running gh-desk, in the cache.
 func runs(cfg config.File) state.Runs { return state.Runs{Dir: filepath.Join(cfg.CacheDir(), "runs")} }
 
+// absPath is p made absolute, as the MCP server runs in another directory;
+// p as it is when that fails.
+func absPath(p string) string {
+	if a, err := filepath.Abs(p); err == nil {
+		return a
+	}
+	return p
+}
+
+// mcpServers are the MCP servers of the conversation: the user's, and
+// gh-desk's own when it is on (ADR-080), started as this program's mcp
+// command with the config file read and --debug, so that it logs as this
+// run does.
+func mcpServers(cfg config.File, configPath, exe string, debug bool) map[string]map[string]any {
+	out := maps.Clone(cfg.Claude.MCP.Servers)
+	if !cfg.BuiltinMCP() || exe == "" {
+		return out
+	}
+	if out == nil {
+		out = map[string]map[string]any{}
+	}
+	tools := make([]any, len(mcpserver.Tools))
+	for i, t := range mcpserver.Tools {
+		tools[i] = t
+	}
+	args := []any{"mcp", "--config", configPath}
+	if debug {
+		args = append(args, "--debug")
+	}
+	out[mcpserver.Name] = map[string]any{"command": exe, "args": args, "tools": tools}
+	return out
+}
+
 // conversationFiles writes what the conversation with Claude is given
-// beside its flags, in a directory of this run, and sets them in opt.
-// release removes them.
-func conversationFiles(cfg config.File, opt *claude.Options) (release func(), err error) {
+// beside its flags, the MCP servers and the skills, in a directory of this
+// run, and sets them in opt. release removes them.
+func conversationFiles(cfg config.File, servers map[string]map[string]any, opt *claude.Options) (release func(), err error) {
 	dir, release, err := runs(cfg).New()
 	if err != nil {
 		return nil, err
 	}
-	if len(cfg.Claude.MCPServers) > 0 {
-		opt.MCPConfig, opt.MCPTools, err = claude.WriteMCPConfig(dir, cfg.CacheDir(), cfg.Claude.MCPServers)
+	if len(servers) > 0 {
+		opt.MCPConfig, opt.MCPTools, err = claude.WriteMCPConfig(dir, cfg.CacheDir(), servers)
 		if err != nil {
 			release()
 			return nil, err
@@ -254,9 +300,14 @@ func conversationFiles(cfg config.File, opt *claude.Options) (release func(), er
 // built-in ones Claude is given, Skill, and the tools of the MCP servers.
 func skillTools(cfg config.File) []string {
 	tools := append(slices.Clone(cfg.Claude.AllowedTools), "Skill")
-	for _, name := range slices.Sorted(maps.Keys(cfg.Claude.MCPServers)) {
-		for _, t := range config.MCPTools(cfg.Claude.MCPServers[name]) {
+	for _, name := range slices.Sorted(maps.Keys(cfg.Claude.MCP.Servers)) {
+		for _, t := range config.MCPTools(cfg.Claude.MCP.Servers[name]) {
 			tools = append(tools, "mcp__"+name+"__"+t)
+		}
+	}
+	if cfg.BuiltinMCP() {
+		for _, t := range mcpserver.Tools {
+			tools = append(tools, "mcp__"+mcpserver.Name+"__"+t)
 		}
 	}
 	return tools

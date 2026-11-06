@@ -2,6 +2,7 @@ package claude
 
 import (
 	"context"
+	"encoding/json"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -21,7 +22,7 @@ const stream = `{"type":"system","subtype":"init"}
 
 func TestReadStream(t *testing.T) {
 	var steps []Step
-	a, err := readStream(strings.NewReader(stream), func(s Step) { steps = append(steps, s) })
+	a, err := readStream(strings.NewReader(stream), nil, func(s Step) { steps = append(steps, s) })
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -39,11 +40,11 @@ func TestReadStream(t *testing.T) {
 }
 
 func TestReadStreamError(t *testing.T) {
-	_, err := readStream(strings.NewReader(`{"type":"result","is_error":true,"result":"rate limited"}`+"\n"), func(Step) {})
+	_, err := readStream(strings.NewReader(`{"type":"result","is_error":true,"result":"rate limited"}`+"\n"), nil, func(Step) {})
 	if err == nil || !strings.Contains(err.Error(), "rate limited") {
 		t.Errorf("err = %v", err)
 	}
-	if _, err := readStream(strings.NewReader(`{"type":"system"}`+"\n"), func(Step) {}); err == nil {
+	if _, err := readStream(strings.NewReader(`{"type":"system"}`+"\n"), nil, func(Step) {}); err == nil {
 		t.Error("a stream without a result should fail")
 	}
 }
@@ -319,5 +320,25 @@ func TestWorkspaceRecoversFromALock(t *testing.T) {
 	}
 	if got := read(t, filepath.Join(wt, "a.txt")); got != "one\n" {
 		t.Errorf("a.txt = %q", got)
+	}
+}
+
+func TestReadStreamLabelsTheToolsItKnows(t *testing.T) {
+	const s = `{"type":"assistant","message":{"content":[{"type":"tool_use","name":"mcp__gh-desk__read_issue","input":{"number":12}},{"type":"tool_use","name":"mcp__recall__recall_search","input":{"query":"retry"}}]}}
+{"type":"result","is_error":false,"result":"ok"}
+`
+	label := func(tool string, args json.RawMessage) (string, bool) {
+		if tool == "mcp__gh-desk__read_issue" {
+			return "#12", true
+		}
+		return "", false
+	}
+	var steps []Step
+	if _, err := readStream(strings.NewReader(s), label, func(st Step) { steps = append(steps, st) }); err != nil {
+		t.Fatal(err)
+	}
+	want := []Step{{"mcp__gh-desk__read_issue", "#12"}, {"mcp__recall__recall_search", "retry"}}
+	if !slices.Equal(steps, want) {
+		t.Errorf("steps = %v", steps)
 	}
 }

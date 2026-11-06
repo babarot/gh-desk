@@ -745,7 +745,7 @@ func (m *Model) stepLines(c *chatScreen, ss []claude.Step, live bool, width int)
 		var names []string
 		count := map[string]int{}
 		for _, s := range ss {
-			n := safeLine(s.Tool)
+			n := toolName(safeLine(s.Tool))
 			if count[n] == 0 {
 				names = append(names, n)
 			}
@@ -763,7 +763,7 @@ func (m *Model) stepLines(c *chatScreen, ss []claude.Step, live bool, width int)
 		ss = ss[k:]
 	}
 	for _, s := range ss {
-		tool := safeLine(s.Tool)
+		tool := toolName(safeLine(s.Tool))
 		line := margin + mark + st.bold.Render(tool)
 		// The room for the argument is what is left after the tool and
 		// its parentheses.
@@ -774,6 +774,18 @@ func (m *Model) stepLines(c *chatScreen, ss []claude.Step, live bool, width int)
 		out = append(out, line)
 	}
 	return out
+}
+
+// toolName is a tool as the steps show it: an MCP server's as
+// server:tool, the way a plugin's skill is named, rather than as Claude
+// Code names it (mcp__server__tool).
+func toolName(t string) string {
+	if rest, ok := strings.CutPrefix(t, "mcp__"); ok {
+		if server, tool, ok := strings.Cut(rest, "__"); ok && server != "" && tool != "" {
+			return server + ":" + tool
+		}
+	}
+	return t
 }
 
 // stepArg is what a tool was used on, w cells wide at most: a path in the

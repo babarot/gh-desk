@@ -16,6 +16,7 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"maps"
 	"os"
 	"path"
 	"path/filepath"
@@ -304,13 +305,39 @@ type Claude struct {
 	// ReleaseNotesCheck lets Claude read the release notes of the bot pull
 	// requests in a merge popup.
 	ReleaseNotesCheck bool `toml:"release_notes_check"`
-	// MCPServers are the MCP servers of the conversation about a pull
-	// request, by name, as Claude Code configures a server, with Tools
-	// (`tools`) added (ADR-037).
-	MCPServers map[string]map[string]any `toml:"mcp_servers"`
+	// MCP are the MCP servers of the conversation about a pull request.
+	MCP MCP `toml:"mcp"`
 	// Plugins are the directories of plugins whose skills the
 	// conversation takes (ADR-037); ~ is the home directory.
 	Plugins []string `toml:"plugins"`
+}
+
+// MCP configures the MCP servers of the conversation about a pull request.
+type MCP struct {
+	// Builtin is whether the conversation takes gh-desk's own server
+	// (ADR-080); nil when the file does not say, which BuiltinMCP decides.
+	Builtin *bool `toml:"builtin"`
+	// Servers are the user's servers, by name, as Claude Code configures a
+	// server, with Tools (`tools`) added (ADR-037).
+	Servers map[string]map[string]any `toml:"servers"`
+}
+
+// BuiltinMCP is whether the conversation takes gh-desk's own MCP server:
+// as the file says, or else when nothing could send what its tools read
+// out of the conversation (ADR-080). Load reports a file that leaves it
+// out where something could.
+func (f File) BuiltinMCP() bool {
+	if b := f.Claude.MCP.Builtin; b != nil {
+		return *b
+	}
+	return !builtinNeedsSaying(f)
+}
+
+// builtinNeedsSaying is whether claude.mcp.builtin must be written: when
+// WebFetch or a server of the user's could send what gh-desk's tools read
+// out of the conversation.
+func builtinNeedsSaying(f File) bool {
+	return slices.Contains(f.Claude.AllowedTools, "WebFetch") || len(f.Claude.MCP.Servers) > 0
 }
 
 // PluginDirs are Claude.Plugins with ~ expanded.
@@ -635,6 +662,15 @@ func Parse(path string, src []byte) (File, Problems, error) {
 	ps = append(ps, sps...)
 
 	ps = append(ps, checkSettings(cfg)...)
+	if cfg.Claude.MCP.Builtin == nil && builtinNeedsSaying(cfg) {
+		// Shown at what calls for it, since the key is not in the file.
+		at := Problem{Key: []string{"claude", "allowed_tools"}, Index: slices.Index(cfg.Claude.AllowedTools, "WebFetch")}
+		if at.Index < 0 {
+			at = Problem{Key: []string{"claude", "mcp", "servers", slices.Min(slices.Collect(maps.Keys(cfg.Claude.MCP.Servers)))}, Index: -1, AtKey: true}
+		}
+		ps = append(ps, Problem{Key: at.Key, Index: at.Index, AtKey: at.AtKey,
+			Message: "claude.mcp.builtin must be written as true or false, since allowed_tools has WebFetch or mcp.servers has a server: what gh-desk's tools read of the repository (issues, pull requests, CI logs) could be sent out through them"})
+	}
 	ps = append(ps, checkColumns(cfg.List.Columns)...)
 	ps = append(ps, namedTwice("menu.actions", cfg.Menu.Actions)...)
 	if d.Review.Editor != nil && strings.TrimSpace(*d.Review.Editor) == "" {
@@ -1094,6 +1130,7 @@ var moved = map[string]string{
 	"refresh":              `moved: refresh.interval is list.refresh, and "0" is "off"`,
 	"preview.description":  `moved to "description.style"`,
 	"merge.checks_timeout": `moved to "checks.wait_timeout"`,
+	"claude.mcp_servers":   `moved to "claude.mcp.servers", beside claude.mcp.builtin`,
 	"merge.watch_timeout":  `is no longer a setting: gh-desk watches a pull request on auto-merge for 24h, and GitHub's auto-merge goes on after`,
 }
 

@@ -33,7 +33,10 @@ func commandsReference(t *testing.T) string {
 		Run(args, &help, &bytes.Buffer{})
 		b.WriteString("\n## " + cmd.CommandPath() + "\n\n```\n" + help.String() + "```\n")
 		for _, sub := range cmd.Commands() {
-			section(sub)
+			// A hidden command (mcp) is run by Claude Code, not by people.
+			if !sub.Hidden {
+				section(sub)
+			}
 		}
 	}
 	section(newRootCommand(io.Discard, io.Discard))

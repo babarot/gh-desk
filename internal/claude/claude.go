@@ -55,6 +55,12 @@ type Options struct {
 	// without a prompt; empty when there are none (ADR-037).
 	MCPConfig string
 	MCPTools  []string
+	// GitHub is whether the servers include gh-desk's own (ADR-080), whose
+	// tools reach GitHub; the instructions say which.
+	GitHub bool
+	// Label shows the calls of the tools it knows, gh-desk's own; the
+	// others show what stepArg finds.
+	Label Labeler
 	// PluginDir is the plugin of the skills of a conversation, as
 	// WritePlugin made it; empty when there are none.
 	PluginDir string
@@ -70,6 +76,10 @@ func (c *Claude) conversationTools() []string {
 	}
 	return tools
 }
+
+// Labeler is how a call of a tool is shown in the steps, from the tool's
+// name and its arguments; ok is false for a tool it does not know.
+type Labeler func(tool string, args json.RawMessage) (label string, ok bool)
 
 // Claude runs Claude Code.
 type Claude struct {
@@ -150,7 +160,7 @@ type Request struct {
 // so it can be resumed, here or in Claude Code. progress hears of each
 // tool Claude uses.
 func (c *Claude) Ask(ctx context.Context, r Request, progress func(Step)) (Answer, error) {
-	args := c.conversation(c.session(r, reviewInstructions+"\n\nAnswer in "+c.opt.Language+".", c.opt.Tools))
+	args := c.conversation(c.session(r, ReviewInstructions(c.opt.GitHub)+"\n\nAnswer in "+c.opt.Language+".", c.opt.Tools))
 	args = append(args, "--allowedTools", strings.Join(append(slices.Clone(c.opt.Tools), c.conversationTools()...), ","))
 	log := c.opt.Log.With(logging.KeyOp, "ask", logging.KeyPR, r.PR.String(), logging.KeyClaude, r.Session)
 	return c.run(ctx, log, r.Dir, prEnv(r.PR), args, r.Prompt, func(s Step) {
@@ -306,7 +316,7 @@ func (c *Claude) run(ctx context.Context, log *slog.Logger, dir string, env, arg
 	// was asked, and how many tools it used.
 	log.Info("claude asked", "model", c.opt.Model)
 	tools := 0
-	answer, readErr := readStream(out, func(s Step) {
+	answer, readErr := readStream(out, c.opt.Label, func(s Step) {
 		log.Debug("claude step", "tool", s.Tool)
 		tools++
 		progress(s)
@@ -352,8 +362,9 @@ type event struct {
 }
 
 // readStream follows claude's stream-json output to its result, reporting
-// each tool used.
-func readStream(r io.Reader, progress func(Step)) (Answer, error) {
+// each tool used, with what it was used on as label says when it knows the
+// tool.
+func readStream(r io.Reader, label Labeler, progress func(Step)) (Answer, error) {
 	br := bufio.NewReader(r)
 	for {
 		line, err := br.ReadBytes('\n')
@@ -364,7 +375,13 @@ func readStream(r io.Reader, progress func(Step)) (Answer, error) {
 				case "assistant":
 					for _, c := range ev.Message.Content {
 						if c.Type == "tool_use" && c.Name != "StructuredOutput" {
-							progress(Step{Tool: c.Name, Arg: stepArg(c.Input)})
+							arg := stepArg(c.Input)
+							if label != nil {
+								if l, ok := label(c.Name, c.Input); ok {
+									arg = l
+								}
+							}
+							progress(Step{Tool: c.Name, Arg: arg})
 						}
 					}
 				case "result":

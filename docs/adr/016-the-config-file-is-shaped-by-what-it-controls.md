@@ -5,6 +5,7 @@
 Accepted
 Partly replaced by ADR-029
 Partly replaced by ADR-062
+Partly replaced by ADR-080
 
 ## Context
 
