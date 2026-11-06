@@ -41,6 +41,10 @@ func (m *Model) welcomeLines(c *chatScreen, height int) []string {
 		worktree = []string{margin + beside + m.working(st.muted, "making the worktree…")}
 	case c.Dir() != "":
 		worktree = []string{margin + beside + st.green.Render("✓") + st.dim.Render(" worktree ready at "+short(p.HeadOID))}
+	case c.prepareErr != "":
+		// The first question makes it again, and says again what went
+		// wrong if it fails.
+		worktree = []string{margin + beside + st.red.Render("✗ worktree not made: "+safe(firstLine(c.prepareErr))) + st.dim.Render(" · the first question tries again")}
 	}
 	var asks []string
 	if ss := suggestions(c); len(ss) > 0 {

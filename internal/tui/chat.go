@@ -59,8 +59,9 @@ type chatScreen struct {
 	// restart is set by a first press of chat_restart, until the next key.
 	restart bool
 	// preparing is set while the worktree is made before anything is
-	// asked.
-	preparing bool
+	// asked; prepareErr is why making it failed, until it is made again.
+	preparing  bool
+	prepareErr string
 }
 
 // chatStatus puts what a conversation says went wrong on the status line.
@@ -194,7 +195,7 @@ func (m *Model) prepareChat(c *chatScreen) tea.Cmd {
 	if c.preparing || c.Running() || !m.chatState.Lock(c.Conversation) {
 		return nil
 	}
-	c.preparing = true
+	c.preparing, c.prepareErr = true, ""
 	key, head := c.PR().Key, c.PR().HeadOID
 	return func() tea.Msg {
 		dir, err := m.claude.Prepare(m.ctx, key, head)
@@ -219,6 +220,7 @@ func (m *Model) chatReady(msg chatReadyMsg) tea.Cmd {
 	case msg.err != nil:
 		// The first question makes it again, and says what went wrong.
 		m.log.Debug("worktree not made ahead", logging.KeyPR, msg.key.String(), "err", msg.err.Error())
+		c.prepareErr = msg.err.Error()
 	case !c.Started():
 		c.Prepared(msg.dir, "")
 	}

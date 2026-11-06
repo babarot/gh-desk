@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"errors"
 	"strings"
 	"testing"
 
@@ -70,6 +71,24 @@ func TestClaudeWelcomeFits(t *testing.T) {
 	c.preparing = true
 	if s := strings.Join(m.welcomeLines(c, 100), "\n"); !strings.Contains(s, "making the worktree") {
 		t.Errorf("no worktree being made:\n%s", s)
+	}
+}
+
+// A worktree that could not be made ahead is told in the welcome, and
+// opening the conversation again tries again.
+func TestClaudeWelcomeWorktreeFailed(t *testing.T) {
+	m, _ := startWith(t, fixture(), keymap.Default())
+	fc := fakeClaudeOf(t, m)
+	fc.prepareErr = errors.New("git fetch: could not read from remote\nmore")
+	press(m, "i")
+	s := screen(m)
+	if !strings.Contains(s, "✗ worktree not made: git fetch: could not read from remote · the first question tries again") || strings.Contains(s, "more") {
+		t.Errorf("the failure is not told on one line:\n%s", s)
+	}
+	fc.prepareErr = nil
+	press(m, "esc", "i")
+	if s := screen(m); !strings.Contains(s, "worktree ready at") || strings.Contains(s, "not made") {
+		t.Errorf("opening again does not try again:\n%s", s)
 	}
 }
 
