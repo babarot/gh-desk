@@ -6,7 +6,7 @@ Accepted
 Partly replaced by ADR-046
 Partly replaced by ADR-068
 Partly replaced by ADR-082
-Partly replaced by ADR-089
+Partly replaced by ADR-092
 
 ## Context
 

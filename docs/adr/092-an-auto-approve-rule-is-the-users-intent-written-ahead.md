@@ -1,4 +1,4 @@
-# ADR-089: An auto-approve rule is the user's intent written ahead, and approves without a confirm
+# ADR-092: An auto-approve rule is the user's intent written ahead, and approves without a confirm
 
 ## Status
 

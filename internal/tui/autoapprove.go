@@ -15,7 +15,7 @@ import (
 )
 
 // AutoApprove is a rule that approves the pull requests its search finds
-// and it matches, without a confirm, while gh-desk runs (ADR-089).
+// and it matches, without a confirm, while gh-desk runs (ADR-092).
 type AutoApprove struct {
 	Rule plan.Rule
 	// Query is the search the pull requests are found by.

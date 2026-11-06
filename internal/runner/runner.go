@@ -96,7 +96,7 @@ type Options struct {
 	Quiet time.Duration
 	// Excluded says why an [[exclude]] rule keeps pr, read as mi, from an
 	// approval a rule asked for, "" when none does; an error keeps it too
-	// (ADR-089). Nil when there are no such rules.
+	// (ADR-092). Nil when there are no such rules.
 	Excluded func(ctx context.Context, pr model.PR, mi model.MergeInfo) (string, error)
 }
 
@@ -172,7 +172,7 @@ type Item struct {
 	// Auto is set on an approval a rule asked for, without a confirm: a
 	// draft, a head whose approval a person dismissed and a pull request
 	// an exclusion matches are not approved, judged again right before
-	// it is sent (ADR-089).
+	// it is sent (ADR-092).
 	Auto bool
 }
 

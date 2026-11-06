@@ -147,7 +147,7 @@ type Settings struct {
 	// of is left out.
 	Exclude []plan.Rule
 	// AutoApprove are the rules that approve what they match without a
-	// confirm (ADR-089).
+	// confirm (ADR-092).
 	AutoApprove []AutoApprove
 	// Resume are the merges an earlier run was waiting for.
 	Resume []model.Pending
