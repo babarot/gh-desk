@@ -384,6 +384,8 @@ func TestConfigInitEditSchema(t *testing.T) {
 // them, written so that they run without Go (mise run config-ui:test).
 func TestConfigUIData(t *testing.T) {
 	const path = "../config/ui/testdata/data.json"
+	// cache.dir defaults to a path under the home of whoever runs this.
+	t.Setenv("XDG_CACHE_HOME", "/home/you/.cache")
 	want, err := json.MarshalIndent(map[string]any{"DATA": config.UI(), "KEYS": uiKeys()}, "", " ")
 	if err != nil {
 		t.Fatal(err)
