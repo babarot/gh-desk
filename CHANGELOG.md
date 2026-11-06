@@ -1,5 +1,10 @@
 # Changelog
 
+## [v0.11.0](https://github.com/babarot/gh-desk/compare/v0.10.0...v0.11.0) - 2026-11-06
+### New Features
+- Let Clawd play a scene picked at random while the worktree is made by @babarot in https://github.com/babarot/gh-desk/pull/83
+- Ring the terminal's bell when the inbox finds a notification newly unread by @babarot in https://github.com/babarot/gh-desk/pull/85
+
 ## [v0.10.0](https://github.com/babarot/gh-desk/compare/v0.9.0...v0.10.0) - 2026-11-06
 ### New Features
 - Show the release notes from the ? list with w by @babarot in https://github.com/babarot/gh-desk/pull/81
