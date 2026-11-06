@@ -6,9 +6,13 @@ These are the rules gh-desk keeps as it grows. Each is recorded, with what was w
 
 An approval or a merge cannot be taken back on GitHub. Every write, whether it is one pull request or twenty, goes through a confirm popup that reads each pull request again and says what will happen to it, and why the rest is skipped. A plan from Claude ends in the same popup.
 
+The one exception is a rule you wrote to approve: an `[[auto_approve]]` rule in the config file is your intent written ahead, so the pull requests it matches are approved without a popup while gh-desk runs, and each approval is told in the notifications.
+
 ## Each write is for the head you saw
 
 What you confirm is the commit that was on the screen. If someone pushes in between, the pull request stops and asks you to confirm again, rather than merging code you have not looked at. The only new head gh-desk takes is one it made itself by updating the branch.
+
+An approval by a rule carries the head the rule judged, and waits for the jobs on it before it is sent.
 
 ## The repository's rules decide how to merge
 
