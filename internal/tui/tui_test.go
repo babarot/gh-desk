@@ -1585,6 +1585,8 @@ type fakeClaude struct {
 	// until it is stopped.
 	fail bool
 	wait bool
+	// prepareErr makes Prepare fail with it.
+	prepareErr error
 	// plan is what Triage answers, and triaged the requests it was given.
 	plan    string
 	triaged []claude.Request
@@ -1592,6 +1594,9 @@ type fakeClaude struct {
 
 func (c *fakeClaude) Prepare(_ context.Context, k model.PRKey, head string) (string, error) {
 	c.prepared = append(c.prepared, k)
+	if c.prepareErr != nil {
+		return "", c.prepareErr
+	}
 	return "/cache/worktrees/" + k.String(), nil
 }
 

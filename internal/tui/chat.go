@@ -1,7 +1,6 @@
 package tui
 
 import (
-	"cmp"
 	"context"
 	"fmt"
 	"os/exec"
@@ -60,8 +59,9 @@ type chatScreen struct {
 	// restart is set by a first press of chat_restart, until the next key.
 	restart bool
 	// preparing is set while the worktree is made before anything is
-	// asked.
-	preparing bool
+	// asked; prepareErr is why making it failed, until it is made again.
+	preparing  bool
+	prepareErr string
 }
 
 // chatStatus puts what a conversation says went wrong on the status line.
@@ -145,20 +145,45 @@ func (m *Model) openChat(p model.PR) tea.Cmd {
 // focusChat puts the focus in the text box of c, which suggests a review
 // until one is asked.
 func (m *Model) focusChat(c *chatScreen) tea.Cmd {
-	c.input.Placeholder = cmp.Or(suggestion(c), "Ask Claude")
+	c.input.Placeholder = "Ask Claude"
+	if s := suggestions(c); len(s) > 0 {
+		c.input.Placeholder = s[0]
+	}
 	c.input.SetWidth(chatInputWidth(m.paneInner()))
 	return c.input.Focus()
 }
 
-// suggestion is what the text box of c offers to fill in: a review, until
-// one is asked in the conversation; empty after.
-func suggestion(c *chatScreen) string {
-	for _, t := range c.Turns() {
+// suggestions are what the text box of c offers to fill in: the questions
+// of claude.Questions while nothing is asked, then a review until one is
+// asked in the conversation; none after.
+func suggestions(c *chatScreen) []string {
+	turns := c.Turns()
+	if len(turns) == 0 && !c.Running() {
+		return claude.Questions()
+	}
+	for _, t := range turns {
 		if t.You && t.Text == claude.ReviewQuestion {
-			return ""
+			return nil
 		}
 	}
-	return claude.ReviewQuestion
+	return []string{claude.ReviewQuestion}
+}
+
+// nextSuggestion is the suggestion fill_suggestion puts in the text box of
+// c: the first when it is empty, the one after when it holds a suggestion,
+// and "" when it holds text of the user's own or there is none.
+func nextSuggestion(c *chatScreen) string {
+	ss, v := suggestions(c), c.input.Value()
+	if len(ss) == 0 {
+		return ""
+	}
+	if v == "" {
+		return ss[0]
+	}
+	if i := slices.Index(ss, v); i >= 0 {
+		return ss[(i+1)%len(ss)]
+	}
+	return ""
 }
 
 // prepareChat makes the worktree of a conversation with nothing asked yet,
@@ -170,7 +195,7 @@ func (m *Model) prepareChat(c *chatScreen) tea.Cmd {
 	if c.preparing || c.Running() || !m.chatState.Lock(c.Conversation) {
 		return nil
 	}
-	c.preparing = true
+	c.preparing, c.prepareErr = true, ""
 	key, head := c.PR().Key, c.PR().HeadOID
 	return func() tea.Msg {
 		dir, err := m.claude.Prepare(m.ctx, key, head)
@@ -195,6 +220,7 @@ func (m *Model) chatReady(msg chatReadyMsg) tea.Cmd {
 	case msg.err != nil:
 		// The first question makes it again, and says what went wrong.
 		m.log.Debug("worktree not made ahead", logging.KeyPR, msg.key.String(), "err", msg.err.Error())
+		c.prepareErr = msg.err.Error()
 	case !c.Started():
 		c.Prepared(msg.dir, "")
 	}
@@ -496,7 +522,7 @@ func (m *Model) chatTyping(msg tea.KeyPressMsg) tea.Cmd {
 		c.scroll = max(0, c.scroll-m.pane.height/2)
 		return nil
 	case is("fill_suggestion"):
-		if s := suggestion(c); s != "" && c.input.Value() == "" {
+		if s := nextSuggestion(c); s != "" {
 			c.input.SetValue(s)
 		}
 		return nil
@@ -904,6 +930,9 @@ func (m *Model) renderClaude(b *strings.Builder, height int) *tea.Cursor {
 	}
 	bodyH := max(height-2-len(ask), 1)
 	L := m.chatLines(c, inner)
+	if len(L) == 0 && !busy(c) {
+		L = m.welcomeLines(c, bodyH)
+	}
 	c.scroll = min(c.scroll, max(len(L)-bodyH, 0))
 	start := max(len(L)-bodyH-c.scroll, 0)
 	body := L[start:min(start+bodyH, len(L))]

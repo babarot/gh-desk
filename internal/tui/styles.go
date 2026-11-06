@@ -86,6 +86,8 @@ type styles struct {
 	code, block, blockLang lipgloss.Style
 	// band is the background of a question in the chat.
 	band lipgloss.Style
+	// mascot is Claude's mascot, in Claude's color on every theme.
+	mascot lipgloss.Style
 }
 
 func newStyles(p palette) styles {
@@ -134,6 +136,7 @@ func newStyles(p palette) styles {
 		block:     lipgloss.NewStyle().Background(p.surface0).Foreground(p.subtext1),
 		blockLang: lipgloss.NewStyle().Background(p.surface0).Foreground(p.overlay),
 		band:      lipgloss.NewStyle().Background(p.surface0),
+		mascot:    fg(claudeOrange()),
 	}
 }
 

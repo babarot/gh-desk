@@ -40,6 +40,17 @@ const maxDiff = 200_000
 // ReviewQuestion asks for a review of the pull request.
 const ReviewQuestion = "Review this pull request."
 
+// Questions are the questions offered before anything is asked about a
+// pull request, ReviewQuestion first.
+func Questions() []string {
+	return []string{
+		ReviewQuestion,
+		"What could break for callers of this change?",
+		"Which files should I read first?",
+		"Are there tests for the new behavior?",
+	}
+}
+
 // PRPrompt is what GitHub knows about a pull request, marked as data. It
 // goes before the first question of a session, whatever that question is.
 func PRPrompt(p model.PR, d model.Detail, diff []byte) string {

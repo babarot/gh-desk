@@ -444,7 +444,7 @@ func (m *Model) hints() string {
 		}
 	case m.typingChat():
 		as = []keymap.Action{"accept"}
-		if c := m.chat(); c.input.Value() == "" && suggestion(c) != "" {
+		if c := m.chat(); nextSuggestion(c) != "" {
 			as = append(as, "fill_suggestion")
 		}
 		as = append(as, "draft_review", "open_claude")
