@@ -244,3 +244,16 @@ func TestReleaseNotesScroll(t *testing.T) {
 		t.Errorf("g did not go to the top:\n%s", screen(m))
 	}
 }
+
+// A build from source names the last release but may be newer: no release
+// is marked installed, and the box says what the build is.
+func TestReleaseNotesOfABuildFromSource(t *testing.T) {
+	m := startReleases(t, &Release{FromSource: true, Running: "0.8.0", How: "https://github.com/babarot/gh-desk/releases",
+		Source: &fakeReleases{list: releaseList()}})
+	m.set.Version = "0.8.0 (e92582e)"
+	press(m, "?", "w")
+	s := screen(m)
+	if !strings.Contains(s, "this build: 0.8.0 (e92582e), built from source") || strings.Contains(s, "installed") {
+		t.Errorf("box =\n%s", s)
+	}
+}

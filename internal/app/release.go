@@ -24,7 +24,7 @@ import (
 func releaseOf(cfg config.File, e env, log *slog.Logger) *tui.Release {
 	store := release.Open(e.stateDir)
 	src := &releases{gh: e.gh, store: store, now: time.Now}
-	r := &tui.Release{Running: version.Version, How: release.Page, Source: src}
+	r := &tui.Release{Running: version.Version, How: release.Page, FromSource: !e.release, Source: src}
 	if !e.release {
 		return r
 	}

@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"cmp"
 	"context"
 	"fmt"
 	"strings"
@@ -22,6 +23,10 @@ type Release struct {
 	// Tell tells of a newer release and of an update. Without it, the
 	// releases are read only when their notes are opened.
 	Tell bool
+	// FromSource is set on a build that is not a release: it names the
+	// last release as Running, but its code may be newer, so no release is
+	// marked as the one installed.
+	FromSource bool
 	// Latest is the newest release a reading before this run found, and
 	// Told the newest one already told of.
 	Latest, Told string
@@ -222,7 +227,8 @@ func (m *Model) releaseNotesHeight() int { return max(m.height-6, 3) }
 
 // releaseNotesLines are the lines of the box of release notes, inner cells wide:
 // every release read, newest first, with the one running marked installed
-// and a newer one not installed with how to update, then its notes.
+// and a newer one not installed with how to update, then its notes. A
+// build from source marks none, and says what it is instead.
 func (m *Model) releaseNotesLines(inner int) []string {
 	st := m.st
 	r := m.rel
@@ -240,6 +246,9 @@ func (m *Model) releaseNotesLines(inner int) []string {
 	}
 	running := m.set.Release.Running
 	var out []string
+	if m.set.Release.FromSource {
+		out = append(out, st.dim.Render(fit("this build: "+cmp.Or(m.set.Version, running)+", built from source", inner)), "")
+	}
 	for i, rel := range r.list {
 		if i > 0 {
 			out = append(out, "")
@@ -249,7 +258,7 @@ func (m *Model) releaseNotesLines(inner int) []string {
 			head += "  " + st.dim.Render(rel.Published.Format("2006-01-02"))
 		}
 		switch c, err := release.Compare(rel.Version, running); {
-		case err != nil:
+		case err != nil || m.set.Release.FromSource:
 		case c == 0:
 			head += "  " + st.green.Render("installed")
 		case c > 0:

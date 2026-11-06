@@ -43,7 +43,7 @@ func releaseEnv(t *testing.T, lastRun string) (env, *release.Store) {
 func TestReleaseOfABuildThatIsNotARelease(t *testing.T) {
 	e, store := releaseEnv(t, "0.1.0")
 	e.release = false
-	if r := releaseOf(config.Default(), e, logging.Discard()); r == nil || r.Tell || r.How != release.Page || r.Running != version.Version {
+	if r := releaseOf(config.Default(), e, logging.Discard()); r == nil || r.Tell || !r.FromSource || r.How != release.Page || r.Running != version.Version {
 		t.Errorf("release = %+v", r)
 	}
 	if rec, _ := store.Load(); rec.LastRun != "0.1.0" {
@@ -57,7 +57,7 @@ func TestReleaseOfAReleaseBuild(t *testing.T) {
 	if r == nil {
 		t.Fatal("no release")
 	}
-	if !r.Tell || r.Running != version.Version || r.UpdatedFrom != "0.1.0" || !r.Due || r.How != "gh extension upgrade desk" {
+	if !r.Tell || r.FromSource || r.Running != version.Version || r.UpdatedFrom != "0.1.0" || !r.Due || r.How != "gh extension upgrade desk" {
 		t.Errorf("release = %+v", r)
 	}
 	if rec, _ := store.Load(); rec.LastRun != version.Version {
