@@ -328,15 +328,14 @@ func (m *Model) linkAt(i, x int) (spot, bool) {
 		return spot{}, false
 	}
 	p := rs[i].pr
-	at := 0
+	at := rowLead
 	for _, c := range m.columns(t) {
 		switch c.id {
 		case "pr":
-			// The cursor and the mark come before the name.
 			name := fmt.Sprintf("%s#%d", m.repoName(p), p.Key.Number)
-			w := min(lipgloss.Width(name), c.width-4)
-			if spanAt([]int{w}, 0, x-at-4) == 0 {
-				return spot{url: m.prURL(p), x: at + 4, w: w}, true
+			w := min(lipgloss.Width(name), c.width)
+			if spanAt([]int{w}, 0, x-at) == 0 {
+				return spot{url: m.prURL(p), x: at, w: w}, true
 			}
 		case "author":
 			a := m.author(p)

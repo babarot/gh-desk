@@ -450,10 +450,15 @@ type column struct {
 
 // columnDefs are every column, in the default order.
 var columnDefs = []column{
-	{id: "pr", title: "    PR", width: 28}, {id: "title", title: "TITLE"}, {id: "author", title: "AUTHOR", width: 14},
+	{id: "pr", title: "PR", width: 24}, {id: "title", title: "TITLE"}, {id: "author", title: "AUTHOR", width: 14},
 	{id: "ci", title: "CI", width: 2}, {id: "review", title: "REVIEW", width: 7}, {id: "why", title: "WHY", width: 10},
 	{id: "size", title: "SIZE", width: 11}, {id: "age", title: "AGE", width: 4, right: true},
 }
+
+// rowLead is how many cells every row starts with, before its columns: the
+// cursor and the row's mark stay at the start of the line wherever the
+// columns are.
+const rowLead = 4
 
 // dropFirst are the columns left out on a narrow terminal, first to last,
 // while TITLE would be narrower than minTitle; the others are never left
@@ -484,7 +489,7 @@ func (m *Model) columns(t *tab) []column {
 	}
 	// TITLE takes what the others leave.
 	titleWidth := func() int {
-		fixed := 0
+		fixed := rowLead
 		for _, c := range cols {
 			fixed += c.width + 2
 		}
@@ -525,7 +530,7 @@ func (m *Model) renderList(b *strings.Builder, height int) {
 		}
 		hdr = append(hdr, m.st.colHeader.Render(s))
 	}
-	b.WriteString(strings.Join(hdr, "  ") + "\n")
+	b.WriteString(spaces(rowLead) + strings.Join(hdr, "  ") + "\n")
 
 	rs := m.rows(t)
 	if len(rs) > 0 {
@@ -723,7 +728,7 @@ func (m *Model) renderRow(r row, cols []column, sel bool, n int) string {
 		// No column right of TITLE: the progress is all taken from it.
 		cells = append(cells, fit(m.progressText(prog), steal-2))
 	}
-	line := strings.Join(cells, "  ")
+	line := m.rowStart(r, sel) + strings.Join(cells, "  ")
 	if bg, ok := m.rowBackground(r.pr.Key, sel); ok {
 		return onBackground(line, bg, m.width)
 	}
@@ -813,33 +818,40 @@ func (m *Model) repoName(p model.PR) string {
 	return p.Key.Repository()
 }
 
+// rowStart is what a row starts with, rowLead cells: the cursor and the
+// row's mark.
+func (m *Model) rowStart(r row, sel bool) string {
+	p, st := r.pr, m.st
+	cursor, mark := " ", " "
+	if sel {
+		cursor = st.blue.Render("▎")
+	}
+	switch {
+	case m.selected[p.Key] == byHand:
+		mark = st.mauve.Render("✓")
+	case m.selected[p.Key] == byClaude:
+		mark = st.teal.Render("✓")
+	case m.answering(p.Key):
+		mark = st.mauve.Render(m.claudeFrame())
+	case m.chats[p.Key] != nil && m.chats[p.Key].unseen:
+		mark = st.mauve.Render("✦")
+	case r.ex.excluded():
+		// Shown with a, as a row the exclusion leaves out.
+		mark = st.dim.Render("⊘")
+	case r.ex.pending && !m.set.Shimmer:
+		// An exclusion rule cannot tell yet; with shimmer, the light
+		// over the pull request says so instead.
+		mark = st.yellow.Render("?")
+	case func() bool { _, ok := m.unread[p.Key]; return ok }():
+		mark = st.blue.Render("●")
+	}
+	return cursor + " " + mark + " "
+}
+
 func (m *Model) cell(id string, r row, sel bool, n int) string {
 	p, st := r.pr, m.st
 	switch id {
 	case "pr":
-		cursor, mark := " ", " "
-		if sel {
-			cursor = st.blue.Render("▎")
-		}
-		switch {
-		case m.selected[p.Key] == byHand:
-			mark = st.mauve.Render("✓")
-		case m.selected[p.Key] == byClaude:
-			mark = st.teal.Render("✓")
-		case m.answering(p.Key):
-			mark = st.mauve.Render(m.claudeFrame())
-		case m.chats[p.Key] != nil && m.chats[p.Key].unseen:
-			mark = st.mauve.Render("✦")
-		case r.ex.excluded():
-			// Shown with a, as a row the exclusion leaves out.
-			mark = st.dim.Render("⊘")
-		case r.ex.pending && !m.set.Shimmer:
-			// An exclusion rule cannot tell yet; with shimmer, the light
-			// over the pull request says so instead.
-			mark = st.yellow.Render("?")
-		case func() bool { _, ok := m.unread[p.Key]; return ok }():
-			mark = st.blue.Render("●")
-		}
 		repo := m.repoName(p)
 		name, num := st.sub1, st.muted
 		if p.Draft || r.ex.excluded() {
@@ -849,9 +861,9 @@ func (m *Model) cell(id string, r row, sel bool, n int) string {
 		// A row an exclusion rule cannot tell yet may leave once what the
 		// rule waits for is read.
 		if (m.answering(p.Key) || r.ex.pending) && m.set.Shimmer {
-			return cursor + " " + mark + " " + m.shimmerParts(styled{repo, name}, styled{number, num})
+			return m.shimmerParts(styled{repo, name}, styled{number, num})
 		}
-		return cursor + " " + mark + " " + name.Render(repo) + num.Render(number)
+		return name.Render(repo) + num.Render(number)
 	case "title":
 		if m.merged[p.Key] {
 			return st.dim.Render(shownTitle(p.Title))
