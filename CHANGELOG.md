@@ -1,5 +1,9 @@
 # Changelog
 
+## [v0.10.0](https://github.com/babarot/gh-desk/compare/v0.9.0...v0.10.0) - 2026-11-06
+### New Features
+- Show the release notes from the ? list with w by @babarot in https://github.com/babarot/gh-desk/pull/81
+
 ## [v0.9.0](https://github.com/babarot/gh-desk/compare/v0.8.0...v0.9.0) - 2026-11-06
 ### New Features
 - Tell of a newer release and of an update in the notifications by @babarot in https://github.com/babarot/gh-desk/pull/79
