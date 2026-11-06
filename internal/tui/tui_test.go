@@ -1895,7 +1895,7 @@ func TestClaudeAnsweringElsewhere(t *testing.T) {
 
 func TestClaudeDraft(t *testing.T) {
 	m, _ := startWith(t, fixture(), keymap.Default())
-	press(m, "i", "ctrl+r")
+	press(m, "i", "ctrl+x")
 	if m.compose == nil {
 		t.Fatal("R did not open the draft")
 	}

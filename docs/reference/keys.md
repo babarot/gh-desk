@@ -118,10 +118,11 @@ browse = []
 | Key | Action | Does |
 |---|---|---|
 | `tab` | `fill_suggestion` | fill in the suggestion |
-| `ctrl+r` | `draft_review` | draft review |
+| `ctrl+x` | `draft_review` | draft review |
 | `ctrl+o` | `open_claude` | open in claude code |
 | `ctrl+p` | `history_prev` | previous question |
 | `ctrl+n` | `history_next` | next question |
+| `ctrl+r` | `history_search` | search the questions |
 | `backspace` | `chat_close` | back, claude goes on |
 
 ## Writing a review

@@ -65,6 +65,7 @@ type triage struct {
 	// closes once it is written.
 	history []askbox.Entry
 	recall  askbox.Recall
+	search  *search
 	askedID string
 	kept    chan struct{}
 }
@@ -133,6 +134,8 @@ func (m *Model) triageKey(msg tea.KeyPressMsg) tea.Cmd {
 	tr, k := m.triage, msg.String()
 	is := func(a keymap.Action) bool { return m.keys.Matches(a, k) }
 	switch {
+	case tr.typing && tr.search != nil:
+		return m.searchKey(&tr.search, &tr.input, &tr.recall, tr.history, msg)
 	case tr.typing:
 		armed := tr.restart
 		tr.restart = false
@@ -156,6 +159,8 @@ func (m *Model) triageKey(msg tea.KeyPressMsg) tea.Cmd {
 			return m.askTriage(q)
 		case m.recallKey(&tr.recall, &tr.input, tr.history, msg):
 			return nil
+		case is("history_search"):
+			return m.openSearch(&tr.search, &tr.input, tr.history)
 		case is("fill_suggestion"):
 			if s := nextSuggestion(claude.TriageQuestions(), tr.input.Value()); s != "" {
 				tr.input.SetValue(s)
@@ -555,11 +560,18 @@ func (m *Model) renderTriage() ([]string, int) {
 			back = "back"
 		}
 		foot = append(foot, m.footKeys([]keymap.Action{"chat_close"}, "", back))
+	case tr.search != nil:
+		foot = append(foot, strings.Split(tr.search.input.View(), "\n")...)
+		foot = append(foot, m.searchLines(tr.search, tr.history, inner, searchRows(m.popupHeight()-3, triageSearchRows))...)
+		foot = append(foot, m.footKeys([]keymap.Action{"accept", "history_search"}, "fill in", "cancel"))
 	case tr.typing:
 		foot = append(foot, strings.Split(tr.input.View(), "\n")...)
 		as := []keymap.Action{"accept"}
 		if nextSuggestion(claude.TriageQuestions(), tr.input.Value()) != "" {
 			as = append(as, "fill_suggestion")
+		}
+		if len(tr.history) > 0 {
+			as = append(as, "history_search")
 		}
 		keys := m.footKeys(as, "send", "back")
 		if hint := m.recallHint(&tr.recall, tr.history); hint != "" {

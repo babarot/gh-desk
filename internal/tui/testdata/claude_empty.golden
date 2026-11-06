@@ -32,7 +32,7 @@ desk // @me    1 review (3)   2 mine (1)   3 involved (0)   4 inbox (1)         
 │ ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯                           │
 ╰────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
 
-enter accept · tab fill in the suggestion · ctrl+r draft review · ctrl+o open in claude code · esc back
+enter accept · tab fill in the suggestion · ctrl+x draft review · ctrl+o open in claude code · esc back
 -- styles --
 L1 0-4 fg=#96bfff bg=#3b3b52 bold
 L1 5-7 fg=#706f87

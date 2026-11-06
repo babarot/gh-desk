@@ -104,7 +104,11 @@ func (m *Model) render() (string, *tea.Cursor) {
 		lines = m.overlay(lines, popup, 2, m.width)
 		cur = nil
 		if at >= 0 {
-			cur = inPopup(m.triage.input.Cursor(), popup, 2+at, m.width)
+			in := &m.triage.input
+			if s := m.triage.search; s != nil {
+				in = &s.input
+			}
+			cur = inPopup(in.Cursor(), popup, 2+at, m.width)
 		}
 	case m.help:
 		cur = nil
@@ -416,7 +420,7 @@ var ready = map[keymap.Action]bool{
 	"preview_down": true, "preview_up": true, "preview_grow": true, "preview_shrink": true, "next_file": true, "prev_file": true, "preview_tab": true, "fold": true, "preview": true,
 	"confirm": true, "next_kind": true, "post": true, "editor": true, "accept": true, "complete": true, "erase": true, "erase_word": true,
 	"log": true, "log_this_pr": true,
-	"triage": true, "triage_apply": true, "triage_more": true, "ask_claude": true, "fill_suggestion": true, "history_prev": true, "history_next": true, "draft_review": true, "open_claude": true, "chat_close": true,
+	"triage": true, "triage_apply": true, "triage_more": true, "ask_claude": true, "fill_suggestion": true, "history_prev": true, "history_next": true, "history_search": true, "draft_review": true, "open_claude": true, "chat_close": true,
 }
 
 // hints is the key line of what has the focus. It holds the ways in (the
@@ -455,6 +459,11 @@ func (m *Model) hints() string {
 				as = append(as, "fill_suggestion")
 			}
 			recall = m.recallHint(&m.triage.recall, m.triage.history)
+			if m.triage.search != nil {
+				as, recall, back = []keymap.Action{"accept", "history_search"}, "", "cancel"
+			} else if len(m.triage.history) > 0 {
+				as = append(as, "history_search")
+			}
 		case m.triage.asking:
 			as = []keymap.Action{"chat_close"}
 			if !m.triage.stopping {
@@ -475,8 +484,14 @@ func (m *Model) hints() string {
 		if c := m.chat(); nextSuggestion(suggestions(c), c.input.Value()) != "" {
 			as = append(as, "fill_suggestion")
 		}
+		if len(chatHistory(m.chat())) > 0 {
+			as = append(as, "history_search")
+		}
 		as = append(as, "draft_review", "open_claude")
 		recall = m.recallHint(&m.chat().recall, chatHistory(m.chat()))
+		if m.chat().search != nil {
+			as, recall, back = []keymap.Action{"accept", "history_search"}, "", "cancel"
+		}
 	case m.logv != nil:
 		as = []keymap.Action{"log_this_pr", "bottom", "log", "help"}
 		back = "close"

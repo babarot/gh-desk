@@ -8,6 +8,7 @@ import (
 	"time"
 
 	tea "charm.land/bubbletea/v2"
+	"github.com/charmbracelet/x/ansi"
 
 	"github.com/babarot/gh-desk/internal/claude"
 	"github.com/babarot/gh-desk/internal/runner"
@@ -515,7 +516,7 @@ func TestChatRecall(t *testing.T) {
 	fakeClaudeOf(t, m)
 	press(m, "i", "o", "n", "e", "enter")
 	c := m.chat()
-	press(m, "t", "w", "o", "enter", "ctrl+r")
+	press(m, "t", "w", "o", "enter", "ctrl+x")
 	press(m, "esc")
 	press(m, "i")
 	press(m, "up")
@@ -553,5 +554,128 @@ func TestRecallOnlyFromTheEdges(t *testing.T) {
 	press(m, "down")
 	if tr.input.Value() != long {
 		t.Errorf("typed text not back: %q", tr.input.Value())
+	}
+}
+
+// ctrl+r turns the text box into a search of the questions, in place: the
+// popup gets no box of its own. enter fills in and sends nothing.
+func TestTriageSearch(t *testing.T) {
+	h := &memoryHistory{entries: []askbox.Entry{
+		{Question: "bots with passing checks", Tab: "review", Reply: "2 bots"},
+		{Question: "先週から動いていないものは？", Tab: "mine"},
+		{Question: "what can I approve safely?"},
+	}}
+	m := withHistory(t, h)
+	h.entries[0].At = m.set.Now().Add(-48 * time.Hour)
+	press(m, "C", "d", "r", "a", "f", "t", "ctrl+r")
+	tr := m.triage
+	s := screen(m)
+	for _, want := range []string{"Search the questions", "› 2d", "bots with passing checks", "⏺ 2 bots", "cancel"} {
+		if !strings.Contains(s, want) {
+			t.Errorf("no %q:\n%s", want, s)
+		}
+	}
+	if strings.Count(s, "╭") != 2 {
+		t.Errorf("a box over the popup:\n%s", s)
+	}
+	press(m, "動", "い")
+	if s := screen(m); !strings.Contains(s, "先週から") || strings.Contains(s, "2 bots") {
+		t.Errorf("not narrowed:\n%s", s)
+	}
+	press(m, "enter")
+	if tr.search != nil || tr.input.Value() != "先週から動いていないものは？" || len(tr.turns) != 0 {
+		t.Errorf("search %v, value %q, turns %d", tr.search, tr.input.Value(), len(tr.turns))
+	}
+	press(m, "ctrl+u")
+	tr.input.SetValue("typed")
+	press(m, "ctrl+r", "ctrl+n", "ctrl+p", "ctrl+p", "ctrl+r", "esc")
+	if tr.search != nil || tr.input.Value() != "typed" || !tr.typing {
+		t.Errorf("after esc: search %v, value %q, typing %v", tr.search, tr.input.Value(), tr.typing)
+	}
+}
+
+// With nothing asked, there is nothing to search.
+func TestTriageSearchOfNothing(t *testing.T) {
+	m := withHistory(t, nil)
+	press(m, "C", "ctrl+r")
+	if m.triage.search != nil || !strings.Contains(status(m), "nothing has been asked") {
+		t.Errorf("search %v, status %q", m.triage.search, status(m))
+	}
+}
+
+// The chosen question stays among those shown when there are more than the
+// rows, and no line of the search is wider than the screen.
+func TestSearchFollowsTheChosen(t *testing.T) {
+	h := &memoryHistory{}
+	for i := range 12 {
+		h.entries = append(h.entries, askbox.Entry{Question: "question " + string(rune('a'+i))})
+	}
+	m := withHistory(t, h)
+	press(m, "C", "ctrl+r")
+	for range 10 {
+		press(m, "down")
+	}
+	if s := screen(m); !strings.Contains(s, "› ") || !strings.Contains(s, "question k") {
+		t.Errorf("chosen not shown:\n%s", s)
+	}
+}
+
+// In i the box of the pane becomes the search, and the draft has moved.
+func TestChatSearch(t *testing.T) {
+	m, _ := startWith(t, fixture(), keymap.Default())
+	fc := fakeClaudeOf(t, m)
+	press(m, "i", "o", "n", "e", "enter")
+	c := m.chat()
+	press(m, "ctrl+r")
+	s := screen(m)
+	if !strings.Contains(s, "history · acme/api#12") || strings.Contains(s, "ask claude") || !strings.Contains(s, "⏺ Answer 1") {
+		t.Errorf("no search:\n%s", s)
+	}
+	press(m, "enter")
+	if c.search != nil || c.input.Value() != "one" || len(fc.asked) != 1 {
+		t.Errorf("search %v, value %q, asked %d", c.search, c.input.Value(), len(fc.asked))
+	}
+	press(m, "ctrl+x")
+	if len(fc.asked) != 2 || !strings.Contains(fc.asked[1].Prompt, claude.DraftPrompt) {
+		t.Errorf("ctrl+x did not draft: %d", len(fc.asked))
+	}
+}
+
+// A text whose lower case is not as long in bytes marks and does not fall
+// over, whichever side it is on.
+func TestMarkHitByRune(t *testing.T) {
+	m, _ := startWith(t, fixture(), keymap.Default())
+	for _, tc := range []struct{ text, q, want string }{
+		{"k", "\u212a", "k"},
+		{"\u212a", "k", "\u212a"},
+		{"Bots with checks", "with", "Bots with checks"},
+		{"先週から動いていない", "動い", "先週から動いていない"},
+		{"nothing", "zzz", "nothing"},
+		{"nothing", "", "nothing"},
+	} {
+		if got := ansi.Strip(m.markHit(tc.text, tc.q, m.st.dim)); got != tc.want {
+			t.Errorf("markHit(%q, %q) = %q", tc.text, tc.q, got)
+		}
+	}
+}
+
+// On a low screen the text box of a search stays in sight.
+func TestSearchOnALowScreen(t *testing.T) {
+	for _, height := range []int{12, 14, 16, 18, 24} {
+		m, _ := startWith(t, fixture(), keymap.Default())
+		fakeClaudeOf(t, m)
+		m.Update(tea.WindowSizeMsg{Width: 130, Height: height})
+		press(m, "i", "o", "n", "e", "enter", "t", "w", "o", "enter", "ctrl+r")
+		if !m.claudeShown() {
+			continue
+		}
+		s, cur := m.render()
+		if cur == nil {
+			t.Fatalf("height %d: no cursor", height)
+		}
+		lines := strings.Split(ansi.Strip(s), "\n")
+		if !strings.Contains(lines[cur.Y], "Search the questions") {
+			t.Errorf("height %d: the cursor is on %q", height, lines[cur.Y])
+		}
 	}
 }
