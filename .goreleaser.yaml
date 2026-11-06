@@ -12,6 +12,7 @@ builds:
       - arm64
     ldflags:
       - -s -w
+      - -X github.com/babarot/gh-desk/internal/version.Source=release
     flags:
       - -trimpath
 

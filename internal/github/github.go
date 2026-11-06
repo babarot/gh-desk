@@ -32,6 +32,10 @@ type Client struct {
 	rest *api.RESTClient
 	diff *api.RESTClient
 	log  *slog.Logger
+	// host is the host gh is logged in to, and next the transport under
+	// the one that logs, for reading github.com when host is another.
+	host string
+	next http.RoundTripper
 	// low is set while GitHub's GraphQL points left are under
 	// lowRemaining, so that is said once, not at every query.
 	low atomic.Bool
@@ -76,7 +80,11 @@ func New(log *slog.Logger, o Options) (*Client, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Client{gql: gql, rest: rest, diff: diff, log: log}, nil
+	host := o.Host
+	if host == "" {
+		host = DefaultHost()
+	}
+	return &Client{gql: gql, rest: rest, diff: diff, log: log, host: host, next: next}, nil
 }
 
 // rateLimit is asked for in every query, to log what each costs.

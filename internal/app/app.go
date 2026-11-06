@@ -108,7 +108,8 @@ func start(o *options, gcOnly bool, stdout, stderr io.Writer) int {
 		log.Warn("gh-desk's own MCP server is left out: where this program is is unknown", "err", err.Error())
 	}
 	p := assemble(cfg, warns, env{gh: gh, host: github.DefaultHost(), viewer: viewer, stateDir: state.DefaultDir(),
-		borrow: claude.GhqRoots(ctx), noCache: o.noCache, config: absPath(o.config), exe: exe, debug: o.debug}, log)
+		borrow: claude.GhqRoots(ctx), noCache: o.noCache, config: absPath(o.config), exe: exe, debug: o.debug,
+		release: version.IsRelease(), notify: os.Getenv("GH_NO_EXTENSION_UPDATE_NOTIFIER") == "", extensions: github.ExtensionsDir()}, log)
 	p.set.LogRecords = recs
 	start := time.Now()
 	err = tui.Run(ctx, source{gh}, p.rn, p.cl, km, log, p.set)
@@ -148,6 +149,12 @@ type env struct {
 	config string
 	exe    string
 	debug  bool
+	// release is whether this build is a release, and notify whether it
+	// may tell of its releases: release.check and gh's
+	// GH_NO_EXTENSION_UPDATE_NOTIFIER both leave it on. extensions is
+	// where gh installs its extensions.
+	release, notify bool
+	extensions      string
 }
 
 // parts are what the TUI runs with. store and lock, when set, are closed
@@ -175,6 +182,7 @@ func assemble(cfg config.File, warns []string, e env, log *slog.Logger) parts {
 	if !e.noCache {
 		set.Lists = openLists(cfg, e.host, e.viewer, log)
 	}
+	set.Release = releaseOf(cfg, e, log)
 	layout := state.OpenLayout(e.stateDir)
 	set.Layout = layout
 	if h, err := layout.PreviewHeight(); err != nil {
