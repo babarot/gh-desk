@@ -4,6 +4,7 @@
 
 Accepted
 Partly replaced by ADR-070
+Partly replaced by ADR-094
 
 ## Context
 

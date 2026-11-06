@@ -839,8 +839,8 @@ func TestCommentWithBody(t *testing.T) {
 
 // c with a selection sends the same comment to each selected pull
 // request. The popup closes at once and the status line counts the
-// comment through them; those it failed on are selected again, and c
-// starts with the comment for them.
+// comment through them; none stays selected, and the retry key sends the
+// comment again to those it failed on.
 func TestCommentOnSelection(t *testing.T) {
 	f := fixture()
 	m := start(t, f, keymap.Default())
@@ -876,16 +876,22 @@ func TestCommentOnSelection(t *testing.T) {
 	if cs := m.cache.details[key("acme", "api", 12)].val.Comments; len(cs) != 1 {
 		t.Errorf("the comment sent is not shown: %+v", cs)
 	}
-	if !strings.Contains(status(m), "failed on 1 of 2") || len(m.selected) != 1 || !m.isSelected(key("acme", "web", 7)) {
-		t.Fatalf("the one it failed on is not selected again: %v, %q", m.selected, status(m))
+	if !strings.Contains(status(m), "failed on 1 of 2") || len(m.selected) != 0 {
+		t.Fatalf("selection = %v, status = %q", m.selected, status(m))
 	}
-	press(m, "c")
-	if m.compose == nil || len(m.compose.prs) != 1 || m.compose.ta.Value() != "@dependabot rebase" {
-		t.Fatalf("c does not write the comment again for the one it failed on: %+v", m.compose)
+	press(m, ".")
+	if m.confirm == nil || len(m.confirm.prs) != 1 || m.confirm.body != "@dependabot rebase" {
+		t.Fatalf("the retry key does not offer the comment again: %+v", m.confirm)
 	}
-	press(m, "esc", "R")
-	if m.compose == nil || m.compose.single || len(m.compose.prs) != 1 || m.compose.ta.Value() != "" {
-		t.Errorf("R on the selection did not open a review of it, apart from the comment: %+v", m.compose)
+	press(m, "esc")
+	if m.retry == nil {
+		t.Fatal("esc lost what is left to try again")
+	}
+	press(m, ".")
+	m.src = f
+	press(m, "y")
+	if len(f.posted) != 2 || f.posted[1] != "acme/web#7 @dependabot rebase" || m.retry != nil {
+		t.Errorf("posted = %q, retry = %+v", f.posted, m.retry)
 	}
 }
 
@@ -934,8 +940,8 @@ func TestReviewWithBody(t *testing.T) {
 	}
 }
 
-// R on a selection sends the same review to each; those the runner did
-// not send it to are left selected, and the next R starts with it.
+// R on a selection sends the same review to each; none stays selected,
+// and the retry key sends it to those the runner did not send it to.
 func TestReviewOnSelection(t *testing.T) {
 	m, r := startWith(t, fixture(), keymap.Default())
 	r.results[key("acme", "web", 7)] = runner.Event{Result: runner.Stopped, Text: "head changed · confirm again"}
@@ -945,13 +951,13 @@ func TestReviewOnSelection(t *testing.T) {
 	if len(r.reviews) != 1 || r.reviews[0].Event != model.EventRequestChanges || len(r.items[0]) != 2 {
 		t.Fatalf("reviews = %+v, items = %+v", r.reviews, r.items)
 	}
-	if len(m.selected) != 1 || !m.isSelected(key("acme", "web", 7)) {
-		t.Fatalf("selection = %v, want the one not sent", m.selected)
+	if len(m.selected) != 0 {
+		t.Fatalf("selection = %v, want none", m.selected)
 	}
-	press(m, "R")
-	if m.compose == nil || len(m.compose.prs) != 1 || kinds[m.compose.kind] != model.EventRequestChanges ||
-		m.compose.ta.Value() != "Please split this." {
-		t.Fatalf("R does not start with the review not sent: %+v", m.compose)
+	press(m, ".")
+	if m.bulk == nil || len(m.bulk.items) != 1 || m.bulk.items[0].pr.Key != key("acme", "web", 7) ||
+		m.bulk.review.Event != model.EventRequestChanges || m.bulk.review.Body != "Please split this." {
+		t.Fatalf("the retry key does not offer the review not sent: %+v", m.bulk)
 	}
 }
 

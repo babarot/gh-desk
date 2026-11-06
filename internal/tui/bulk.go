@@ -51,6 +51,9 @@ type bulk struct {
 	// close is the comment and the branch of a close popup; nil for
 	// another kind.
 	close *closeForm
+	// retry is set when the popup tries a stopped action again, which is
+	// then no longer left to try.
+	retry bool
 }
 
 type notesState int
@@ -453,12 +456,21 @@ func (m *Model) bulkKey(k string) tea.Cmd {
 	return nil
 }
 
-// runBulk starts the batch: what it skips leaves the selection at once and
-// keeps its reason on its row; what it acts on shows its progress there.
+// runBulk starts the batch: the pull requests of the popup leave the
+// selection, whatever becomes of them (ADR-094). What it skips keeps its
+// reason on its row; what it acts on shows its progress there.
 // A review being written under the popup is closed once its batch starts;
 // with nothing to do, it is left open.
 func (m *Model) runBulk() tea.Cmd {
 	b := m.bulk
+	if b.retry {
+		m.retry = nil
+	}
+	spent := make([]model.PRKey, len(b.items))
+	for i, it := range b.items {
+		spent[i] = it.pr.Key
+	}
+	m.spend(spent)
 	var items []runner.Item
 	bs := &batchState{kind: b.kind, review: b.review, byClaude: b.by != "", goes: map[model.PRKey]bool{}, done: map[model.PRKey]progress{}}
 	for _, it := range b.items {
@@ -469,7 +481,6 @@ func (m *Model) runBulk() tea.Cmd {
 			bs.order = append(bs.order, it.pr.Key)
 			continue
 		}
-		delete(m.selected, it.pr.Key)
 		why := it.why(m.firstKey("refresh"), m.lockedBy())
 		// The row says why for a while; the log keeps it.
 		m.log.Info("pr skipped", logging.KeyOp, b.verb(), logging.KeyPR, it.pr.Key.String(), "why", why)
@@ -498,9 +509,6 @@ func (m *Model) runBulk() tea.Cmd {
 	for _, it := range items {
 		m.hold(it.PR.Key)
 		m.progress[it.PR.Key] = progress{text: "queued"}
-		if !b.approves() {
-			delete(m.selected, it.PR.Key)
-		}
 	}
 	var id string
 	var ch <-chan runner.Event
@@ -510,7 +518,7 @@ func (m *Model) runBulk() tea.Cmd {
 		id, ch = m.run.StartReview(m.ctx, b.review, items)
 	case b.close != nil:
 		ct := b.close.text()
-		bs.comment = ct.Body
+		bs.comment, bs.deleteBranch = ct.Body, ct.DeleteBranch
 		m.unsentClose = ""
 		id, ch = m.run.StartClose(m.ctx, ct, items)
 	default:

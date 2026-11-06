@@ -44,7 +44,7 @@ func (m *Model) listKey(k string) tea.Cmd {
 	case k == keymap.Back:
 		switch {
 		case len(m.selected) > 0:
-			clear(m.selected)
+			m.clearSelection()
 		case m.filter != "" || t.ruleFilter != nil:
 			m.filter, t.ruleFilter = "", nil
 		default:
@@ -86,8 +86,14 @@ func (m *Model) listKey(k string) tea.Cmd {
 		}
 		return nil
 	case is("clear_selection"):
-		clear(m.selected)
+		if len(m.selected) > 0 {
+			m.clearSelection()
+		} else {
+			m.restoreSelection()
+		}
 		return nil
+	case is("retry"):
+		return m.tryAgain()
 	case is("select_rule"):
 		return m.openPick()
 	case is("triage"):
@@ -315,18 +321,17 @@ func (m *Model) hide(p model.PR, n *model.Notification) tea.Cmd {
 
 // putAway hides k in the tab shown and takes it out of the selection; in
 // the inbox, with its notification n, it also marks n done, and done says
-// so. One selected that fails to be marked done is selected again.
+// so. One that fails to be marked done can be tried again.
 func (m *Model) putAway(k model.PRKey, n *model.Notification) (cmd tea.Cmd, done bool) {
 	t := m.tab()
 	t.hidden[k] = true
-	was := m.isSelected(k)
 	delete(m.selected, k)
 	if !t.inbox || n == nil {
 		return nil, false
 	}
 	delete(m.unread, k)
 	note := *n
-	return func() tea.Msg { return doneMsg{note, m.src.MarkDone(m.ctx, note), was} }, true
+	return m.markDone(note), true
 }
 
 // selectedHere are the selected pull requests the tab shown shows, each

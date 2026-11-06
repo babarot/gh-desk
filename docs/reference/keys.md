@@ -56,7 +56,7 @@ browse = []
 | `space` | `select` | select |
 | `V` | `select_shown` | select shown |
 | `S` | `select_rule` | select by rule |
-| `u` | `clear_selection` | clear selection |
+| `u` | `clear_selection` | clear / restore selection |
 | `A` | `approve` | approve |
 | `M` | `merge` | merge |
 | `D` | `ready_for_review` | ready for review |
