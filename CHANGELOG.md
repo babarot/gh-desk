@@ -1,5 +1,16 @@
 # Changelog
 
+## [v0.13.0](https://github.com/babarot/gh-desk/compare/v0.12.0...v0.13.0) - 2026-11-06
+### New Features
+- Keep the questions of a triage and recall them from the text box by @babarot in https://github.com/babarot/gh-desk/pull/95
+- Search the questions in place of the text box by @babarot in https://github.com/babarot/gh-desk/pull/96
+- Complete what is typed in the text box, and name pull requests in a triage by @babarot in https://github.com/babarot/gh-desk/pull/97
+### Improvements
+- Let a confirmed action use up its selection by @babarot in https://github.com/babarot/gh-desk/pull/90
+- Send a comment through the confirm popup and the runner by @babarot in https://github.com/babarot/gh-desk/pull/92
+- Draw a triage as the claude pane draws a conversation by @babarot in https://github.com/babarot/gh-desk/pull/93
+- Let a triage go on under the popup, and keep its plan on its tab by @babarot in https://github.com/babarot/gh-desk/pull/94
+
 ## [v0.12.0](https://github.com/babarot/gh-desk/compare/v0.11.0...v0.12.0) - 2026-11-06
 ### New Features
 - Write a short config file, and tell of new settings after an update by @babarot in https://github.com/babarot/gh-desk/pull/87
