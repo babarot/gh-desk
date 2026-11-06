@@ -30,6 +30,8 @@ type progress struct {
 	// locked is set on a merge skipped because another gh-desk holds
 	// the record of pending merges; its row starts with the word.
 	locked bool
+	// ended is when the result came, zero while a step is running.
+	ended time.Time
 }
 
 // heldSort is where a row sorts while it shows a result: by what it was
@@ -203,6 +205,9 @@ func (m *Model) event(msg eventMsg) tea.Cmd {
 	// progress pane draws them.
 	ev.Text = safeLine(ev.Text)
 	pg := progress{text: ev.Text, result: ev.Result, watch: ev.Watch}
+	if ev.Result.Final() {
+		pg.ended = m.set.Now()
+	}
 	if ev.Locked {
 		pg.text, pg.detail, pg.locked = m.lockedBy(), m.lockedDetail(ev.Key, ""), true
 	}
@@ -711,6 +716,24 @@ func (m *Model) clearResults() int {
 	}
 	return n
 }
+
+// fadeResults puts away, before an automatic reading, the results of
+// reviews, approvals included, that have been shown for at least an
+// interval of the automatic refresh, so the reading drops the rows the tab
+// no longer has. Every other result stays until r (ADR-084).
+func (m *Model) fadeResults() {
+	now := m.set.Now()
+	for k, p := range m.progress {
+		if !fades(p.result) || p.ended.IsZero() || now.Sub(p.ended) < m.set.Refresh {
+			continue
+		}
+		delete(m.progress, k)
+		delete(m.held, k)
+	}
+}
+
+// fades reports whether a result is put away by the automatic refresh.
+func fades(r runner.Result) bool { return r == runner.Approved || r == runner.Reviewed }
 
 // tally is the header's count of results on rows.
 func (m *Model) tally() string {

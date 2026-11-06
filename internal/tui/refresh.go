@@ -21,12 +21,14 @@ func (m *Model) tick() tea.Cmd {
 }
 
 // autoRefresh reads the shown tab and the notifications again. It leaves
-// the results on the rows; while a popup is open it waits for the next
-// tick, so what is being confirmed does not change under the user.
+// the results on the rows but those of reviews shown long enough; while a
+// popup is open it waits for the next tick, so what is being confirmed
+// does not change under the user.
 func (m *Model) autoRefresh() tea.Cmd {
 	if m.bulk != nil || m.confirm != nil || m.compose != nil || m.notesAt != nil || m.picker != nil || m.menu != nil || m.typingChat() || m.viewer == "" {
 		return m.tick()
 	}
+	m.fadeResults()
 	if m.rereading == nil {
 		m.rereading = &rereading{by: "clock", start: m.set.Now(), tabs: m.reloadTabs()}
 	}
