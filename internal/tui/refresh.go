@@ -25,14 +25,16 @@ func (m *Model) tick() tea.Cmd {
 // popup is open it waits for the next tick, so what is being confirmed
 // does not change under the user.
 func (m *Model) autoRefresh() tea.Cmd {
+	// Rules approve whatever is open: they change no row under the user.
+	auto := m.autoApprove()
 	if m.bulk != nil || m.confirm != nil || m.compose != nil || m.notesAt != nil || m.picker != nil || m.menu != nil || m.typingChat() || m.viewer == "" {
-		return m.tick()
+		return tea.Batch(auto, m.tick())
 	}
 	m.fadeResults()
 	if m.rereading == nil {
 		m.rereading = &rereading{by: "clock", start: m.set.Now(), tabs: m.reloadTabs()}
 	}
-	return tea.Batch(m.reload(), m.tick())
+	return tea.Batch(m.reload(), m.tick(), auto)
 }
 
 // rereading is a reading of the lists again, by r or by the clock, kept
@@ -72,7 +74,7 @@ func (m *Model) refresh() tea.Cmd {
 	tabs := m.reloadTabs()
 	m.refreshing = &refreshRun{tabs: tabs, cleared: n}
 	m.rereading = &rereading{by: "r", start: m.set.Now(), tabs: tabs}
-	return m.reload()
+	return tea.Batch(m.reload(), m.autoApprove())
 }
 
 // endRefresh forgets the reading r started once each tab it reads is

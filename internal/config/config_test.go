@@ -76,6 +76,22 @@ func TestRulesWrittenReplaceTheDefault(t *testing.T) {
 	}
 }
 
+func TestRulesThatApproveHaveNoDefault(t *testing.T) {
+	if len(Default().AutoApprove) != 0 {
+		t.Errorf("Default() approves: %+v", Default().AutoApprove)
+	}
+	for _, src := range []string{Template(), "select = []\n"} {
+		cfg, _, err := Load(write(t, src))
+		if err != nil || len(cfg.AutoApprove) != 0 {
+			t.Errorf("%q approves: %+v, %v", src, cfg.AutoApprove, err)
+		}
+	}
+	// The manual shows them, as comments.
+	if cfg, _, err := Load(write(t, Manual("", Mark{}))); err != nil || len(cfg.AutoApprove) != 0 {
+		t.Errorf("the manual approves: %+v, %v", cfg.AutoApprove, err)
+	}
+}
+
 func TestNoRulesAtAll(t *testing.T) {
 	cfg, _, err := Load(write(t, "select = []\n\n[list]\nrefresh = \"1m\"\n"))
 	if err != nil || len(cfg.Select) != 0 {
@@ -647,4 +663,51 @@ func TestMenuActions(t *testing.T) {
 		`config.toml:2:21: menu.actions names "merge" twice`,
 		`menu.actions[2] must be one of "ask_claude", "browse", "review", "comment", "approve", "merge", "ready_for_review", "close", "hide", got "aprove"; did you mean "approve"?`)
 	wantErrs(t, "[menu]\nactions = []\n", `menu.actions must name at least one of`)
+}
+
+func TestAutoApproveRules(t *testing.T) {
+	cfg, _, err := Load(write(t, `
+[[auto_approve]]
+name = "renovate patches"
+authors = ["renovate"]
+title = "^chore"
+checks = ["passing"]
+
+[[auto_approve]]
+query = "is:pr is:open author:app/renovate"
+dry_run = true
+`))
+	if err != nil || len(cfg.AutoApprove) != 2 || cfg.AutoApprove[0].Name != "renovate patches" || cfg.AutoApprove[0].Query != "" ||
+		cfg.AutoApprove[0].DryRun || !cfg.AutoApprove[0].Title.MatchString("chore(deps)") ||
+		cfg.AutoApprove[1].Query != "is:pr is:open author:app/renovate" || !cfg.AutoApprove[1].DryRun {
+		t.Fatalf("cfg.AutoApprove = %+v, %v", cfg.AutoApprove, err)
+	}
+	again, _, err := Load(write(t, Show(cfg, true)))
+	if err != nil || !reflect.DeepEqual(again.AutoApprove, cfg.AutoApprove) {
+		t.Fatalf("Show then Load = %+v, %v\n%s", again.AutoApprove, err, Show(cfg, true))
+	}
+	wantErrs(t, `
+[[auto_approve]]
+name = "everything"
+
+[[auto_approve]]
+name = "everything"
+labels = ["deps"]
+reasons = ["mention"]
+
+[[auto_approve]]
+query = ""
+
+[[auto_approve]]
+labels = ["deps"]
+draft = true
+state = ["merged"]
+`,
+		`auto_approve[0]: "everything" matches every pull request`,
+		`auto_approve[1].name "everything" is used twice`,
+		`auto_approve[1].reasons is read only by [[exclude]]`,
+		`auto_approve[2].query must not be empty`,
+		`auto_approve[3].draft a draft is never approved by a rule`,
+		`auto_approve[3].state[0] "merged": only open pull requests are approved`,
+	)
 }

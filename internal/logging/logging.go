@@ -41,6 +41,10 @@ const (
 	// KeyWas what it was before.
 	KeyMergeState = "merge_state"
 	KeyWas        = "was"
+	// KeyRule names the [[auto_approve]] rule that asked for an approval,
+	// and KeyHead the head it judged.
+	KeyRule = "rule"
+	KeyHead = "head"
 )
 
 // Rotation defaults: the file is moved aside when it is over MaxSize at

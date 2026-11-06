@@ -539,6 +539,8 @@ var arrayTables = []arrayTable{
 		Doc: `The rules S offers to select pull requests, besides the built-in "approved by me". A pull request matches a rule when it meets every key the rule gives. These rules are the default; rules written in the file replace all of them, and ` + "`select = []`" + ` at the top of the file leaves none:`},
 	{Name: "exclude", Words: func() string { return excludeWords },
 		Doc: "Rules that leave pull requests out of every tab, until a shows them. A pull request is left out when it meets every key of one of them. There are none by default."},
+	{Name: "auto_approve", Words: func() string { return autoApproveWords },
+		Doc: "Rules that approve, without a confirm, the pull requests they match while gh-desk runs. There are none by default: nothing is approved unless a rule is written. A pull request an `[[exclude]]` rule matches is never approved."},
 }
 
 // elems are the keys of the arrays of tables.
@@ -559,6 +561,11 @@ var elems = map[string][]elem{
 	"exclude": append([]elem{
 		{Key: "name", Kind: stringKind{}, Doc: "The rule's name, which a row it leaves out says; without one, the row says the rule's conditions."},
 	}, slices.DeleteFunc(slices.Clone(conditionElems), func(e elem) bool { return e.Key == "packages" })...),
+	"auto_approve": append([]elem{
+		{Key: "name", Kind: stringKind{}, Doc: "The rule's name, which the notifications say of what it approved; without one, they say the rule's conditions."},
+		{Key: "query", Kind: stringKind{NonEmpty: true}, Doc: "The GitHub search the pull requests are found by; without it, the open pull requests that are not drafts and whose review is asked of you, in the rule's repos when each can be searched. A rule with neither query nor a condition is a mistake."},
+		{Key: "dry_run", Kind: boolKind{}, Doc: "true: only tell, in the notifications, what the rule would approve."},
+	}, conditionElems...),
 }
 
 // conditionElems are the conditions of a rule, which [[select]] takes.
@@ -585,7 +592,7 @@ var conditionElems = []elem{
 	{Key: "approved_by_me", Kind: boolKind{}, Doc: "true: your latest review must approve it, a person's pull request too, unlike the built-in \"approved by me\"; false: none of yours does."},
 	{Key: "reviewed_by_me", Kind: boolKind{}, Doc: "true: you must have reviewed it, whatever the review said; false: you have not."},
 	{Key: "requested", Kind: listKind{NonEmpty: true}, Doc: `Whom a review must be asked of, one of them: "me", or a team as "@slug".`},
-	{Key: "reasons", Kind: listKind{Values: Reasons, NonEmpty: true}, Doc: "Reasons of a notification, one of which the row's must have; S has no notification, so [[select]] does not take it."},
+	{Key: "reasons", Kind: listKind{Values: Reasons, NonEmpty: true}, Doc: "Reasons of a notification, one of which the row's must have; S and a rule that approves judge a pull request without one, so [[select]] and [[auto_approve]] do not take it."},
 }
 
 // checkSettings checks every setting's value against its kind.
@@ -705,6 +712,20 @@ const excludeWords = `# Rules that leave pull requests out of every tab, until a
 #
 # [[exclude]]
 # labels = ["wip", "do-not-merge"]
+`
+
+const autoApproveWords = `# Rules that approve, without a confirm, the pull requests they match while
+# gh-desk runs. They take the keys of [[select]] but reasons, a query to find
+# the pull requests by (the open ones whose review is asked of you, without
+# it), and dry_run to only tell what they would approve. A pull request an
+# [[exclude]] rule matches is never approved; the jobs on its head are waited
+# for first.
+#
+# [[auto_approve]]
+# name = "renovate patches"
+# authors = ["renovate"]
+# title = '^chore\(deps\): update .* to v?\d+\.\d+\.\d+$'
+# checks = ["passing"]
 `
 
 const keysHead = `[keys]
@@ -1064,6 +1085,18 @@ func Show(f File, onlyDiff bool) string {
 		b.WriteString("[[exclude]]\n")
 		fmt.Fprintf(&b, "name = %q\n", e.Name)
 		writeConditions(&b, e.Conditions)
+		b.WriteString("\n")
+	}
+	for _, a := range f.AutoApprove {
+		b.WriteString("[[auto_approve]]\n")
+		fmt.Fprintf(&b, "name = %q\n", a.Name)
+		if a.Query != "" {
+			fmt.Fprintf(&b, "query = %q\n", a.Query)
+		}
+		if a.DryRun {
+			b.WriteString("dry_run = true\n")
+		}
+		writeConditions(&b, a.Conditions)
 		b.WriteString("\n")
 	}
 	for _, t := range tables {

@@ -70,6 +70,32 @@ func TestAssembleKeepsTheRecord(t *testing.T) {
 	}
 }
 
+// A pending approval a rule asked for is not gone on with: the rule may
+// have been taken out of the file, and reading the rules finds it again.
+func TestAssembleForgetsAnApprovalARuleAskedFor(t *testing.T) {
+	dir := t.TempDir()
+	s, err := state.Open(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	confirmed := model.Pending{Kind: model.PendingApprove, Key: model.PRKey{Owner: "babarot", Repo: "gh-desk", Number: 1}, ID: "PR_1", Head: "abc", Author: "me"}
+	byRule := model.Pending{Kind: model.PendingApprove, Auto: true, Key: model.PRKey{Owner: "babarot", Repo: "gh-desk", Number: 2}, ID: "PR_2", Head: "def", Author: "renovate"}
+	for _, p := range []model.Pending{confirmed, byRule} {
+		if err := s.Put(p); err != nil {
+			t.Fatal(err)
+		}
+	}
+	s.Close()
+
+	p, _ := assembleIn(t, dir, false)
+	if len(p.set.Resume) != 1 || p.set.Resume[0].Key != confirmed.Key {
+		t.Errorf("resume = %+v", p.set.Resume)
+	}
+	if kept := p.store.Pending(); len(kept) != 1 || kept[0].Key != confirmed.Key {
+		t.Errorf("kept = %+v", kept)
+	}
+}
+
 // Another gh-desk holding the record leaves this one without waiting
 // merges, with a lock to take the record over once the other quits.
 func TestAssembleWhileAnotherHoldsTheRecord(t *testing.T) {

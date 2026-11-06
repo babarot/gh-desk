@@ -104,7 +104,7 @@ title = "(?i)lock file maintenance"
 | `approved_by_me` | boolean | true: your latest review must approve it, a person's pull request too, unlike the built-in "approved by me"; false: none of yours does. |
 | `reviewed_by_me` | boolean | true: you must have reviewed it, whatever the review said; false: you have not. |
 | `requested` | list of strings | Whom a review must be asked of, one of them: "me", or a team as "@slug". |
-| `reasons` | list of `approval_requested`, `assign`, `author`, `ci_activity`, `comment`, `invitation`, `manual`, `member_feature_requested`, `mention`, `review_requested`, `security_advisory_credit`, `security_alert`, `state_change`, `subscribed`, `team_mention` | Reasons of a notification, one of which the row's must have; S has no notification, so [[select]] does not take it. |
+| `reasons` | list of `approval_requested`, `assign`, `author`, `ci_activity`, `comment`, `invitation`, `manual`, `member_feature_requested`, `mention`, `review_requested`, `security_advisory_credit`, `security_alert`, `state_change`, `subscribed`, `team_mention` | Reasons of a notification, one of which the row's must have; S and a rule that approves judge a pull request without one, so [[select]] and [[auto_approve]] do not take it. |
 
 ## [[exclude]]
 
@@ -134,7 +134,40 @@ Rules that leave pull requests out of every tab, until a shows them. A pull requ
 | `approved_by_me` | boolean | true: your latest review must approve it, a person's pull request too, unlike the built-in "approved by me"; false: none of yours does. |
 | `reviewed_by_me` | boolean | true: you must have reviewed it, whatever the review said; false: you have not. |
 | `requested` | list of strings | Whom a review must be asked of, one of them: "me", or a team as "@slug". |
-| `reasons` | list of `approval_requested`, `assign`, `author`, `ci_activity`, `comment`, `invitation`, `manual`, `member_feature_requested`, `mention`, `review_requested`, `security_advisory_credit`, `security_alert`, `state_change`, `subscribed`, `team_mention` | Reasons of a notification, one of which the row's must have; S has no notification, so [[select]] does not take it. |
+| `reasons` | list of `approval_requested`, `assign`, `author`, `ci_activity`, `comment`, `invitation`, `manual`, `member_feature_requested`, `mention`, `review_requested`, `security_advisory_credit`, `security_alert`, `state_change`, `subscribed`, `team_mention` | Reasons of a notification, one of which the row's must have; S and a rule that approves judge a pull request without one, so [[select]] and [[auto_approve]] do not take it. |
+
+## [[auto_approve]]
+
+Rules that approve, without a confirm, the pull requests they match while gh-desk runs. There are none by default: nothing is approved unless a rule is written. A pull request an `[[exclude]]` rule matches is never approved.
+
+| Key | Type | |
+|---|---|---|
+| `name` | string | The rule's name, which the notifications say of what it approved; without one, they say the rule's conditions. |
+| `query` | string | The GitHub search the pull requests are found by; without it, the open pull requests that are not drafts and whose review is asked of you, in the rule's repos when each can be searched. A rule with neither query nor a condition is a mistake. |
+| `dry_run` | boolean | true: only tell, in the notifications, what the rule would approve. |
+| `repos` | list of strings | owner/repo globs the repository must match one of; * matches any part of the owner or the name. |
+| `authors` | list of strings | The logins the author must be one of; bots without app/. |
+| `packages` | list of strings | The dependencies a renovate or dependabot pull request updates, read from its body; every one it updates must be listed. |
+| `title` | string | A regular expression the title must match, as written: a shortcode such as `:arrow_up:` is matched as itself, not as its emoji. |
+| `max_files` | integer, 1 or more | The most files it may change. |
+| `max_lines` | integer, 1 or more | The most lines it may add and delete together: the sum of the two numbers SIZE shows. |
+| `min_files` | integer, 1 or more | The least files it may change. |
+| `min_lines` | integer, 1 or more | The least lines it may add and delete together. |
+| `updated_within_days` | integer, 1 to 36500 | The most days, of 24 hours, since it was last updated: a label or a bot's comment updates it too. An old pull request updated lately matches. |
+| `created_within_days` | integer, 1 to 36500 | The most days, of 24 hours, since it was created. |
+| `updated_before_days` | integer, 1 to 36500 | The least days, of 24 hours, since it was last updated, as AGE counts them in a search tab. |
+| `created_before_days` | integer, 1 to 36500 | The least days, of 24 hours, since it was created. |
+| `bot` | boolean | true: the author must be a bot; false: a person. |
+| `mine` | boolean | true: it must be your own pull request; false: someone else's. |
+| `draft` | boolean | true: it must be a draft, which S never selects, so [[select]] does not take true; false: ready for review. |
+| `state` | list of `open`, `merged`, `closed` | The states it must be in one of: "open", "merged" or "closed"; S selects open ones only, so [[select]] takes "open" alone. |
+| `checks` | list of `passing`, `failing`, `pending` | The states its checks must be in one of: "passing" (passed, none at all, or only checks.approval pending), "failing" or "pending" (still running). |
+| `decision` | list of `approved`, `changes_requested`, `review_required`, `none` | The review decisions REVIEW shows, one of which it must have; "none" is none, as in a repository that requires no review. |
+| `labels` | list of strings | Labels one of which it must have. |
+| `approved_by_me` | boolean | true: your latest review must approve it, a person's pull request too, unlike the built-in "approved by me"; false: none of yours does. |
+| `reviewed_by_me` | boolean | true: you must have reviewed it, whatever the review said; false: you have not. |
+| `requested` | list of strings | Whom a review must be asked of, one of them: "me", or a team as "@slug". |
+| `reasons` | list of `approval_requested`, `assign`, `author`, `ci_activity`, `comment`, `invitation`, `manual`, `member_feature_requested`, `mention`, `review_requested`, `security_advisory_credit`, `security_alert`, `state_change`, `subscribed`, `team_mention` | Reasons of a notification, one of which the row's must have; S and a rule that approves judge a pull request without one, so [[select]] and [[auto_approve]] do not take it. |
 
 ## [list]
 
