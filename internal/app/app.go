@@ -537,7 +537,7 @@ func editor(set string, getenv func(string) string) string {
 // come back one line each, with where they are, for the TUI to show; they
 // are logged too.
 func setup(path string, debug bool, level *slog.LevelVar, log *slog.Logger) (config.File, keymap.Map, []string, error) {
-	if err := config.WriteTemplate(path, KeysTemplate()); err == nil {
+	if err := config.WriteTemplate(path); err == nil {
 		log.Info("wrote the config file", "config", path)
 	} else if !errors.Is(err, fs.ErrExist) {
 		log.Warn("could not write the config file", "config", path, "err", err.Error())
@@ -619,9 +619,9 @@ func applyKeys(set config.Keys) (keymap.Map, config.Problems) {
 	return km, nil
 }
 
-// KeysTemplate is the [keys] part of the config file written on first run:
-// every action at its default keys, commented out, scope by scope.
-func KeysTemplate() string {
+// KeysManual is the [keys] part of the manual: every action at its default
+// keys, commented out, scope by scope.
+func KeysManual() string {
 	var b strings.Builder
 	scope := keymap.Scope("")
 	for _, d := range keymap.Defaults {

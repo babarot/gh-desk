@@ -14,6 +14,8 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/babarot/gh-desk/internal/config"
+	"github.com/babarot/gh-desk/internal/release"
+	"github.com/babarot/gh-desk/internal/state"
 	"github.com/babarot/gh-desk/internal/tui/keymap"
 )
 
@@ -21,8 +23,8 @@ import (
 func newConfigCommand(o *options, stdout, stderr io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "config",
-		Short: "check, show or edit the config file",
-		Long: `Check, show or edit the config file.
+		Short: "check, show or edit the config file, and print what each setting does",
+		Long: `Check, show or edit the config file, and print what each setting does.
 
 The config file is the one --config names: by default
 $XDG_CONFIG_HOME/gh-desk/config.toml, or ~/.config/gh-desk/config.toml.`,
@@ -71,10 +73,10 @@ $XDG_CONFIG_HOME/gh-desk/config.toml, or ~/.config/gh-desk/config.toml.`,
 		show,
 		&cobra.Command{
 			Use:   "init",
-			Short: "write the config file with every setting at its default, unless one is there",
+			Short: "write the config file with the rules to start with, unless one is there",
 			Args:  cobra.NoArgs,
 			RunE: func(*cobra.Command, []string) error {
-				switch err := config.WriteTemplate(o.config, KeysTemplate()); {
+				switch err := config.WriteTemplate(o.config); {
 				case errors.Is(err, fs.ErrExist):
 					fmt.Fprintf(stdout, "%s is there already; nothing was written\n", config.TildePath(o.config))
 				case err != nil:
@@ -95,6 +97,29 @@ $XDG_CONFIG_HOME/gh-desk/config.toml, or ~/.config/gh-desk/config.toml.`,
 			},
 		},
 		&cobra.Command{
+			Use:   "reference [table or key]",
+			Short: "print every setting with what it does and its default, or those of a table or a key",
+			Long: `Print every setting with what it does and its default, as comments, from
+this version of gh-desk. The config file is not read.
+
+A name narrows it to a table (merge), an array of tables (select), keys, or
+one key of any of them (list.refresh, select.max_lines, keys.approve).`,
+			Args: cobra.MaximumNArgs(1),
+			RunE: func(_ *cobra.Command, args []string) error {
+				if len(args) == 0 {
+					fmt.Fprint(stdout, config.Manual(KeysManual(), newSettings(state.DefaultDir())))
+					return nil
+				}
+				text, err := config.ManualOf(args[0], KeysManual(), newSettings(state.DefaultDir()))
+				if err != nil {
+					fmt.Fprintf(stderr, "gh-desk: %v\n", err)
+					return exitCode(1)
+				}
+				fmt.Fprint(stdout, text)
+				return nil
+			},
+		},
+		&cobra.Command{
 			Use:   "schema",
 			Short: "print the JSON Schema of the config file",
 			Args:  cobra.NoArgs,
@@ -105,6 +130,17 @@ $XDG_CONFIG_HOME/gh-desk/config.toml, or ~/.config/gh-desk/config.toml.`,
 		},
 	)
 	return cmd
+}
+
+// newSettings are the settings to mark as new, kept under dir by the
+// update that found them. The manual reads as well without them, so a
+// record that cannot be read marks none.
+func newSettings(dir string) config.Mark {
+	rec, err := release.Open(dir).Load()
+	if err != nil || len(rec.New) == 0 {
+		return config.Mark{}
+	}
+	return config.Mark{Names: rec.New, Since: "v" + strings.TrimPrefix(rec.NewSince, "v")}
 }
 
 // checkConfig prints the mistakes and warnings of the config file at
@@ -133,7 +169,7 @@ func checkConfig(path string, debug bool, stdout io.Writer) int {
 // writing it first when it is not there, and checks it when the editor is
 // closed.
 func editConfig(path string, debug bool, stdout, stderr io.Writer) int {
-	if err := config.WriteTemplate(path, KeysTemplate()); err != nil && !errors.Is(err, fs.ErrExist) {
+	if err := config.WriteTemplate(path); err != nil && !errors.Is(err, fs.ErrExist) {
 		fmt.Fprintf(stderr, "gh-desk: %v\n", err)
 		return 1
 	}

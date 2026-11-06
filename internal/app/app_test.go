@@ -18,11 +18,11 @@ import (
 	"github.com/babarot/gh-desk/internal/version"
 )
 
-func TestKeysTemplateLoadsUncommented(t *testing.T) {
-	// Every line of the [keys] template, uncommented, is a valid setting
+func TestKeysManualLoadsUncommented(t *testing.T) {
+	// Every line of the [keys] manual, uncommented, is a valid setting
 	// that changes nothing.
 	var lines []string
-	for l := range strings.SplitSeq(KeysTemplate(), "\n") {
+	for l := range strings.SplitSeq(KeysManual(), "\n") {
 		if strings.HasPrefix(l, "# ") && strings.Contains(l, " = ") {
 			lines = append(lines, strings.TrimPrefix(l, "# "))
 		}
@@ -41,15 +41,15 @@ func TestKeysTemplateLoadsUncommented(t *testing.T) {
 }
 
 func TestEveryScopeHasWords(t *testing.T) {
-	// The [keys] template heads each scope with its words; a scope added to
+	// The [keys] manual heads each scope with its words; a scope added to
 	// the keymap without them would get an empty heading.
 	for _, d := range keymap.Defaults {
 		if strings.TrimSpace(scopeWords[d.Scope]) == "" {
 			t.Errorf("scope %q of %s has no words in scopeWords", d.Scope, d.Action)
 		}
 	}
-	if strings.Contains(KeysTemplate(), "# :") {
-		t.Errorf("template has an empty heading:\n%s", KeysTemplate())
+	if strings.Contains(KeysManual(), "# :") {
+		t.Errorf("template has an empty heading:\n%s", KeysManual())
 	}
 }
 

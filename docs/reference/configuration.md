@@ -2,9 +2,10 @@
 
 <!-- Generated from internal/config by TestReferenceIsUpToDate. Do not edit; run go test ./internal/config -run TestReferenceIsUpToDate -update. -->
 
-The first launch writes `~/.config/gh-desk/config.toml` (or under `$XDG_CONFIG_HOME`) with every setting below at its default, commented out. Uncomment a line to change it. A mistake in the file is reported with where it is, and `gh desk config check` reports them without starting.
+The first launch writes `~/.config/gh-desk/config.toml` (or under `$XDG_CONFIG_HOME`) with the rules to start with and nothing else. A setting left out takes its default; write the ones you change. A mistake in the file is reported with where it is, and `gh desk config check` reports them without starting.
 
 ```sh
+gh desk config reference    # every setting, as this page lists them
 gh desk config check        # read the file and print its mistakes
 gh desk config show --diff  # the settings that differ from the defaults
 gh desk config edit         # open it in $EDITOR, then check it

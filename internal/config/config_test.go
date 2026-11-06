@@ -43,17 +43,17 @@ func TestLoadMissingFileIsDefault(t *testing.T) {
 
 func TestTemplateLoadsAsDefault(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "gh-desk", "config.toml")
-	if err := WriteTemplate(path, "# approve = \"A\"\n"); err != nil {
+	if err := WriteTemplate(path); err != nil {
 		t.Fatal(err)
 	}
-	if err := WriteTemplate(path, ""); err == nil {
+	if err := WriteTemplate(path); err == nil {
 		t.Error("WriteTemplate overwrote an existing file")
 	}
 	cfg, _, err := Load(path)
 	if err != nil {
 		t.Fatal(err)
 	}
-	// The rules to start with are the only part written live (ADR-028);
+	// The rules to start with are all the file holds (ADR-028, ADR-092);
 	// none of them is a default.
 	var names []string
 	for _, s := range cfg.Select {
@@ -71,12 +71,37 @@ func TestTemplateLoadsAsDefault(t *testing.T) {
 	}
 }
 
-// TestTemplateTabsAreTheDefault uncomments the tabs the template shows and
+// TestManualIsTheDefaults reads the manual as a file: all of it is comments
+// under the headers.
+func TestManualIsTheDefaults(t *testing.T) {
+	cfg, ps, err := Load(write(t, Manual("# approve = \"A\"\n", Mark{})))
+	if err != nil || len(ps) > 0 {
+		t.Fatalf("%v %v", err, ps)
+	}
+	if !reflect.DeepEqual(cfg, Default()) {
+		t.Errorf("cfg = %+v\nwant %+v", cfg, Default())
+	}
+}
+
+func TestEveryNameHasAManual(t *testing.T) {
+	for _, name := range Names() {
+		if _, err := ManualOf(name, "", Mark{}); err != nil {
+			t.Error(err)
+		}
+	}
+	for _, tb := range tables {
+		if _, err := ManualOf(tb.Name, "", Mark{}); err != nil {
+			t.Error(err)
+		}
+	}
+}
+
+// TestManualTabsAreTheDefault uncomments the tabs the manual shows and
 // reads them as the default tabs.
-func TestTemplateTabsAreTheDefault(t *testing.T) {
+func TestManualTabsAreTheDefault(t *testing.T) {
 	var b strings.Builder
 	in := false
-	for line := range strings.SplitSeq(Template(""), "\n") {
+	for line := range strings.SplitSeq(Manual("", Mark{}), "\n") {
 		switch {
 		case line == "# [[tabs]]":
 			in = true

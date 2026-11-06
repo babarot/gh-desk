@@ -108,7 +108,7 @@ type desk struct {
 
 func newDesk(t *testing.T) *desk {
 	t.Helper()
-	cfg, _, err := config.Parse("~/.config/gh-desk/config.toml", []byte(config.Template(app.KeysTemplate())))
+	cfg, _, err := config.Parse("~/.config/gh-desk/config.toml", []byte(config.Template()))
 	if err != nil {
 		t.Fatal(err)
 	}

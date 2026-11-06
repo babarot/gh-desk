@@ -112,6 +112,17 @@ func TestAnUpdateIsToldAtStart(t *testing.T) {
 	}
 }
 
+func TestNewSettingsAreToldOneByOne(t *testing.T) {
+	f := &fakeReleases{}
+	m := startReleases(t, &Release{Tell: true, Running: "0.8.0", Latest: "0.8.0", Told: "0.8.0", UpdatedFrom: "0.6.0", NewSettings: []string{"list.bell", "merge.x"}, Source: f})
+	got := strings.Join(noteTitles(m), "\n")
+	for _, want := range []string{"new setting list.bell · gh desk config reference list.bell", "new setting merge.x · gh desk config reference merge.x"} {
+		if !strings.Contains(got, want) {
+			t.Errorf("notes %q, want %q", got, want)
+		}
+	}
+}
+
 // A reading that fails keeps when it was tried and tells nothing; one that
 // finds no newer release, or a tag of another form, tells nothing either.
 func TestReadingsThatTellNothing(t *testing.T) {

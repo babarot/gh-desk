@@ -316,7 +316,7 @@ func main() {
 // not nil.
 func (t *terminal) run(out output, sc *playground.Scenario, pl play) error {
 	// The config file a first launch writes, read without a disk.
-	cfg, _, err := config.Parse("~/.config/gh-desk/config.toml", []byte(config.Template(app.KeysTemplate())))
+	cfg, _, err := config.Parse("~/.config/gh-desk/config.toml", []byte(config.Template()))
 	if err != nil {
 		return err
 	}

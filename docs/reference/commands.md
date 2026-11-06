@@ -15,7 +15,7 @@ Usage:
 
 Available Commands:
   completion  Generate the autocompletion script for the specified shell
-  config      check, show or edit the config file
+  config      check, show or edit the config file, and print what each setting does
   gc          remove the worktrees of pull requests no longer open
   help        Help about any command
   log         print where the log file is
@@ -33,7 +33,7 @@ Use "gh desk [command] --help" for more information about a command.
 ## gh desk config
 
 ```
-Check, show or edit the config file.
+Check, show or edit the config file, and print what each setting does.
 
 The config file is the one --config names: by default
 $XDG_CONFIG_HOME/gh-desk/config.toml, or ~/.config/gh-desk/config.toml.
@@ -45,7 +45,8 @@ Usage:
 Available Commands:
   check       read the config file and print its mistakes and warnings, without starting; exits 1 when it has mistakes
   edit        open the config file in review.editor, $VISUAL or $EDITOR, then check it
-  init        write the config file with every setting at its default, unless one is there
+  init        write the config file with the rules to start with, unless one is there
+  reference   print every setting with what it does and its default, or those of a table or a key
   schema      print the JSON Schema of the config file
   show        print the settings in effect, or with --diff only those that differ from the defaults
 
@@ -94,13 +95,33 @@ Global Flags:
 ## gh desk config init
 
 ```
-write the config file with every setting at its default, unless one is there
+write the config file with the rules to start with, unless one is there
 
 Usage:
   gh desk config init [flags]
 
 Flags:
   -h, --help   help for init
+
+Global Flags:
+      --config string   the config file (default "~/.config/gh-desk/config.toml")
+      --debug           log at debug level
+```
+
+## gh desk config reference
+
+```
+Print every setting with what it does and its default, as comments, from
+this version of gh-desk. The config file is not read.
+
+A name narrows it to a table (merge), an array of tables (select), keys, or
+one key of any of them (list.refresh, select.max_lines, keys.approve).
+
+Usage:
+  gh desk config reference [table or key] [flags]
+
+Flags:
+  -h, --help   help for reference
 
 Global Flags:
       --config string   the config file (default "~/.config/gh-desk/config.toml")

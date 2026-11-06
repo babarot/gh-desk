@@ -488,9 +488,8 @@ func FilePath() string {
 	return filepath.Join(dir, "gh-desk", "config.toml")
 }
 
-// WriteTemplate writes Template(keys) to path unless a file is already
-// there.
-func WriteTemplate(path, keys string) error {
+// WriteTemplate writes Template to path unless a file is already there.
+func WriteTemplate(path string) error {
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return err
 	}
@@ -498,7 +497,7 @@ func WriteTemplate(path, keys string) error {
 	if err != nil {
 		return err
 	}
-	if _, err := f.WriteString(Template(keys)); err != nil {
+	if _, err := f.WriteString(Template()); err != nil {
 		f.Close()
 		return err
 	}

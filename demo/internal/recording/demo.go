@@ -28,7 +28,7 @@ func Run(ctx context.Context, speed float64) error {
 	}
 	defer os.RemoveAll(dir)
 	path := filepath.Join(dir, "config.toml")
-	if err := config.WriteTemplate(path, app.KeysTemplate()); err != nil {
+	if err := config.WriteTemplate(path); err != nil {
 		return err
 	}
 	cfg, _, err := config.Load(path)

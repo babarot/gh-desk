@@ -28,7 +28,7 @@ gh-desk reads GitHub with the account gh is logged in to (`gh auth login`); ther
 gh desk
 ```
 
-The first run writes the config file, `~/.config/gh-desk/config.toml`, with every setting at its default and commented out, then opens the pull requests waiting for you. The lists are kept on disk when gh-desk quits, and the next launch shows them at once while it reads them again.
+The first run writes the config file, `~/.config/gh-desk/config.toml`, with the rules to start with, then opens the pull requests waiting for you. The lists are kept on disk when gh-desk quits, and the next launch shows them at once while it reads them again.
 
 ## The screen
 
