@@ -66,6 +66,7 @@ type triage struct {
 	history []askbox.Entry
 	recall  askbox.Recall
 	search  *search
+	menu    askbox.Menu
 	askedID string
 	kept    chan struct{}
 }
@@ -136,6 +137,8 @@ func (m *Model) triageKey(msg tea.KeyPressMsg) tea.Cmd {
 	switch {
 	case tr.typing && tr.search != nil:
 		return m.searchKey(&tr.search, &tr.input, &tr.recall, tr.history, msg)
+	case tr.typing && len(m.askMenu()) > 0:
+		return m.askMenuKey(msg)
 	case tr.typing:
 		armed := tr.restart
 		tr.restart = false
@@ -161,11 +164,11 @@ func (m *Model) triageKey(msg tea.KeyPressMsg) tea.Cmd {
 			return nil
 		case is("history_search"):
 			return m.openSearch(&tr.search, &tr.input, tr.history)
-		case is("fill_suggestion"):
-			if s := nextSuggestion(claude.TriageQuestions(), tr.input.Value()); s != "" {
-				tr.input.SetValue(s)
-				tr.recall.Leave()
-			}
+		case is("complete"):
+			completeAsk(&tr.recall, &tr.input, claude.TriageQuestions(), tr.history)
+			return nil
+		case is("expand") && msg.Text == "" && askGhost(&tr.input, &tr.recall, claude.TriageQuestions(), tr.history) != "":
+			completeAsk(&tr.recall, &tr.input, claude.TriageQuestions(), tr.history)
 			return nil
 		case is("chat_restart"):
 			switch {
@@ -565,10 +568,20 @@ func (m *Model) renderTriage() ([]string, int) {
 		foot = append(foot, m.searchLines(tr.search, tr.history, inner, searchRows(m.popupHeight()-3, triageSearchRows))...)
 		foot = append(foot, m.footKeys([]keymap.Action{"accept", "history_search"}, "fill in", "cancel"))
 	case tr.typing:
-		foot = append(foot, strings.Split(tr.input.View(), "\n")...)
+		menu := m.askMenu()
+		ghost := askGhost(&tr.input, &tr.recall, claude.TriageQuestions(), tr.history)
+		if len(menu) > 0 {
+			ghost = ""
+		}
+		foot = append(foot, m.askLines(&tr.input, ghost)...)
+		if len(menu) > 0 {
+			foot = append(foot, m.menuLines(menu, inner)...)
+			foot = append(foot, m.footKeys([]keymap.Action{"accept"}, "fill in", "close"))
+			break
+		}
 		as := []keymap.Action{"accept"}
-		if nextSuggestion(claude.TriageQuestions(), tr.input.Value()) != "" {
-			as = append(as, "fill_suggestion")
+		if ghost != "" || nextSuggestion(claude.TriageQuestions(), tr.input.Value()) != "" {
+			as = append(as, "complete")
 		}
 		if len(tr.history) > 0 {
 			as = append(as, "history_search")
@@ -662,7 +675,7 @@ func (m *Model) triageTurnLines(textW int) []string {
 
 // triageWelcome is what the popup shows while nothing has been asked, in at
 // most height lines: Clawd beside what the tab holds, and the questions
-// fill_suggestion puts in the text box. The questions give way first; when
+// complete puts in the text box. The questions give way first; when
 // even Clawd does not fit, nothing is shown.
 func (m *Model) triageWelcome(height int) []string {
 	st, t := m.st, m.tab()
@@ -676,9 +689,15 @@ func (m *Model) triageWelcome(height int) []string {
 	if p, _, ok := m.currentPR(); ok {
 		where += sep + st.dim.Render("cursor ") + st.muted.Render(fmt.Sprintf("%s#%d", m.repoName(p), p.Key.Number))
 	}
+	// What a triage is given, as it counts it: without what the tab leaves
+	// out.
+	var prs []model.PR
+	for _, r := range m.listed(t) {
+		prs = append(prs, r.pr)
+	}
 	right := []string{
-		st.title.Render(t.name) + "  " + st.dim.Render(pullRequests(len(m.listed(t)))),
-		st.dim.Render(strings.Join(m.groupCounts(t), " · ")),
+		st.title.Render(t.name) + "  " + st.dim.Render(pullRequests(len(prs))),
+		st.dim.Render(strings.Join(m.groupCounts(t, prs), " · ")),
 		where,
 	}
 	top, head := m.clawdBeside(stand(pDefault), clawdW, right)

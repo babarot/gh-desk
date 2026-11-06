@@ -13,7 +13,7 @@ const welcomeGap = 3
 
 // welcomeLines are what the claude pane shows of c while nothing has been
 // asked, in at most height lines: Clawd beside the pull request,
-// the worktree being made, and the questions fill_suggestion puts in the
+// the worktree being made, and the questions complete puts in the
 // text box. The questions give way first, then the worktree; when even the
 // pull request does not fit, nothing is shown.
 func (m *Model) welcomeLines(c *chatScreen, height int) []string {

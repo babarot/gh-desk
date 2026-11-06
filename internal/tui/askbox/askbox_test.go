@@ -57,6 +57,59 @@ func TestRecallOfNothing(t *testing.T) {
 	}
 }
 
+func TestGhost(t *testing.T) {
+	try := []string{"bots with passing checks"}
+	list := entries("Bots again", "先週から動いていないものは？", "the same")
+	for _, tc := range []struct{ typed, want string }{
+		{"", ""},
+		{"BO", "ts with passing checks"},
+		{"bots a", "gain"},
+		{"先週", "から動いていないものは？"},
+		{"the same", ""},
+		{"nothing", ""},
+		{"\u212a", ""},
+	} {
+		if got := Ghost(tc.typed, try, list); got != tc.want {
+			t.Errorf("Ghost(%q) = %q, want %q", tc.typed, got, tc.want)
+		}
+	}
+}
+
+func TestLastWord(t *testing.T) {
+	for _, tc := range []struct{ typed, head, word string }{
+		{"", "", ""},
+		{"#1", "", "#1"},
+		{"compare #1", "compare ", "#1"},
+		{"compare ", "compare ", ""},
+		{"比べて　#1", "比べて　", "#1"},
+	} {
+		if h, w := LastWord(tc.typed); h != tc.head || w != tc.word {
+			t.Errorf("LastWord(%q) = %q, %q", tc.typed, h, w)
+		}
+	}
+}
+
+func TestMenu(t *testing.T) {
+	var m Menu
+	m.For("a").Next(3)
+	m.For("a").Next(3)
+	if m.For("a").At(3) != 2 {
+		t.Errorf("At = %d", m.At(3))
+	}
+	m.Next(3)
+	m.Prev(3)
+	if m.At(3) != 2 {
+		t.Errorf("round the end: %d", m.At(3))
+	}
+	m.Close()
+	if !m.For("a").Closed() {
+		t.Error("not closed")
+	}
+	if m.For("ab").Closed() || m.At(3) != 0 {
+		t.Error("a text changed did not open it from the first")
+	}
+}
+
 func TestHits(t *testing.T) {
 	got := Hits(entries("Bots with passing checks", "先週から動いていないものは？", "bots again"), "BOTS")
 	if len(got) != 2 {

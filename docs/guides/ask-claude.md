@@ -14,7 +14,9 @@ Claude answers in `claude.language`, and follows `claude.instructions` in every 
 
 ## About the tab
 
-`C` asks Claude about the tab shown, in your own words, such as "merge the bots with passing checks". `tab` fills in the questions it offers. While Claude answers, `esc` stops it and `backspace` closes the popup with Claude still at work; `C` shows the answer when it comes. `ctrl+l`, pressed twice, starts the conversation over.
+`C` asks Claude about the tab shown, in your own words, such as "merge the bots with passing checks". `tab` fills in the questions it offers. In `C`, `#` and `@` open a menu of the pull requests and authors of the tab, to name one in a question.
+
+As you type in either, the rest of a question you asked or are offered shows faintly after the cursor, and `tab` or `right` fills it in. While Claude answers, `esc` stops it and `backspace` closes the popup with Claude still at work; `C` shows the answer when it comes. `ctrl+l`, pressed twice, starts the conversation over.
 
 In both, `up` and `ctrl+p` bring back the questions asked before, and `down` and `ctrl+n` go forward again, back to what you were typing. `C` keeps its questions between launches, from every tab; a question brought back is asked about the tab shown. `i` goes through the questions of that pull request. `ctrl+r` opens them as a list in place of the text box: type to narrow it, `enter` puts the question in the text box without sending it, and `esc` goes back. Claude answers with a plan of what to filter, fold, select, and at the end approve or merge; it does not act on the screen itself. `enter` applies the plan on the tab it was asked on, and an approve or a merge in it opens the confirm popup with the pull requests Claude named.
 

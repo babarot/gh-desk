@@ -11,6 +11,7 @@ import (
 	"github.com/charmbracelet/x/ansi"
 
 	"github.com/babarot/gh-desk/internal/claude"
+	"github.com/babarot/gh-desk/internal/model"
 	"github.com/babarot/gh-desk/internal/runner"
 	"github.com/babarot/gh-desk/internal/tui/askbox"
 	"github.com/babarot/gh-desk/internal/tui/keymap"
@@ -677,5 +678,124 @@ func TestSearchOnALowScreen(t *testing.T) {
 		if !strings.Contains(lines[cur.Y], "Search the questions") {
 			t.Errorf("height %d: the cursor is on %q", height, lines[cur.Y])
 		}
+	}
+}
+
+// What is typed is followed, faint, by the rest of a question, and tab or
+// right fills it in. The cursor stays after the typed text.
+func TestAskGhost(t *testing.T) {
+	h := &memoryHistory{entries: []askbox.Entry{{Question: "先週から動いていないものは？"}}}
+	m := withHistory(t, h)
+	press(m, "C", "b", "o")
+	tr := m.triage
+	s, cur := m.render()
+	if !strings.Contains(ansi.Strip(s), "┃ bots with passing checks") {
+		t.Fatalf("no ghost:\n%s", ansi.Strip(s))
+	}
+	if !strings.Contains(ansi.Strip(s), "tab complete") {
+		t.Errorf("no key told:\n%s", ansi.Strip(s))
+	}
+	lines := strings.Split(ansi.Strip(s), "\n")
+	if got := ansi.Cut(lines[cur.Y], 0, cur.X); !strings.HasSuffix(got, "┃ bo") {
+		t.Errorf("cursor after %q", got)
+	}
+	press(m, "tab")
+	if tr.input.Value() != "bots with passing checks" {
+		t.Errorf("tab gave %q", tr.input.Value())
+	}
+	tr.input.Reset()
+	press(m, "先", "right")
+	if tr.input.Value() != "先週から動いていないものは？" {
+		t.Errorf("right gave %q", tr.input.Value())
+	}
+	tr.input.SetValue("bo")
+	press(m, "left")
+	if got := screen(m); strings.Contains(got, "┃ bots with") {
+		t.Errorf("a ghost with the cursor inside the text:\n%s", got)
+	}
+	press(m, "right")
+	if tr.input.Value() != "bo" {
+		t.Errorf("right inside the text filled in %q", tr.input.Value())
+	}
+}
+
+// The welcome counts what a triage is given, by group as a whole.
+func TestTriageWelcomeCountsTheSameRows(t *testing.T) {
+	m, _ := startWith(t, fixture(), keymap.Default())
+	fakeClaudeOf(t, m)
+	tab := m.tab()
+	listed := m.listed(tab)
+	tab.prs = append(tab.prs, tab.prs...)
+	if len(m.listed(tab)) == 0 || len(listed) == 0 {
+		t.Fatal("nothing listed")
+	}
+	press(m, "C")
+	var prs []model.PR
+	for _, r := range m.listed(tab) {
+		prs = append(prs, r.pr)
+	}
+	s := screen(m)
+	if !strings.Contains(s, pullRequests(len(prs))) || !strings.Contains(s, strings.Join(m.groupCounts(tab, prs), " · ")) {
+		t.Errorf("counts differ:\n%s", s)
+	}
+}
+
+// # and @ open a menu of what the tab holds, which fills in the word typed.
+func TestTriageMenu(t *testing.T) {
+	m := withHistory(t, nil)
+	press(m, "C", "a", "space", "#")
+	tr := m.triage
+	s := screen(m)
+	if !strings.Contains(s, "› api#12  Add retries to the client") || !strings.Contains(s, "close") {
+		t.Fatalf("no menu:\n%s", s)
+	}
+	press(m, "3", "enter")
+	if got := tr.input.Value(); got != "a api#30 " || len(tr.turns) != 0 {
+		t.Fatalf("value %q, turns %d", got, len(tr.turns))
+	}
+	press(m, "@", "ctrl+n", "tab")
+	if got := tr.input.Value(); !strings.HasPrefix(got, "a api#30 @") || !strings.HasSuffix(got, " ") || got == "a api#30 @" {
+		t.Fatalf("value %q", got)
+	}
+	tr.input.SetValue("#")
+	press(m, "esc")
+	if !tr.open || !tr.typing || !tr.menu.Closed() || strings.Contains(screen(m), "› api#12") {
+		t.Errorf("esc: open %v, typing %v, closed %v", tr.open, tr.typing, tr.menu.Closed())
+	}
+	press(m, "enter")
+	if len(tr.turns) != 1 {
+		t.Errorf("enter with the menu closed sent %d", len(tr.turns))
+	}
+}
+
+// i has no menu: # is typed as any character.
+func TestChatHasNoMenu(t *testing.T) {
+	m, _ := startWith(t, fixture(), keymap.Default())
+	fakeClaudeOf(t, m)
+	press(m, "i", "#", "1")
+	if s := screen(m); strings.Contains(s, "› api#12") {
+		t.Errorf("a menu in i:\n%s", s)
+	}
+}
+
+// A question of several lines is drawn as far as its first, and filled in
+// whole.
+func TestAskGhostOfSeveralLines(t *testing.T) {
+	h := &memoryHistory{entries: []askbox.Entry{{Question: "foo\n\n\nbar"}}}
+	m := withHistory(t, h)
+	press(m, "C", "f")
+	before := strings.Count(screen(m), "\n")
+	lines := m.askLines(&m.triage.input, askGhost(&m.triage.input, &m.triage.recall, nil, m.triage.history))
+	for _, l := range lines {
+		if strings.Contains(l, "\n") {
+			t.Fatalf("a line of the box holds a line break: %q", l)
+		}
+	}
+	if !strings.Contains(screen(m), "┃ foo") || strings.Count(screen(m), "\n") != before {
+		t.Errorf("screen:\n%s", screen(m))
+	}
+	press(m, "tab")
+	if got := m.triage.input.Value(); got != "foo\n\n\nbar" {
+		t.Errorf("tab gave %q", got)
 	}
 }

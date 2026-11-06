@@ -7,6 +7,8 @@ import (
 	"slices"
 	"strings"
 	"time"
+	"unicode"
+	"unicode/utf8"
 )
 
 // Entry is a question asked before.
@@ -50,6 +52,93 @@ func Unique(list []Entry) []Entry {
 		}
 	}
 	return out
+}
+
+// Ghost is what follows typed in the first of try and then list that starts
+// with it, ignoring case; empty when none does. It goes by rune, as lower
+// case keeps the runes of a text but not always its bytes.
+func Ghost(typed string, try []string, list []Entry) string {
+	if typed == "" {
+		return ""
+	}
+	want := []rune(strings.ToLower(typed))
+	rest := func(q string) string {
+		rs, low := []rune(q), []rune(strings.ToLower(q))
+		if len(low) != len(rs) || len(low) <= len(want) || !slices.Equal(low[:len(want)], want) {
+			return ""
+		}
+		return string(rs[len(want):])
+	}
+	for _, q := range try {
+		if s := rest(q); s != "" {
+			return s
+		}
+	}
+	for _, e := range list {
+		if s := rest(e.Question); s != "" {
+			return s
+		}
+	}
+	return ""
+}
+
+// Item is a choice of a menu: Text is what the word typed becomes, and Note
+// says more of it.
+type Item struct {
+	Text string
+	Note string
+}
+
+// LastWord is what typed holds before its last word, and that word.
+func LastWord(typed string) (head, word string) {
+	i := strings.LastIndexFunc(typed, unicode.IsSpace)
+	if i < 0 {
+		return "", typed
+	}
+	_, n := utf8.DecodeRuneInString(typed[i:])
+	return typed[:i+n], typed[i+n:]
+}
+
+// MenuRows is how many items a menu shows.
+const MenuRows = 5
+
+// Menu is the place in a menu over a text, which it stays closed on once
+// the user closes it. A text changed opens it again from the first item.
+type Menu struct {
+	text   string
+	at     int
+	closed bool
+}
+
+// For is the menu over text.
+func (m *Menu) For(text string) *Menu {
+	if m.text != text {
+		*m = Menu{text: text}
+	}
+	return m
+}
+
+// Closed reports whether the user closed the menu.
+func (m *Menu) Closed() bool { return m.closed }
+
+// Close closes the menu until the text changes.
+func (m *Menu) Close() { m.closed = true }
+
+// At is the place in n items.
+func (m *Menu) At(n int) int { return min(m.at, max(n-1, 0)) }
+
+// Next moves to the next of n items, round to the first.
+func (m *Menu) Next(n int) {
+	if n > 0 {
+		m.at = (m.At(n) + 1) % n
+	}
+}
+
+// Prev moves to the previous of n items, round to the last.
+func (m *Menu) Prev(n int) {
+	if n > 0 {
+		m.at = (m.At(n) + n - 1) % n
+	}
 }
 
 // Hits are the questions of list that hold q, ignoring case.

@@ -122,7 +122,7 @@ func Scenarios() []Scenario {
 		// review popup for the visitor to read; nothing is sent.
 		{Name: "claude", Title: "Claude's review of a pull request, a question, and the review it drafts", Steps: []Step{
 			{Action: "ask_claude", Hold: time.Second},
-			{Action: "fill_suggestion", Wait: time.Second},
+			{Action: "complete", Wait: time.Second},
 			{Action: "accept", Hold: time.Second},
 			{Text: "What happens when the retries run out?", Wait: 5 * time.Second, Hold: 2 * time.Second},
 			{Action: "accept"},

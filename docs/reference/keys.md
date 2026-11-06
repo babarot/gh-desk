@@ -117,7 +117,6 @@ browse = []
 
 | Key | Action | Does |
 |---|---|---|
-| `tab` | `fill_suggestion` | fill in the suggestion |
 | `ctrl+x` | `draft_review` | draft review |
 | `ctrl+o` | `open_claude` | open in claude code |
 | `ctrl+p` | `history_prev` | previous question |
@@ -132,6 +131,15 @@ browse = []
 | `tab` | `next_kind` | kind |
 | `ctrl+s` | `post` | post |
 | `ctrl+e` | `editor` | $EDITOR |
+
+## A text box
+
+| Key | Action | Does |
+|---|---|---|
+| `enter` | `accept` | accept |
+| `tab` | `complete` | complete |
+| `backspace` | `erase` | erase |
+| `ctrl+w` | `erase_word` | erase word |
 
 ## This list
 

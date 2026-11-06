@@ -10,6 +10,7 @@ import (
 	"github.com/charmbracelet/x/ansi"
 
 	"github.com/babarot/gh-desk/internal/claude"
+	"github.com/babarot/gh-desk/internal/model"
 	"github.com/babarot/gh-desk/internal/plan"
 	"github.com/babarot/gh-desk/internal/tui/keymap"
 )
@@ -378,7 +379,7 @@ func (m *Model) headerParts() []string {
 	if len(m.progress) > 0 {
 		return parts
 	}
-	parts = append(parts, m.groupCounts(t)...)
+	parts = append(parts, m.groupCounts(t, t.prs)...)
 	if t.loaded && t.total > len(t.prs) && !t.inbox {
 		parts = append(parts, fmt.Sprintf("showing %d of %d", len(t.prs), t.total))
 	}
@@ -388,14 +389,14 @@ func (m *Model) headerParts() []string {
 	return parts
 }
 
-// groupCounts count the pull requests of t by group, a group with none left
-// out as in the list; none when t has no groups or is not read yet.
-func (m *Model) groupCounts(t *tab) []string {
+// groupCounts count prs of t by group, a group with none left out as in the
+// list; none when t has no groups or is not read yet.
+func (m *Model) groupCounts(t *tab, prs []model.PR) []string {
 	if !t.grouped || !t.loaded {
 		return nil
 	}
 	n := map[plan.Group]int{}
-	for _, p := range t.prs {
+	for _, p := range prs {
 		n[plan.GroupOf(p, m.viewer)]++
 	}
 	var parts []string
@@ -420,7 +421,7 @@ var ready = map[keymap.Action]bool{
 	"preview_down": true, "preview_up": true, "preview_grow": true, "preview_shrink": true, "next_file": true, "prev_file": true, "preview_tab": true, "fold": true, "preview": true,
 	"confirm": true, "next_kind": true, "post": true, "editor": true, "accept": true, "complete": true, "erase": true, "erase_word": true,
 	"log": true, "log_this_pr": true,
-	"triage": true, "triage_apply": true, "triage_more": true, "ask_claude": true, "fill_suggestion": true, "history_prev": true, "history_next": true, "history_search": true, "draft_review": true, "open_claude": true, "chat_close": true,
+	"triage": true, "triage_apply": true, "triage_more": true, "ask_claude": true, "history_prev": true, "history_next": true, "history_search": true, "draft_review": true, "open_claude": true, "chat_close": true,
 }
 
 // hints is the key line of what has the focus. It holds the ways in (the
@@ -455,11 +456,13 @@ func (m *Model) hints() string {
 		switch {
 		case m.triage.typing:
 			as = []keymap.Action{"accept"}
-			if nextSuggestion(claude.TriageQuestions(), m.triage.input.Value()) != "" {
-				as = append(as, "fill_suggestion")
+			if tr := m.triage; nextSuggestion(claude.TriageQuestions(), tr.input.Value()) != "" || askGhost(&tr.input, &tr.recall, claude.TriageQuestions(), tr.history) != "" {
+				as = append(as, "complete")
 			}
 			recall = m.recallHint(&m.triage.recall, m.triage.history)
-			if m.triage.search != nil {
+			if len(m.askMenu()) > 0 {
+				as, recall, back = []keymap.Action{"accept", "complete"}, "", "close"
+			} else if m.triage.search != nil {
 				as, recall, back = []keymap.Action{"accept", "history_search"}, "", "cancel"
 			} else if len(m.triage.history) > 0 {
 				as = append(as, "history_search")
@@ -481,8 +484,8 @@ func (m *Model) hints() string {
 		}
 	case m.typingChat():
 		as = []keymap.Action{"accept"}
-		if c := m.chat(); nextSuggestion(suggestions(c), c.input.Value()) != "" {
-			as = append(as, "fill_suggestion")
+		if c := m.chat(); nextSuggestion(suggestions(c), c.input.Value()) != "" || askGhost(&c.input, &c.recall, suggestions(c), chatHistory(c)) != "" {
+			as = append(as, "complete")
 		}
 		if len(chatHistory(m.chat())) > 0 {
 			as = append(as, "history_search")
