@@ -1,4 +1,4 @@
-# ADR-097: The config file is replaced by a command the user runs
+# ADR-099: The config file is replaced by a command the user runs
 
 ## Status
 
