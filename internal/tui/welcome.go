@@ -24,8 +24,6 @@ func (m *Model) welcomeLines(c *chatScreen, height int) []string {
 	if c.scene != nil {
 		w = c.scene.width()
 	}
-	clawd := st.clawdLines(f, w)
-	above, art := clawd[0], clawd[1:]
 	beside := spaces(w + welcomeGap)
 	var right []string
 	right = append(right, st.title.Render(p.Key.String())+"  "+st.dim.Render(shownTitle(p.Title)))
@@ -34,10 +32,7 @@ func (m *Model) welcomeLines(c *chatScreen, height int) []string {
 		who += st.dim.Render(" · draft")
 	}
 	right = append(right, who, m.welcomeFacts(p))
-	var head []string
-	for i, a := range art {
-		head = append(head, margin+a+spaces(welcomeGap)+right[i])
-	}
+	top, head := m.clawdBeside(f, w, right)
 	var worktree []string
 	switch {
 	case c.preparing:
@@ -49,23 +44,7 @@ func (m *Model) welcomeLines(c *chatScreen, height int) []string {
 		// wrong if it fails.
 		worktree = []string{margin + beside + st.red.Render("✗ worktree not made: "+safe(firstLine(c.prepareErr))) + st.dim.Render(" · the first question tries again")}
 	}
-	var asks []string
-	if ss := suggestions(c); len(ss) > 0 {
-		asks = append(asks, "", margin+st.muted.Render("try"))
-		for _, s := range ss {
-			if s == c.input.Value() {
-				asks = append(asks, margin+st.mauve.Render("›")+" "+st.sub1.Render(s))
-			} else {
-				asks = append(asks, margin+"  "+st.dim.Render(s))
-			}
-		}
-	}
-	// A line is left above, as a conversation leaves one under the
-	// pane's top edge; what Clawd holds up is drawn in it.
-	top := ""
-	if strings.TrimSpace(above) != "" {
-		top = margin + above
-	}
+	asks := m.tryLines(suggestions(c), c.input.Value())
 	for _, L := range [][]string{
 		append(append(append([]string{top}, head...), worktree...), asks...),
 		append(append([]string{top}, head...), worktree...),
@@ -76,6 +55,39 @@ func (m *Model) welcomeLines(c *chatScreen, height int) []string {
 		}
 	}
 	return nil
+}
+
+// clawdBeside is Clawd in frame f, w wide, with the three lines of right
+// beside it, and the line left above it, as a conversation leaves one under
+// the pane's top edge; what Clawd holds up is drawn in that line.
+func (m *Model) clawdBeside(f clawdFrame, w int, right []string) (top string, head []string) {
+	margin := spaces(chatMargin)
+	clawd := m.st.clawdLines(f, w)
+	for i, a := range clawd[1:] {
+		head = append(head, margin+a+spaces(welcomeGap)+right[i])
+	}
+	if strings.TrimSpace(clawd[0]) != "" {
+		top = margin + clawd[0]
+	}
+	return top, head
+}
+
+// tryLines are the questions ss offered, the one the text box holds as
+// typed marked; none when there are none.
+func (m *Model) tryLines(ss []string, typed string) []string {
+	if len(ss) == 0 {
+		return nil
+	}
+	st, margin := m.st, spaces(chatMargin)
+	out := []string{"", margin + st.muted.Render("try")}
+	for _, s := range ss {
+		if s == typed {
+			out = append(out, margin+st.mauve.Render("›")+" "+st.sub1.Render(s))
+		} else {
+			out = append(out, margin+"  "+st.dim.Render(s))
+		}
+	}
+	return out
 }
 
 // welcomeFacts is the line of the welcome that says how big the pull

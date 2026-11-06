@@ -307,14 +307,23 @@ func newInput(st styles) textarea.Model {
 	return ta
 }
 
+// boxTop is the top edge of a popup's box, w wide, with title on its left
+// and, when given, info on its right.
+func boxTop(st styles, title, info string, w int) string {
+	head := st.focus.Render("╭ ") + st.title.Render(title) + " "
+	right := st.focus.Render("╮")
+	if info != "" {
+		right = st.dim.Render(" "+info+" ") + st.focus.Render("─╮")
+	}
+	return head + st.focus.Render(strings.Repeat("─", max(w-lipgloss.Width(head)-lipgloss.Width(right), 0))) + right
+}
+
 // box is a popup's box, w wide, with title on its top border. It takes
 // the keys while it is shown, so its frame is in the focus color
 // (ADR-079).
 func box(st styles, title string, lines []string, w int) []string {
 	inner := w - 4
-	top := st.focus.Render("╭ ") + st.title.Render(title) + " "
-	top += st.focus.Render(strings.Repeat("─", max(w-lipgloss.Width(top)-1, 0)) + "╮")
-	out := []string{top}
+	out := []string{boxTop(st, title, "", w)}
 	for _, l := range lines {
 		out = append(out, st.focus.Render("│ ")+fit(l, inner)+st.focus.Render(" │"))
 	}

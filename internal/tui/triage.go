@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -16,6 +17,7 @@ import (
 	"github.com/babarot/gh-desk/internal/model"
 	"github.com/babarot/gh-desk/internal/plan"
 	"github.com/babarot/gh-desk/internal/runner"
+	"github.com/babarot/gh-desk/internal/tui/chat"
 	"github.com/babarot/gh-desk/internal/tui/keymap"
 )
 
@@ -48,6 +50,8 @@ type triage struct {
 	// shown (follow).
 	top    int
 	follow bool
+	// model is the model of the last answer.
+	model string
 }
 
 // triageTurn is a request and Claude's reply, or why there is none.
@@ -55,6 +59,9 @@ type triageTurn struct {
 	request string
 	reply   string
 	err     bool
+	// cost is what the reply cost, and took how long it took.
+	cost float64
+	took time.Duration
 }
 
 type triageMsg struct {
@@ -119,6 +126,11 @@ func (m *Model) triageKey(msg tea.KeyPressMsg) tea.Cmd {
 			tr.typing = false
 			tr.input.Blur()
 			return m.askTriage(q)
+		case is("fill_suggestion"):
+			if s := nextSuggestion(claude.TriageQuestions(), tr.input.Value()); s != "" {
+				tr.input.SetValue(s)
+			}
+			return nil
 		}
 		var cmd tea.Cmd
 		tr.input, cmd = tr.input.Update(msg)
@@ -187,6 +199,7 @@ func (m *Model) triageAnswered(msg triageMsg) {
 	}
 	tr.asking, tr.cancel = false, nil
 	t := &tr.turns[len(tr.turns)-1]
+	t.took = m.set.Now().Sub(tr.since)
 	if msg.err != nil {
 		if !tr.started {
 			tr.session = claude.NewSession()
@@ -201,7 +214,10 @@ func (m *Model) triageAnswered(msg triageMsg) {
 		t.reply, t.err = err.Error(), true
 		return
 	}
-	t.reply, tr.actions = p.Reply, p.Actions
+	t.reply, t.cost, tr.actions = p.Reply, p.Cost, p.Actions
+	if p.Model != "" {
+		tr.model = p.Model
+	}
 	m.log.Debug("triage answered", logging.KeyOp, "triage", logging.KeyClaude, tr.session, "actions", len(p.Actions))
 }
 
@@ -452,26 +468,19 @@ func (m *Model) renderTriage() ([]string, int) {
 	tr, st := m.triage, m.st
 	w := m.triageWidth()
 	inner := w - 4
-	var body []string
-	for _, t := range tr.turns {
-		body = append(body, hang(st.blue.Render("you")+"  ", st.sub1.Render(safeLine(t.request)), inner)...)
-		style := st.sub1
-		if t.err {
-			style = st.red
-		}
-		for _, l := range wrapText(t.reply, inner) {
-			body = append(body, style.Render(l))
-		}
-		body = append(body, "")
-	}
+	body := m.triageTurnLines(min(inner, chatMaxWidth))
 	var foot []string
 	switch {
 	case tr.asking:
-		body = append(body, m.working(st.muted, "thinking…")+" "+st.dim.Render(elapsed(m.set.Now().Sub(tr.since))))
+		body = append(body, spaces(chatMargin)+m.working(st.muted, "thinking…")+" "+st.dim.Render(elapsed(m.set.Now().Sub(tr.since))))
 		foot = append(foot, st.key.Render(keymap.Back)+" "+st.muted.Render("stop"))
 	case tr.typing:
 		foot = append(foot, strings.Split(tr.input.View(), "\n")...)
-		foot = append(foot, m.footKeys([]keymap.Action{"accept"}, "send", "back"))
+		as := []keymap.Action{"accept"}
+		if nextSuggestion(claude.TriageQuestions(), tr.input.Value()) != "" {
+			as = append(as, "fill_suggestion")
+		}
+		foot = append(foot, m.footKeys(as, "send", "back"))
 	default:
 		for i, s := range m.checkPlan() {
 			num := fmt.Sprintf("%d ", i+1)
@@ -493,8 +502,7 @@ func (m *Model) renderTriage() ([]string, int) {
 		foot = append(foot, m.footKeys(append(as, "triage_more"), "", "close"))
 	}
 	if len(tr.turns) == 0 && !tr.asking {
-		body = append(body, wrapped(st.dim, "Ask what to show or select: \"bots with passing checks\", \"what has waited longest\".", inner)...)
-		body = append(body, "")
+		body = append(m.triageWelcome(m.popupHeight()-2-len(foot)), body...)
 	}
 	// The latest is shown until the user scrolls up.
 	top := tr.top
@@ -505,7 +513,13 @@ func (m *Model) renderTriage() ([]string, int) {
 	if !tr.typing && !tr.asking {
 		keys = m.scrollKeys()
 	}
-	out, top := scrollBox(st, "claude · "+m.tab().name, body, foot, w, m.popupHeight(), top, keepLines{}, keys)
+	title := "claude · " + m.tab().name
+	out, top := scrollBox(st, title, body, foot, w, m.popupHeight(), top, keepLines{}, keys)
+	info := "plan only"
+	if tr.model != "" {
+		info = tr.model + " · " + info
+	}
+	out[0] = boxTop(st, title, info, w)
 	tr.top = top
 	at := -1
 	if tr.typing {
@@ -513,6 +527,72 @@ func (m *Model) renderTriage() ([]string, int) {
 		at = len(out) - 1 - len(foot)
 	}
 	return out, at
+}
+
+// triageTurnLines are the conversation, laid out as the claude pane lays
+// out one, wrapped to textW.
+func (m *Model) triageTurnLines(textW int) []string {
+	tr := m.triage
+	var L []string
+	for i, t := range tr.turns {
+		L = append(L, m.questionLines(t.request, textW)...)
+		L = append(L, "")
+		if i == len(tr.turns)-1 && tr.asking {
+			break
+		}
+		switch {
+		case t.err:
+			L = append(L, m.failedLines(t.reply, textW)...)
+		case t.reply != "":
+			L = append(L, m.answerLines(t.reply, textW)...)
+		}
+		if info := turnInfo(chat.Turn{Cost: t.cost}, t.took); info != "" && !t.err {
+			L = append(L, "", spaces(chatIndent)+m.st.dim.Render(info))
+		}
+		L = append(L, "")
+	}
+	return L
+}
+
+// triageWelcome is what the popup shows while nothing has been asked, in at
+// most height lines: Clawd beside what the tab holds, and the questions
+// fill_suggestion puts in the text box. The questions give way first; when
+// even Clawd does not fit, nothing is shown.
+func (m *Model) triageWelcome(height int) []string {
+	st, t := m.st, m.tab()
+	sep := st.dim.Render(" · ")
+	selected := strconv.Itoa(len(m.selected))
+	filter := "none"
+	if m.filter != "" {
+		filter = safeLine(m.filter)
+	}
+	where := st.dim.Render("filter ") + st.muted.Render(filter) + sep + st.dim.Render("selected ") + st.muted.Render(selected)
+	if p, _, ok := m.currentPR(); ok {
+		where += sep + st.dim.Render("cursor ") + st.muted.Render(fmt.Sprintf("%s#%d", m.repoName(p), p.Key.Number))
+	}
+	right := []string{
+		st.title.Render(t.name) + "  " + st.dim.Render(pullRequests(len(m.listed(t)))),
+		st.dim.Render(strings.Join(m.groupCounts(t), " · ")),
+		where,
+	}
+	top, head := m.clawdBeside(stand(pDefault), clawdW, right)
+	asks := m.tryLines(claude.TriageQuestions(), m.triage.input.Value())
+	for _, L := range [][]string{
+		append(append([]string{top}, head...), append(asks, "")...),
+		append(append([]string{top}, head...), ""),
+	} {
+		if len(L) <= height {
+			return L
+		}
+	}
+	return nil
+}
+
+func pullRequests(n int) string {
+	if n == 1 {
+		return "1 pull request"
+	}
+	return strconv.Itoa(n) + " pull requests"
 }
 
 // footKeys are the keys of a popup's last line; accept, when given, is

@@ -9,6 +9,7 @@ import (
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
 
+	"github.com/babarot/gh-desk/internal/claude"
 	"github.com/babarot/gh-desk/internal/plan"
 	"github.com/babarot/gh-desk/internal/tui/keymap"
 )
@@ -373,23 +374,31 @@ func (m *Model) headerParts() []string {
 	if len(m.progress) > 0 {
 		return parts
 	}
-	if t.grouped && t.loaded {
-		n := map[plan.Group]int{}
-		for _, p := range t.prs {
-			n[plan.GroupOf(p, m.viewer)]++
-		}
-		// A group with no pull requests is left out, as in the list.
-		for _, g := range t.groups {
-			if n[g] > 0 {
-				parts = append(parts, fmt.Sprintf("%d %s", n[g], groupCount[g]))
-			}
-		}
-	}
+	parts = append(parts, m.groupCounts(t)...)
 	if t.loaded && t.total > len(t.prs) && !t.inbox {
 		parts = append(parts, fmt.Sprintf("showing %d of %d", len(t.prs), t.total))
 	}
 	if len(t.warnings) > 0 {
 		parts = append(parts, st.yellow.Render("⚠ read in part"))
+	}
+	return parts
+}
+
+// groupCounts count the pull requests of t by group, a group with none left
+// out as in the list; none when t has no groups or is not read yet.
+func (m *Model) groupCounts(t *tab) []string {
+	if !t.grouped || !t.loaded {
+		return nil
+	}
+	n := map[plan.Group]int{}
+	for _, p := range t.prs {
+		n[plan.GroupOf(p, m.viewer)]++
+	}
+	var parts []string
+	for _, g := range t.groups {
+		if n[g] > 0 {
+			parts = append(parts, fmt.Sprintf("%d %s", n[g], groupCount[g]))
+		}
 	}
 	return parts
 }
@@ -441,6 +450,9 @@ func (m *Model) hints() string {
 		switch {
 		case m.triage.typing:
 			as = []keymap.Action{"accept"}
+			if nextSuggestion(claude.TriageQuestions(), m.triage.input.Value()) != "" {
+				as = append(as, "fill_suggestion")
+			}
 		case m.triage.asking:
 		case m.applicable():
 			as = []keymap.Action{"triage_apply", "triage_more"}
@@ -454,7 +466,7 @@ func (m *Model) hints() string {
 		}
 	case m.typingChat():
 		as = []keymap.Action{"accept"}
-		if c := m.chat(); nextSuggestion(c) != "" {
+		if c := m.chat(); nextSuggestion(suggestions(c), c.input.Value()) != "" {
 			as = append(as, "fill_suggestion")
 		}
 		as = append(as, "draft_review", "open_claude")

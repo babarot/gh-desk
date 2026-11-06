@@ -174,11 +174,11 @@ func suggestions(c *chatScreen) []string {
 	return []string{claude.ReviewQuestion}
 }
 
-// nextSuggestion is the suggestion fill_suggestion puts in the text box of
-// c: the first when it is empty, the one after when it holds a suggestion,
-// and "" when it holds text of the user's own or there is none.
-func nextSuggestion(c *chatScreen) string {
-	ss, v := suggestions(c), c.input.Value()
+// nextSuggestion is which of the suggestions ss fill_suggestion puts in a
+// text box holding v: the first when it is empty, the one after when it
+// holds a suggestion, and "" when it holds text of the user's own or there
+// is none.
+func nextSuggestion(ss []string, v string) string {
 	if len(ss) == 0 {
 		return ""
 	}
@@ -528,7 +528,7 @@ func (m *Model) chatTyping(msg tea.KeyPressMsg) tea.Cmd {
 		c.scroll = max(0, c.scroll-m.pane.height/2)
 		return nil
 	case is("fill_suggestion"):
-		if s := nextSuggestion(c); s != "" {
+		if s := nextSuggestion(suggestions(c), c.input.Value()); s != "" {
 			c.input.SetValue(s)
 		}
 		return nil
@@ -654,22 +654,6 @@ func (m *Model) chatLines(c *chatScreen, width int) []string {
 	textW := min(width, chatMaxWidth)
 	margin, indent := spaces(chatMargin), spaces(chatIndent)
 	var L []string
-	// lead puts ⏺ before the first line that has text, and the others
-	// under its text.
-	lead := func(lines []string, mark lipgloss.Style) {
-		first := true
-		for _, l := range lines {
-			switch {
-			case l == "":
-				L = append(L, "")
-			case first:
-				L = append(L, margin+mark.Render("⏺")+" "+l)
-				first = false
-			default:
-				L = append(L, indent+l)
-			}
-		}
-	}
 	steps := func(ss []claude.Step, live bool) {
 		if s := m.stepLines(c, ss, live, width); len(s) > 0 {
 			L = append(L, s...)
@@ -705,25 +689,10 @@ func (m *Model) chatLines(c *chatScreen, width int) []string {
 			L = append(L, margin+st.dim.Render("⏺ stopped"))
 		case t.Err:
 			steps(t.Steps, false)
-			var ls []string
-			for i, para := range strings.Split(strings.TrimRight(safe(t.Text), " \t\n"), "\n") {
-				if i == 0 {
-					para = "claude failed: " + para
-				}
-				for _, l := range wrapSpans([]span{{text: para, style: st.red}}, max(textW-chatIndent, 10), 0) {
-					ls = append(ls, renderSpans(l))
-				}
-			}
-			lead(ls, st.red)
+			L = append(L, m.failedLines(t.Text, textW)...)
 		default:
 			steps(t.Steps, false)
-			// An answer is Markdown, drawn as a description is.
-			text := zeroWidth.Replace(mdLinkRe.ReplaceAllString(safe(t.Text), "$1"))
-			var ls []string
-			for _, l := range m.markdownLines(strings.TrimRight(text, " \t\n"), max(textW-chatIndent, 10)) {
-				ls = append(ls, l.text)
-			}
-			lead(ls, st.text)
+			L = append(L, m.answerLines(t.Text, textW)...)
 			var took time.Duration
 			if !asked.IsZero() && t.At.After(asked) {
 				took = t.At.Sub(asked)
@@ -746,6 +715,50 @@ func (m *Model) chatLines(c *chatScreen, width int) []string {
 		L = append(L, margin+m.working(st.muted, what)+" "+st.dim.Render(elapsed(m.set.Now().Sub(c.Since()))), "")
 	}
 	return L
+}
+
+// leadLines puts ⏺ before the first line that has text, and the others
+// under its text.
+func leadLines(lines []string, mark lipgloss.Style) []string {
+	var out []string
+	first := true
+	for _, l := range lines {
+		switch {
+		case l == "":
+			out = append(out, "")
+		case first:
+			out = append(out, spaces(chatMargin)+mark.Render("⏺")+" "+l)
+			first = false
+		default:
+			out = append(out, spaces(chatIndent)+l)
+		}
+	}
+	return out
+}
+
+// answerLines are an answer, which is Markdown, drawn as a description is.
+func (m *Model) answerLines(text string, textW int) []string {
+	text = zeroWidth.Replace(mdLinkRe.ReplaceAllString(safe(text), "$1"))
+	var ls []string
+	for _, l := range m.markdownLines(strings.TrimRight(text, " \t\n"), max(textW-chatIndent, 10)) {
+		ls = append(ls, l.text)
+	}
+	return leadLines(ls, m.st.text)
+}
+
+// failedLines say why there is no answer.
+func (m *Model) failedLines(text string, textW int) []string {
+	st := m.st
+	var ls []string
+	for i, para := range strings.Split(strings.TrimRight(safe(text), " \t\n"), "\n") {
+		if i == 0 {
+			para = "claude failed: " + para
+		}
+		for _, l := range wrapSpans([]span{{text: para, style: st.red}}, max(textW-chatIndent, 10), 0) {
+			ls = append(ls, renderSpans(l))
+		}
+	}
+	return leadLines(ls, st.red)
 }
 
 // questionLines are a question in full, on a band as wide as the text

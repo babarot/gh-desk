@@ -1603,8 +1603,10 @@ func TestTakeLockOver(t *testing.T) {
 
 // fakeClaude answers every question at once and keeps what it was asked.
 type fakeClaude struct {
-	asked    []claude.Request
-	prepared []model.PRKey
+	triageCost  float64
+	triageModel string
+	asked       []claude.Request
+	prepared    []model.PRKey
 	// notes are the prompts Once was given.
 	notes []string
 	// fail makes the next question fail, and wait makes a question wait
@@ -1649,7 +1651,7 @@ func (c *fakeClaude) Interactive(_ model.PRKey, dir, session string) *exec.Cmd {
 
 func (c *fakeClaude) Triage(_ context.Context, r claude.Request) (claude.Answer, error) {
 	c.triaged = append(c.triaged, r)
-	return claude.Answer{Structured: []byte(c.plan)}, nil
+	return claude.Answer{Structured: []byte(c.plan), Cost: c.triageCost, Model: c.triageModel}, nil
 }
 
 func (c *fakeClaude) Once(_ context.Context, _, prompt, _ string) (claude.Answer, error) {
