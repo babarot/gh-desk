@@ -134,6 +134,9 @@ type Settings struct {
 	Plan plan.Settings
 	// Language is what Claude answers in.
 	Language string
+	// Bell rings the terminal's bell when a notification in the inbox is
+	// newly unread, after the first reading from GitHub.
+	Bell bool
 	// ReleaseNotes has Claude read the release notes of the bot pull
 	// requests in a merge popup.
 	ReleaseNotes bool

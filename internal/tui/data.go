@@ -43,6 +43,13 @@ type tab struct {
 
 	notifs   []model.Notification
 	inboxPRs map[model.PRKey]model.PR
+	// readLive is set once the inbox is read from GitHub in this run, not
+	// only from the cache.
+	readLive bool
+	// newUnread are the pull requests newly unread in the inbox's readings
+	// since the bell last asked, rung for once their pull requests are
+	// read.
+	newUnread []model.PRKey
 
 	// hidden are pull requests put away here: hidden in a section, done in
 	// the inbox.
@@ -616,6 +623,7 @@ func (m *Model) handleData(msg tea.Msg) tea.Cmd {
 			return nil
 		}
 		first := firstInbox(t, msg.notifs)
+		m.noteNewUnread(t, msg.notifs)
 		keys := m.setNotifs(t, msg.notifs)
 		gen := msg.gen
 		return tea.Batch(m.readInboxFirst(gen, first), func() tea.Msg {
@@ -638,13 +646,13 @@ func (m *Model) handleData(msg tea.Msg) tea.Cmd {
 			}
 		}
 		if msg.err != nil {
-			return m.ensure()
+			return tea.Batch(m.ensure(), m.ringBell(t))
 		}
 		t.asOf, t.readAt = time.Time{}, m.set.Now()
 		// The inbox reads every field at once, so its pull requests do
 		// not come through the reads of heavy fields, which read the
 		// single checks of the lists' ones.
-		return tea.Batch(m.ensure(), m.saveInbox(t), m.readBodies(m.inbox), m.ensureChecks(slices.Collect(maps.Values(t.inboxPRs))))
+		return tea.Batch(m.ensure(), m.saveInbox(t), m.readBodies(m.inbox), m.ensureChecks(slices.Collect(maps.Values(t.inboxPRs))), m.ringBell(t))
 	case diffMsg:
 		e := m.cache.diffs[msg.id]
 		e.loading, e.err, e.val = false, msg.err, safeFiles(msg.files)

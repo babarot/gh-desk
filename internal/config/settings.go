@@ -394,6 +394,8 @@ var settings = []setting{
 		Doc: "Owners whose name is left out of the PR column, such as your company."},
 	{Key: "list.columns", Kind: listKind{Values: Columns, NonEmpty: true}, Value: func(f File) any { return f.List.Columns },
 		Doc: `The columns shown, in the order given; "pr" and "title" are needed. WHY shows on grouped tabs and the inbox only, and AUTHOR not on a tab of your own pull requests. On a narrow terminal SIZE goes first, then AUTHOR.`},
+	{Key: "list.bell", Kind: boolKind{}, Value: func(f File) any { return f.List.Bell },
+		Doc: "Ring the terminal's bell when a reading of the inbox finds a notification newly unread: new, read before, or updated since. The first reading after start does not ring it, nor one of the excluded. The terminal rings, flashes or stays quiet as it is set to."},
 
 	{Key: "menu.actions", Kind: listKind{Values: MenuActions, NonEmpty: true}, Value: func(f File) any { return f.Menu.Actions },
 		Doc: `The actions the menu of enter offers, in the order given. One left out is not in the menu; its key still runs it from the list.`},
