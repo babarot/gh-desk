@@ -43,6 +43,7 @@ Usage:
   gh desk config [command]
 
 Available Commands:
+  apply       replace the config file with the one read from standard input, if it has no mistakes
   check       read the config file and print its mistakes and warnings, without starting; exits 1 when it has mistakes
   edit        open the config file in review.editor, $VISUAL or $EDITOR, then check it
   init        write the config file, which holds no settings yet, unless one is there
@@ -58,6 +59,26 @@ Global Flags:
       --debug           log at debug level
 
 Use "gh desk config [command] --help" for more information about a command.
+```
+
+## gh desk config apply
+
+```
+Replace the config file with the one read from standard input.
+
+The file is checked as gh-desk checks it at start, and nothing is written
+when it has mistakes. The file it replaces is kept beside it, with .bak
+added to its name.
+
+Usage:
+  gh desk config apply [flags]
+
+Flags:
+  -h, --help   help for apply
+
+Global Flags:
+      --config string   the config file (default "~/.config/gh-desk/config.toml")
+      --debug           log at debug level
 ```
 
 ## gh desk config check
