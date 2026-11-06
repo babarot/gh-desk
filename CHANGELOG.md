@@ -1,5 +1,18 @@
 # Changelog
 
+## [v0.8.0](https://github.com/babarot/gh-desk/compare/v0.7.0...v0.8.0) - 2026-11-06
+### New Features
+- Give Claude read-only tools over the pull request's repository by @babarot in https://github.com/babarot/gh-desk/pull/70
+- Greet an empty claude pane with Claude's mascot and the pull request by @babarot in https://github.com/babarot/gh-desk/pull/71
+### Bug fixes
+- Draw golden views on a light background and on every theme by @babarot in https://github.com/babarot/gh-desk/pull/78
+### Improvements
+- Make merges of a repository wait their turn across batches by @babarot in https://github.com/babarot/gh-desk/pull/73
+- Count what a narrowed tab's rows hold in its title by @babarot in https://github.com/babarot/gh-desk/pull/74
+- Put a review's result away at the automatic refresh after an interval by @babarot in https://github.com/babarot/gh-desk/pull/75
+- Keep an opening bracket off a line's end and fit a table's columns to the pane by @babarot in https://github.com/babarot/gh-desk/pull/76
+- Compare the colors of a golden view as well as its text by @babarot in https://github.com/babarot/gh-desk/pull/77
+
 ## [v0.7.0](https://github.com/babarot/gh-desk/compare/v0.6.0...v0.7.0) - 2026-11-05
 ### New Features
 - Let the filter ask one field with author:, repo: and title: by @babarot in https://github.com/babarot/gh-desk/pull/66
