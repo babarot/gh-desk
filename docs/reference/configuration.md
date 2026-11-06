@@ -103,7 +103,7 @@ title = "(?i)lock file maintenance"
 | `approved_by_me` | boolean | true: your latest review must approve it, a person's pull request too, unlike the built-in "approved by me"; false: none of yours does. |
 | `reviewed_by_me` | boolean | true: you must have reviewed it, whatever the review said; false: you have not. |
 | `requested` | list of strings | Whom a review must be asked of, one of them: "me", or a team as "@slug". |
-| `reasons` | list of `approval_requested`, `assign`, `author`, `ci_activity`, `comment`, `invitation`, `manual`, `member_feature_requested`, `mention`, `review_requested`, `security_advisory_credit`, `security_alert`, `state_change`, `subscribed`, `team_mention` | Reasons of a notification, one of which the row's must have; S has no notification, so [[select]] does not take it. |
+| `reasons` | list of `approval_requested`, `assign`, `author`, `ci_activity`, `comment`, `invitation`, `manual`, `member_feature_requested`, `mention`, `review_requested`, `security_advisory_credit`, `security_alert`, `state_change`, `subscribed`, `team_mention` | Reasons of a notification, one of which the row's must have; S and a rule that approves judge a pull request without one, so [[select]] and [[auto_approve]] do not take it. |
 
 ## [list]
 

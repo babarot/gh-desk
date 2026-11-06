@@ -79,11 +79,14 @@ type File struct {
 	// Exclude are the rules that leave pull requests out of every tab, one
 	// of which a pull request must match to be left out.
 	Exclude []Exclude
-	Claude  Claude
-	Theme   Theme
-	Release Release
-	Log     Log
-	Cache   Cache
+	// AutoApprove are the rules that approve the pull requests they match
+	// without a confirm (ADR-089).
+	AutoApprove []AutoApprove
+	Claude      Claude
+	Theme       Theme
+	Release     Release
+	Log         Log
+	Cache       Cache
 	// Keys is [keys] as written; the keymap package checks it.
 	Keys Keys
 }
@@ -220,6 +223,21 @@ type Exclude struct {
 	// Name is the rule's name, "" when it has none and is named by its
 	// conditions.
 	Name string
+	Conditions
+}
+
+// AutoApprove is a rule that approves the pull requests its search finds
+// and that meet every condition given, without a confirm, while gh-desk
+// runs (ADR-089).
+type AutoApprove struct {
+	// Name is the rule's name, "" when it has none and is named by its
+	// conditions.
+	Name string
+	// Query is the GitHub search the pull requests are found by; "" for
+	// the one gh-desk builds from the conditions.
+	Query string
+	// DryRun only tells what the rule would approve.
+	DryRun bool
 	Conditions
 }
 
@@ -510,24 +528,25 @@ func WriteTemplate(path, keys string) error {
 // one written.
 type (
 	doc struct {
-		Tabs        []tabDoc       `toml:"tabs"`
-		List        listDoc        `toml:"list"`
-		Menu        menuDoc        `toml:"menu"`
-		Preview     previewDoc     `toml:"preview"`
-		Description descriptionDoc `toml:"description"`
-		Diff        diffDoc        `toml:"diff"`
-		Checks      checksDoc      `toml:"checks"`
-		Review      reviewDoc      `toml:"review"`
-		Merge       mergeDoc       `toml:"merge"`
-		Bulk        bulkDoc        `toml:"bulk"`
-		Select      []selectDoc    `toml:"select"`
-		Exclude     []excludeDoc   `toml:"exclude"`
-		Claude      Claude         `toml:"claude"`
-		Theme       Theme          `toml:"theme"`
-		Release     Release        `toml:"release"`
-		Log         Log            `toml:"log"`
-		Cache       Cache          `toml:"cache"`
-		Keys        map[string]any `toml:"keys"`
+		Tabs        []tabDoc         `toml:"tabs"`
+		List        listDoc          `toml:"list"`
+		Menu        menuDoc          `toml:"menu"`
+		Preview     previewDoc       `toml:"preview"`
+		Description descriptionDoc   `toml:"description"`
+		Diff        diffDoc          `toml:"diff"`
+		Checks      checksDoc        `toml:"checks"`
+		Review      reviewDoc        `toml:"review"`
+		Merge       mergeDoc         `toml:"merge"`
+		Bulk        bulkDoc          `toml:"bulk"`
+		Select      []selectDoc      `toml:"select"`
+		Exclude     []excludeDoc     `toml:"exclude"`
+		AutoApprove []autoApproveDoc `toml:"auto_approve"`
+		Claude      Claude           `toml:"claude"`
+		Theme       Theme            `toml:"theme"`
+		Release     Release          `toml:"release"`
+		Log         Log              `toml:"log"`
+		Cache       Cache            `toml:"cache"`
+		Keys        map[string]any   `toml:"keys"`
 	}
 	tabDoc struct {
 		Kind        *string   `toml:"kind"`
@@ -583,6 +602,13 @@ type (
 	}
 	excludeDoc struct {
 		Name string `toml:"name"`
+		conditionDoc
+	}
+	autoApproveDoc struct {
+		Name     string   `toml:"name"`
+		Query    *string  `toml:"query"`
+		DryRun   bool     `toml:"dry_run"`
+		Packages []string `toml:"packages"`
 		conditionDoc
 	}
 	conditionDoc struct {
@@ -674,6 +700,8 @@ func Parse(path string, src []byte) (File, Problems, error) {
 	cfg.Select, sps = selectFrom(d.Select)
 	ps = append(ps, sps...)
 	cfg.Exclude, sps = excludeFrom(d.Exclude)
+	ps = append(ps, sps...)
+	cfg.AutoApprove, sps = autoApproveFrom(d.AutoApprove)
 	ps = append(ps, sps...)
 
 	ps = append(ps, checkSettings(cfg)...)
@@ -871,6 +899,7 @@ func selectFrom(ds []selectDoc) ([]Select, Problems) {
 		}
 		seen[d.Name] = true
 		c := conditionsFrom(d.conditionDoc, d.Packages, d.Name, r)
+		reportNoCondition(d.conditionDoc, d.Packages, d.Name, r)
 		// S selects open pull requests that are not drafts, and matches a
 		// pull request alone, without a notification.
 		if c.Draft != nil && *c.Draft {
@@ -912,7 +941,55 @@ func excludeFrom(ds []excludeDoc) ([]Exclude, Problems) {
 		// the bot pull requests of the tab shown, and leaving pull
 		// requests out by them would read every body in every tab.
 		c := conditionsFrom(d.conditionDoc, nil, d.Name, r)
+		reportNoCondition(d.conditionDoc, nil, d.Name, r)
 		out = append(out, Exclude{Name: d.Name, Conditions: c})
+	}
+	return out, ps
+}
+
+// autoApproveFrom reads the rules that approve without a confirm and
+// reports what is wrong with them.
+func autoApproveFrom(ds []autoApproveDoc) ([]AutoApprove, Problems) {
+	var ps Problems
+	var out []AutoApprove
+	seen := map[string]bool{}
+	for i, d := range ds {
+		r := elemReporter{&ps, "auto_approve", i}
+		at := r.at
+		d.Name = strings.TrimSpace(d.Name)
+		if d.Name != "" && seen[d.Name] {
+			at("name", "%q is used twice", d.Name)
+		}
+		if d.Name != "" {
+			seen[d.Name] = true
+		}
+		c := conditionsFrom(d.conditionDoc, d.Packages, d.Name, r)
+		// A search given says which pull requests the rule is for; without
+		// one, a rule with no condition would approve every review asked
+		// of the user.
+		var query string
+		if d.Query != nil {
+			query = strings.TrimSpace(*d.Query)
+			if query == "" {
+				at("query", "must not be empty; leave it out for the search gh-desk builds")
+			}
+		} else {
+			reportNoCondition(d.conditionDoc, d.Packages, d.Name, r)
+		}
+		// It approves open pull requests that are not drafts, and judges a
+		// pull request alone, without a notification.
+		if c.Draft != nil && *c.Draft {
+			at("draft", "a draft is never approved by a rule, so the rule would approve nothing")
+		}
+		if d.Reasons != nil {
+			at("reasons", "is read only by [[exclude]]: a rule approves pull requests, which have no notification")
+		}
+		for j, st := range c.States {
+			if st != "open" && slices.Contains(States, st) {
+				r.item("state", j, "%q: only open pull requests are approved, so the rule would approve nothing", st)
+			}
+		}
+		out = append(out, AutoApprove{Name: d.Name, Query: query, DryRun: d.DryRun, Conditions: c})
 	}
 	return out, ps
 }
@@ -1020,6 +1097,12 @@ func conditionsFrom(d conditionDoc, packages []string, name string, r elemReport
 			}
 		}
 	}
+	return c
+}
+
+// reportNoCondition reports a rule named name that sets no condition, and
+// so matches every pull request.
+func reportNoCondition(d conditionDoc, packages []string, name string, r elemReporter) {
 	// A list left empty sets no condition: the rule reads it as none.
 	if len(d.Repos) == 0 && len(d.Authors) == 0 && len(packages) == 0 && len(d.Labels) == 0 && len(d.Requested) == 0 && len(d.Reasons) == 0 && len(d.States) == 0 &&
 		len(d.Checks) == 0 && len(d.Decision) == 0 && d.Title == nil &&
@@ -1030,9 +1113,8 @@ func conditionsFrom(d conditionDoc, packages []string, name string, r elemReport
 		if name != "" {
 			what = fmt.Sprintf("%q", name)
 		}
-		at("", "%s matches every pull request; give it at least one condition", what)
+		r.at("", "%s matches every pull request; give it at least one condition", what)
 	}
-	return c
 }
 
 // dotted is ".key", or "" for no key.

@@ -68,6 +68,13 @@ type Review struct {
 	State  ReviewState
 }
 
+// ViewerReview is the viewer's latest review and the commit it was given
+// on.
+type ViewerReview struct {
+	State  ReviewState
+	Commit string
+}
+
 // PR is a pull request as the lists show it.
 type PR struct {
 	// ID is GitHub's node ID, for mutations.
@@ -281,6 +288,9 @@ type MergeInfo struct {
 	Repo        RepoMerge
 	// Reviews are the latest review of each reviewer.
 	Reviews []Review
+	// ViewerReview is the viewer's latest review, of any state, a
+	// dismissed one too; nil for none.
+	ViewerReview *ViewerReview
 	// CanClose is whether the viewer may close it.
 	CanClose bool
 	// Locked is whether its conversation is locked.
@@ -335,6 +345,9 @@ type Pending struct {
 	// IncludeFailing is set on an approval the user let in although a
 	// check failed: a job that fails while it waits does not stop it.
 	IncludeFailing bool `json:"include_failing,omitempty"`
+	// Auto is set on an approval a rule asked for, judged again as one
+	// when it goes on (ADR-089).
+	Auto bool `json:"auto,omitempty"`
 	// Body is the text of an approval that waits, kept only until it is
 	// sent; it is never logged.
 	Body        string `json:"body,omitempty"`

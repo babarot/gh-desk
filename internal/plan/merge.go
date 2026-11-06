@@ -230,6 +230,24 @@ func ForApprove(mi model.MergeInfo, pr model.PR, viewer string, includeFailing b
 	return d
 }
 
+// ForAutoApprove decides an approval a rule asked for (ADR-089): as
+// ForApprove, and besides it never approves a draft, nor a head on which
+// the viewer's approval was dismissed, which a person took back. An
+// approval dismissed by a push is on an older head and does not count.
+func ForAutoApprove(mi model.MergeInfo, pr model.PR, viewer string, includeFailing bool, set Settings) Decision {
+	d := ForApprove(mi, pr, viewer, includeFailing, set)
+	if d.Step == StepSkip {
+		return d
+	}
+	switch v := mi.ViewerReview; {
+	case mi.Draft:
+		d.Step, d.Reason, d.Approve = StepSkip, "draft", false
+	case v != nil && v.State == model.ReviewDismissed && v.Commit == mi.HeadOID:
+		d.Step, d.Reason, d.Approve = StepSkip, "your approval was dismissed on this head", false
+	}
+	return d
+}
+
 // ForReview decides sending a review of the kind event: an approval as
 // ForApprove does, a request for changes to another's open pull request,
 // and a comment to any.

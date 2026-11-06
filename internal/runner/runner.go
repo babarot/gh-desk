@@ -94,6 +94,10 @@ type Options struct {
 	// or updating its branch, jobs not seen yet are waited for; plan.Quiet
 	// unless set.
 	Quiet time.Duration
+	// Excluded says why an [[exclude]] rule keeps pr, read as mi, from an
+	// approval a rule asked for, "" when none does; an error keeps it too
+	// (ADR-089). Nil when there are no such rules.
+	Excluded func(ctx context.Context, pr model.PR, mi model.MergeInfo) (string, error)
 }
 
 // Defaults fills in the intervals left zero.
@@ -165,6 +169,11 @@ type Item struct {
 	// checks failed: a job that fails while the approval waits does not
 	// stop it.
 	IncludeFailing bool
+	// Auto is set on an approval a rule asked for, without a confirm: a
+	// draft, a head whose approval a person dismissed and a pull request
+	// an exclusion matches are not approved, judged again right before
+	// it is sent (ADR-089).
+	Auto bool
 }
 
 // Result is where a pull request ended, or Running while it has not.
@@ -406,7 +415,7 @@ func (r *Runner) Resume(ctx context.Context, ps []model.Pending) (string, <-chan
 	pend := map[model.PRKey]model.Pending{}
 	for i, p := range ps {
 		items[i] = Item{PR: model.PR{ID: p.ID, Key: p.Key, Author: p.Author, AuthorIsBot: p.AuthorIsBot, HeadOID: p.Head},
-			Head: p.Head, AutoMerge: p.AutoMerge, Wait: p.Kind == model.PendingApprove, IncludeFailing: p.IncludeFailing}
+			Head: p.Head, AutoMerge: p.AutoMerge, Wait: p.Kind == model.PendingApprove, IncludeFailing: p.IncludeFailing, Auto: p.Auto}
 		pend[p.Key] = p
 	}
 	return r.run(ctx, Merge, items, pend, ReviewText{}, CloseText{})
@@ -746,7 +755,7 @@ func (j *job) waitToApprove(body string) {
 		return
 	}
 	j.record = j.store != nil
-	j.pend.Kind, j.pend.IncludeFailing, j.pend.Body = model.PendingApprove, j.it.IncludeFailing, body
+	j.pend.Kind, j.pend.IncludeFailing, j.pend.Body, j.pend.Auto = model.PendingApprove, j.it.IncludeFailing, body, j.it.Auto
 	if !j.save() {
 		j.say(Failed, "could not record the pending approval; nothing was sent")
 		return
@@ -800,7 +809,7 @@ func (j *job) approveAfterJobs() {
 		w.read(mi)
 		// Failing required checks were left out by the popup unless let
 		// in, as for an approval that does not wait.
-		d := plan.ForApprove(mi, j.it.PR, j.r.opt.Viewer, true, j.r.opt.Settings)
+		d := j.forApprove(mi)
 		d = plan.AfterJobs(d, mi, j.trigger, time.Now(), j.it.IncludeFailing)
 		switch d.Step {
 		case plan.StepSkip:
@@ -819,12 +828,44 @@ func (j *job) approveAfterJobs() {
 			continue
 		}
 		w.end("ready")
+		if !j.notExcluded(mi) {
+			return
+		}
 		j.forecast([]Step{StepApprove})
 		if j.sendApproval(j.pend.Body) {
 			j.say(Approved, "approved")
 		}
 		return
 	}
+}
+
+// forApprove decides approving the pull request read as mi: as a rule's
+// approval when the item is one. Failing checks are let through here: the
+// popup, or the rule, already left them out.
+func (j *job) forApprove(mi model.MergeInfo) plan.Decision {
+	if j.it.Auto {
+		return plan.ForAutoApprove(mi, j.it.PR, j.r.opt.Viewer, true, j.r.opt.Settings)
+	}
+	return plan.ForApprove(mi, j.it.PR, j.r.opt.Viewer, true, j.r.opt.Settings)
+}
+
+// notExcluded reports whether a rule's approval may still be sent: no
+// exclusion matches the pull request, read as mi, right before it is. It
+// ends the job when one does, or when that cannot be told.
+func (j *job) notExcluded(mi model.MergeInfo) bool {
+	if !j.it.Auto || j.r.opt.Excluded == nil {
+		return true
+	}
+	why, err := j.r.opt.Excluded(j.ctx, j.it.PR, mi)
+	switch {
+	case err != nil:
+		j.say(Skipped, "could not tell whether it is excluded: "+short(err))
+		return false
+	case why != "":
+		j.say(Skipped, "excluded: "+why)
+		return false
+	}
+	return true
 }
 
 // approvedBy reports whether login's latest review approves.
@@ -870,6 +911,9 @@ func (j *job) review(rv ReviewText) {
 	// Failing checks are let through here: the popup already left them out
 	// unless the user asked to include them.
 	d := plan.ForReview(mi, j.it.PR, j.r.opt.Viewer, rv.Event, true, j.r.opt.Settings)
+	if approve {
+		d = j.forApprove(mi)
+	}
 	if d.Step == plan.StepSkip {
 		j.say(Skipped, d.Reason)
 		return
@@ -886,6 +930,9 @@ func (j *job) review(rv ReviewText) {
 		}
 	}
 	if approve {
+		if !j.notExcluded(mi) {
+			return
+		}
 		j.forecast([]Step{StepApprove})
 		if j.sendApproval(rv.Body) {
 			j.say(Approved, "approved")

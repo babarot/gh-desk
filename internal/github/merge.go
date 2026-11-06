@@ -23,6 +23,7 @@ const infoFields = `
   viewerCanClose locked headRefName headRef { id } isCrossRepository viewerCanDeleteHeadRef
   repository { nameWithOwner mergeCommitAllowed squashMergeAllowed rebaseMergeAllowed autoMergeAllowed viewerPermission }
   latestReviews(first: 20) { nodes { author { login } state } }
+  viewerLatestReview { state commit { oid } }
   commits(last: 1) { nodes { commit { statusCheckRollup { state } } } }`
 
 type commitsNode struct {
@@ -84,6 +85,10 @@ type infoNode struct {
 			State  string
 		}
 	}
+	ViewerLatestReview *struct {
+		State  string
+		Commit *struct{ Oid string }
+	}
 	Commits commitsNode
 	Files   *struct{ Nodes []struct{ Path string } }
 }
@@ -115,6 +120,12 @@ func (n infoNode) toModel() model.MergeInfo {
 	for _, r := range n.LatestReviews.Nodes {
 		if r.Author != nil {
 			mi.Reviews = append(mi.Reviews, model.Review{Author: r.Author.Login, State: model.ReviewState(r.State)})
+		}
+	}
+	if v := n.ViewerLatestReview; v != nil {
+		mi.ViewerReview = &model.ViewerReview{State: model.ReviewState(v.State)}
+		if v.Commit != nil {
+			mi.ViewerReview.Commit = v.Commit.Oid
 		}
 	}
 	if len(n.Commits.Nodes) > 0 {
