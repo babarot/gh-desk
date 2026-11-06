@@ -67,6 +67,6 @@ A tab says how many it leaves out on the last line of its list, and its count in
 
 Only these are read: a word such as `fix:` is looked for as it is. The filter line colors the words it reads this way. While you type, an empty filter shows them faint, and the rest of one follows faint once a word starts it; `tab` fills it in. After `author:` or `repo:`, the logins or repositories of the rows the rest of the filter leaves follow faint, the most common first; `tab` fills one in, and `tab` again goes to the next.
 
-The rules of `S` can narrow the rows too ([Selecting by rules](selecting.md)); a row is shown when it passes both. The columns are chosen with `list.columns`, and a narrow terminal drops SIZE first, then AUTHOR.
+The rules of `S` can narrow the rows too ([Selecting by rules](selecting.md)); a row is shown when it passes both. While the rows are narrowed, a tab's count in the header is in the filter's color and counts only what its rows hold, the unread among them in the inbox; the filter narrows every tab, so the header tells which tabs hold what you typed. The columns are chosen with `list.columns`, and a narrow terminal drops SIZE first, then AUTHOR.
 
 See [`[[tabs]]`](../reference/configuration.md#tabs) for every key of a tab.

@@ -349,10 +349,33 @@ func (m *Model) excludedPassing(t *tab, filter string, rules []plan.Rule) exclud
 	return c
 }
 
+// narrowed reports whether the rows of t are narrowed, by the filter typed
+// or by the rules of S, so that its count is what the narrowed rows hold.
+func (m *Model) narrowed(t *tab) bool { return m.filter != "" || t.ruleFilter != nil }
+
+// narrowedCount is the count of t while its rows are narrowed: the pull
+// requests its rows hold, or in the inbox the unread notifications they
+// hold, with no group folded. Only what was read can be matched, so a
+// search tab counts none beyond what it reads (ADR-083).
+func (m *Model) narrowedCount(t *tab) int {
+	n := 0
+	for _, r := range m.rowsOf(t, m.filter, t.ruleFilter, nil) {
+		if r.kind != rowPR {
+			continue
+		}
+		if t.inbox {
+			if _, ok := m.unread[r.pr.Key]; !ok {
+				continue
+			}
+		}
+		n++
+	}
+	return n
+}
+
 // unreadShown is how many unread notifications the inbox t shows: those
 // it excludes count only while they are shown, so that the tab's count is
-// what its rows hold. The filter is left out, as it only looks for rows
-// for a moment.
+// what its rows hold. While the rows are narrowed, narrowedCount counts.
 func (m *Model) unreadShown(t *tab) int {
 	if t.showExcluded {
 		return len(m.unread)
