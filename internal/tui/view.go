@@ -454,6 +454,10 @@ func (m *Model) hints() string {
 				as = append(as, "fill_suggestion")
 			}
 		case m.triage.asking:
+			as = []keymap.Action{"chat_close"}
+			if !m.triage.stopping {
+				back = "stop"
+			}
 		case m.applicable():
 			as = []keymap.Action{"triage_apply", "triage_more"}
 		default:

@@ -14,7 +14,7 @@ Claude answers in `claude.language`, and follows `claude.instructions` in every 
 
 ## About the tab
 
-`C` asks Claude about the tab shown, in your own words, such as "merge the bots with passing checks". `tab` fills in the questions it offers. Claude answers with a plan of what to filter, fold, select, and at the end approve or merge; it does not act on the screen itself. `enter` applies the plan, and an approve or a merge in it opens the confirm popup with the pull requests Claude named.
+`C` asks Claude about the tab shown, in your own words, such as "merge the bots with passing checks". `tab` fills in the questions it offers. While Claude answers, `esc` stops it and `backspace` closes the popup with Claude still at work; `C` shows the answer when it comes. `ctrl+l`, pressed twice, starts the conversation over. Claude answers with a plan of what to filter, fold, select, and at the end approve or merge; it does not act on the screen itself. `enter` applies the plan on the tab it was asked on, and an approve or a merge in it opens the confirm popup with the pull requests Claude named.
 
 [A plan from Claude, applied and merged](https://babarot.me/gh-desk/?scenario=triage "playground")
 

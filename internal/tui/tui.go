@@ -501,8 +501,7 @@ func (m *Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case heavyMsg:
 		return m, m.heavyRead(msg)
 	case triageMsg:
-		m.triageAnswered(msg)
-		return m, nil
+		return m, m.triageAnswered(msg)
 	case tea.PasteMsg:
 		return m, m.paste(msg)
 	case tea.MouseMsg:
