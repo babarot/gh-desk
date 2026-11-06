@@ -62,6 +62,11 @@ type chatScreen struct {
 	// asked; prepareErr is why making it failed, until it is made again.
 	preparing  bool
 	prepareErr string
+	// scene is what Clawd does in the welcome, picked as the worktree
+	// begins to be made at sceneAt; endedAt is when it was made or
+	// failed, zero until then.
+	scene            *clawdScene
+	sceneAt, endedAt time.Time
 }
 
 // chatStatus puts what a conversation says went wrong on the status line.
@@ -196,6 +201,7 @@ func (m *Model) prepareChat(c *chatScreen) tea.Cmd {
 		return nil
 	}
 	c.preparing, c.prepareErr = true, ""
+	c.scene, c.sceneAt, c.endedAt = m.pickScene(), m.set.Now(), time.Time{}
 	key, head := c.PR().Key, c.PR().HeadOID
 	return func() tea.Msg {
 		dir, err := m.claude.Prepare(m.ctx, key, head)
@@ -215,7 +221,7 @@ func (m *Model) chatReady(msg chatReadyMsg) tea.Cmd {
 	if !ok {
 		return nil
 	}
-	c.preparing = false
+	c.preparing, c.endedAt = false, m.set.Now()
 	switch {
 	case msg.err != nil:
 		// The first question makes it again, and says what went wrong.

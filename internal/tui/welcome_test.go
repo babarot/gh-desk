@@ -4,6 +4,7 @@ import (
 	"errors"
 	"strings"
 	"testing"
+	"time"
 
 	tea "charm.land/bubbletea/v2"
 
@@ -18,8 +19,10 @@ func TestClaudeWelcome(t *testing.T) {
 	m.Update(tea.WindowSizeMsg{Width: 130, Height: 60})
 	m.pane.height = 30
 	press(m, "i")
+	// Clawd's scene is over a minute on.
+	m.set.Now = func() time.Time { return now.Add(time.Minute) }
 	s := screen(m)
-	for _, want := range []string{"▐▛███▜▌", "acme/api#12  Add retries to the client", "alice wants to merge", "worktree ready at", "try"} {
+	for _, want := range []string{"▝▜██████▀", "acme/api#12  Add retries to the client", "alice wants to merge", "worktree ready at", "try"} {
 		if !strings.Contains(s, want) {
 			t.Errorf("welcome lacks %q:\n%s", want, s)
 		}
@@ -47,7 +50,7 @@ func TestClaudeWelcome(t *testing.T) {
 		t.Errorf("tab replaced the user's text with %q", c.input.Value())
 	}
 	press(m, "enter")
-	if s := screen(m); strings.Contains(s, "▐▛███▜▌") || strings.Contains(s, qs[2]) {
+	if s := screen(m); strings.Contains(s, "▝▜██████▀") || strings.Contains(s, qs[2]) {
 		t.Errorf("the welcome stays after a question:\n%s", s)
 	}
 }
@@ -92,11 +95,11 @@ func TestClaudeWelcomeWorktreeFailed(t *testing.T) {
 	}
 }
 
-// The mascot is drawn in Claude's color on every theme (ADR-081).
+// Clawd is drawn in Claude's color on every theme (ADR-081).
 func TestMascotKeepsClaudesColor(t *testing.T) {
 	for name, p := range themes {
 		if got := newStyles(p).mascot.GetForeground(); got != claudeOrange() {
-			t.Errorf("theme %s draws the mascot in %v", name, got)
+			t.Errorf("theme %s draws Clawd in %v", name, got)
 		}
 	}
 }

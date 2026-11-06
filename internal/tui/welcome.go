@@ -3,27 +3,30 @@ package tui
 import (
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/babarot/gh-desk/internal/model"
 )
 
-// mascot is Claude's mascot, drawn as Claude Code draws it: three lines,
-// each as wide as the others.
-const mascot = " ▐▛███▜▌ \n▝▜█████▛▘\n  ▘▘ ▝▝  "
-
-// welcomeGap is the space between the mascot and the text beside it.
+// welcomeGap is the space between Clawd and the text beside it.
 const welcomeGap = 3
 
 // welcomeLines are what the claude pane shows of c while nothing has been
-// asked, in at most height lines: Claude's mascot beside the pull request,
+// asked, in at most height lines: Clawd beside the pull request,
 // the worktree being made, and the questions fill_suggestion puts in the
 // text box. The questions give way first, then the worktree; when even the
 // pull request does not fit, nothing is shown.
 func (m *Model) welcomeLines(c *chatScreen, height int) []string {
 	st, p := m.st, c.PR()
 	margin := spaces(chatMargin)
-	art := strings.Split(mascot, "\n")
-	beside := spaces(len([]rune(art[0])) + welcomeGap)
+	f, _ := m.clawdNow(c)
+	w := clawdW
+	if c.scene != nil {
+		w = c.scene.width()
+	}
+	clawd := st.clawdLines(f, w)
+	above, art := clawd[0], clawd[1:]
+	beside := spaces(w + welcomeGap)
 	var right []string
 	right = append(right, st.title.Render(p.Key.String())+"  "+st.dim.Render(shownTitle(p.Title)))
 	who := st.dim.Render(p.Author+" wants to merge ") + st.muted.Render(p.HeadRef) + st.dim.Render(" into ") + st.muted.Render(p.BaseRef)
@@ -33,7 +36,7 @@ func (m *Model) welcomeLines(c *chatScreen, height int) []string {
 	right = append(right, who, m.welcomeFacts(p))
 	var head []string
 	for i, a := range art {
-		head = append(head, margin+st.mascot.Render(a)+spaces(welcomeGap)+right[i])
+		head = append(head, margin+a+spaces(welcomeGap)+right[i])
 	}
 	var worktree []string
 	switch {
@@ -58,11 +61,15 @@ func (m *Model) welcomeLines(c *chatScreen, height int) []string {
 		}
 	}
 	// A line is left above, as a conversation leaves one under the
-	// pane's top edge.
+	// pane's top edge; what Clawd holds up is drawn in it.
+	top := ""
+	if strings.TrimSpace(above) != "" {
+		top = margin + above
+	}
 	for _, L := range [][]string{
-		append(append(append([]string{""}, head...), worktree...), asks...),
-		append(append([]string{""}, head...), worktree...),
-		append([]string{""}, head...),
+		append(append(append([]string{top}, head...), worktree...), asks...),
+		append(append([]string{top}, head...), worktree...),
+		append([]string{top}, head...),
 	} {
 		if len(L) <= height {
 			return L
@@ -121,4 +128,55 @@ func decisionWord(d model.ReviewDecision) string {
 		return "review required"
 	}
 	return ""
+}
+
+// clawdNow is the frame Clawd is drawn in for c now, and whether it is
+// moving. It plays c's scene from when the worktree began to be made;
+// with no scene, or with the spinner chosen still, it stands still, in
+// the frame its scene ends in once the worktree's end came.
+func (m *Model) clawdNow(c *chatScreen) (clawdFrame, bool) {
+	s := c.scene
+	if s == nil {
+		return stand(pDefault), false
+	}
+	ended := time.Duration(-1)
+	if !c.endedAt.IsZero() {
+		ended = c.endedAt.Sub(c.sceneAt)
+	}
+	ok := c.prepareErr == ""
+	if m.spinStyle.still {
+		switch {
+		case ended < 0:
+			return stand(pDefault), false
+		case ok:
+			return s.readyRest, false
+		}
+		return s.failRest, false
+	}
+	return s.at(m.set.Now().Sub(c.sceneAt), ended, ok)
+}
+
+// clawdMoving reports whether Clawd moves in the claude pane shown.
+func (m *Model) clawdMoving() bool {
+	c := m.chat()
+	if !m.claudeShown() || c == nil || busy(c) || c.Started() {
+		return false
+	}
+	_, moving := m.clawdNow(c)
+	return moving
+}
+
+// pickScene picks one of Clawd's themes for a worktree being made, not
+// the one picked last, and its parts.
+func (m *Model) pickScene() *clawdScene {
+	ts := clawdThemes()
+	i := m.set.Pick(len(ts))
+	if m.lastTheme >= 0 && len(ts) > 1 {
+		i = m.set.Pick(len(ts) - 1)
+		if i >= m.lastTheme {
+			i++
+		}
+	}
+	m.lastTheme = i
+	return newScene(ts[i], m.set.Pick)
 }

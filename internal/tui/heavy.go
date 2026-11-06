@@ -151,10 +151,11 @@ func (m *Model) shimmering() bool { return m.set.Shimmer && m.pendingShown() }
 // spinMsg turns the spinner of what is being read.
 type spinMsg struct{}
 
-// spin keeps the screen drawn while something is read, and while a row
-// shimmers as an exclusion rule waits to tell it, and only then.
+// spin keeps the screen drawn while something is read, while a row
+// shimmers as an exclusion rule waits to tell it, and while Clawd moves,
+// and only then.
 func (m *Model) spin() tea.Cmd {
-	if m.spinning || !m.reading() && !m.shimmering() {
+	if m.spinning || !m.reading() && !m.shimmering() && !m.clawdMoving() {
 		return nil
 	}
 	m.spinning = true
@@ -175,6 +176,10 @@ func (m *Model) spin() tea.Cmd {
 			every = min(every, claudeSpinner.every)
 			break
 		}
+	}
+	if m.clawdMoving() {
+		// Clawd moves at Claude Code's pace.
+		every = min(every, clawdStep)
 	}
 	return m.after(every, spinMsg{})
 }
