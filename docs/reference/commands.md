@@ -50,6 +50,7 @@ Available Commands:
   reference   print every setting with what it does and its default, or those of a table or a key
   schema      print the JSON Schema of the config file
   show        print the settings in effect, or with --diff only those that differ from the defaults
+  ui          edit the settings on a page in the browser, and print how to apply them
 
 Flags:
   -h, --help   help for config
@@ -176,6 +177,30 @@ Usage:
 Flags:
       --diff   only the settings that differ from the defaults
   -h, --help   help for show
+
+Global Flags:
+      --config string   the config file (default "~/.config/gh-desk/config.toml")
+      --debug           log at debug level
+```
+
+## gh desk config ui
+
+```
+Open a page in the browser with the settings of the config file.
+
+The page shows gh-desk with the settings as they are changed. It is served
+on this machine for as long as this runs, and writes nothing. Saving on the
+page writes the new file to standard output, so that it can be applied:
+
+    gh desk config ui | gh desk config apply
+
+Closing the page, or ctrl+c, leaves without saving, and writes nothing.
+
+Usage:
+  gh desk config ui [flags]
+
+Flags:
+  -h, --help   help for ui
 
 Global Flags:
       --config string   the config file (default "~/.config/gh-desk/config.toml")

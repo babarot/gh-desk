@@ -62,6 +62,7 @@ Keys are bound by the name of their action, and can be changed in the config fil
 The first launch writes `~/.config/gh-desk/config.toml` (or under `$XDG_CONFIG_HOME`), with no settings in it. A setting left out takes its default, so write only what you change: the tabs and their searches, the columns, the rules for selecting, how to merge, the theme, and the keys. A mistake in it is reported with where it is.
 
 ```sh
+gh desk config ui           # edit the settings on a page, with gh-desk drawn above them
 gh desk config reference    # every setting, with what it does and its default
 gh desk config check        # read it and print its mistakes, without starting
 gh desk config show --diff  # the settings that differ from the defaults

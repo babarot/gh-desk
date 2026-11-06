@@ -2,6 +2,12 @@ package app
 
 import (
 	"bytes"
+	"context"
+	"encoding/json"
+	"errors"
+	"io"
+	"log/slog"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
@@ -371,5 +377,185 @@ func TestConfigInitEditSchema(t *testing.T) {
 	}
 	if code, _, _ := runConfig(t, path); code != 2 {
 		t.Errorf("no command: code %d", code)
+	}
+}
+
+// What scripts of the page read: the settings and the keys as a page has
+// them, written so that they run without Go (mise run configui:test).
+func TestConfigUIData(t *testing.T) {
+	const path = "../configui/testdata/data.json"
+	want, err := json.MarshalIndent(map[string]any{"DATA": config.UI(), "KEYS": uiKeys()}, "", " ")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if *update {
+		if err := os.WriteFile(path, want, 0o644); err != nil {
+			t.Fatal(err)
+		}
+		return
+	}
+	if got, err := os.ReadFile(path); err != nil || !bytes.Equal(got, want) {
+		t.Errorf("%s is not up to date; run go test ./internal/app -run TestConfigUIData -update", path)
+	}
+}
+
+// What the page's code writes reads back as gh-desk reads it at start.
+func TestConfigUIOutputLoads(t *testing.T) {
+	const path = "../configui/testdata/output.toml"
+	if _, _, _, err := load(path, false, new(slog.LevelVar)); err != nil {
+		t.Fatal(err)
+	}
+	// And it says what it was given: nothing is lost or moved by being
+	// written again.
+	got, err := config.Raw([]byte(read(t, path)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var want map[string]any
+	if err := json.Unmarshal([]byte(read(t, "../configui/testdata/input.json")), &want); err != nil {
+		t.Fatal(err)
+	}
+	g, _ := json.Marshal(got)
+	w, _ := json.Marshal(want)
+	if string(g) != string(w) {
+		t.Errorf("output differs from input:\n%s\n%s", g, w)
+	}
+}
+
+func TestApplyCommandQuotesThePath(t *testing.T) {
+	for path, want := range map[string]string{
+		"/tmp/a.toml":       "--config /tmp/a.toml",
+		"/tmp/my cfg.toml":  "--config '/tmp/my cfg.toml'",
+		"/tmp/$(rm x).toml": "--config '/tmp/$(rm x).toml'",
+		"/tmp/it's.toml":    `--config '/tmp/it'\''s.toml'`,
+	} {
+		if got := applyCommand(path); !strings.HasSuffix(got, want) {
+			t.Errorf("%q: %q", path, got)
+		}
+	}
+}
+
+// savePage plays the browser: it reads the page, and saves src on it.
+func savePage(t *testing.T, url, src string) (*http.Response, string) {
+	t.Helper()
+	page, err := http.Get(url)
+	if err != nil {
+		t.Error(err)
+		return nil, ""
+	}
+	b, _ := io.ReadAll(page.Body)
+	page.Body.Close()
+	req, err := http.NewRequest(http.MethodPost, url+"save", strings.NewReader(src))
+	if err != nil {
+		t.Error(err)
+		return nil, ""
+	}
+	req.Header.Set("Origin", "http://"+req.URL.Host)
+	res, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Error(err)
+		return nil, ""
+	}
+	return res, string(b)
+}
+
+func TestConfigUI(t *testing.T) {
+	path := writeFile(t, "[list]\nbell = true\n")
+	const made = "[list]\nbell = false\n"
+	var out, errb bytes.Buffer
+	pages := make(chan string, 1)
+	open := func(u string) error {
+		// A file with a mistake stays on the page, and the second try goes.
+		go func() {
+			res, _ := savePage(t, u, "[keys]\napprove = 123\n")
+			if res.StatusCode != http.StatusUnprocessableEntity {
+				t.Errorf("a mistake: %d", res.StatusCode)
+			}
+			b, _ := io.ReadAll(res.Body)
+			res.Body.Close()
+			if !strings.Contains(string(b), "keys.approve") || strings.Contains(string(b), "gh-desk-config-") {
+				t.Errorf("answer %s", b)
+			}
+			res, page := savePage(t, u, made)
+			res.Body.Close()
+			pages <- page
+		}()
+		return nil
+	}
+	if code := uiConfig(t.Context(), path, false, false, open, &out, &errb); code != 0 {
+		t.Fatalf("code %d, err %q", code, errb.String())
+	}
+	if out.String() != made {
+		t.Errorf("stdout %q", out.String())
+	}
+	if got := read(t, path); !strings.Contains(got, "bell = true") {
+		t.Errorf("the file was written: %q", got)
+	}
+	if page := <-pages; !strings.Contains(page, `"bell":true`) || !strings.Contains(page, "merge.auto_merge") {
+		t.Error("the page has no settings")
+	}
+}
+
+func TestConfigUIWhenTheFileChanged(t *testing.T) {
+	path := writeFile(t, "[list]\nbell = true\n")
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+	var out, errb bytes.Buffer
+	open := func(u string) error {
+		go func() {
+			if err := os.WriteFile(path, []byte("[list]\nbell = false\n"), 0o644); err != nil {
+				t.Error(err)
+			}
+			res, _ := savePage(t, u, "[list]\nstale_days = 9\n")
+			b, _ := io.ReadAll(res.Body)
+			res.Body.Close()
+			if res.StatusCode != http.StatusUnprocessableEntity || !strings.Contains(string(b), "changed while") {
+				t.Errorf("%d %s", res.StatusCode, b)
+			}
+			cancel()
+		}()
+		return nil
+	}
+	if code := uiConfig(ctx, path, false, false, open, &out, &errb); code != 1 || out.Len() != 0 {
+		t.Errorf("code %d, out %q", code, out.String())
+	}
+}
+
+func TestConfigUIOpensNothingForAMistake(t *testing.T) {
+	var out, errb bytes.Buffer
+	opened := false
+	open := func(string) error { opened = true; return nil }
+	if code := uiConfig(t.Context(), writeFile(t, "[keys]\napprove = 123\n"), false, false, open, &out, &errb); code != 1 || opened {
+		t.Errorf("code %d, opened %v", code, opened)
+	}
+}
+
+func TestConfigUIClosed(t *testing.T) {
+	var out, errb bytes.Buffer
+	open := func(u string) error {
+		go func() {
+			req, _ := http.NewRequest(http.MethodPost, u+"close", nil)
+			req.Header.Set("Origin", "http://"+req.URL.Host)
+			if res, err := http.DefaultClient.Do(req); err != nil {
+				t.Error(err)
+			} else {
+				res.Body.Close()
+			}
+		}()
+		return nil
+	}
+	if code := uiConfig(t.Context(), writeFile(t, "[list]\nbell = true\n"), false, false, open, &out, &errb); code != 0 || out.Len() != 0 {
+		t.Errorf("code %d, out %q, err %q", code, out.String(), errb.String())
+	}
+}
+
+// ctrl+c leaves without saving, and with no browser it still waits.
+func TestConfigUILeftWithoutSaving(t *testing.T) {
+	ctx, cancel := context.WithCancel(t.Context())
+	var out, errb bytes.Buffer
+	open := func(string) error { cancel(); return errors.New("no browser") }
+	code := uiConfig(ctx, filepath.Join(t.TempDir(), "config.toml"), false, false, open, &out, &errb)
+	if code != 1 || out.Len() != 0 || !strings.Contains(errb.String(), "nothing was saved") {
+		t.Errorf("code %d, out %q, err %q", code, out.String(), errb.String())
 	}
 }

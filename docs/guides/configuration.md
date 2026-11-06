@@ -40,6 +40,20 @@ $ gh desk config check
 
 A warning (something that is likely not what you meant, but does not stop gh-desk) is shown the same way, and gh-desk starts anyway.
 
+## On a page
+
+`gh desk config ui` opens a page in your browser with the settings of the file, and gh-desk drawn above them as they change. Rules, tabs, keys and themes are easier to try there.
+
+```sh
+gh desk config ui | gh desk config apply
+```
+
+Saving on the page checks the file as gh-desk does at start, writes it to standard output, and ends the command; `config apply` then puts it in place. Run alone, `gh desk config ui` prints the new file and puts it on the clipboard too. Closing the page, with its Close button or by closing the tab, leaves without saving and writes nothing, so `config apply` leaves the file as it is.
+
+The page is served on this machine for as long as the command runs, and it writes nothing itself. Settings you did not touch stay as they are, even where they match the default; your comments do not carry over, but the old file is kept beside the new one as `config.toml.bak`. Do not redirect the output onto the config file: the shell empties the file before gh-desk reads it.
+
+MCP servers are shown and removed there; to add or change one, edit the file.
+
 ## After an update
 
 When an update brings settings this install has not had, gh-desk says so in the notifications, one line for each, with the command that explains it. `gh desk config reference` then lists them at its top and marks them, until an update brings others. The file is never changed for you.

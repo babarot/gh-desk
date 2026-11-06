@@ -1,6 +1,8 @@
 package app
 
 import (
+	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -8,15 +10,20 @@ import (
 	"log/slog"
 	"os"
 	"os/exec"
+	"os/signal"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"strings"
 
+	"github.com/cli/go-gh/v2/pkg/browser"
 	"github.com/spf13/cobra"
 
 	"github.com/babarot/gh-desk/internal/config"
+	"github.com/babarot/gh-desk/internal/configui"
 	"github.com/babarot/gh-desk/internal/release"
 	"github.com/babarot/gh-desk/internal/state"
+	"github.com/babarot/gh-desk/internal/tui"
 	"github.com/babarot/gh-desk/internal/tui/keymap"
 )
 
@@ -58,6 +65,30 @@ $XDG_CONFIG_HOME/gh-desk/config.toml, or ~/.config/gh-desk/config.toml.`,
 	}
 	show.Flags().BoolVar(&diff, "diff", false, "only the settings that differ from the defaults")
 
+	ui := &cobra.Command{
+		Use:   "ui",
+		Short: "edit the settings on a page in the browser, and print how to apply them",
+		Long: `Open a page in the browser with the settings of the config file.
+
+The page shows gh-desk with the settings as they are changed. It is served
+on this machine for as long as this runs, and writes nothing. Saving on the
+page writes the new file to standard output, so that it can be applied:
+
+    gh desk config ui | gh desk config apply
+
+Closing the page, or ctrl+c, leaves without saving, and writes nothing.`,
+		Args: cobra.NoArgs,
+		RunE: func(*cobra.Command, []string) error {
+			ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
+			defer stop()
+			tty := false
+			if st, err := os.Stdout.Stat(); err == nil {
+				tty = st.Mode()&os.ModeCharDevice != 0
+			}
+			return exited(uiConfig(ctx, o.config, o.debug, tty, openPage, stdout, stderr))
+		},
+	}
+
 	apply := &cobra.Command{
 		Use:   "apply",
 		Short: "replace the config file with the one read from standard input, if it has no mistakes",
@@ -78,6 +109,7 @@ added to its name.`,
 
 	cmd.AddCommand(
 		apply,
+		ui,
 		&cobra.Command{
 			Use:   "check [path]",
 			Short: "read the config file and print its mistakes and warnings, without starting; exits 1 when it has mistakes",
@@ -183,6 +215,124 @@ func checkConfig(path string, debug bool, stdout io.Writer) int {
 	}
 	fmt.Fprintf(stdout, "%s: no mistakes\n", shown)
 	return 0
+}
+
+// uiConfig serves the page of the config file at path, and writes what the
+// page saves to stdout, and nothing else there, so that it can be piped to
+// config apply. A file with mistakes is reported, not opened: gh-desk could
+// not start with it, and the page would have nothing to stand on. With no
+// file, the page starts from the defaults.
+func uiConfig(ctx context.Context, path string, debug, tty bool, open func(string) error, stdout, stderr io.Writer) int {
+	src, err := os.ReadFile(path)
+	if err != nil && !errors.Is(err, fs.ErrNotExist) {
+		fmt.Fprintf(stderr, "gh-desk: %v\n", err)
+		return 1
+	}
+	exists := err == nil
+	if exists {
+		if _, _, _, err := load(path, debug, new(slog.LevelVar)); err != nil {
+			fmt.Fprintln(stderr, err)
+			return 1
+		}
+	}
+	page, err := configui.Page(configui.Input{File: configui.File{Path: config.TildePath(path), Src: src}, Keys: uiKeys(),
+		Themes: tui.Palettes(), Spinners: tui.Spinners()})
+	if err != nil {
+		fmt.Fprintf(stderr, "gh-desk: %v\n", err)
+		return 1
+	}
+	srv := &configui.Server{Page: page, Check: func(made []byte) error {
+		// What the file was read as is what the page changed.
+		now, err := os.ReadFile(path)
+		if err != nil && !errors.Is(err, fs.ErrNotExist) {
+			return err
+		}
+		if !bytes.Equal(now, src) || (err == nil) != exists {
+			return fmt.Errorf("%s changed while this page was open. Run gh desk config ui again, or your change would be lost", config.TildePath(path))
+		}
+		_, err = checkedFile(path, made, "", debug)
+		return err
+	}}
+	saved, err := srv.Serve(ctx, func(url string) {
+		fmt.Fprintf(stderr, "editing the settings at %s\nsave on the page to finish; close it to leave them as they are\n", url)
+		if err := open(url); err != nil {
+			fmt.Fprintln(stderr, "open it in your browser")
+		}
+	})
+	if err != nil {
+		fmt.Fprintln(stderr, "nothing was saved")
+		return 1
+	}
+	// Closed without saving: nothing goes out, so that config apply leaves
+	// the file as it is, its comments and all.
+	if saved == nil {
+		fmt.Fprintln(stderr, "closed; nothing was changed")
+		return 0
+	}
+	if _, err := stdout.Write(saved); err != nil {
+		fmt.Fprintf(stderr, "gh-desk: %v\n", err)
+		return 1
+	}
+	if tty {
+		if clipboard(saved) {
+			fmt.Fprintln(stderr, "\nthis is on the clipboard too; to apply it:\n  "+applyCommand(path))
+		} else {
+			fmt.Fprintln(stderr, "\nto apply it, pipe it to gh desk config apply, as: gh desk config ui | gh desk config apply")
+		}
+	}
+	return 0
+}
+
+// clipboard puts text on the clipboard with what this system has, and
+// says whether it did.
+func clipboard(text []byte) bool {
+	var cmd *exec.Cmd
+	switch {
+	case runtime.GOOS == "darwin":
+		cmd = exec.Command("pbcopy")
+	case os.Getenv("WAYLAND_DISPLAY") != "":
+		cmd = exec.Command("wl-copy")
+	default:
+		cmd = exec.Command("xclip", "-selection", "clipboard")
+	}
+	cmd.Stdin = bytes.NewReader(text)
+	return cmd.Run() == nil
+}
+
+// openPage opens a page in the browser.
+func openPage(url string) error { return browser.New("", io.Discard, io.Discard).Browse(url) }
+
+// uiKeys are the key actions with the words of their scope.
+func uiKeys() []configui.Key {
+	out := make([]configui.Key, len(keymap.Defaults))
+	for i, d := range keymap.Defaults {
+		out[i] = configui.Key{Action: string(d.Action), Keys: d.Keys, Scope: string(d.Scope), ScopeWords: scopeWords[d.Scope]}
+	}
+	return out
+}
+
+// applyCommand is the command that applies what the page made, reading the
+// clipboard with what this system has.
+func applyCommand(path string) string {
+	cmd := "gh desk config apply"
+	if path != config.FilePath() {
+		cmd += " --config " + shellQuoted(path)
+	}
+	switch {
+	case runtime.GOOS == "darwin":
+		return "pbpaste | " + cmd
+	case os.Getenv("WAYLAND_DISPLAY") != "":
+		return "wl-paste | " + cmd
+	}
+	return "xclip -selection clipboard -o | " + cmd
+}
+
+// shellQuoted is s as a shell reads it back, whatever it holds.
+func shellQuoted(s string) string {
+	if s != "" && strings.Trim(s, "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-./~") == "" {
+		return s
+	}
+	return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'"
 }
 
 // checkedFile writes src to the file tmp, or to a new temporary one, and

@@ -1,0 +1,35 @@
+#:schema https://raw.githubusercontent.com/babarot/gh-desk/main/docs/config.schema.json
+
+[[select]]
+name = "a \"quoted\" rule"
+title = '(?i)^fix\(deps\)'
+max_lines = 10
+
+[[exclude]]
+repos = ["old/*"]
+
+[[auto_approve]]
+name = "bots"
+authors = ["renovate"]
+dry_run = true
+
+[list]
+refresh = "90s"
+home_owners = ["acme"]
+bell = true
+
+[merge]
+methods = ["squash", "merge"]
+
+[claude]
+language = "Japanese"
+instructions = "Answer in short.\nName files with 'quotes' and \\ backslashes."
+
+[claude.mcp]
+builtin = true
+servers = { recall = { command = "recall", args = ["mcp", "--repo", "${GH_DESK_URL}"], tools = ["recall_search"], env = { "KEY.WITH.DOTS" = "${VAR}" } }, remote = { type = "http", url = "https://example.com/mcp", headers = { "X.Custom Header" = "a \"quoted\" value" }, tools = ["read"] } }
+
+[keys]
+approve = "ctrl+a"
+up = ["up", "k", "ctrl+p"]
+hide = []
