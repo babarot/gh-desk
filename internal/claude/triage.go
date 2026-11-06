@@ -84,6 +84,16 @@ type SnapshotRow struct {
 // maxTriageRows is how many rows of the tab go into a triage prompt.
 const maxTriageRows = 300
 
+// TriageQuestions are the questions offered for a triage.
+func TriageQuestions() []string {
+	return []string{
+		"bots with passing checks",
+		"what has waited longest",
+		"pick the small ones",
+		"what can I approve safely?",
+	}
+}
+
 // TriagePrompt is a triage request with the tab it is about.
 func TriagePrompt(s Snapshot, request string) string {
 	var b strings.Builder
@@ -201,6 +211,9 @@ func ago(d time.Duration) string {
 type Plan struct {
 	Reply   string
 	Actions []Action
+	// Cost and Model are what the answer cost and which model gave it.
+	Cost  float64
+	Model string
 }
 
 // Do is what an action does.
@@ -237,5 +250,5 @@ func ParseTriage(a Answer) (Plan, error) {
 	if a.Structured == nil || json.Unmarshal(a.Structured, &p) != nil {
 		return Plan{}, errors.New("claude gave no plan")
 	}
-	return Plan{Reply: strings.TrimSpace(p.Reply), Actions: p.Actions}, nil
+	return Plan{Reply: strings.TrimSpace(p.Reply), Actions: p.Actions, Cost: a.Cost, Model: a.Model}, nil
 }

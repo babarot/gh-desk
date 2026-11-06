@@ -4,6 +4,8 @@ import (
 	"strings"
 	"testing"
 
+	tea "charm.land/bubbletea/v2"
+
 	"github.com/babarot/gh-desk/internal/claude"
 	"github.com/babarot/gh-desk/internal/runner"
 	"github.com/babarot/gh-desk/internal/tui/keymap"
@@ -22,6 +24,50 @@ func startTriage(t *testing.T, plan string, tab ...string) (*Model, *fakeClaude)
 		t.Fatalf("asked %d times", len(fc.triaged))
 	}
 	return m, fc
+}
+
+// A triage with nothing asked shows Clawd beside what the tab holds, with
+// the questions tab fills in; the questions give way first on a low screen.
+func TestTriageWelcome(t *testing.T) {
+	m, _ := startWith(t, fixture(), keymap.Default())
+	fakeClaudeOf(t, m)
+	press(m, "C")
+	golden(t, "triage-welcome", m)
+	press(m, "tab")
+	if got := m.triage.input.Value(); got != claude.TriageQuestions()[0] {
+		t.Errorf("tab filled %q", got)
+	}
+	press(m, "tab")
+	if got := m.triage.input.Value(); got != claude.TriageQuestions()[1] {
+		t.Errorf("a second tab filled %q", got)
+	}
+	press(m, "x", "tab")
+	if got := m.triage.input.Value(); got != claude.TriageQuestions()[1]+"x" {
+		t.Errorf("tab changed the user's own text to %q", got)
+	}
+	m.Update(tea.WindowSizeMsg{Width: 130, Height: 18})
+	if s := screen(m); !strings.Contains(s, "▐▛") || strings.Contains(s, "what can I approve") {
+		t.Errorf("a low screen:\n%s", s)
+	}
+	m.Update(tea.WindowSizeMsg{Width: 130, Height: 12})
+	if s := screen(m); strings.Contains(s, "▐▛") {
+		t.Errorf("a screen too low for Clawd:\n%s", s)
+	}
+}
+
+// A reply is drawn as the claude pane draws one, with its model and cost.
+func TestTriageAnswerDrawnAsAChat(t *testing.T) {
+	m, fc := startTriage(t, `{"reply":"**One** bot.","actions":[]}`)
+	s := screen(m)
+	if !strings.Contains(s, "> bots") || !strings.Contains(s, "⏺ One bot.") || strings.Contains(s, "**") {
+		t.Errorf("reply:\n%s", s)
+	}
+	fc.triageCost, fc.triageModel = 0.25, "claude-opus-5-5"
+	press(m, "i", "m", "o", "r", "e", "enter")
+	s = screen(m)
+	if !strings.Contains(s, "$0.25") || !strings.Contains(s, "claude-opus-5-5 · plan only") {
+		t.Errorf("no model or cost:\n%s", s)
+	}
 }
 
 func TestTriagePlanApplied(t *testing.T) {
