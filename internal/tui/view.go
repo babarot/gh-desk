@@ -482,6 +482,12 @@ func (m *Model) hints() string {
 		back = "clear"
 	default:
 		as = []keymap.Action{"menu", "select", "select_rule", "triage", "log"}
+		if m.retry != nil {
+			as = append([]keymap.Action{"retry"}, as...)
+		}
+		if len(m.lastSelected) > 0 {
+			as = append([]keymap.Action{"clear_selection"}, as...)
+		}
 		if m.tab().inbox {
 			as = append(as, "hide")
 		}

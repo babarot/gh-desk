@@ -19,7 +19,7 @@ desk // @me    1 review (3)   2 mine (1)   3 involved (0)   4 inbox (1)         
                                  │   space           select                                     │
                                  │   V               select shown                               │
                                  │   S               select by rule                             │
-╭  overview   diff (2)  ─────────│   u               clear selection                            │───────── acme/api#12 · J/K · v ╮
+╭  overview   diff (2)  ─────────│   u               clear / restore selection                  │───────── acme/api#12 · J/K · v ╮
 │ #12 Add retries to the client  │   A               approve                                    │tus    open                     │
 │ ▾ description ─────────────────│   M               merge                                      │uested me @core                 │
 │ │ What                         │   D               ready for review                           │cks    ✓1                       │
@@ -100,7 +100,7 @@ L20 96-97 fg=#96bfff
 L21 0-33 fg=#706f87
 L21 33-34 fg=#96bfff
 L21 37-38 fg=#96bfff bold
-L21 53-68 fg=#8888a4
+L21 53-78 fg=#8888a4
 L21 96-97 fg=#96bfff
 L21 97-130 fg=#706f87
 L22 0-31 fg=#706f87

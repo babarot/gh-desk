@@ -3,6 +3,7 @@ package tui
 import (
 	"slices"
 	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/babarot/gh-desk/internal/model"
@@ -114,8 +115,8 @@ func TestClaudeReviewKeepsTheSelection(t *testing.T) {
 		goes: map[model.PRKey]bool{k: true}, order: []model.PRKey{k},
 		done: map[model.PRKey]progress{k: {result: runner.Stopped}}}
 	run(m, m.noteBatch(bs))
-	if len(m.selected) != 1 || !m.isSelected(key("acme", "web", 7)) || m.unsentReview != nil {
-		t.Errorf("selection = %v, unsent = %v", m.selected, m.unsentReview)
+	if len(m.selected) != 1 || !m.isSelected(key("acme", "web", 7)) || m.retry != nil {
+		t.Errorf("selection = %v, retry = %v", m.selected, m.retry)
 	}
 }
 
@@ -158,19 +159,106 @@ func TestHideFoldedGroup(t *testing.T) {
 	}
 }
 
-// A selected notification whose done failed comes back selected, so d can
-// try it again; one that was not selected does not.
-func TestFailedDoneSelectedAgain(t *testing.T) {
-	m := start(t, fixture(), keymap.Default())
-	m.src = failingDone{fixture()}
+// A done that failed leaves nothing selected: the retry key marks those
+// done again, alone.
+func TestFailedDoneTriedAgain(t *testing.T) {
+	f := fixture()
+	m := start(t, f, keymap.Default())
+	m.src = failingDone{f}
 	press(m, "4", "a", "V", "d")
-	if len(m.selected) != 2 {
-		t.Errorf("selection after failures = %v, want both again", m.selected)
+	if len(m.selected) != 0 || m.retry == nil || len(m.retry.notes) != 2 {
+		t.Fatalf("selection = %v, retry = %+v", m.selected, m.retry)
 	}
-	m = start(t, fixture(), keymap.Default())
-	m.src = failingDone{fixture()}
-	press(m, "4", "d")
+	m.src = f
+	press(m, ".")
+	if m.retry != nil || len(f.done) != 2 {
+		t.Errorf("retry = %+v, done = %v", m.retry, f.done)
+	}
+}
+
+// An action confirmed takes its pull requests out of the selection, and u
+// brings them back for the next one, so A, u, M merges what was approved.
+func TestApproveThenRestoreThenMerge(t *testing.T) {
+	m, r := startWith(t, fixture(), keymap.Default())
+	press(m, "space", "space", "k", "A", "y")
+	if len(r.reviews) != 1 || len(r.items[0]) != 2 {
+		t.Fatalf("reviews = %+v, items = %+v", r.reviews, r.items)
+	}
 	if len(m.selected) != 0 {
-		t.Errorf("a failed done of one not selected made a selection: %v", m.selected)
+		t.Fatalf("selection left after approve: %v", m.selected)
+	}
+	press(m, "u")
+	if len(m.selected) != 2 {
+		t.Fatalf("u did not bring both back: %v", m.selected)
+	}
+	press(m, "M")
+	if m.bulk == nil || len(m.bulk.items) != 2 {
+		t.Errorf("the merge popup does not list both: %+v", m.bulk)
+	}
+}
+
+// u clears the selection, and again brings it back; a popup closed
+// without confirming spends nothing.
+func TestClearAndCancelKeepTheLastSelection(t *testing.T) {
+	m := start(t, fixture(), keymap.Default())
+	press(m, "V", "A", "esc")
+	n := len(m.selected)
+	if n == 0 {
+		t.Fatal("esc in the popup took the selection away")
+	}
+	press(m, "u")
+	if len(m.selected) != 0 {
+		t.Fatalf("u left %v", m.selected)
+	}
+	press(m, "u")
+	if len(m.selected) != n {
+		t.Errorf("u brought back %v, want %d", m.selected, n)
+	}
+}
+
+// What was put away since does not come back, so nothing out of sight is
+// acted on by a later key (ADR-042).
+func TestRestoreLeavesOutWhatWasPutAway(t *testing.T) {
+	m := start(t, fixture(), keymap.Default())
+	press(m, "space", "space", "k", "u")
+	k := m.lastSelected[0]
+	for _, tb := range m.tabs {
+		tb.hidden[k] = true
+	}
+	press(m, "u")
+	if m.isSelected(k) || len(m.selected) == 0 {
+		t.Errorf("selection = %v, with %v put away", m.selected, k)
+	}
+}
+
+// A batch that ends leaves a selection made meanwhile alone.
+func TestBatchEndLeavesANewSelection(t *testing.T) {
+	m := start(t, fixture(), keymap.Default())
+	mine, k := key("acme", "web", 7), key("acme", "api", 12)
+	m.selected[mine] = byHand
+	bs := &batchState{kind: runner.Merge, goes: map[model.PRKey]bool{k: true}, order: []model.PRKey{k},
+		done: map[model.PRKey]progress{k: {result: runner.Failed}}}
+	run(m, m.noteBatch(bs))
+	if len(m.selected) != 1 || !m.isSelected(mine) {
+		t.Errorf("selection = %v", m.selected)
+	}
+	if m.retry == nil {
+		t.Error("a merge that failed left nothing to try again")
+	}
+}
+
+// A skip is a decision, not a failure: there is nothing to try again.
+func TestSkippedIsNotTriedAgain(t *testing.T) {
+	m := start(t, fixture(), keymap.Default())
+	k := key("acme", "api", 12)
+	bs := &batchState{kind: runner.Merge, goes: map[model.PRKey]bool{k: true}, order: []model.PRKey{k},
+		done: map[model.PRKey]progress{k: {result: runner.Skipped}}}
+	run(m, m.noteBatch(bs))
+	if m.retry != nil {
+		t.Errorf("retry = %+v", m.retry)
+	}
+	press(m, ".")
+	if !strings.Contains(status(m), "nothing to try again") {
+		t.Errorf("status = %q", status(m))
 	}
 }

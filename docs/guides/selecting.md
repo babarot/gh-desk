@@ -2,7 +2,9 @@
 
 Approve, merge, review, hide and done act on the selection when there is one, and on the pull request under the cursor when there is none. A key never acts on the cursor's pull request while something is selected: it acts on the selection, or refuses and says why.
 
-`space` selects one, `V` selects every row shown, and `u` clears the selection.
+`space` selects one, `V` selects every row shown, and `u` clears the selection. With nothing selected, `u` brings the last selection back, without what left the list or was put away since.
+
+Confirming an action takes its pull requests out of the selection, however it ends; closing the popup without confirming takes nothing out. `.` tries again what failed or stopped, without touching the selection.
 
 ## Rules
 

@@ -257,21 +257,21 @@ type Model struct {
 	// sending names the pull requests a comment is on its way to; none
 	// other is sent until it is back. Empty when none is.
 	sending string
-	// posting is the comment on its way, and unsent the text of one that
-	// failed on some, which the next comment starts with.
+	// posting is the comment on its way.
 	posting *posting
-	unsent  string
 	// unsentClose is the comment of a close popup closed without
 	// confirming, given back when close is opened again (ADR-066).
 	unsentClose string
-	// unsentReview is the review that was not sent to some of its pull
-	// requests, which the next review starts with.
-	unsentReview *runner.ReviewText
 
 	selected map[model.PRKey]selection
-	bulk     *bulk
-	picker   *pick
-	menu     *actionMenu
+	// lastSelected is the selection an action or the clear key took away,
+	// which u brings back (ADR-093).
+	lastSelected []model.PRKey
+	// retry is the action left to try again, nil when none is.
+	retry  *retry
+	bulk   *bulk
+	picker *pick
+	menu   *actionMenu
 	// progress is each pull request's step or result in a batch, shown on
 	// its row until a refresh.
 	progress map[model.PRKey]progress

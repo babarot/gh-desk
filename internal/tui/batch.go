@@ -71,6 +71,8 @@ type batchState struct {
 	// comment is what a close batch writes before closing, shown in the
 	// pane once GitHub took it (ADR-067).
 	comment string
+	// deleteBranch is set when a close batch deletes the head branches.
+	deleteBranch bool
 	// lanes are the steps of each pull request, for the progress pane.
 	lanes map[model.PRKey]*lane
 	// started and ended are when the batch started and when its last
@@ -341,35 +343,10 @@ func (m *Model) noteBatch(bs *batchState) tea.Cmd {
 		icon = "✗"
 	}
 	title := kindVerb(bs.kind, bs.review.Event) + " done: " + strings.Join(parts, ", ")
-	if bs.kind == runner.Review && !bs.byClaude && m.keepUnsent(bs) {
-		title += fmt.Sprintf(" · those not sent are selected; %s to send it again", m.firstKey("review"))
+	if !bs.byClaude && m.retryBatch(bs) {
+		title += fmt.Sprintf(" · %s to try the stopped ones again", m.firstKey("retry"))
 	}
 	return m.pushNote(icon, title, items)
-}
-
-// keepUnsent keeps a review that the runner did not send to some of its
-// pull requests (it failed, stopped on a moved head, or was skipped when
-// decided again): only those are left selected and the text comes back
-// in the next review, so none is sent it twice. It reports whether any
-// was left.
-func (m *Model) keepUnsent(bs *batchState) bool {
-	var left []model.PRKey
-	for _, k := range bs.order {
-		switch bs.done[k].result {
-		case runner.Failed, runner.Stopped, runner.Skipped:
-			left = append(left, k)
-		}
-	}
-	if len(left) == 0 {
-		return false
-	}
-	clear(m.selected)
-	for _, k := range left {
-		m.selected[k] = byHand
-	}
-	rv := bs.review
-	m.unsentReview = &rv
-	return true
 }
 
 // methodWord names a merge method as people say it.

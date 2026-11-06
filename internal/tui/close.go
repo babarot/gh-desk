@@ -78,16 +78,21 @@ func (m *Model) startClose() tea.Cmd {
 	if m.bulk == nil || m.bulk.kind != runner.Close {
 		return cmd
 	}
+	m.bulk.close = m.newCloseForm(m.unsentClose)
+	m.unsentClose = ""
+	return cmd
+}
+
+// newCloseForm is the form of a close popup, starting with the comment.
+func (m *Model) newCloseForm(comment string) *closeForm {
 	f := &closeForm{ta: newInput(m.st)}
 	f.ta.ShowLineNumbers = true
 	f.ta.EndOfBufferCharacter = '~'
 	f.ta.Placeholder = "Leave a comment (markdown)"
 	f.ta.SetHeight(closeInputLines)
-	f.ta.SetValue(m.unsentClose)
+	f.ta.SetValue(comment)
 	f.ta.Blur()
-	m.unsentClose = ""
-	m.bulk.close = f
-	return cmd
+	return f
 }
 
 // decide is what closing a pull request read again would do, with the

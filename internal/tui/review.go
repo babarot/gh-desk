@@ -85,6 +85,8 @@ type confirm struct {
 	body string
 	// top is the first line of the popup's body shown.
 	top int
+	// retry is set when it sends again a comment that failed on these.
+	retry bool
 }
 
 // sentWord names what is written: a comment, or a review of its kind.
@@ -119,33 +121,17 @@ func (m *Model) startComment() tea.Cmd {
 	}
 	c := &compose{pr: prs[0], prs: prs, single: true, ta: newInput(m.st)}
 	c.ta.Placeholder = "Write the comment (markdown)"
-	// A comment that failed comes back to be sent again.
-	c.ta.SetValue(m.unsent)
-	m.unsent = ""
 	return m.openCompose(c)
 }
 
 // startReview opens the popup for a review of each selected pull request,
-// or of the one under the cursor. A review that was not sent to some
-// comes back to be sent again.
+// or of the one under the cursor.
 func (m *Model) startReview() tea.Cmd {
 	prs := m.menuTargets()
 	if len(prs) == 0 {
 		return nil
 	}
-	ev, body := model.EventComment, ""
-	if u := m.unsentReview; u != nil {
-		ev, body = u.Event, u.Body
-		m.unsentReview = nil
-	}
-	if len(prs) == 1 && m.own(prs[0]) {
-		ev = model.EventComment
-	}
-	cmd := m.startCompose(prs, ev)
-	if m.compose != nil {
-		m.compose.ta.SetValue(body)
-	}
-	return cmd
+	return m.startCompose(prs, model.EventComment)
 }
 
 // startCompose opens the popup for a review of prs, of the kind event.
@@ -264,6 +250,10 @@ func (m *Model) confirmKey(k string) tea.Cmd {
 	switch {
 	case m.keys.Matches("confirm", k):
 		m.confirm = nil
+		if c.retry {
+			m.retry = nil
+		}
+		m.spend(prKeys(c.prs))
 		// The popup closes at once; the status line follows the comment
 		// to each pull request.
 		m.compose = nil
@@ -315,8 +305,7 @@ func (m *Model) postNext(p *posting) tea.Cmd {
 }
 
 // posted takes in one comment sent and sends the next. When the last is
-// back, those it failed on are selected and the comment is kept, so c
-// writes it again for them.
+// back, the comment is kept to be sent again to those it failed on.
 func (m *Model) posted(msg postedMsg) tea.Cmd {
 	p := msg.p
 	// A comment GitHub took is shown in the pane at once (ADR-067).
@@ -348,13 +337,9 @@ func (m *Model) posted(msg postedMsg) tea.Cmd {
 		}
 		return tea.Batch(shown, m.pushNote("✓", text, items))
 	}
-	clear(m.selected)
-	for _, f := range p.failed {
-		m.selected[f.Key] = byHand
-	}
-	m.unsent = p.body
-	return tea.Batch(shown, m.failNoted(fmt.Sprintf("comment failed on %d of %d (%s: %v) · they are selected; %s to send it again",
-		len(p.failed), len(p.prs), p.failed[0].Key, p.err, m.firstKey("comment")), p.failed[0].Key))
+	m.retryComment(p)
+	return tea.Batch(shown, m.failNoted(fmt.Sprintf("comment failed on %d of %d (%s: %v) · %s to send it again",
+		len(p.failed), len(p.prs), p.failed[0].Key, p.err, m.firstKey("retry")), p.failed[0].Key))
 }
 
 // postingActivity is a comment on its way.

@@ -33,7 +33,9 @@ The method is the first of `merge.methods` the repository allows, and the popup 
 
 When some of the pull requests to approve have jobs at work, the approve popup waits for them by default: each is approved once its check runs and workflow runs have finished, and one whose job failed is skipped, unless failing ones are included with `f`. `w` approves at once instead. An approval with a text, written with `R`, waits the same way; a comment or a request for changes is sent at once.
 
-After an approve, the approved pull requests stay selected, so `M` merges the same set next.
+A confirmed action uses up its selection. To merge what you just approved, press `u` to bring the selection back and then `M`; `M` alone also approves what needs it, once the jobs passed.
+
+When a batch ends with pull requests failed or stopped, the notification says so and `.` opens the same action again for those alone, with its text. `.` is kept until it is used or another action fails, and skipped pull requests are not included.
 
 ## Following a batch
 

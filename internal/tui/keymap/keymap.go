@@ -87,7 +87,9 @@ var Defaults = []Def{
 	{"select", ScopeList, []string{"space"}, "select"},
 	{"select_shown", ScopeList, []string{"V"}, "select shown"},
 	{"select_rule", ScopeList, []string{"S"}, "select by rule"},
-	{"clear_selection", ScopeList, []string{"u"}, "clear selection"},
+	// Takes the selection away or, with none, brings the last one back.
+	{"clear_selection", ScopeList, []string{"u"}, "clear / restore selection"},
+	{"retry", ScopeList, []string{"."}, "try again"},
 	{"approve", ScopeList, []string{"A"}, "approve"},
 	{"merge", ScopeList, []string{"M"}, "merge"},
 	{"ready_for_review", ScopeList, []string{"D"}, "ready for review"},
