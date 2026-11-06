@@ -2,6 +2,12 @@ package app
 
 import (
 	"bytes"
+	"context"
+	"encoding/json"
+	"errors"
+	"io"
+	"log/slog"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
@@ -279,7 +285,7 @@ func TestConfigApplyRefuses(t *testing.T) {
 	}
 }
 
-// Nothing to apply is no mistake: config ui closed without saving gives
+// Nothing to apply is no mistake: a tool that ended without saving gives
 // nothing, and the pipe it is in should not fail for it.
 func TestConfigApplyWithNothing(t *testing.T) {
 	const before = "# kept\n[list]\nbell = true\n"
@@ -371,5 +377,365 @@ func TestConfigInitEditSchema(t *testing.T) {
 	}
 	if code, _, _ := runConfig(t, path); code != 2 {
 		t.Errorf("no command: code %d", code)
+	}
+}
+
+// What scripts of the page read: the settings and the keys as a page has
+// them, written so that they run without Go (mise run config-ui:test).
+func TestConfigUIData(t *testing.T) {
+	const path = "../config/ui/testdata/data.json"
+	// cache.dir defaults to a path under the home of whoever runs this.
+	t.Setenv("XDG_CACHE_HOME", "/home/you/.cache")
+	want, err := json.MarshalIndent(map[string]any{"DATA": config.UI(), "KEYS": uiKeys()}, "", " ")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if *update {
+		if err := os.WriteFile(path, want, 0o644); err != nil {
+			t.Fatal(err)
+		}
+		return
+	}
+	if got, err := os.ReadFile(path); err != nil || !bytes.Equal(got, want) {
+		t.Errorf("%s is not up to date; run go test ./internal/app -run TestConfigUIData -update", path)
+	}
+}
+
+// What the page's code writes reads back as gh-desk reads it at start.
+func TestConfigUIOutputLoads(t *testing.T) {
+	const path = "../config/ui/testdata/output.toml"
+	if _, _, _, err := load(path, false, new(slog.LevelVar)); err != nil {
+		t.Fatal(err)
+	}
+	// And it says what it was given: nothing is lost or moved by being
+	// written again.
+	got, err := config.Raw([]byte(read(t, path)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var want map[string]any
+	if err := json.Unmarshal([]byte(read(t, "../config/ui/testdata/input.json")), &want); err != nil {
+		t.Fatal(err)
+	}
+	g, _ := json.Marshal(got)
+	w, _ := json.Marshal(want)
+	if string(g) != string(w) {
+		t.Errorf("output differs from input:\n%s\n%s", g, w)
+	}
+}
+
+// savePage plays the browser: it reads the page, and saves src on it.
+func savePage(t *testing.T, url, src string) (*http.Response, string) {
+	t.Helper()
+	page, err := http.Get(url)
+	if err != nil {
+		t.Error(err)
+		return nil, ""
+	}
+	b, _ := io.ReadAll(page.Body)
+	page.Body.Close()
+	req, err := http.NewRequest(http.MethodPost, url+"save", strings.NewReader(src))
+	if err != nil {
+		t.Error(err)
+		return nil, ""
+	}
+	req.Header.Set("Origin", "http://"+req.URL.Host)
+	res, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Error(err)
+		return nil, ""
+	}
+	return res, string(b)
+}
+
+// noQuestion fails a test when the terminal is asked.
+func noQuestion(t *testing.T) confirmer {
+	return func(_ context.Context, q string) (bool, error) {
+		t.Errorf("asked %q", q)
+		return false, nil
+	}
+}
+
+func saved(t *testing.T, res *http.Response) (int, string) {
+	t.Helper()
+	b, _ := io.ReadAll(res.Body)
+	res.Body.Close()
+	return res.StatusCode, string(b)
+}
+
+func TestConfigUI(t *testing.T) {
+	path := writeFile(t, "[list]\nbell = true\n")
+	const made = "[list]\nbell = false\n"
+	var out, errb bytes.Buffer
+	pages := make(chan string, 1)
+	open := func(u string) error {
+		// A file with a mistake stays on the page, and the second try goes.
+		go func() {
+			res, _ := savePage(t, u, "[keys]\napprove = 123\n")
+			code, b := saved(t, res)
+			if code != http.StatusUnprocessableEntity {
+				t.Errorf("a mistake: %d", code)
+			}
+			if !strings.Contains(b, "keys.approve") || strings.Contains(b, "gh-desk-config-") {
+				t.Errorf("answer %s", b)
+			}
+			res, page := savePage(t, u, made)
+			res.Body.Close()
+			pages <- page
+		}()
+		return nil
+	}
+	if code := uiConfig(t.Context(), path, false, noQuestion(t), open, &out, &errb); code != 0 {
+		t.Fatalf("code %d, err %q", code, errb.String())
+	}
+	if got := read(t, path); got != made {
+		t.Errorf("the file is %q", got)
+	}
+	if got := read(t, path+".bak"); !strings.Contains(got, "bell = true") {
+		t.Errorf("the old file is %q", got)
+	}
+	if !strings.Contains(out.String(), "wrote") {
+		t.Errorf("stdout %q", out.String())
+	}
+	if page := <-pages; !strings.Contains(page, `"bell":true`) || !strings.Contains(page, "merge.auto_merge") {
+		t.Error("the page has no settings")
+	}
+}
+
+// Anything but how things are drawn is saved only on a yes in the terminal,
+// and what was asked about is what is written.
+func TestConfigUIConfirmsInTheTerminal(t *testing.T) {
+	const was = "[claude]\ncommand = \"claude\"\n"
+	const made = "[claude]\ncommand = \"./evil\"\n"
+	for _, tt := range []struct {
+		name    string
+		answer  bool
+		askErr  error
+		written bool
+		page    string
+	}{
+		{name: "no", page: "not confirmed"},
+		{name: "yes", answer: true, written: true},
+		{name: "no terminal", askErr: errNoTerminal, page: "in a terminal"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			path := writeFile(t, was)
+			ctx, cancel := context.WithCancel(t.Context())
+			defer cancel()
+			var asked string
+			ask := func(_ context.Context, q string) (bool, error) {
+				asked = q
+				return tt.answer, tt.askErr
+			}
+			var out, errb bytes.Buffer
+			open := func(u string) error {
+				go func() {
+					res, _ := savePage(t, u, made)
+					code, b := saved(t, res)
+					if tt.written {
+						if code != http.StatusOK {
+							t.Errorf("%d %s", code, b)
+						}
+						return
+					}
+					if code != http.StatusUnprocessableEntity || !strings.Contains(b, tt.page) {
+						t.Errorf("%d %s", code, b)
+					}
+					// The page stays open: read again, it still answers.
+					if res, err := http.Get(u); err != nil {
+						t.Error(err)
+					} else if res.Body.Close(); res.StatusCode != http.StatusOK {
+						t.Errorf("the page is gone: %d", res.StatusCode)
+					}
+					cancel()
+				}()
+				return nil
+			}
+			uiConfig(ctx, path, false, ask, open, &out, &errb)
+			if !strings.Contains(asked, `claude.command: "claude" -> "./evil"`) {
+				t.Errorf("asked %q", asked)
+			}
+			want := was
+			if tt.written {
+				want = made
+			}
+			if got := read(t, path); got != want {
+				t.Errorf("the file is %q", got)
+			}
+		})
+	}
+}
+
+// A file changed during the question is not overwritten by the answer.
+func TestConfigUIWhenTheFileChangedDuringTheQuestion(t *testing.T) {
+	path := writeFile(t, "[claude]\ncommand = \"claude\"\n")
+	const other = "[claude]\ncommand = \"other\"\n"
+	ask := func(context.Context, string) (bool, error) {
+		return true, os.WriteFile(path, []byte(other), 0o644)
+	}
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+	var out, errb bytes.Buffer
+	open := func(u string) error {
+		go func() {
+			res, _ := savePage(t, u, "[claude]\ncommand = \"mine\"\n")
+			if code, b := saved(t, res); code != http.StatusUnprocessableEntity || !strings.Contains(b, "changed while") {
+				t.Errorf("%d %s", code, b)
+			}
+			cancel()
+		}()
+		return nil
+	}
+	uiConfig(ctx, path, false, ask, open, &out, &errb)
+	if got := read(t, path); got != other {
+		t.Errorf("the file is %q", got)
+	}
+}
+
+func TestConfigUIWhenTheFileCannotBeWritten(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "config.toml")
+	if err := os.WriteFile(path, []byte("[list]\nbell = true\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(dir, 0o555); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(dir, 0o755) })
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+	var out, errb bytes.Buffer
+	open := func(u string) error {
+		go func() {
+			res, _ := savePage(t, u, "[list]\nbell = false\n")
+			if code, b := saved(t, res); code != http.StatusUnprocessableEntity || !strings.Contains(b, "New file") {
+				t.Errorf("%d %s", code, b)
+			}
+			cancel()
+		}()
+		return nil
+	}
+	uiConfig(ctx, path, false, noQuestion(t), open, &out, &errb)
+}
+
+func TestAskLine(t *testing.T) {
+	for in, want := range map[string]bool{
+		"y\n":      true,
+		"YES\n":    true,
+		" y \n":    true,
+		"\n":       false,
+		"n\n":      false,
+		"yep\n":    false,
+		"y":        false,
+		"":         false,
+		"y y\n":    false,
+		"no y\n":   false,
+		"yes!\n":   false,
+		"1\n":      false,
+		"ok\n":     false,
+		"true\n":   false,
+		"\x1b[A\n": false,
+	} {
+		got, err := askLine(t.Context(), strings.NewReader(in), "save?", io.Discard)
+		if err != nil || got != want {
+			t.Errorf("%q: %v, %v", in, got, err)
+		}
+	}
+}
+
+func TestAskLineStopsOnCtrlC(t *testing.T) {
+	r, w := io.Pipe()
+	defer w.Close()
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+	if got, err := askLine(ctx, r, "save?", io.Discard); got || err == nil {
+		t.Errorf("%v, %v", got, err)
+	}
+}
+
+// Standard input that is no terminal cannot confirm anything.
+func TestTerminalConfirmerNeedsATerminal(t *testing.T) {
+	f, err := os.Open(writeFile(t, "y\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Close()
+	got, err := terminalConfirmer(f, io.Discard)(t.Context(), "save?")
+	if got || !errors.Is(err, errNoTerminal) {
+		t.Errorf("%v, %v", got, err)
+	}
+}
+
+func TestConfirmation(t *testing.T) {
+	if q := confirmation("/c", []config.Change{{Key: "theme.dark", Display: true}}); q != "" {
+		t.Errorf("asked %q", q)
+	}
+	q := confirmation("/c", []config.Change{{Key: "theme.dark", Display: true}, {Key: "merge.auto_merge", Was: "false", Now: "true"}})
+	if !strings.Contains(q, "merge.auto_merge: false -> true") || !strings.Contains(q, "and 1 that change") {
+		t.Errorf("asked %q", q)
+	}
+}
+
+func TestConfigUIWhenTheFileChanged(t *testing.T) {
+	path := writeFile(t, "[list]\nbell = true\n")
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+	var out, errb bytes.Buffer
+	open := func(u string) error {
+		go func() {
+			if err := os.WriteFile(path, []byte("[list]\nbell = false\n"), 0o644); err != nil {
+				t.Error(err)
+			}
+			res, _ := savePage(t, u, "[list]\nstale_days = 9\n")
+			b, _ := io.ReadAll(res.Body)
+			res.Body.Close()
+			if res.StatusCode != http.StatusUnprocessableEntity || !strings.Contains(string(b), "changed while") {
+				t.Errorf("%d %s", res.StatusCode, b)
+			}
+			cancel()
+		}()
+		return nil
+	}
+	if code := uiConfig(ctx, path, false, noQuestion(t), open, &out, &errb); code != 1 || out.Len() != 0 {
+		t.Errorf("code %d, out %q", code, out.String())
+	}
+}
+
+func TestConfigUIOpensNothingForAMistake(t *testing.T) {
+	var out, errb bytes.Buffer
+	opened := false
+	open := func(string) error { opened = true; return nil }
+	if code := uiConfig(t.Context(), writeFile(t, "[keys]\napprove = 123\n"), false, noQuestion(t), open, &out, &errb); code != 1 || opened {
+		t.Errorf("code %d, opened %v", code, opened)
+	}
+}
+
+func TestConfigUIClosed(t *testing.T) {
+	var out, errb bytes.Buffer
+	open := func(u string) error {
+		go func() {
+			req, _ := http.NewRequest(http.MethodPost, u+"close", nil)
+			req.Header.Set("Origin", "http://"+req.URL.Host)
+			if res, err := http.DefaultClient.Do(req); err != nil {
+				t.Error(err)
+			} else {
+				res.Body.Close()
+			}
+		}()
+		return nil
+	}
+	if code := uiConfig(t.Context(), writeFile(t, "[list]\nbell = true\n"), false, noQuestion(t), open, &out, &errb); code != 0 || out.Len() != 0 {
+		t.Errorf("code %d, out %q, err %q", code, out.String(), errb.String())
+	}
+}
+
+// ctrl+c leaves without saving, and with no browser it still waits.
+func TestConfigUILeftWithoutSaving(t *testing.T) {
+	ctx, cancel := context.WithCancel(t.Context())
+	var out, errb bytes.Buffer
+	open := func(string) error { cancel(); return errors.New("no browser") }
+	code := uiConfig(ctx, filepath.Join(t.TempDir(), "config.toml"), false, noQuestion(t), open, &out, &errb)
+	if code != 1 || out.Len() != 0 || !strings.Contains(errb.String(), "nothing was saved") {
+		t.Errorf("code %d, out %q, err %q", code, out.String(), errb.String())
 	}
 }

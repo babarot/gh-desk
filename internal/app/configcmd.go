@@ -1,6 +1,9 @@
 package app
 
 import (
+	"bufio"
+	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -8,15 +11,19 @@ import (
 	"log/slog"
 	"os"
 	"os/exec"
+	"os/signal"
 	"path/filepath"
 	"slices"
 	"strings"
 
+	"github.com/cli/go-gh/v2/pkg/browser"
 	"github.com/spf13/cobra"
 
 	"github.com/babarot/gh-desk/internal/config"
+	"github.com/babarot/gh-desk/internal/config/ui"
 	"github.com/babarot/gh-desk/internal/release"
 	"github.com/babarot/gh-desk/internal/state"
+	"github.com/babarot/gh-desk/internal/tui"
 	"github.com/babarot/gh-desk/internal/tui/keymap"
 )
 
@@ -57,6 +64,32 @@ $XDG_CONFIG_HOME/gh-desk/config.toml, or ~/.config/gh-desk/config.toml.`,
 		},
 	}
 	show.Flags().BoolVar(&diff, "diff", false, "only the settings that differ from the defaults")
+
+	var onPage bool
+	edit := &cobra.Command{
+		Use:   "edit",
+		Short: "open the config file in review.editor, $VISUAL or $EDITOR, then check it; with --ui, on a page in the browser",
+		Long: `Open the config file in review.editor, $VISUAL or $EDITOR, then check it.
+
+With --ui, open a page in the browser instead, with the settings of the
+file and gh-desk drawn as they change. It is served on this machine for as
+long as this runs. Saving on the page checks the file as gh-desk checks it
+at start and replaces it, keeping the old one beside it, with .bak added to
+its name. Comments do not carry over. A change to anything but how things
+are drawn is listed here first, and saved only if it is answered with y.
+
+Closing the page, or ctrl+c, leaves without saving, and writes nothing.`,
+		Args: cobra.NoArgs,
+		RunE: func(*cobra.Command, []string) error {
+			if !onPage {
+				return exited(editConfig(o.config, o.debug, stdout, stderr))
+			}
+			ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
+			defer stop()
+			return exited(uiConfig(ctx, o.config, o.debug, terminalConfirmer(os.Stdin, stderr), openPage, stdout, stderr))
+		},
+	}
+	edit.Flags().BoolVar(&onPage, "ui", false, "edit the settings on a page in the browser")
 
 	apply := &cobra.Command{
 		Use:   "apply",
@@ -108,14 +141,7 @@ added to its name.`,
 				return nil
 			},
 		},
-		&cobra.Command{
-			Use:   "edit",
-			Short: "open the config file in review.editor, $VISUAL or $EDITOR, then check it",
-			Args:  cobra.NoArgs,
-			RunE: func(*cobra.Command, []string) error {
-				return exited(editConfig(o.config, o.debug, stdout, stderr))
-			},
-		},
+		edit,
 		&cobra.Command{
 			Use:   "reference [table or key]",
 			Short: "print every setting with what it does and its default, or those of a table or a key",
@@ -185,6 +211,157 @@ func checkConfig(path string, debug bool, stdout io.Writer) int {
 	return 0
 }
 
+// confirmer asks a question and says whether it was answered yes.
+type confirmer func(ctx context.Context, question string) (bool, error)
+
+// errNoTerminal is why a change that must be confirmed cannot be.
+var errNoTerminal = errors.New("this change must be confirmed in a terminal, and gh desk has none: run gh desk config edit --ui in one, or use gh desk config apply")
+
+// terminalConfirmer asks on the terminal standard input is. Only someone at
+// that terminal can answer, which a request to the page cannot do.
+func terminalConfirmer(in *os.File, stderr io.Writer) confirmer {
+	return func(ctx context.Context, question string) (bool, error) {
+		if st, err := in.Stat(); err != nil || st.Mode()&os.ModeCharDevice == 0 {
+			return false, errNoTerminal
+		}
+		return askLine(ctx, in, question, stderr)
+	}
+}
+
+// askLine reads one answer. Only y or yes, with its newline, is yes: no
+// answer, the end of the input or anything else leaves the file alone.
+func askLine(ctx context.Context, in io.Reader, question string, stderr io.Writer) (bool, error) {
+	fmt.Fprintf(stderr, "%s [y/N] ", question)
+	line := make(chan string, 1)
+	go func() {
+		s, err := bufio.NewReader(in).ReadString('\n')
+		if err != nil {
+			s = ""
+		}
+		line <- s
+	}()
+	select {
+	case s := <-line:
+		s = strings.ToLower(strings.TrimSpace(s))
+		return s == "y" || s == "yes", nil
+	case <-ctx.Done():
+		fmt.Fprintln(stderr)
+		return false, ctx.Err()
+	}
+}
+
+// confirmation is what is asked before changes are saved, or "" when they
+// change only how things are drawn.
+func confirmation(path string, changes []config.Change) string {
+	var b strings.Builder
+	display := 0
+	for _, c := range changes {
+		if c.Display {
+			display++
+			continue
+		}
+		fmt.Fprintf(&b, "  %s\n", c)
+	}
+	if b.Len() == 0 {
+		return ""
+	}
+	if display > 0 {
+		fmt.Fprintf(&b, "  and %d that change only how things are drawn\n", display)
+	}
+	return fmt.Sprintf("\nthe page asks to save:\n\n%s\nsave them to %s?", b.String(), config.TildePath(path))
+}
+
+// uiConfig edits the settings on a page. Saving there replaces the file
+// with what the terminal confirmed, byte for byte, as config apply does.
+func uiConfig(ctx context.Context, path string, debug bool, ask confirmer, open func(string) error, stdout, stderr io.Writer) int {
+	src, err := os.ReadFile(path)
+	if err != nil && !errors.Is(err, fs.ErrNotExist) {
+		fmt.Fprintf(stderr, "gh-desk: %v\n", err)
+		return 1
+	}
+	exists := err == nil
+	if exists {
+		if _, _, _, err := load(path, debug, new(slog.LevelVar)); err != nil {
+			fmt.Fprintln(stderr, err)
+			return 1
+		}
+	}
+	page, err := ui.Page(ui.Input{File: ui.File{Path: config.TildePath(path), Src: src}, Keys: uiKeys(),
+		Themes: tui.Palettes(), Spinners: tui.Spinners()})
+	if err != nil {
+		fmt.Fprintf(stderr, "gh-desk: %v\n", err)
+		return 1
+	}
+	// What the file was read as is what the page changed.
+	unchanged := func(now []byte, there bool) error {
+		if !bytes.Equal(now, src) || there != exists {
+			return fmt.Errorf("%s changed while this page was open. Run gh desk config edit --ui again, or your change would be lost", config.TildePath(path))
+		}
+		return nil
+	}
+	srv := &ui.Server{Page: page, Save: func(ctx context.Context, made []byte) error {
+		now, err := os.ReadFile(path)
+		if err != nil && !errors.Is(err, fs.ErrNotExist) {
+			return err
+		}
+		if err := unchanged(now, err == nil); err != nil {
+			return err
+		}
+		if _, err := checkedFile(path, made, "", debug); err != nil {
+			return err
+		}
+		changes, err := config.Changes(src, made)
+		if err != nil {
+			return err
+		}
+		if question := confirmation(path, changes); question != "" {
+			yes, err := ask(ctx, question)
+			if err != nil {
+				return err
+			}
+			if !yes {
+				fmt.Fprintln(stderr, "not saved; the page is still open")
+				return errors.New("nothing was saved: this was not confirmed in your terminal")
+			}
+		}
+		warned, kept, err := replaceConfig(path, made, debug, unchanged)
+		if errors.As(err, new(writeError)) {
+			return fmt.Errorf("%w\n\nnothing was saved; the new file is under New file, to put where this one is kept", err)
+		}
+		if err != nil {
+			return err
+		}
+		reportReplaced(path, warned, kept, stdout)
+		return nil
+	}}
+	saved, err := srv.Serve(ctx, func(url string) {
+		fmt.Fprintf(stderr, "editing the settings at %s\nsave on the page to finish; close it to leave them as they are\n", url)
+		if err := open(url); err != nil {
+			fmt.Fprintln(stderr, "open it in your browser")
+		}
+	})
+	if err != nil {
+		fmt.Fprintln(stderr, "nothing was saved")
+		return 1
+	}
+	if !saved {
+		fmt.Fprintln(stderr, "closed; nothing was changed")
+	}
+	return 0
+}
+
+// openPage opens a page in the browser.
+func openPage(url string) error { return browser.New("", io.Discard, io.Discard).Browse(url) }
+
+// uiKeys are the key actions with the words of their scope.
+func uiKeys() []ui.Key {
+	out := make([]ui.Key, len(keymap.Defaults))
+	for i, d := range keymap.Defaults {
+		out[i] = ui.Key{Action: string(d.Action), Keys: d.Keys, Scope: string(d.Scope), ScopeWords: scopeWords[d.Scope]}
+	}
+	return out
+}
+
 // checkedFile writes src to the file tmp, or to a new temporary one, and
 // checks it as gh-desk checks a config file at start, telling of it as the
 // config file at path. It leaves tmp holding src. What comes back are the
@@ -224,76 +401,99 @@ func writeSynced(path string, src []byte) error {
 	return errors.Join(werr, f.Sync(), f.Close())
 }
 
-// applyConfig replaces the config file at path with what in holds. It is
-// checked first, as a file of its own beside the config file, so that the
-// mistakes are found as gh-desk would find them, and the config file is
-// there, the old one or the new, at every moment.
+// applyConfig replaces the config file at path with what in holds.
 func applyConfig(path string, debug bool, in io.Reader, stdout, stderr io.Writer) int {
 	src, err := io.ReadAll(in)
 	if err != nil {
 		fmt.Fprintf(stderr, "gh-desk: %v\n", err)
 		return 1
 	}
-	// config ui closed without saving, or an empty clipboard: no file was
+	// An empty clipboard, or a tool that ended without saving: no file was
 	// given, so there is nothing to replace this one with.
 	if strings.TrimSpace(string(src)) == "" {
 		fmt.Fprintf(stderr, "nothing to apply; %s was not changed\n", config.TildePath(path))
 		return 0
+	}
+	warned, kept, err := replaceConfig(path, src, debug, nil)
+	if err != nil {
+		fmt.Fprintln(stderr, err)
+		fmt.Fprintf(stderr, "\n%s was not changed\n", config.TildePath(path))
+		return 1
+	}
+	reportReplaced(path, warned, kept, stdout)
+	return 0
+}
+
+func reportReplaced(path, warned string, kept bool, stdout io.Writer) {
+	if warned != "" {
+		fmt.Fprintln(stdout, warned)
+	}
+	fmt.Fprintf(stdout, "wrote %s\n", config.TildePath(path))
+	if kept {
+		fmt.Fprintf(stdout, "the old one is %s\n", config.TildePath(path+".bak"))
+	}
+}
+
+// writeError is a failure to write beside the config file, rather than a
+// mistake in what was to be written.
+type writeError struct{ error }
+
+// replaceConfig replaces the config file at path with src. It is checked
+// first, as a file of its own beside the config file, so that the mistakes
+// are found as gh-desk would find them, and the config file is there, the
+// old one or the new, at every moment. unchanged, if given, sees the file
+// right before that and can refuse. It returns the warnings, and whether an
+// old file was kept.
+func replaceConfig(path string, src []byte, debug bool, unchanged func(now []byte, there bool) error) (string, bool, error) {
+	cannotWrite := func(err error) error {
+		return writeError{fmt.Errorf("cannot write %s: %w", config.TildePath(path), err)}
 	}
 	// A link stays one: what it points to is replaced.
 	real := path
 	if r, err := filepath.EvalSymlinks(path); err == nil {
 		real = r
 	}
-	old, err := os.ReadFile(real)
-	if err != nil && !errors.Is(err, fs.ErrNotExist) {
-		fmt.Fprintf(stderr, "gh-desk: %v\n", err)
-		return 1
-	}
-	exists := err == nil
-
-	mode := fs.FileMode(0o644)
+	// A file gh-desk writes for the first time is the user's alone: it can
+	// hold what an MCP server signs in with.
+	mode := fs.FileMode(0o600)
 	if st, err := os.Stat(real); err == nil {
 		mode = st.Mode().Perm()
 	}
 	if err := os.MkdirAll(filepath.Dir(real), 0o755); err != nil {
-		fmt.Fprintf(stderr, "gh-desk: %v\n", err)
-		return 1
+		return "", false, cannotWrite(err)
 	}
 	tmp, err := os.CreateTemp(filepath.Dir(real), ".config-*.toml")
 	if err != nil {
-		fmt.Fprintf(stderr, "gh-desk: cannot write %s: %v\n", config.TildePath(real), err)
-		return 1
+		return "", false, cannotWrite(err)
 	}
 	defer os.Remove(tmp.Name())
 	if err := errors.Join(tmp.Close(), os.Chmod(tmp.Name(), mode)); err != nil {
-		fmt.Fprintf(stderr, "gh-desk: cannot write %s: %v\n", config.TildePath(real), err)
-		return 1
+		return "", false, cannotWrite(err)
 	}
 	warned, err := checkedFile(path, src, tmp.Name(), debug)
 	if err != nil {
-		fmt.Fprintln(stderr, err)
-		fmt.Fprintf(stderr, "\n%s was not changed\n", config.TildePath(path))
-		return 1
+		return "", false, err
 	}
-	if warned != "" {
-		fmt.Fprintln(stdout, warned)
+	old, err := os.ReadFile(real)
+	if err != nil && !errors.Is(err, fs.ErrNotExist) {
+		return "", false, err
+	}
+	exists := err == nil
+	if unchanged != nil {
+		if err := unchanged(old, exists); err != nil {
+			return "", false, err
+		}
 	}
 	if exists {
-		if err := os.WriteFile(real+".bak", old, mode); err != nil {
-			fmt.Fprintf(stderr, "gh-desk: cannot keep the old file: %v\n", err)
-			return 1
+		bak := real + ".bak"
+		if err := errors.Join(os.WriteFile(bak, old, 0o600), os.Chmod(bak, 0o600)); err != nil {
+			return "", false, writeError{fmt.Errorf("cannot keep the old file: %w", err)}
 		}
 	}
 	if err := os.Rename(tmp.Name(), real); err != nil {
-		fmt.Fprintf(stderr, "gh-desk: cannot write %s: %v\n", config.TildePath(real), err)
-		return 1
+		return "", false, cannotWrite(err)
 	}
-	fmt.Fprintf(stdout, "wrote %s\n", config.TildePath(path))
-	if exists {
-		fmt.Fprintf(stdout, "the old one is %s\n", config.TildePath(path+".bak"))
-	}
-	return 0
+	return warned, exists, nil
 }
 
 // editConfig opens the config file in the editor a review is written in,

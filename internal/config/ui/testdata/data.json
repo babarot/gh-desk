@@ -1,0 +1,2142 @@
+{
+ "DATA": {
+  "settings": [
+   {
+    "key": "list.refresh",
+    "table": "list",
+    "name": "refresh",
+    "doc": "Refresh the shown tab this often, as a Go duration such as \"3m\" or \"90s\"; \"off\" refreshes only when r is pressed.",
+    "kind": {
+     "type": "config.durationKind",
+     "name": "duration or \"off\"",
+     "off": true
+    },
+    "defv": "3m"
+   },
+   {
+    "key": "list.stale_days",
+    "table": "list",
+    "name": "stale_days",
+    "doc": "Mark AGE when a pull request has not been updated for this many days, or \"off\".",
+    "kind": {
+     "type": "config.daysKind",
+     "name": "days or \"off\""
+    },
+    "defv": 30
+   },
+   {
+    "key": "list.home_owners",
+    "table": "list",
+    "name": "home_owners",
+    "doc": "Owners whose name is left out of the PR column, such as your company.",
+    "kind": {
+     "type": "config.listKind",
+     "name": "list of strings"
+    },
+    "defv": []
+   },
+   {
+    "key": "list.columns",
+    "table": "list",
+    "name": "columns",
+    "doc": "The columns shown, in the order given; \"pr\" and \"title\" are needed. WHY shows on grouped tabs and the inbox only, and AUTHOR not on a tab of your own pull requests. On a narrow terminal SIZE goes first, then AUTHOR.",
+    "kind": {
+     "type": "config.listKind",
+     "name": "list of `pr`, `title`, `author`, `ci`, `review`, `why`, `size`, `age`",
+     "values": [
+      "pr",
+      "title",
+      "author",
+      "ci",
+      "review",
+      "why",
+      "size",
+      "age"
+     ],
+     "nonEmpty": true
+    },
+    "defv": [
+     "pr",
+     "title",
+     "author",
+     "ci",
+     "review",
+     "why",
+     "size",
+     "age"
+    ]
+   },
+   {
+    "key": "list.bell",
+    "table": "list",
+    "name": "bell",
+    "doc": "Ring the terminal's bell when a reading of the inbox finds a notification newly unread: new, read before, or updated since. The first reading after start does not ring it, nor one of the excluded. The terminal rings, flashes or stays quiet as it is set to.",
+    "kind": {
+     "type": "config.boolKind",
+     "name": "boolean"
+    },
+    "defv": false
+   },
+   {
+    "key": "menu.actions",
+    "table": "menu",
+    "name": "actions",
+    "doc": "The actions the menu of enter offers, in the order given. One left out is not in the menu; its key still runs it from the list.",
+    "kind": {
+     "type": "config.listKind",
+     "name": "list of `ask_claude`, `browse`, `review`, `comment`, `approve`, `merge`, `ready_for_review`, `close`, `hide`",
+     "values": [
+      "ask_claude",
+      "browse",
+      "review",
+      "comment",
+      "approve",
+      "merge",
+      "ready_for_review",
+      "close",
+      "hide"
+     ],
+     "nonEmpty": true
+    },
+    "defv": [
+     "ask_claude",
+     "browse",
+     "review",
+     "comment",
+     "approve",
+     "merge",
+     "ready_for_review",
+     "close",
+     "hide"
+    ]
+   },
+   {
+    "key": "preview.height",
+    "table": "preview",
+    "name": "height",
+    "doc": "Lines of the preview pane under the list; 0 hides it until it is shown with a key. Dragging the pane's top edge, or + and -, changes them, and the lines set that way are kept over this one.",
+    "kind": {
+     "type": "config.intKind",
+     "name": "integer, 0 or more"
+    },
+    "defv": 14
+   },
+   {
+    "key": "preview.tab",
+    "table": "preview",
+    "name": "tab",
+    "doc": "The tab the pane opens on: \"overview\" (default), the description beside a column of facts, or \"diff\".",
+    "kind": {
+     "type": "config.enumKind",
+     "name": "one of `overview`, `diff`",
+     "values": [
+      "overview",
+      "diff"
+     ]
+    },
+    "defv": "overview"
+   },
+   {
+    "key": "description.style",
+    "table": "description",
+    "name": "style",
+    "doc": "How a description and its comments are drawn in the pane: \"rendered\" (default) draws headings, lists, code, quotes and tables; \"plain\" shows the Markdown as written.",
+    "kind": {
+     "type": "config.enumKind",
+     "name": "one of `rendered`, `plain`",
+     "values": [
+      "rendered",
+      "plain"
+     ]
+    },
+    "defv": "rendered"
+   },
+   {
+    "key": "diff.collapse",
+    "table": "diff",
+    "name": "collapse",
+    "doc": "Files shown folded, as their name and line counts, until unfolded: glob patterns, matched against the base name unless they have a slash.",
+    "kind": {
+     "type": "config.globsKind",
+     "name": "list of glob patterns"
+    },
+    "defv": [
+     "*.lock",
+     "go.sum",
+     "pnpm-lock.yaml",
+     "package-lock.json",
+     "yarn.lock"
+    ]
+   },
+   {
+    "key": "checks.approval",
+    "table": "checks",
+    "name": "approval",
+    "doc": "Checks that pass only after an approval, such as a policy bot's: glob patterns of check names. While only they are pending, CI shows ◌, and the checks count as passing when deciding a merge.",
+    "kind": {
+     "type": "config.globsKind",
+     "name": "list of glob patterns"
+    },
+    "defv": []
+   },
+   {
+    "key": "checks.wait_timeout",
+    "table": "checks",
+    "name": "wait_timeout",
+    "doc": "How long a merge, or an approval asked to wait, waits for the jobs still at work on the pull request's head, required or not; an admin merge also waits for the required checks within it. Only the time gh-desk is running counts.",
+    "kind": {
+     "type": "config.durationKind",
+     "name": "duration"
+    },
+    "defv": "6h"
+   },
+   {
+    "key": "review.mark_done",
+    "table": "review",
+    "name": "mark_done",
+    "doc": "Mark a pull request's notification done after you review it here, from any tab.",
+    "kind": {
+     "type": "config.boolKind",
+     "name": "boolean"
+    },
+    "defv": true
+   },
+   {
+    "key": "review.editor",
+    "table": "review",
+    "name": "editor",
+    "doc": "The editor ctrl+e opens to write a review, with its arguments, such as \"code --wait\". Left out, $VISUAL, then $EDITOR.",
+    "kind": {
+     "type": "config.stringKind",
+     "name": "string"
+    },
+    "example": "code --wait"
+   },
+   {
+    "key": "merge.methods",
+    "table": "merge",
+    "name": "methods",
+    "doc": "The order of preference among the methods a repository allows: \"merge\", \"squash\", \"rebase\". The first one the repository allows is used.",
+    "kind": {
+     "type": "config.listKind",
+     "name": "list of `merge`, `squash`, `rebase`",
+     "values": [
+      "merge",
+      "squash",
+      "rebase"
+     ],
+     "nonEmpty": true
+    },
+    "defv": [
+     "merge",
+     "squash",
+     "rebase"
+    ]
+   },
+   {
+    "key": "merge.auto_merge",
+    "table": "merge",
+    "name": "auto_merge",
+    "doc": "Use GitHub's auto-merge where the repository allows it; elsewhere gh-desk waits for the checks and merges when they pass. Commits pushed after auto-merge is turned on are merged too, as GitHub does.",
+    "kind": {
+     "type": "config.boolKind",
+     "name": "boolean"
+    },
+    "defv": true
+   },
+   {
+    "key": "merge.blocked_timeout",
+    "table": "merge",
+    "name": "blocked_timeout",
+    "doc": "Where gh-desk waits, how long a pull request may stay blocked by another rule (a second approval, code owners) after its jobs finished. Only the time gh-desk is running counts.",
+    "kind": {
+     "type": "config.durationKind",
+     "name": "duration"
+    },
+    "defv": "30m"
+   },
+   {
+    "key": "merge.update_branch",
+    "table": "merge",
+    "name": "update_branch",
+    "doc": "Whose branch is updated when it is behind its base: \"humans\" (default), \"all\" or \"never\". Bots rebase their own branches, and some (renovate) stop updating a branch someone else committed to.",
+    "kind": {
+     "type": "config.enumKind",
+     "name": "one of `humans`, `all`, `never`",
+     "values": [
+      "humans",
+      "all",
+      "never"
+     ]
+    },
+    "defv": "humans"
+   },
+   {
+    "key": "bulk.attention_paths",
+    "table": "bulk",
+    "name": "attention_paths",
+    "doc": "Pull requests changing files that match these glob patterns get a mark in the confirm popup, which names the patterns matched; a pattern of one file is named by the file name, as CODEOWNERS.",
+    "kind": {
+     "type": "config.globsKind",
+     "name": "list of glob patterns"
+    },
+    "defv": [
+     ".github/workflows/*",
+     "CODEOWNERS",
+     ".github/CODEOWNERS",
+     "docs/CODEOWNERS"
+    ]
+   },
+   {
+    "key": "claude.command",
+    "table": "claude",
+    "name": "command",
+    "doc": "The claude command: a name looked up on PATH, or a path to it (~ is your home), without arguments.",
+    "kind": {
+     "type": "config.stringKind",
+     "name": "string",
+     "nonEmpty": true
+    },
+    "defv": "claude"
+   },
+   {
+    "key": "claude.model",
+    "table": "claude",
+    "name": "model",
+    "doc": "The model Claude Code runs, as claude --model takes it.",
+    "kind": {
+     "type": "config.stringKind",
+     "name": "string",
+     "nonEmpty": true
+    },
+    "defv": "opus"
+   },
+   {
+    "key": "claude.allowed_tools",
+    "table": "claude",
+    "name": "allowed_tools",
+    "doc": "The tools Claude may use, among \"Read\", \"Grep\", \"Glob\" and \"WebFetch\".",
+    "kind": {
+     "type": "config.listKind",
+     "name": "list of strings"
+    },
+    "defv": [
+     "Read",
+     "Grep",
+     "Glob"
+    ]
+   },
+   {
+    "key": "claude.language",
+    "table": "claude",
+    "name": "language",
+    "doc": "The language Claude answers in about a pull request, such as \"Japanese\". A review drafted with D is written in the language of the pull request instead.",
+    "kind": {
+     "type": "config.stringKind",
+     "name": "string",
+     "nonEmpty": true
+    },
+    "defv": "English"
+   },
+   {
+    "key": "claude.instructions",
+    "table": "claude",
+    "name": "instructions",
+    "doc": "Appended to the instructions of every review and triage, such as \"Point out changes that have no tests.\"",
+    "kind": {
+     "type": "config.stringKind",
+     "name": "string"
+    },
+    "defv": ""
+   },
+   {
+    "key": "claude.release_notes_check",
+    "table": "claude",
+    "name": "release_notes_check",
+    "doc": "Let Claude read the release notes of the bot pull requests in the merge popup, and mark those that need care.",
+    "kind": {
+     "type": "config.boolKind",
+     "name": "boolean"
+    },
+    "defv": true
+   },
+   {
+    "key": "claude.mcp.builtin",
+    "table": "claude.mcp",
+    "name": "builtin",
+    "doc": "Give the conversation gh-desk's own MCP server, whose tools read the pull request's repository and nothing else: its checks and CI logs, its issues and pull requests. They only read, without a prompt, what anyone who sees the pull request can see. Left out, it is on, unless allowed_tools has WebFetch or servers has one: either could send what the tools read out of the conversation, so then write true or false.",
+    "kind": {
+     "type": "config.optBoolKind",
+     "name": "boolean, or left out"
+    },
+    "example": "true"
+   },
+   {
+    "key": "claude.mcp.servers",
+    "table": "claude.mcp",
+    "name": "servers",
+    "doc": "Your MCP servers for the conversation about a pull request, by name, written as Claude Code configures a server (command, args, env; or type, url, headers), with tools: the server's tools that may run without a prompt. A server started with a command runs in the cache, not in the worktree. ${GH_DESK_OWNER}, ${GH_DESK_REPO}, ${GH_DESK_NUMBER} and ${GH_DESK_URL} (the repository's URL) are the pull request; pass secrets as ${VAR} from your environment. What the pull request says may call these tools: a server that reads private data, together with WebFetch, lets it send the data out.",
+    "kind": {
+     "type": "config.mcpServersKind",
+     "name": "table of MCP servers"
+    },
+    "defv": {},
+    "example": "{ recall = { command = \"recall\", args = [\"mcp\", \"--repo\", \"${GH_DESK_URL}\"], tools = [\"recall_search\", \"recall_list\", \"recall_export\"] } }"
+   },
+   {
+    "key": "claude.plugins",
+    "table": "claude",
+    "name": "plugins",
+    "doc": "Plugins whose skills the conversation about a pull request takes, as their directories (~ is your home). Only the skills are taken, copied when gh-desk starts, as gh-desk:\u003cname\u003e; the rest of a plugin (hooks, MCP servers, language servers, commands) is not. A skill whose allowed-tools grants a tool outside allowed_tools, Skill and the tools of the MCP servers is a mistake.",
+    "kind": {
+     "type": "config.listKind",
+     "name": "list of strings"
+    },
+    "defv": [],
+    "example": "[\"~/.claude/plugins/cache/\u003cmarketplace\u003e/\u003cplugin\u003e/\u003cversion\u003e\"]"
+   },
+   {
+    "key": "theme.dark",
+    "table": "theme",
+    "name": "dark",
+    "doc": "The color scheme on a dark terminal, and on one that does not tell its background.",
+    "kind": {
+     "type": "config.enumKind",
+     "name": "one of `default`, `latte`, `github-dark`, `github-light`, `tokyonight`, `tokyonight-day`, `gruvbox-dark`, `gruvbox-light`, `nord`",
+     "values": [
+      "default",
+      "latte",
+      "github-dark",
+      "github-light",
+      "tokyonight",
+      "tokyonight-day",
+      "gruvbox-dark",
+      "gruvbox-light",
+      "nord"
+     ]
+    },
+    "defv": "default"
+   },
+   {
+    "key": "theme.light",
+    "table": "theme",
+    "name": "light",
+    "doc": "The color scheme on a light terminal. Write the same theme as theme.dark to use it on any terminal.",
+    "kind": {
+     "type": "config.enumKind",
+     "name": "one of `default`, `latte`, `github-dark`, `github-light`, `tokyonight`, `tokyonight-day`, `gruvbox-dark`, `gruvbox-light`, `nord`",
+     "values": [
+      "default",
+      "latte",
+      "github-dark",
+      "github-light",
+      "tokyonight",
+      "tokyonight-day",
+      "gruvbox-dark",
+      "gruvbox-light",
+      "nord"
+     ]
+    },
+    "defv": "latte"
+   },
+   {
+    "key": "theme.spinner",
+    "table": "theme",
+    "name": "spinner",
+    "doc": "The spinner shown while something is read: \"dots\" (default) ⠋⠙⠹, \"dense\" ⣾⣽⣻, \"bounce\" ⠁⠂⠄, \"snake\" ⠉⠙⠚, \"jump\" ⢄⢂⢁, \"fill\" ⣀⣤⣶, \"sand\" ⡀⣀⣤, \"line\" |/-\\, \"arc\" ◜◠◝, \"quarter\" ◴◷◶, \"block\" ▖▘▝, \"star\" ✶✸✹, or \"off\", a ⋯ that does not move and is left out before a line that says what is going on. The progress pane of the log viewer turns a spinner and marks of its own, which \"off\" stops too.",
+    "kind": {
+     "type": "config.enumKind",
+     "name": "one of `dots`, `dense`, `bounce`, `snake`, `jump`, `fill`, `sand`, `line`, `arc`, `quarter`, `block`, `star`, `off`",
+     "values": [
+      "dots",
+      "dense",
+      "bounce",
+      "snake",
+      "jump",
+      "fill",
+      "sand",
+      "line",
+      "arc",
+      "quarter",
+      "block",
+      "star",
+      "off"
+     ]
+    },
+    "defv": "dots"
+   },
+   {
+    "key": "theme.shimmer",
+    "table": "theme",
+    "name": "shimmer",
+    "doc": "Run a light over the text that says what is going on, such as refreshing… or thinking…; the screen is drawn more often while something is read.",
+    "kind": {
+     "type": "config.boolKind",
+     "name": "boolean"
+    },
+    "defv": true
+   },
+   {
+    "key": "release.check",
+    "table": "release",
+    "name": "check",
+    "doc": "Read gh-desk's releases on GitHub once a day, and tell in the notifications of a newer release and, after an update, of the update. Only the builds of a release read them; GH_NO_EXTENSION_UPDATE_NOTIFIER turns it off too.",
+    "kind": {
+     "type": "config.boolKind",
+     "name": "boolean"
+    },
+    "defv": true
+   },
+   {
+    "key": "log.level",
+    "table": "log",
+    "name": "level",
+    "doc": "How much goes to the log file: \"debug\", \"info\" (default), \"warn\" or \"error\". --debug and GH_DESK_LOG_LEVEL take precedence. gh desk log prints where the file is.",
+    "kind": {
+     "type": "config.stringKind",
+     "name": "string"
+    },
+    "defv": "info"
+   },
+   {
+    "key": "cache.dir",
+    "table": "cache",
+    "name": "dir",
+    "doc": "Where gh-desk keeps its clones and the worktrees Claude reads, and the lists last read (lists.json, shown at once at the next launch) (~ is your home); by default $XDG_CACHE_HOME/gh-desk, or ~/.cache/gh-desk.",
+    "kind": {
+     "type": "config.stringKind",
+     "name": "string",
+     "nonEmpty": true
+    },
+    "defv": "/home/you/.cache/gh-desk",
+    "example": "~/.cache/gh-desk"
+   }
+  ],
+  "tables": [
+   {
+    "name": "list",
+    "doc": ""
+   },
+   {
+    "name": "menu",
+    "doc": ""
+   },
+   {
+    "name": "preview",
+    "doc": ""
+   },
+   {
+    "name": "description",
+    "doc": ""
+   },
+   {
+    "name": "diff",
+    "doc": ""
+   },
+   {
+    "name": "checks",
+    "doc": ""
+   },
+   {
+    "name": "review",
+    "doc": ""
+   },
+   {
+    "name": "merge",
+    "doc": ""
+   },
+   {
+    "name": "bulk",
+    "doc": ""
+   },
+   {
+    "name": "claude",
+    "doc": "C and i ask Claude Code (claude -p, with the account you are signed in with). i, or ask claude about it in the menu of enter, reviews the pull request under the cursor in a worktree of its head. C plans what to show and select in the tab shown, with no tools, and answers in the language you ask in; enter applies the plan, and an approve or a merge in it opens the confirm popup. Claude's own tools only read: no settings files are loaded, its file tools see only the worktree and the skills of plugins, and it has none that run commands. The conversation also takes the MCP servers of [claude.mcp] and the skills of plugins, which can do whatever they are made to."
+   },
+   {
+    "name": "claude.mcp",
+    "doc": "The MCP servers of the conversation about a pull request: gh-desk's own, and yours."
+   },
+   {
+    "name": "theme",
+    "doc": ""
+   },
+   {
+    "name": "release",
+    "doc": ""
+   },
+   {
+    "name": "log",
+    "doc": ""
+   },
+   {
+    "name": "cache",
+    "doc": ""
+   }
+  ],
+  "arrays": [
+   {
+    "name": "tabs",
+    "doc": "The tabs, in the order shown; the keys 1 to 9 go to them. Tabs given replace the default four, and one of them must be the inbox. At most 9 tabs."
+   },
+   {
+    "name": "select",
+    "doc": "The rules S offers to select pull requests, besides the built-in \"approved by me\". A pull request matches a rule when it meets every key the rule gives. These rules are the default; rules written in the file replace all of them, and `select = []` at the top of the file leaves none:"
+   },
+   {
+    "name": "exclude",
+    "doc": "Rules that leave pull requests out of every tab, until a shows them. A pull request is left out when it meets every key of one of them. There are none by default."
+   },
+   {
+    "name": "auto_approve",
+    "doc": "Rules that approve, without a confirm, the pull requests they match while gh-desk runs. There are none by default: nothing is approved unless a rule is written. A pull request an `[[exclude]]` rule matches is never approved."
+   }
+  ],
+  "elems": {
+   "auto_approve": [
+    {
+     "key": "name",
+     "doc": "The rule's name, which the notifications say of what it approved; without one, they say the rule's conditions.",
+     "kind": {
+      "type": "config.stringKind",
+      "name": "string"
+     }
+    },
+    {
+     "key": "query",
+     "doc": "The GitHub search the pull requests are found by; without it, the open pull requests that are not drafts and whose review is asked of you, in the rule's repos when each can be searched. A rule with neither query nor a condition is a mistake.",
+     "kind": {
+      "type": "config.stringKind",
+      "name": "string",
+      "nonEmpty": true
+     }
+    },
+    {
+     "key": "dry_run",
+     "doc": "true: only tell, in the notifications, what the rule would approve.",
+     "kind": {
+      "type": "config.boolKind",
+      "name": "boolean"
+     }
+    },
+    {
+     "key": "repos",
+     "doc": "owner/repo globs the repository must match one of; * matches any part of the owner or the name.",
+     "kind": {
+      "type": "config.listKind",
+      "name": "list of strings",
+      "nonEmpty": true
+     }
+    },
+    {
+     "key": "authors",
+     "doc": "The logins the author must be one of; bots without app/.",
+     "kind": {
+      "type": "config.listKind",
+      "name": "list of strings",
+      "nonEmpty": true
+     }
+    },
+    {
+     "key": "packages",
+     "doc": "The dependencies a renovate or dependabot pull request updates, read from its body; every one it updates must be listed.",
+     "kind": {
+      "type": "config.listKind",
+      "name": "list of strings"
+     }
+    },
+    {
+     "key": "title",
+     "doc": "A regular expression the title must match, as written: a shortcode such as `:arrow_up:` is matched as itself, not as its emoji.",
+     "kind": {
+      "type": "config.stringKind",
+      "name": "string"
+     }
+    },
+    {
+     "key": "max_files",
+     "doc": "The most files it may change.",
+     "kind": {
+      "type": "config.intKind",
+      "name": "integer, 1 or more",
+      "min": 1
+     }
+    },
+    {
+     "key": "max_lines",
+     "doc": "The most lines it may add and delete together: the sum of the two numbers SIZE shows.",
+     "kind": {
+      "type": "config.intKind",
+      "name": "integer, 1 or more",
+      "min": 1
+     }
+    },
+    {
+     "key": "min_files",
+     "doc": "The least files it may change.",
+     "kind": {
+      "type": "config.intKind",
+      "name": "integer, 1 or more",
+      "min": 1
+     }
+    },
+    {
+     "key": "min_lines",
+     "doc": "The least lines it may add and delete together.",
+     "kind": {
+      "type": "config.intKind",
+      "name": "integer, 1 or more",
+      "min": 1
+     }
+    },
+    {
+     "key": "updated_within_days",
+     "doc": "The most days, of 24 hours, since it was last updated: a label or a bot's comment updates it too. An old pull request updated lately matches.",
+     "kind": {
+      "type": "config.intKind",
+      "name": "integer, 1 to 36500",
+      "min": 1,
+      "max": 36500
+     }
+    },
+    {
+     "key": "created_within_days",
+     "doc": "The most days, of 24 hours, since it was created.",
+     "kind": {
+      "type": "config.intKind",
+      "name": "integer, 1 to 36500",
+      "min": 1,
+      "max": 36500
+     }
+    },
+    {
+     "key": "updated_before_days",
+     "doc": "The least days, of 24 hours, since it was last updated, as AGE counts them in a search tab.",
+     "kind": {
+      "type": "config.intKind",
+      "name": "integer, 1 to 36500",
+      "min": 1,
+      "max": 36500
+     }
+    },
+    {
+     "key": "created_before_days",
+     "doc": "The least days, of 24 hours, since it was created.",
+     "kind": {
+      "type": "config.intKind",
+      "name": "integer, 1 to 36500",
+      "min": 1,
+      "max": 36500
+     }
+    },
+    {
+     "key": "bot",
+     "doc": "true: the author must be a bot; false: a person.",
+     "kind": {
+      "type": "config.boolKind",
+      "name": "boolean"
+     }
+    },
+    {
+     "key": "mine",
+     "doc": "true: it must be your own pull request; false: someone else's.",
+     "kind": {
+      "type": "config.boolKind",
+      "name": "boolean"
+     }
+    },
+    {
+     "key": "draft",
+     "doc": "true: it must be a draft, which S never selects, so [[select]] does not take true; false: ready for review.",
+     "kind": {
+      "type": "config.boolKind",
+      "name": "boolean"
+     }
+    },
+    {
+     "key": "state",
+     "doc": "The states it must be in one of: \"open\", \"merged\" or \"closed\"; S selects open ones only, so [[select]] takes \"open\" alone.",
+     "kind": {
+      "type": "config.listKind",
+      "name": "list of `open`, `merged`, `closed`",
+      "values": [
+       "open",
+       "merged",
+       "closed"
+      ],
+      "nonEmpty": true
+     }
+    },
+    {
+     "key": "checks",
+     "doc": "The states its checks must be in one of: \"passing\" (passed, none at all, or only checks.approval pending), \"failing\" or \"pending\" (still running).",
+     "kind": {
+      "type": "config.listKind",
+      "name": "list of `passing`, `failing`, `pending`",
+      "values": [
+       "passing",
+       "failing",
+       "pending"
+      ],
+      "nonEmpty": true
+     }
+    },
+    {
+     "key": "decision",
+     "doc": "The review decisions REVIEW shows, one of which it must have; \"none\" is none, as in a repository that requires no review.",
+     "kind": {
+      "type": "config.listKind",
+      "name": "list of `approved`, `changes_requested`, `review_required`, `none`",
+      "values": [
+       "approved",
+       "changes_requested",
+       "review_required",
+       "none"
+      ],
+      "nonEmpty": true
+     }
+    },
+    {
+     "key": "labels",
+     "doc": "Labels one of which it must have.",
+     "kind": {
+      "type": "config.listKind",
+      "name": "list of strings",
+      "nonEmpty": true
+     }
+    },
+    {
+     "key": "approved_by_me",
+     "doc": "true: your latest review must approve it, a person's pull request too, unlike the built-in \"approved by me\"; false: none of yours does.",
+     "kind": {
+      "type": "config.boolKind",
+      "name": "boolean"
+     }
+    },
+    {
+     "key": "reviewed_by_me",
+     "doc": "true: you must have reviewed it, whatever the review said; false: you have not.",
+     "kind": {
+      "type": "config.boolKind",
+      "name": "boolean"
+     }
+    },
+    {
+     "key": "requested",
+     "doc": "Whom a review must be asked of, one of them: \"me\", or a team as \"@slug\".",
+     "kind": {
+      "type": "config.listKind",
+      "name": "list of strings",
+      "nonEmpty": true
+     }
+    },
+    {
+     "key": "reasons",
+     "doc": "Reasons of a notification, one of which the row's must have; S and a rule that approves judge a pull request without one, so [[select]] and [[auto_approve]] do not take it.",
+     "kind": {
+      "type": "config.listKind",
+      "name": "list of `approval_requested`, `assign`, `author`, `ci_activity`, `comment`, `invitation`, `manual`, `member_feature_requested`, `mention`, `review_requested`, `security_advisory_credit`, `security_alert`, `state_change`, `subscribed`, `team_mention`",
+      "values": [
+       "approval_requested",
+       "assign",
+       "author",
+       "ci_activity",
+       "comment",
+       "invitation",
+       "manual",
+       "member_feature_requested",
+       "mention",
+       "review_requested",
+       "security_advisory_credit",
+       "security_alert",
+       "state_change",
+       "subscribed",
+       "team_mention"
+      ],
+      "nonEmpty": true
+     }
+    }
+   ],
+   "exclude": [
+    {
+     "key": "name",
+     "doc": "The rule's name, which a row it leaves out says; without one, the row says the rule's conditions.",
+     "kind": {
+      "type": "config.stringKind",
+      "name": "string"
+     }
+    },
+    {
+     "key": "repos",
+     "doc": "owner/repo globs the repository must match one of; * matches any part of the owner or the name.",
+     "kind": {
+      "type": "config.listKind",
+      "name": "list of strings",
+      "nonEmpty": true
+     }
+    },
+    {
+     "key": "authors",
+     "doc": "The logins the author must be one of; bots without app/.",
+     "kind": {
+      "type": "config.listKind",
+      "name": "list of strings",
+      "nonEmpty": true
+     }
+    },
+    {
+     "key": "title",
+     "doc": "A regular expression the title must match, as written: a shortcode such as `:arrow_up:` is matched as itself, not as its emoji.",
+     "kind": {
+      "type": "config.stringKind",
+      "name": "string"
+     }
+    },
+    {
+     "key": "max_files",
+     "doc": "The most files it may change.",
+     "kind": {
+      "type": "config.intKind",
+      "name": "integer, 1 or more",
+      "min": 1
+     }
+    },
+    {
+     "key": "max_lines",
+     "doc": "The most lines it may add and delete together: the sum of the two numbers SIZE shows.",
+     "kind": {
+      "type": "config.intKind",
+      "name": "integer, 1 or more",
+      "min": 1
+     }
+    },
+    {
+     "key": "min_files",
+     "doc": "The least files it may change.",
+     "kind": {
+      "type": "config.intKind",
+      "name": "integer, 1 or more",
+      "min": 1
+     }
+    },
+    {
+     "key": "min_lines",
+     "doc": "The least lines it may add and delete together.",
+     "kind": {
+      "type": "config.intKind",
+      "name": "integer, 1 or more",
+      "min": 1
+     }
+    },
+    {
+     "key": "updated_within_days",
+     "doc": "The most days, of 24 hours, since it was last updated: a label or a bot's comment updates it too. An old pull request updated lately matches.",
+     "kind": {
+      "type": "config.intKind",
+      "name": "integer, 1 to 36500",
+      "min": 1,
+      "max": 36500
+     }
+    },
+    {
+     "key": "created_within_days",
+     "doc": "The most days, of 24 hours, since it was created.",
+     "kind": {
+      "type": "config.intKind",
+      "name": "integer, 1 to 36500",
+      "min": 1,
+      "max": 36500
+     }
+    },
+    {
+     "key": "updated_before_days",
+     "doc": "The least days, of 24 hours, since it was last updated, as AGE counts them in a search tab.",
+     "kind": {
+      "type": "config.intKind",
+      "name": "integer, 1 to 36500",
+      "min": 1,
+      "max": 36500
+     }
+    },
+    {
+     "key": "created_before_days",
+     "doc": "The least days, of 24 hours, since it was created.",
+     "kind": {
+      "type": "config.intKind",
+      "name": "integer, 1 to 36500",
+      "min": 1,
+      "max": 36500
+     }
+    },
+    {
+     "key": "bot",
+     "doc": "true: the author must be a bot; false: a person.",
+     "kind": {
+      "type": "config.boolKind",
+      "name": "boolean"
+     }
+    },
+    {
+     "key": "mine",
+     "doc": "true: it must be your own pull request; false: someone else's.",
+     "kind": {
+      "type": "config.boolKind",
+      "name": "boolean"
+     }
+    },
+    {
+     "key": "draft",
+     "doc": "true: it must be a draft, which S never selects, so [[select]] does not take true; false: ready for review.",
+     "kind": {
+      "type": "config.boolKind",
+      "name": "boolean"
+     }
+    },
+    {
+     "key": "state",
+     "doc": "The states it must be in one of: \"open\", \"merged\" or \"closed\"; S selects open ones only, so [[select]] takes \"open\" alone.",
+     "kind": {
+      "type": "config.listKind",
+      "name": "list of `open`, `merged`, `closed`",
+      "values": [
+       "open",
+       "merged",
+       "closed"
+      ],
+      "nonEmpty": true
+     }
+    },
+    {
+     "key": "checks",
+     "doc": "The states its checks must be in one of: \"passing\" (passed, none at all, or only checks.approval pending), \"failing\" or \"pending\" (still running).",
+     "kind": {
+      "type": "config.listKind",
+      "name": "list of `passing`, `failing`, `pending`",
+      "values": [
+       "passing",
+       "failing",
+       "pending"
+      ],
+      "nonEmpty": true
+     }
+    },
+    {
+     "key": "decision",
+     "doc": "The review decisions REVIEW shows, one of which it must have; \"none\" is none, as in a repository that requires no review.",
+     "kind": {
+      "type": "config.listKind",
+      "name": "list of `approved`, `changes_requested`, `review_required`, `none`",
+      "values": [
+       "approved",
+       "changes_requested",
+       "review_required",
+       "none"
+      ],
+      "nonEmpty": true
+     }
+    },
+    {
+     "key": "labels",
+     "doc": "Labels one of which it must have.",
+     "kind": {
+      "type": "config.listKind",
+      "name": "list of strings",
+      "nonEmpty": true
+     }
+    },
+    {
+     "key": "approved_by_me",
+     "doc": "true: your latest review must approve it, a person's pull request too, unlike the built-in \"approved by me\"; false: none of yours does.",
+     "kind": {
+      "type": "config.boolKind",
+      "name": "boolean"
+     }
+    },
+    {
+     "key": "reviewed_by_me",
+     "doc": "true: you must have reviewed it, whatever the review said; false: you have not.",
+     "kind": {
+      "type": "config.boolKind",
+      "name": "boolean"
+     }
+    },
+    {
+     "key": "requested",
+     "doc": "Whom a review must be asked of, one of them: \"me\", or a team as \"@slug\".",
+     "kind": {
+      "type": "config.listKind",
+      "name": "list of strings",
+      "nonEmpty": true
+     }
+    },
+    {
+     "key": "reasons",
+     "doc": "Reasons of a notification, one of which the row's must have; S and a rule that approves judge a pull request without one, so [[select]] and [[auto_approve]] do not take it.",
+     "kind": {
+      "type": "config.listKind",
+      "name": "list of `approval_requested`, `assign`, `author`, `ci_activity`, `comment`, `invitation`, `manual`, `member_feature_requested`, `mention`, `review_requested`, `security_advisory_credit`, `security_alert`, `state_change`, `subscribed`, `team_mention`",
+      "values": [
+       "approval_requested",
+       "assign",
+       "author",
+       "ci_activity",
+       "comment",
+       "invitation",
+       "manual",
+       "member_feature_requested",
+       "mention",
+       "review_requested",
+       "security_advisory_credit",
+       "security_alert",
+       "state_change",
+       "subscribed",
+       "team_mention"
+      ],
+      "nonEmpty": true
+     }
+    }
+   ],
+   "select": [
+    {
+     "key": "name",
+     "doc": "The rule's name, as S lists it.",
+     "kind": {
+      "type": "config.stringKind",
+      "name": "string",
+      "nonEmpty": true
+     }
+    },
+    {
+     "key": "repos",
+     "doc": "owner/repo globs the repository must match one of; * matches any part of the owner or the name.",
+     "kind": {
+      "type": "config.listKind",
+      "name": "list of strings",
+      "nonEmpty": true
+     }
+    },
+    {
+     "key": "authors",
+     "doc": "The logins the author must be one of; bots without app/.",
+     "kind": {
+      "type": "config.listKind",
+      "name": "list of strings",
+      "nonEmpty": true
+     }
+    },
+    {
+     "key": "packages",
+     "doc": "The dependencies a renovate or dependabot pull request updates, read from its body; every one it updates must be listed.",
+     "kind": {
+      "type": "config.listKind",
+      "name": "list of strings"
+     }
+    },
+    {
+     "key": "title",
+     "doc": "A regular expression the title must match, as written: a shortcode such as `:arrow_up:` is matched as itself, not as its emoji.",
+     "kind": {
+      "type": "config.stringKind",
+      "name": "string"
+     }
+    },
+    {
+     "key": "max_files",
+     "doc": "The most files it may change.",
+     "kind": {
+      "type": "config.intKind",
+      "name": "integer, 1 or more",
+      "min": 1
+     }
+    },
+    {
+     "key": "max_lines",
+     "doc": "The most lines it may add and delete together: the sum of the two numbers SIZE shows.",
+     "kind": {
+      "type": "config.intKind",
+      "name": "integer, 1 or more",
+      "min": 1
+     }
+    },
+    {
+     "key": "min_files",
+     "doc": "The least files it may change.",
+     "kind": {
+      "type": "config.intKind",
+      "name": "integer, 1 or more",
+      "min": 1
+     }
+    },
+    {
+     "key": "min_lines",
+     "doc": "The least lines it may add and delete together.",
+     "kind": {
+      "type": "config.intKind",
+      "name": "integer, 1 or more",
+      "min": 1
+     }
+    },
+    {
+     "key": "updated_within_days",
+     "doc": "The most days, of 24 hours, since it was last updated: a label or a bot's comment updates it too. An old pull request updated lately matches.",
+     "kind": {
+      "type": "config.intKind",
+      "name": "integer, 1 to 36500",
+      "min": 1,
+      "max": 36500
+     }
+    },
+    {
+     "key": "created_within_days",
+     "doc": "The most days, of 24 hours, since it was created.",
+     "kind": {
+      "type": "config.intKind",
+      "name": "integer, 1 to 36500",
+      "min": 1,
+      "max": 36500
+     }
+    },
+    {
+     "key": "updated_before_days",
+     "doc": "The least days, of 24 hours, since it was last updated, as AGE counts them in a search tab.",
+     "kind": {
+      "type": "config.intKind",
+      "name": "integer, 1 to 36500",
+      "min": 1,
+      "max": 36500
+     }
+    },
+    {
+     "key": "created_before_days",
+     "doc": "The least days, of 24 hours, since it was created.",
+     "kind": {
+      "type": "config.intKind",
+      "name": "integer, 1 to 36500",
+      "min": 1,
+      "max": 36500
+     }
+    },
+    {
+     "key": "bot",
+     "doc": "true: the author must be a bot; false: a person.",
+     "kind": {
+      "type": "config.boolKind",
+      "name": "boolean"
+     }
+    },
+    {
+     "key": "mine",
+     "doc": "true: it must be your own pull request; false: someone else's.",
+     "kind": {
+      "type": "config.boolKind",
+      "name": "boolean"
+     }
+    },
+    {
+     "key": "draft",
+     "doc": "true: it must be a draft, which S never selects, so [[select]] does not take true; false: ready for review.",
+     "kind": {
+      "type": "config.boolKind",
+      "name": "boolean"
+     }
+    },
+    {
+     "key": "state",
+     "doc": "The states it must be in one of: \"open\", \"merged\" or \"closed\"; S selects open ones only, so [[select]] takes \"open\" alone.",
+     "kind": {
+      "type": "config.listKind",
+      "name": "list of `open`, `merged`, `closed`",
+      "values": [
+       "open",
+       "merged",
+       "closed"
+      ],
+      "nonEmpty": true
+     }
+    },
+    {
+     "key": "checks",
+     "doc": "The states its checks must be in one of: \"passing\" (passed, none at all, or only checks.approval pending), \"failing\" or \"pending\" (still running).",
+     "kind": {
+      "type": "config.listKind",
+      "name": "list of `passing`, `failing`, `pending`",
+      "values": [
+       "passing",
+       "failing",
+       "pending"
+      ],
+      "nonEmpty": true
+     }
+    },
+    {
+     "key": "decision",
+     "doc": "The review decisions REVIEW shows, one of which it must have; \"none\" is none, as in a repository that requires no review.",
+     "kind": {
+      "type": "config.listKind",
+      "name": "list of `approved`, `changes_requested`, `review_required`, `none`",
+      "values": [
+       "approved",
+       "changes_requested",
+       "review_required",
+       "none"
+      ],
+      "nonEmpty": true
+     }
+    },
+    {
+     "key": "labels",
+     "doc": "Labels one of which it must have.",
+     "kind": {
+      "type": "config.listKind",
+      "name": "list of strings",
+      "nonEmpty": true
+     }
+    },
+    {
+     "key": "approved_by_me",
+     "doc": "true: your latest review must approve it, a person's pull request too, unlike the built-in \"approved by me\"; false: none of yours does.",
+     "kind": {
+      "type": "config.boolKind",
+      "name": "boolean"
+     }
+    },
+    {
+     "key": "reviewed_by_me",
+     "doc": "true: you must have reviewed it, whatever the review said; false: you have not.",
+     "kind": {
+      "type": "config.boolKind",
+      "name": "boolean"
+     }
+    },
+    {
+     "key": "requested",
+     "doc": "Whom a review must be asked of, one of them: \"me\", or a team as \"@slug\".",
+     "kind": {
+      "type": "config.listKind",
+      "name": "list of strings",
+      "nonEmpty": true
+     }
+    },
+    {
+     "key": "reasons",
+     "doc": "Reasons of a notification, one of which the row's must have; S and a rule that approves judge a pull request without one, so [[select]] and [[auto_approve]] do not take it.",
+     "kind": {
+      "type": "config.listKind",
+      "name": "list of `approval_requested`, `assign`, `author`, `ci_activity`, `comment`, `invitation`, `manual`, `member_feature_requested`, `mention`, `review_requested`, `security_advisory_credit`, `security_alert`, `state_change`, `subscribed`, `team_mention`",
+      "values": [
+       "approval_requested",
+       "assign",
+       "author",
+       "ci_activity",
+       "comment",
+       "invitation",
+       "manual",
+       "member_feature_requested",
+       "mention",
+       "review_requested",
+       "security_advisory_credit",
+       "security_alert",
+       "state_change",
+       "subscribed",
+       "team_mention"
+      ],
+      "nonEmpty": true
+     }
+    }
+   ],
+   "tabs": [
+    {
+     "key": "kind",
+     "doc": "\"search\" (default), a GitHub search, or \"inbox\", the pull requests in your notifications.",
+     "kind": {
+      "type": "config.enumKind",
+      "name": "one of `search`, `inbox`",
+      "values": [
+       "search",
+       "inbox"
+      ]
+     }
+    },
+    {
+     "key": "name",
+     "doc": "The tab's name; \"inbox\" for the inbox by default.",
+     "kind": {
+      "type": "config.stringKind",
+      "name": "string",
+      "nonEmpty": true
+     }
+    },
+    {
+     "key": "query",
+     "doc": "A search's GitHub search query.",
+     "kind": {
+      "type": "config.stringKind",
+      "name": "string",
+      "nonEmpty": true
+     }
+    },
+    {
+     "key": "groups",
+     "doc": "The groups a search is split into, in the order shown.",
+     "kind": {
+      "type": "config.listKind",
+      "name": "list of `you`, `team`, `other`, `bots`",
+      "values": [
+       "you",
+       "team",
+       "other",
+       "bots"
+      ],
+      "nonEmpty": true
+     }
+    },
+    {
+     "key": "folded",
+     "doc": "The groups folded at start, among groups.",
+     "kind": {
+      "type": "config.listKind",
+      "name": "list of `you`, `team`, `other`, `bots`",
+      "values": [
+       "you",
+       "team",
+       "other",
+       "bots"
+      ]
+     }
+    },
+    {
+     "key": "sort",
+     "doc": "\"updated\" (default) or \"drafts_last\".",
+     "kind": {
+      "type": "config.enumKind",
+      "name": "one of `updated`, `drafts_last`",
+      "values": [
+       "updated",
+       "drafts_last"
+      ]
+     }
+    },
+    {
+     "key": "limit",
+     "doc": "How many pull requests, or notifications, to read (at most 1000; 100 by default).",
+     "kind": {
+      "type": "config.intKind",
+      "name": "integer, 1 or more",
+      "min": 1
+     }
+    },
+    {
+     "key": "show_settled",
+     "doc": "The inbox shows the notifications whose pull request is merged or closed, rather than leave them out with the excluded until a shows them.",
+     "kind": {
+      "type": "config.boolKind",
+      "name": "boolean"
+     }
+    }
+   ]
+  },
+  "defaultRules": [
+   {
+    "max_lines": 300,
+    "name": "small"
+   },
+   {
+    "authors": [
+     "renovate",
+     "dependabot"
+    ],
+    "checks": [
+     "passing"
+    ],
+    "name": "dependency bots"
+   },
+   {
+    "approved_by_me": true,
+    "name": "approved"
+   },
+   {
+    "name": "recent",
+    "updated_within_days": 90
+   },
+   {
+    "authors": [
+     "renovate"
+    ],
+    "name": "lock files",
+    "title": "(?i)lock file maintenance"
+   }
+  ],
+  "defaultTabs": [
+   {
+    "folded": [
+     "team",
+     "bots"
+    ],
+    "groups": [
+     "you",
+     "team",
+     "other",
+     "bots"
+    ],
+    "name": "review",
+    "query": "is:open is:pr review-requested:@me archived:false"
+   },
+   {
+    "name": "mine",
+    "query": "is:open is:pr author:@me archived:false",
+    "sort": "drafts_last"
+   },
+   {
+    "name": "involved",
+    "query": "is:open is:pr involves:@me -author:@me -review-requested:@me archived:false"
+   },
+   {
+    "kind": "inbox",
+    "name": "inbox",
+    "show_settled": false
+   }
+  ],
+  "schema": "https://raw.githubusercontent.com/babarot/gh-desk/main/docs/config.schema.json"
+ },
+ "KEYS": [
+  {
+   "action": "quit",
+   "keys": [
+    "q"
+   ],
+   "scope": "global",
+   "scopeWords": "Anywhere"
+  },
+  {
+   "action": "help",
+   "keys": [
+    "?"
+   ],
+   "scope": "global",
+   "scopeWords": "Anywhere"
+  },
+  {
+   "action": "refresh",
+   "keys": [
+    "r"
+   ],
+   "scope": "global",
+   "scopeWords": "Anywhere"
+  },
+  {
+   "action": "events",
+   "keys": [
+    "n"
+   ],
+   "scope": "global",
+   "scopeWords": "Anywhere"
+  },
+  {
+   "action": "up",
+   "keys": [
+    "up",
+    "k"
+   ],
+   "scope": "nav",
+   "scopeWords": "Moving, in every list and pane"
+  },
+  {
+   "action": "down",
+   "keys": [
+    "down",
+    "j"
+   ],
+   "scope": "nav",
+   "scopeWords": "Moving, in every list and pane"
+  },
+  {
+   "action": "top",
+   "keys": [
+    "home",
+    "g"
+   ],
+   "scope": "nav",
+   "scopeWords": "Moving, in every list and pane"
+  },
+  {
+   "action": "bottom",
+   "keys": [
+    "end",
+    "G"
+   ],
+   "scope": "nav",
+   "scopeWords": "Moving, in every list and pane"
+  },
+  {
+   "action": "page_up",
+   "keys": [
+    "pgup",
+    "ctrl+u"
+   ],
+   "scope": "nav",
+   "scopeWords": "Moving, in every list and pane"
+  },
+  {
+   "action": "page_down",
+   "keys": [
+    "pgdown",
+    "ctrl+d"
+   ],
+   "scope": "nav",
+   "scopeWords": "Moving, in every list and pane"
+  },
+  {
+   "action": "next_tab",
+   "keys": [
+    "tab"
+   ],
+   "scope": "list",
+   "scopeWords": "The list and its preview pane"
+  },
+  {
+   "action": "prev_tab",
+   "keys": [
+    "shift+tab"
+   ],
+   "scope": "list",
+   "scopeWords": "The list and its preview pane"
+  },
+  {
+   "action": "tab_1",
+   "keys": [
+    "1"
+   ],
+   "scope": "list",
+   "scopeWords": "The list and its preview pane"
+  },
+  {
+   "action": "tab_2",
+   "keys": [
+    "2"
+   ],
+   "scope": "list",
+   "scopeWords": "The list and its preview pane"
+  },
+  {
+   "action": "tab_3",
+   "keys": [
+    "3"
+   ],
+   "scope": "list",
+   "scopeWords": "The list and its preview pane"
+  },
+  {
+   "action": "tab_4",
+   "keys": [
+    "4"
+   ],
+   "scope": "list",
+   "scopeWords": "The list and its preview pane"
+  },
+  {
+   "action": "tab_5",
+   "keys": [
+    "5"
+   ],
+   "scope": "list",
+   "scopeWords": "The list and its preview pane"
+  },
+  {
+   "action": "tab_6",
+   "keys": [
+    "6"
+   ],
+   "scope": "list",
+   "scopeWords": "The list and its preview pane"
+  },
+  {
+   "action": "tab_7",
+   "keys": [
+    "7"
+   ],
+   "scope": "list",
+   "scopeWords": "The list and its preview pane"
+  },
+  {
+   "action": "tab_8",
+   "keys": [
+    "8"
+   ],
+   "scope": "list",
+   "scopeWords": "The list and its preview pane"
+  },
+  {
+   "action": "tab_9",
+   "keys": [
+    "9"
+   ],
+   "scope": "list",
+   "scopeWords": "The list and its preview pane"
+  },
+  {
+   "action": "menu",
+   "keys": [
+    "enter"
+   ],
+   "scope": "list",
+   "scopeWords": "The list and its preview pane"
+  },
+  {
+   "action": "expand",
+   "keys": [
+    "l",
+    "right"
+   ],
+   "scope": "list",
+   "scopeWords": "The list and its preview pane"
+  },
+  {
+   "action": "collapse",
+   "keys": [
+    "h",
+    "left"
+   ],
+   "scope": "list",
+   "scopeWords": "The list and its preview pane"
+  },
+  {
+   "action": "select",
+   "keys": [
+    "space"
+   ],
+   "scope": "list",
+   "scopeWords": "The list and its preview pane"
+  },
+  {
+   "action": "select_shown",
+   "keys": [
+    "V"
+   ],
+   "scope": "list",
+   "scopeWords": "The list and its preview pane"
+  },
+  {
+   "action": "select_rule",
+   "keys": [
+    "S"
+   ],
+   "scope": "list",
+   "scopeWords": "The list and its preview pane"
+  },
+  {
+   "action": "clear_selection",
+   "keys": [
+    "u"
+   ],
+   "scope": "list",
+   "scopeWords": "The list and its preview pane"
+  },
+  {
+   "action": "retry",
+   "keys": [
+    "."
+   ],
+   "scope": "list",
+   "scopeWords": "The list and its preview pane"
+  },
+  {
+   "action": "approve",
+   "keys": [
+    "A"
+   ],
+   "scope": "list",
+   "scopeWords": "The list and its preview pane"
+  },
+  {
+   "action": "merge",
+   "keys": [
+    "M"
+   ],
+   "scope": "list",
+   "scopeWords": "The list and its preview pane"
+  },
+  {
+   "action": "ready_for_review",
+   "keys": [
+    "D"
+   ],
+   "scope": "list",
+   "scopeWords": "The list and its preview pane"
+  },
+  {
+   "action": "close",
+   "keys": null,
+   "scope": "list",
+   "scopeWords": "The list and its preview pane"
+  },
+  {
+   "action": "comment",
+   "keys": [
+    "c"
+   ],
+   "scope": "list",
+   "scopeWords": "The list and its preview pane"
+  },
+  {
+   "action": "review",
+   "keys": [
+    "R"
+   ],
+   "scope": "list",
+   "scopeWords": "The list and its preview pane"
+  },
+  {
+   "action": "triage",
+   "keys": [
+    "C"
+   ],
+   "scope": "list",
+   "scopeWords": "The list and its preview pane"
+  },
+  {
+   "action": "ask_claude",
+   "keys": [
+    "i"
+   ],
+   "scope": "list",
+   "scopeWords": "The list and its preview pane"
+  },
+  {
+   "action": "browse",
+   "keys": [
+    "o"
+   ],
+   "scope": "list",
+   "scopeWords": "The list and its preview pane"
+  },
+  {
+   "action": "hide",
+   "keys": [
+    "d"
+   ],
+   "scope": "list",
+   "scopeWords": "The list and its preview pane"
+  },
+  {
+   "action": "fold_bots",
+   "keys": [
+    "b"
+   ],
+   "scope": "list",
+   "scopeWords": "The list and its preview pane"
+  },
+  {
+   "action": "show_excluded",
+   "keys": [
+    "a"
+   ],
+   "scope": "list",
+   "scopeWords": "The list and its preview pane"
+  },
+  {
+   "action": "filter",
+   "keys": [
+    "/"
+   ],
+   "scope": "list",
+   "scopeWords": "The list and its preview pane"
+  },
+  {
+   "action": "preview_down",
+   "keys": [
+    "J"
+   ],
+   "scope": "list",
+   "scopeWords": "The list and its preview pane"
+  },
+  {
+   "action": "preview_up",
+   "keys": [
+    "K"
+   ],
+   "scope": "list",
+   "scopeWords": "The list and its preview pane"
+  },
+  {
+   "action": "next_file",
+   "keys": [
+    "]"
+   ],
+   "scope": "list",
+   "scopeWords": "The list and its preview pane"
+  },
+  {
+   "action": "prev_file",
+   "keys": [
+    "["
+   ],
+   "scope": "list",
+   "scopeWords": "The list and its preview pane"
+  },
+  {
+   "action": "preview_tab",
+   "keys": [
+    "v"
+   ],
+   "scope": "list",
+   "scopeWords": "The list and its preview pane"
+  },
+  {
+   "action": "fold",
+   "keys": [
+    "z"
+   ],
+   "scope": "list",
+   "scopeWords": "The list and its preview pane"
+  },
+  {
+   "action": "preview",
+   "keys": [
+    "p"
+   ],
+   "scope": "list",
+   "scopeWords": "The list and its preview pane"
+  },
+  {
+   "action": "preview_grow",
+   "keys": [
+    "+"
+   ],
+   "scope": "list",
+   "scopeWords": "The list and its preview pane"
+  },
+  {
+   "action": "preview_shrink",
+   "keys": [
+    "-"
+   ],
+   "scope": "list",
+   "scopeWords": "The list and its preview pane"
+  },
+  {
+   "action": "log",
+   "keys": [
+    "L"
+   ],
+   "scope": "list",
+   "scopeWords": "The list and its preview pane"
+  },
+  {
+   "action": "choose",
+   "keys": [
+    "enter"
+   ],
+   "scope": "popup",
+   "scopeWords": "The menu of enter, and the popups that pick from a list"
+  },
+  {
+   "action": "toggle_rule",
+   "keys": [
+    "space"
+   ],
+   "scope": "popup",
+   "scopeWords": "The menu of enter, and the popups that pick from a list"
+  },
+  {
+   "action": "add_to_selection",
+   "keys": [
+    "a"
+   ],
+   "scope": "popup",
+   "scopeWords": "The menu of enter, and the popups that pick from a list"
+  },
+  {
+   "action": "filter_by_rule",
+   "keys": [
+    "f"
+   ],
+   "scope": "popup",
+   "scopeWords": "The menu of enter, and the popups that pick from a list"
+  },
+  {
+   "action": "confirm",
+   "keys": [
+    "y",
+    "enter"
+   ],
+   "scope": "confirm",
+   "scopeWords": "A confirm popup"
+  },
+  {
+   "action": "include_failing",
+   "keys": [
+    "f"
+   ],
+   "scope": "confirm",
+   "scopeWords": "A confirm popup"
+  },
+  {
+   "action": "wait_for_checks",
+   "keys": [
+    "w"
+   ],
+   "scope": "confirm",
+   "scopeWords": "A confirm popup"
+  },
+  {
+   "action": "delete_branch",
+   "keys": [
+    "x"
+   ],
+   "scope": "confirm",
+   "scopeWords": "A confirm popup"
+  },
+  {
+   "action": "write_comment",
+   "keys": [
+    "i"
+   ],
+   "scope": "confirm",
+   "scopeWords": "A confirm popup"
+  },
+  {
+   "action": "log_this_pr",
+   "keys": [
+    "f"
+   ],
+   "scope": "log",
+   "scopeWords": "The log viewer"
+  },
+  {
+   "action": "triage_apply",
+   "keys": [
+    "enter"
+   ],
+   "scope": "triage",
+   "scopeWords": "The list, while Claude's plan is shown"
+  },
+  {
+   "action": "triage_more",
+   "keys": [
+    "i"
+   ],
+   "scope": "triage",
+   "scopeWords": "The list, while Claude's plan is shown"
+  },
+  {
+   "action": "draft_review",
+   "keys": [
+    "ctrl+x"
+   ],
+   "scope": "chat",
+   "scopeWords": "Asking Claude"
+  },
+  {
+   "action": "open_claude",
+   "keys": [
+    "ctrl+o"
+   ],
+   "scope": "chat",
+   "scopeWords": "Asking Claude"
+  },
+  {
+   "action": "chat_restart",
+   "keys": [
+    "ctrl+l"
+   ],
+   "scope": "chat",
+   "scopeWords": "Asking Claude"
+  },
+  {
+   "action": "history_prev",
+   "keys": [
+    "ctrl+p"
+   ],
+   "scope": "chat",
+   "scopeWords": "Asking Claude"
+  },
+  {
+   "action": "history_next",
+   "keys": [
+    "ctrl+n"
+   ],
+   "scope": "chat",
+   "scopeWords": "Asking Claude"
+  },
+  {
+   "action": "history_search",
+   "keys": [
+    "ctrl+r"
+   ],
+   "scope": "chat",
+   "scopeWords": "Asking Claude"
+  },
+  {
+   "action": "chat_close",
+   "keys": [
+    "backspace"
+   ],
+   "scope": "chat",
+   "scopeWords": "Asking Claude"
+  },
+  {
+   "action": "next_kind",
+   "keys": [
+    "tab"
+   ],
+   "scope": "compose",
+   "scopeWords": "Writing a review"
+  },
+  {
+   "action": "post",
+   "keys": [
+    "ctrl+s"
+   ],
+   "scope": "compose",
+   "scopeWords": "Writing a review"
+  },
+  {
+   "action": "editor",
+   "keys": [
+    "ctrl+e"
+   ],
+   "scope": "compose",
+   "scopeWords": "Writing a review"
+  },
+  {
+   "action": "accept",
+   "keys": [
+    "enter"
+   ],
+   "scope": "input",
+   "scopeWords": "Typing in the filter"
+  },
+  {
+   "action": "complete",
+   "keys": [
+    "tab"
+   ],
+   "scope": "input",
+   "scopeWords": "Typing in the filter"
+  },
+  {
+   "action": "erase",
+   "keys": [
+    "backspace"
+   ],
+   "scope": "input",
+   "scopeWords": "Typing in the filter"
+  },
+  {
+   "action": "erase_word",
+   "keys": [
+    "ctrl+w"
+   ],
+   "scope": "input",
+   "scopeWords": "Typing in the filter"
+  },
+  {
+   "action": "release_notes",
+   "keys": [
+    "w"
+   ],
+   "scope": "help",
+   "scopeWords": "The ? list of keys"
+  }
+ ]
+}

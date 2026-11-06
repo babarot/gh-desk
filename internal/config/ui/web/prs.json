@@ -1,0 +1,189 @@
+[
+ {
+  "repo": "acme/api",
+  "n": 412,
+  "author": "renovate",
+  "bot": true,
+  "title": "chore(deps): update golang.org/x/net to v0.34.1",
+  "lines": 12,
+  "add": 8,
+  "del": 4,
+  "files": 2,
+  "state": "open",
+  "checks": "passing",
+  "decision": "none",
+  "labels": [
+   "deps"
+  ],
+  "updated": 1,
+  "created": 2,
+  "approved_by_me": true,
+  "reviewed_by_me": true,
+  "requested": [
+   "me"
+  ],
+  "why": "you",
+  "updatedHours": 24
+ },
+ {
+  "repo": "acme/api",
+  "n": 409,
+  "author": "renovate",
+  "bot": true,
+  "title": "Lock file maintenance",
+  "lines": 840,
+  "add": 420,
+  "del": 420,
+  "files": 1,
+  "state": "open",
+  "checks": "passing",
+  "decision": "none",
+  "labels": [
+   "deps"
+  ],
+  "updated": 3,
+  "created": 3,
+  "requested": [
+   "me"
+  ],
+  "why": "you",
+  "updatedHours": 72
+ },
+ {
+  "repo": "acme/web",
+  "n": 231,
+  "author": "dependabot",
+  "bot": true,
+  "title": "Bump vite from 7.1.2 to 7.1.4",
+  "lines": 30,
+  "add": 18,
+  "del": 12,
+  "files": 2,
+  "state": "open",
+  "checks": "failing",
+  "decision": "review_required",
+  "labels": [
+   "deps"
+  ],
+  "updated": 0,
+  "created": 1,
+  "requested": [
+   "@frontend"
+  ],
+  "why": "@frontend",
+  "updatedHours": 4
+ },
+ {
+  "repo": "acme/web",
+  "n": 228,
+  "author": "mika",
+  "title": "Add a dark theme to the settings page",
+  "lines": 640,
+  "add": 601,
+  "del": 39,
+  "files": 14,
+  "state": "open",
+  "checks": "pending",
+  "decision": "review_required",
+  "labels": [
+   "ui"
+  ],
+  "updated": 0,
+  "created": 4,
+  "requested": [
+   "me"
+  ],
+  "why": "you",
+  "updatedHours": 2
+ },
+ {
+  "repo": "acme/web",
+  "n": 219,
+  "author": "ren",
+  "title": "WIP: rework the cart",
+  "lines": 1820,
+  "add": 1400,
+  "del": 420,
+  "files": 41,
+  "draft": true,
+  "state": "open",
+  "checks": "failing",
+  "decision": "none",
+  "labels": [
+   "wip"
+  ],
+  "updated": 12,
+  "created": 30,
+  "requested": [],
+  "why": "",
+  "updatedHours": 288
+ },
+ {
+  "repo": "acme/infra",
+  "n": 77,
+  "author": "renovate",
+  "bot": true,
+  "title": "Update Helm release datadog to v3.120.0",
+  "lines": 4,
+  "add": 2,
+  "del": 2,
+  "files": 1,
+  "state": "open",
+  "checks": "passing",
+  "decision": "approved",
+  "labels": [
+   "deps"
+  ],
+  "updated": 2,
+  "created": 6,
+  "approved_by_me": true,
+  "reviewed_by_me": true,
+  "requested": [],
+  "why": "",
+  "updatedHours": 48
+ },
+ {
+  "repo": "acme/infra",
+  "n": 74,
+  "author": "sora",
+  "title": "Update terraform modules for the new region",
+  "lines": 210,
+  "add": 150,
+  "del": 60,
+  "files": 9,
+  "state": "open",
+  "checks": "passing",
+  "decision": "changes_requested",
+  "labels": [],
+  "updated": 95,
+  "created": 400,
+  "reviewed_by_me": true,
+  "requested": [
+   "me"
+  ],
+  "why": "you",
+  "updatedHours": 2280
+ },
+ {
+  "repo": "acme/docs",
+  "n": 58,
+  "author": "babarot",
+  "mine": true,
+  "title": "Explain the config reference",
+  "lines": 90,
+  "add": 88,
+  "del": 2,
+  "files": 3,
+  "state": "open",
+  "checks": "passing",
+  "decision": "approved",
+  "labels": [
+   "docs"
+  ],
+  "updated": 0,
+  "created": 1,
+  "requested": [],
+  "why": "",
+  "updatedHours": 5
+ }
+]
