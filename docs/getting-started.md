@@ -43,7 +43,7 @@ Across the top are the tabs. By default they are four:
 
 Under the list is the pane: the pull request under the cursor, its description beside its checks and reviews, or its diff. The line at the bottom shows the keys that matter where you are, and `?` lists them all.
 
-[A walk round the screen](https://babarot.me/gh-desk/?scenario=tour "playground")
+[A walk round the screen](https://babarot.me/gh-desk/play/?scenario=tour "playground")
 
 A few keys to start with:
 
@@ -60,6 +60,16 @@ A few keys to start with:
 
 Nothing is written to GitHub without a confirm popup that lists what will be done to each pull request.
 
+## Make it yours
+
+There is no file to write. This opens a page in your browser, with gh-desk drawn above the settings and following each change before you save it:
+
+```sh
+gh desk config edit --ui
+```
+
+From there you can add a tab for your repository, try a rule for what is safe to merge on your own pull requests, and choose how to merge, the keys and the colors. [Configuration](guides/configuration.md) shows the page.
+
 ## Update
 
 Installed as a gh extension or with Nix, gh-desk reads its releases on GitHub once a day and tells in the notifications (`n`) when a newer one is out, with how to update this install: `gh extension upgrade desk`, or Nix for a Nix install. The `?` list says so too, under the version. The first launch after an update tells of the update. In the `?` list, `w` shows the release notes of every release, newest first, with the one running marked installed and a newer one not installed (a build from a clone marks none); they are read from GitHub the first time they are opened. `release.check = false` in the config file, or `GH_NO_EXTENSION_UPDATE_NOTIFIER` set as for gh, turns it off; a build with `go install` or from a clone never reads them.
@@ -68,5 +78,4 @@ Installed as a gh extension or with Nix, gh-desk reads its releases on GitHub on
 
 - [Tabs and groups](guides/tabs.md), to make the tabs your own
 - [Approving and merging](guides/approve-and-merge.md), to know what the popup will do
-- [Configuration](guides/configuration.md), to change the rest
 - [Concepts](concepts/README.md), for what gh-desk aims for and why it works the way it does
