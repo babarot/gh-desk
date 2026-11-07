@@ -6,11 +6,10 @@ leads on the site:
   page, or the page of the section; a link that leads to no page stops the
   build
 - to the rest of the repository (an ADR, the code) - that file on GitHub
-- to the playground (params.playground) - the playground next to the docs,
-  on the whole window; one titled "playground" is embedded instead, a card
-  until it is clicked
-- to the settings page (params.playground, then settings/) - that page next
-  to the docs; one titled "settings" is embedded the same way
+- to the playground (params.playground) - the playground next to the docs;
+  one titled "playground" is embedded instead, a card until it is clicked
+- to the settings playground (params.playground, then settings/) - that
+  page next to the docs; one titled "settings" is embedded the same way
 */ -}}
 {{- $dest := .Destination -}}
 {{- $u := urls.Parse $dest -}}
@@ -20,15 +19,14 @@ leads on the site:
 {{- $src := "" -}}
 {{- $settings := false -}}
 {{- if strings.HasPrefix $dest (printf "%ssettings/" $playground) -}}
-  {{- $href = printf "%s../settings/" site.Home.RelPermalink -}}
+  {{- $href = printf "%s../play/settings/" site.Home.RelPermalink -}}
   {{- $src = $href -}}
   {{- $settings = true -}}
   {{- $embed = eq .Title "settings" -}}
 {{- else if strings.HasPrefix $dest $playground -}}
-  {{- /* The playground on the whole window, as the navbar's link opens
-         it; embedded, the playground's page in a frame. */ -}}
+  {{- /* Embedded, the playground in a frame only shows. */ -}}
   {{- $href = printf "%s../play/" site.Home.RelPermalink -}}
-  {{- $src = printf "%s../?embed=1&watch=1" site.Home.RelPermalink -}}
+  {{- $src = printf "%s?watch=1" $href -}}
   {{- with $u.RawQuery }}
     {{- $href = printf "%s?%s" $href . -}}
     {{- $src = printf "%s&%s" $src . -}}

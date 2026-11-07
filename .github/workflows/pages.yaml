@@ -1,8 +1,8 @@
 name: Pages
 
-# The site at babarot.me/gh-desk/: the playground, gh-desk compiled to
-# WebAssembly against the made-up GitHub of demo/internal/playground, and
-# under it the docs, built from docs/ with Hugo. It is published when a
+# The site at babarot.me/gh-desk/: the landing page, under it the playground,
+# gh-desk compiled to WebAssembly against the made-up GitHub of
+# demo/internal/playground, and the docs, built from docs/ with Hugo. It is published when a
 # release is made, from the commit released, so that the playground, the
 # docs and the version the docs name are those of the gh-desk people
 # install (ADR-055). Release calls it. It can be run by hand on main, which

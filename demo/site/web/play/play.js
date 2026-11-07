@@ -1,14 +1,13 @@
-// The page: the terminal that runs gh-desk.wasm, the key buttons under it,
-// the copy button and the theme.
+// The playground: the terminal that runs gh-desk.wasm and the key buttons
+// under it.
 //
 // ?scenario=<name> plays a scenario of demo/internal/playground once
 // gh-desk has read its lists: its steps are typed one by one, each shown in
 // a caption, until the visitor types, with a player under the terminal
 // that shows the steps, pauses, goes to a step and plays again. ?watch=1
-// only shows: the visitor's keys and clicks do not reach gh-desk. ?embed=1
-// shows only the terminal and its keys, for a page that embeds it in a
-// frame, and ?theme=dark|light sets the theme; the script in the head
-// reads embed, watch and theme.
+// only shows: the visitor's keys and clicks do not reach gh-desk.
+// ?theme=dark|light sets the theme. The script in the head reads watch and
+// theme, and sees whether the page is in a frame.
 (() => {
   const $ = id => document.getElementById(id);
   const root = document.documentElement;
@@ -16,18 +15,15 @@
   const query = new URLSearchParams(location.search);
   const scenario = query.get('scenario') || '';
 
-  // In a frame, the link opens the screen on the whole page, where the
-  // visitor drives; watching on the whole page, it lets the visitor drive
+  // In a frame, the link opens the screen on the whole window, where the
+  // visitor drives; watching on the whole window, it lets the visitor drive
   // right there (drive, below).
   const embedded = root.classList.contains('embed');
   if (embedded || root.classList.contains('watch')) {
     const full = new URLSearchParams(query);
-    full.delete('embed');
     full.delete('watch');
     const s = full.toString();
-    // play/ is the playground on the whole window; the page's base makes
-    // the path the same from it and from the top.
-    $('full').href = (embedded ? 'play/' : '') + (s ? '?' + s : '') || './';
+    $('full').href = s ? '?' + s : './';
     if (root.classList.contains('watch')) $('full').textContent = 'Try it yourself ↗';
   }
 
@@ -55,7 +51,7 @@
   // steps by the time the next one waits. Going to a step plays the
   // scenario again from the start, fast up to that step: a screen of
   // gh-desk cannot be wound back.
-  // watch is let: on the whole page the visitor can stop watching and
+  // watch is let: on the whole window the visitor can stop watching and
   // drive the screen being shown.
   let watch = root.classList.contains('watch');
   // END is a step past the last: playing from it types every step fast.
@@ -319,7 +315,8 @@
     term.onKey(() => { api.takeOver(); taken(); });
     term.onBinary(d => api.input(d));
     term.onResize(({ cols, rows }) => api.resize(cols, rows));
-    if (!watch) term.focus();
+    // In a frame the page around it keeps the focus until a click.
+    if (!watch && !embedded) term.focus();
   }
 
   new ResizeObserver(size).observe(screen);
@@ -337,40 +334,19 @@
   }));
   $('restart').addEventListener('click', () => replay(0));
 
-  $('copy').addEventListener('click', e => {
-    navigator.clipboard.writeText($('cmd').textContent).then(() => {
-      e.target.textContent = 'Copied';
-      setTimeout(() => { e.target.textContent = 'Copy'; }, 2000);
-    });
-  });
-
-  // Each click goes on to the next of system, light and dark, as in the
-  // docs, whose key keeps it. A change of what is drawn restarts gh-desk,
-  // which reads the terminal's background as it starts.
-  const themeBtn = $('theme');
-  const showMode = () => { themeBtn.dataset.mode = root.dataset.theme || 'system'; };
-  themeBtn.addEventListener('click', () => {
-    const was = dark();
-    const next = { system: 'light', light: 'dark', dark: 'system' }[root.dataset.theme || 'system'];
-    if (next === 'system') delete root.dataset.theme;
-    else root.dataset.theme = next;
-    try { localStorage.setItem('color-theme', next); } catch (e) {}
-    showMode();
-    if (dark() !== was) start();
-  });
+  // What is drawn follows the OS, and a switch on the page around this
+  // frame or in another tab. A change restarts gh-desk, which reads the
+  // terminal's background as it starts.
   matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
     if (!root.dataset.theme) start();
   });
-  // Switched somewhere else: in the docs around this frame, or in another tab.
   addEventListener('storage', e => {
     if (e.key !== 'color-theme') return;
     const was = dark();
     if (e.newValue === 'dark' || e.newValue === 'light') root.dataset.theme = e.newValue;
     else delete root.dataset.theme;
-    showMode();
     if (dark() !== was) start();
   });
-  showMode();
 
   document.fonts.load('13px "JetBrains Mono"').finally(start);
 
@@ -389,9 +365,9 @@
     history.replaceState(null, '', location.pathname + (rest ? '?' + rest : '') + location.hash);
     term.focus();
   }
-  // In a frame the link leaves it; on a page of its own, whole or not, the
-  // visitor drives right there.
-  if (!embedded || root.classList.contains('whole')) {
+  // In a frame the link leaves it; on the whole window the visitor drives
+  // right there.
+  if (!embedded) {
     $('full').addEventListener('click', e => {
       if (!watch) return;
       e.preventDefault();

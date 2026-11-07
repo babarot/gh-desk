@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Playground - gh-desk</title>
+<meta name="description" content="gh-desk itself, compiled to WebAssembly and running in your browser against a made-up GitHub.">
+<meta property="og:type" content="website">
+<meta property="og:title" content="gh-desk playground">
+<meta property="og:description" content="gh-desk itself, running in your browser against a made-up GitHub.">
+<!-- The icons are those of the docs (docs/site/static), which Pages
+     publishes under docs/ beside this page's directory. -->
+<link rel="icon" href="../docs/favicon.ico" sizes="32x32">
+<link rel="icon" href="../docs/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="../docs/favicon-16x16.png" type="image/png" sizes="16x16">
+<link rel="icon" href="../docs/favicon-32x32.png" type="image/png" sizes="32x32">
+<link rel="apple-touch-icon" href="../docs/apple-touch-icon.png" sizes="180x180">
+<script>
+// ?theme=dark|light overrides the theme picked on this site, ?watch=1 only
+// shows, and a page in a frame shows the way out of it. They are set before
+// the page is drawn, so it does not flash.
+(() => {
+  const root = document.documentElement, q = new URLSearchParams(location.search);
+  // The site keeps the theme as color-theme, Hextra's key, which may also be
+  // "system".
+  try {
+    const t = localStorage.getItem('color-theme');
+    if (t === 'dark' || t === 'light') root.dataset.theme = t;
+  } catch (e) {}
+  if (q.get('theme') === 'dark' || q.get('theme') === 'light') root.dataset.theme = q.get('theme');
+  if (window.self !== window.top) root.classList.add('embed');
+  // ?watch=1 only shows: the keys and clicks of the visitor do not reach
+  // gh-desk, and a scenario plays like a video.
+  if (q.has('watch') && q.get('watch') !== '0') root.classList.add('watch');
+})();
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Inter:wght@400;600;800&display=swap">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/css/xterm.min.css">
+<link rel="stylesheet" href="../site.css">
+<link rel="stylesheet" href="play.css">
+</head>
+<body>
+<main class="play">
+  <div class="term">
+    <div class="term-bar">
+      <div class="dots"><i></i><i></i><i></i></div>
+      <span class="title">~ — gh desk</span>
+      <a class="full" id="full" href="./" target="_blank" rel="noopener">Open the playground ↗</a>
+      <nav class="out"><a href="../">About gh-desk</a><a href="settings/">Settings</a><a href="../docs/">Docs</a></nav>
+      <button id="restart" type="button">Restart</button>
+    </div>
+    <div class="screen" id="screen" aria-label="Terminal running gh-desk. Click it and type."></div>
+    <div class="loading" id="loading">Loading gh-desk…</div>
+    <div class="player" id="player" hidden>
+      <button class="pp" id="pp" type="button" aria-label="Pause">❚❚</button>
+      <div class="track" id="track" title="Go to a step"><div class="fill" id="fill"></div></div>
+      <span class="now" id="now"></span>
+      <button class="again" id="again" type="button" aria-label="Play from the start" title="Play from the start">↺</button>
+    </div>
+    <div class="caption" id="caption" aria-live="polite" hidden></div>
+  </div>
+  <div class="keys" id="keys">
+    <button data-k="j">↓ j</button><button data-k="k">↑ k</button>
+    <button data-k="\t">tab</button><button data-k="\r">enter</button>
+    <button data-k=" ">space</button><button data-k="p">p</button><button data-k="v">v</button>
+    <button data-k="]">]</button><button data-k="[">[</button>
+    <button data-k="J">J</button><button data-k="K">K</button>
+    <button data-k="b">b</button><button data-k="S">S</button><button data-k="d">d</button>
+    <button data-k="4">4</button><button data-k="i">i</button>
+    <button data-k="\x18">ctrl+x</button><button data-k="C">C</button><button data-k="M">M</button>
+    <button data-k="?">?</button><button data-k="\x1b">esc</button>
+  </div>
+</main>
+<script src="https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/lib/xterm.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@xterm/addon-fit@0.10.0/lib/addon-fit.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@xterm/addon-unicode11@0.8.0/lib/addon-unicode11.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@xterm/addon-webgl@0.18.0/lib/addon-webgl.min.js"></script>
+<script src="wasm_exec.js"></script>
+<script src="play.js"></script>
+</body>
+</html>

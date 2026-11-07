@@ -6,7 +6,7 @@ With [Claude Code](https://docs.anthropic.com/en/docs/claude-code) installed and
 
 `i` opens a conversation with Claude about the pull request under the cursor. It takes the place of the pane, and is kept per pull request: move to another and back, and it is still there. Until something is asked, the pane shows the pull request and a few questions to start with, a review first; `tab` puts them in the text box one after another, and `enter` asks. Type to ask your own.
 
-[Claude on a pull request](https://babarot.me/gh-desk/?scenario=claude "playground")
+[Claude on a pull request](https://babarot.me/gh-desk/play/?scenario=claude "playground")
 
 `ctrl+x` drafts a review from the conversation. The draft goes into the review popup for you to read and edit, and is sent through the usual confirm popup. `ctrl+o` hands the conversation to Claude Code in the terminal.
 
@@ -20,7 +20,7 @@ As you type in either, the rest of a question you asked or are offered shows fai
 
 In both, `up` and `ctrl+p` bring back the questions asked before, and `down` and `ctrl+n` go forward again, back to what you were typing. `C` keeps its questions between launches, from every tab; a question brought back is asked about the tab shown. `i` goes through the questions of that pull request. `ctrl+r` opens them as a list in place of the text box: type to narrow it, `enter` puts the question in the text box without sending it, and `esc` goes back. Claude answers with a plan of what to filter, fold, select, and at the end approve or merge; it does not act on the screen itself. `enter` applies the plan on the tab it was asked on, and an approve or a merge in it opens the confirm popup with the pull requests Claude named.
 
-[A plan from Claude, applied and merged](https://babarot.me/gh-desk/?scenario=triage "playground")
+[A plan from Claude, applied and merged](https://babarot.me/gh-desk/play/?scenario=triage "playground")
 
 Claude is given only the rows of the tab shown, so it cannot name a pull request of another tab. A pull request that has left the tab, or whose head moved since Claude saw it, is left out of the plan, and the plan says why.
 

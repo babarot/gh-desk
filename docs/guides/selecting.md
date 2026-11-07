@@ -32,7 +32,7 @@ Five rules are there by default: `small`, `dependency bots`, `approved`, `recent
 | `a` | add what matches to the selection instead of replacing it |
 | `f` | show only these rows in the tab, leaving the selection as it is |
 
-[The rules of S](https://babarot.me/gh-desk/?scenario=rules "playground")
+[The rules of S](https://babarot.me/gh-desk/play/?scenario=rules "playground")
 
 Checking rules is AND; adding to the selection is OR, so (A and B) or C is chosen in two steps. A combination you use again is better written as one rule.
 

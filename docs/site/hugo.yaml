@@ -1,4 +1,4 @@
-# The documentation site, under the playground at babarot.me/gh-desk/.
+# The docs, under the landing page at babarot.me/gh-desk/.
 # The pages are the Markdown files in docs/, which build.sh copies in;
 # see build.sh for which ones and how.
 baseURL: https://babarot.me/gh-desk/docs/
@@ -25,7 +25,7 @@ markup:
 
 menu:
   main:
-  # The playground on the whole window, play/ beside the docs. A url
+  # The playground, play/ beside the docs. A url
   # starting with / is taken from the base URL (/gh-desk/docs/), so
   # /../play/ is it wherever the site is served; ../play/ alone would be
   # read from each page, and a query is dropped from a menu's url.
@@ -46,7 +46,8 @@ params:
   description: A desk in your terminal for the pull requests waiting on you.
   # The playground's address; a link to it in a page is taken to the
   # playground next to the docs, and one titled "playground" is embedded.
-  playground: https://babarot.me/gh-desk/
+  # The settings playground is settings/ under it.
+  playground: https://babarot.me/gh-desk/play/
   repository: https://github.com/babarot/gh-desk
   navbar:
     displayTitle: true

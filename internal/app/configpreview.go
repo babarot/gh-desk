@@ -76,14 +76,14 @@ func newPreview(cfg config.File, now time.Time, log *slog.Logger) (*preview, err
 	return p, nil
 }
 
-// SettingsDemo is the settings page for the site, with no file and the
+// SettingsPlayground is the settings page as the site shows it, with no file and the
 // made-up pull requests (ADR-103).
-func SettingsDemo() ([]byte, error) {
+func SettingsPlayground() ([]byte, error) {
 	shown, err := samplePreview(ui.SampleTime)
 	if err != nil {
 		return nil, err
 	}
-	return ui.Page(ui.Input{File: ui.File{Path: "config.toml"}, Keys: uiKeys(), Themes: tui.Palettes(), Spinners: tui.Spinners(), Lists: shown.lists, Demo: true})
+	return ui.Page(ui.Input{File: ui.File{Path: "config.toml"}, Keys: uiKeys(), Themes: tui.Palettes(), Spinners: tui.Spinners(), Lists: shown.lists, Playground: true})
 }
 
 func samplePreview(now time.Time) (*preview, error) {

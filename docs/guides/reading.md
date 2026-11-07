@@ -14,7 +14,7 @@ The overview tab draws the description as Markdown (headings, lists, code, quote
 - `z` folds a file to its name and line counts; `diff.collapse` lists files to fold from the start, such as lock files
 - `J` and `K` scroll the pane while the cursor stays in the list
 
-[The diff of a pull request](https://babarot.me/gh-desk/?scenario=diff "playground")
+[The diff of a pull request](https://babarot.me/gh-desk/play/?scenario=diff "playground")
 
 `preview.tab = "diff"` opens the pane on the diff.
 

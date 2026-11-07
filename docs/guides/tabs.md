@@ -37,7 +37,7 @@ The groups are shown in the order you write them. A group left out is not shown,
 
 One tab is the inbox (`kind = "inbox"`): the pull requests in your notifications, with the reason each is there. Your notifications also put an unread mark (●) on the rows of every tab. The inbox leaves out the notifications whose pull request is merged or closed, as it leaves out what your exclusion rules match, until `a` shows them; `show_settled = true` keeps them as rows. `d` marks one done. With `list.bell = true`, a notification newly unread while gh-desk runs rings the terminal's bell, unless the inbox excludes it.
 
-[The inbox](https://babarot.me/gh-desk/?scenario=inbox "playground")
+[The inbox](https://babarot.me/gh-desk/play/?scenario=inbox "playground")
 
 ## Leaving pull requests out
 

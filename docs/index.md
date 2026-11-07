@@ -4,9 +4,9 @@ A desk in your terminal for the pull requests waiting on you.
 
 gh-desk is a [gh](https://cli.github.com/) extension. It opens the pull requests asked of you, yours, the ones you are involved in, and your notifications, each in a tab. You read a pull request in a pane under the list, select many by a rule, approve and merge them through one popup that says what will happen to each, and ask Claude about the one you are unsure of.
 
-[The playground](https://babarot.me/gh-desk/) runs gh-desk itself in your browser, against a made-up GitHub. The pages here embed it where a screen says more than words: scrolled to, it plays the way to that screen, and you can pause it or go to a step; "try it yourself" opens it on its own page, where you drive.
+[The playground](https://babarot.me/gh-desk/play/) runs gh-desk itself in your browser, against a made-up GitHub. The pages here embed it where a screen says more than words: scrolled to, it plays the way to that screen, and you can pause it or go to a step; "try it yourself" opens it on its own page, where you drive.
 
-[A walk round gh-desk](https://babarot.me/gh-desk/?scenario=tour "playground")
+[A walk round gh-desk](https://babarot.me/gh-desk/play/?scenario=tour "playground")
 
 ## Where to go
 
