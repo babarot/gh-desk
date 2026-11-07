@@ -50,7 +50,24 @@ h3 { letter-spacing: -.01em; }
   overflow: hidden; background: var(--term-bg); box-shadow: var(--shadow);
 }
 .frame iframe { display: block; width: 100%; height: clamp(500px, calc(70vh + 96px), 716px); border: 0; }
-.frame.tall iframe { height: 46rem; }
+/* The settings as the command shows them, and the file they write. */
+/* The panel keeps its sidebar above 820px, as the command draws it, so the
+   two may reach past the column. */
+.split {
+  --width: min(1320px, 100vw - 48px);
+  display: grid; grid-template-columns: minmax(832px, 1fr) minmax(0, 340px); gap: 20px;
+  width: var(--width); margin: 24px 0 0 calc((100% - var(--width)) / 2);
+}
+.split .frame { margin-top: 0; }
+.split iframe { height: 724px; }
+.file { display: flex; flex-direction: column; min-height: 0; margin: 0; height: 724px; }
+.file figcaption { margin-bottom: 8px; color: var(--mid); font: 13px "JetBrains Mono", monospace; }
+.file .code { flex: 1; min-height: 0; overflow: auto; white-space: pre-wrap; word-break: break-word; }
+@media (max-width: 1179px) {
+  .split { grid-template-columns: minmax(0, 1fr); width: auto; margin-left: 0; }
+  .split iframe { height: 640px; }
+  .file { height: 320px; }
+}
 #config .install { max-width: 420px; }
 .sub.note { margin: 20px 0 48px; font-size: 15px; }
 
@@ -84,13 +101,14 @@ h3 { letter-spacing: -.01em; }
 /* install */
 #install { background: var(--band); border-top: 1px solid var(--line); }
 .steps { list-style: none; margin: 32px 0 0; padding: 0; display: grid; gap: 36px; max-width: 760px; }
-.steps li { display: grid; grid-template-columns: 44px minmax(0, 1fr); gap: 20px; }
+.steps li { display: grid; grid-template-columns: 26px minmax(0, 1fr); gap: 16px; }
+/* a key, as the rest of the page draws them */
 .steps .num {
-  width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center;
-  font: 700 16px "JetBrains Mono", monospace; color: #fff;
-  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  width: 26px; height: 26px; margin-top: 1px; border-radius: 5px; display: grid; place-items: center;
+  font: 13px "JetBrains Mono", monospace; color: var(--mid);
+  background: var(--card); border: 1px solid var(--line); border-bottom-width: 2px;
 }
-.steps h3 { margin: 6px 0 6px; font-size: 19px; }
+.steps h3 { margin: 0 0 6px; font-size: 19px; }
 .steps p { margin: 0 0 14px; color: var(--mid); }
 .install {
   display: flex; align-items: center; gap: 12px; background: var(--term-bg); border: 1px solid var(--line);
@@ -118,5 +136,5 @@ footer.wrap {
 .cards p.more a:hover { text-decoration: underline; }
 .cards p.more a[data-scenario]::before { content: "▶ "; font-size: 11px; }
 .cards p.more a:not([data-scenario])::after { content: " →"; }
-.next { margin-top: 28px; color: var(--mid); }
+.next { margin-top: 28px; max-width: 760px; color: var(--mid); }
 .next a { color: var(--accent); font-weight: 600; }

@@ -1,5 +1,5 @@
-// The landing page: the copy button, the theme, and the cards that play a
-// scenario in the frame of the playground. The playground hears of a switch
+// The landing page: the copy button, the theme, the file the settings
+// write, and the cards that play a scenario in the frame of the playground. The playground hears of a switch
 // of the theme through the key it is kept under.
 (() => {
   const $ = id => document.getElementById(id);
@@ -31,9 +31,27 @@
   });
   show();
 
+  // The file the settings would write, moved to the last line that changed,
+  // as a list of rules is longer than the box. A line's height is the
+  // box's, which landing.css sets.
+  const toml = $('toml');
+  const empty = '# Change a setting, and what gh-desk\n# would write shows here.';
+  toml.textContent = empty;
+  let shown = '';
+  addEventListener('message', e => {
+    if (e.origin !== location.origin || e.source !== $('panel').contentWindow) return;
+    const text = e.data.config.replace(/^#:schema.*\n/, '').trim();
+    const was = shown.split('\n'), now = text.split('\n');
+    let same = 0;
+    while (same < was.length && same < now.length && was[was.length - 1 - same] === now[now.length - 1 - same]) same++;
+    shown = text;
+    toml.textContent = text || empty;
+    const line = parseFloat(getComputedStyle(toml).lineHeight);
+    toml.scrollTop = (now.length - same) * line - toml.clientHeight / 2;
+  });
+
   document.querySelectorAll('[data-scenario]').forEach(a => a.addEventListener('click', e => {
     e.preventDefault();
-    $('playground').src = `play/?watch=1&scenario=${a.dataset.scenario}`;
-    $('try').scrollIntoView({ behavior: 'smooth' });
+    $('playground').src = `play/?watch=1&inline=1&scenario=${a.dataset.scenario}`;
   }));
 })();

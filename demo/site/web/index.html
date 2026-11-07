@@ -100,8 +100,14 @@
       <p class="sub">There is no file to write. One command opens a page in your browser, with gh-desk drawn above the settings and following each change before you save it.</p>
       <div class="install"><pre>gh desk config edit --ui</pre></div>
 
-      <div class="frame tall"><iframe src="play/settings/" loading="lazy" title="The settings page, with made-up pull requests"></iframe></div>
-      <p class="sub note">Try a theme, or change the columns or a key: this is that page, with made-up pull requests, and it saves nothing. Run the command, and the list is your own.</p>
+      <div class="split">
+        <div class="frame"><iframe id="panel" src="play/settings/?panel=1" loading="lazy" title="The settings of gh-desk"></iframe></div>
+        <figure class="file">
+          <figcaption>config.toml</figcaption>
+          <pre class="code" id="toml"></pre>
+        </figure>
+      </div>
+      <p class="sub note">Every setting is here, and the file shows what it would write; nothing is saved. Run the command, and gh-desk is drawn above the page, with your own pull requests.</p>
 
       <div class="cards">
         <article>
@@ -201,12 +207,13 @@
         <li>
           <span class="num">3</span>
           <div>
-            <h3>Optionally, Claude</h3>
-            <p>With <a href="https://docs.claude.com/en/docs/claude-code/overview">Claude Code</a> installed and signed in, <kbd>i</kbd> and <kbd>C</kbd> work. Without it, everything else does.</p>
+            <h3>Make it yours</h3>
+            <p>Add a tab for your repository, write your rules, and choose the keys and the colors, on a page in your browser.</p>
+            <div class="install"><pre>gh desk config edit --ui</pre></div>
           </div>
         </li>
       </ol>
-      <p class="next"><a href="docs/getting-started/">Getting started</a> walks through the first run, and <a href="docs/">the docs</a> explain the rest.</p>
+      <p class="next">To ask Claude with <kbd>i</kbd> and <kbd>C</kbd>, have <a href="https://docs.claude.com/en/docs/claude-code/overview">Claude Code</a> installed and signed in; everything else works without it. <a href="docs/getting-started/">Getting started</a> walks through the first run, and <a href="docs/">the docs</a> explain the rest.</p>
     </div>
   </section>
 </main>
