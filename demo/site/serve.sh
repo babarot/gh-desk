@@ -15,4 +15,15 @@ BASE_URL="http://localhost:$port/gh-desk/docs/" "$site/build.sh" "$out/gh-desk"
 
 echo "http://localhost:$port/gh-desk/"
 cd "$out"
-exec python3 -m http.server "$port" --bind 127.0.0.1
+# no-store: every build has the same addresses, so a page kept by the browser
+# would hide what changed.
+exec python3 -c '
+import http.server, sys
+
+class Handler(http.server.SimpleHTTPRequestHandler):
+    def end_headers(self):
+        self.send_header("Cache-Control", "no-store")
+        super().end_headers()
+
+http.server.ThreadingHTTPServer(("127.0.0.1", int(sys.argv[1])), Handler).serve_forever()
+' "$port"

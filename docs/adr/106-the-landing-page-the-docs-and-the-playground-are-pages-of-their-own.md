@@ -33,7 +33,7 @@ This replaces three sentences. Of ADR-052: "`play/` is the playground on the who
 
 ## Consequences
 
-- A scenario played from the landing page plays in its frame. Driving from there leaves the frame for the playground, as it does in the docs.
+- A scenario played from the landing page plays in its frame.
 - The playground and the landing page share only `site.css`; a style for one does not reach the other.
 - A new page that lets a visitor try something goes under `play/`.
 - The site keeps the theme under one storage key, and a frame hears of a switch through that key. A page that switches the theme has to write it there.

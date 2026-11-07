@@ -5,8 +5,9 @@
 // gh-desk has read its lists: its steps are typed one by one, each shown in
 // a caption, until the visitor types, with a player under the terminal
 // that shows the steps, pauses, goes to a step and plays again. ?watch=1
-// only shows: the visitor's keys and clicks do not reach gh-desk.
-// ?theme=dark|light sets the theme. The script in the head reads watch and
+// only shows: the visitor's keys and clicks do not reach gh-desk. ?inline=1
+// lets a frame large enough to drive in keep the visitor when they stop
+// watching. ?theme=dark|light sets the theme. The script in the head reads watch and
 // theme, and sees whether the page is in a frame.
 (() => {
   const $ = id => document.getElementById(id);
@@ -16,12 +17,14 @@
   const scenario = query.get('scenario') || '';
 
   // In a frame, the link opens the screen on the whole window, where the
-  // visitor drives; watching on the whole window, it lets the visitor drive
-  // right there (drive, below).
+  // visitor drives; watching on the whole window or inline, it lets the
+  // visitor drive right there (drive, below).
   const embedded = root.classList.contains('embed');
+  const inline = query.has('inline') && query.get('inline') !== '0';
   if (embedded || root.classList.contains('watch')) {
     const full = new URLSearchParams(query);
     full.delete('watch');
+    full.delete('inline');
     const s = full.toString();
     $('full').href = s ? '?' + s : './';
     if (root.classList.contains('watch')) $('full').textContent = 'Try it yourself ↗';
@@ -85,7 +88,10 @@
     if (pl.state === 'taken') { now.textContent = 'you are driving'; return; }
     if (pl.state === 'done') { now.textContent = 'done'; return; }
     if (pl.cur < 0) { now.textContent = `0/${pl.steps.length}`; return; }
-    const st = pl.steps[pl.cur], k = document.createElement('kbd');
+    // On the way to the end of a scenario (END), no step is shown.
+    const st = pl.steps[pl.cur];
+    if (!st) return;
+    const k = document.createElement('kbd');
     k.textContent = st.key;
     now.append(`${pl.cur + 1}/${pl.steps.length} `, k, st.help ? ' ' + st.help : '');
   }
@@ -332,7 +338,13 @@
     }
     term.focus();
   }));
-  $('restart').addEventListener('click', () => replay(0));
+  // Inline, a scenario was only shown to the visitor, who starts over at the
+  // list; elsewhere the address names the scenario, and it plays again.
+  $('restart').addEventListener('click', () => {
+    if (inline) { location.replace('./'); return; }
+    replay(0);
+    if (!watch) term.focus();
+  });
 
   // What is drawn follows the OS, and a switch on the page around this
   // frame or in another tab. A change restarts gh-desk, which reads the
@@ -359,15 +371,17 @@
     pl.state = 'taken';
     if (pl.held) { release(); uncover(); }
     playerEl.hidden = true;
+    $('full').textContent = 'Open the playground ↗';
     const q = new URLSearchParams(location.search);
     q.delete('watch');
+    q.delete('inline');
     const rest = q.toString();
     history.replaceState(null, '', location.pathname + (rest ? '?' + rest : '') + location.hash);
     term.focus();
   }
-  // In a frame the link leaves it; on the whole window the visitor drives
-  // right there.
-  if (!embedded) {
+  // In a frame the link leaves it, unless the frame is inline; on the whole
+  // window the visitor drives right there.
+  if (!embedded || inline) {
     $('full').addEventListener('click', e => {
       if (!watch) return;
       e.preventDefault();

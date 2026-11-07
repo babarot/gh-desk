@@ -33,7 +33,6 @@
 
   document.querySelectorAll('[data-scenario]').forEach(a => a.addEventListener('click', e => {
     e.preventDefault();
-    $('playground').src = `play/?watch=1&scenario=${a.dataset.scenario}`;
-    $('try').scrollIntoView({ behavior: 'smooth' });
+    $('playground').src = `play/?watch=1&inline=1&scenario=${a.dataset.scenario}`;
   }));
 })();
