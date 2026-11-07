@@ -32,6 +32,33 @@
 })();
 </script>
 <script>
+// One click switches between light and dark, as on the playground, in place
+// of Hextra's menu. Its items do the switching, so what they keep is
+// Hextra's own; the theme follows the OS until it is switched, and the icon
+// always shows the theme in use.
+(() => {
+  const now = () => document.documentElement.classList.contains('dark') ? 'dark' : 'light';
+  const show = () => document.querySelectorAll('.hextra-theme-toggle').forEach(b => {
+    b.parentElement.dataset.theme = now();
+    b.removeAttribute('aria-haspopup');
+    b.removeAttribute('aria-expanded');
+  });
+  document.addEventListener('click', e => {
+    if (!e.target.closest('.hextra-theme-toggle')) return;
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    const next = now() === 'dark' ? 'light' : 'dark';
+    document.querySelector(`.hextra-theme-toggle-options [data-item=${next}]`).click();
+  }, true);
+  document.addEventListener('DOMContentLoaded', show);
+  matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+    if (localStorage.getItem('color-theme') !== 'system') return;
+    setTheme('system');
+    show();
+  });
+})();
+</script>
+<script>
 // The version the docs are of, where Hextra puts the language switch on a
 // site with more than one language: the foot of the sidebar, left of the
 // theme switch. Hextra has no place of its own for it there.

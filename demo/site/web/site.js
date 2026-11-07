@@ -344,21 +344,23 @@
     });
   });
 
-  // The theme follows the OS until the visitor picks one. A change
-  // restarts gh-desk, which reads the terminal's background as it starts.
+  // The theme follows the OS until the visitor switches it, here or in
+  // the docs, whose key keeps it. A change restarts gh-desk, which reads
+  // the terminal's background as it starts.
   const themeBtn = $('theme');
-  const label = () => { themeBtn.textContent = dark() ? 'light' : 'dark'; };
+  const showMode = () => { themeBtn.dataset.mode = dark() ? 'dark' : 'light'; };
   themeBtn.addEventListener('click', () => {
     root.dataset.theme = dark() ? 'light' : 'dark';
-    // color-theme is the docs' key, so the docs open in the theme picked here.
-    try {
-      localStorage.setItem('gh-desk-theme', root.dataset.theme);
-      localStorage.setItem('color-theme', root.dataset.theme);
-    } catch (e) {}
-    label();
+    try { localStorage.setItem('color-theme', root.dataset.theme); } catch (e) {}
+    showMode();
     start();
   });
-  label();
+  matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+    if (root.dataset.theme) return;
+    showMode();
+    start();
+  });
+  showMode();
 
   document.fonts.load('13px "JetBrains Mono"').finally(start);
 
