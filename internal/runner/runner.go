@@ -1205,6 +1205,11 @@ func (j *job) inTurn() (again bool) {
 		}
 		d = j.hold(mi, d)
 		jobs := plan.JobsRunning(mi, j.trigger, time.Now())
+		// A merge it is based on may have been confirmed since it entered
+		// the lane: that one goes first, and this one waits off the lane.
+		if d.Step != plan.StepSkip && !jobs && j.r.basePending(j.it.PR.Key) {
+			return true
+		}
 		switch {
 		case d.Step == plan.StepSkip:
 			j.say(Skipped, d.Reason)

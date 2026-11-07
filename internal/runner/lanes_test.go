@@ -398,3 +398,47 @@ func TestUnreadBranchesWriteNothing(t *testing.T) {
 	}
 	merged(t, evs, ib)
 }
+
+// A merge confirmed while its child waits in the lane still goes first.
+func TestABaseConfirmedWhileItsChildWaitsInTheLane(t *testing.T) {
+	x, ix := pr("9", "api", 9, "me")
+	a, ia := pr("1", "api", 1, "me")
+	b, ib := pr("2", "api", 2, "me")
+	branches(&a, "feature", "main")
+	branches(&b, "child", "feature")
+	x.MergeState = model.MergeBehind
+	f := newFake(x, a, b)
+	f.commits["h-9-updated"] = Commit{Parents: []string{"h-9", "base"}, ViaWeb: true, Author: "me"}
+	var updated time.Time
+	f.onRead = func(id string, mi *model.MergeInfo, _ int) {
+		if id != "9" || mi.HeadOID != "h-9-updated" {
+			return
+		}
+		if updated.IsZero() {
+			updated = time.Now()
+		}
+		if time.Since(updated) < 80*time.Millisecond {
+			mi.MergeState = model.MergeUnstable
+			mi.Checks = []model.Check{checkRun("test", "IN_PROGRESS", "")}
+			return
+		}
+		mi.MergeState = model.MergeClean
+		mi.Checks = []model.Check{checkRun("test", model.RunCompleted, model.CheckSuccess)}
+	}
+	pending(f, f.prs["1"], 30)
+	r := newRunner(f, newStore())
+	ctx := context.Background()
+	_, holder := r.Start(ctx, Merge, []Item{ix})
+	waitFor(t, func() bool { return pos(f, "update acme/api#9") >= 0 })
+	_, child := r.Start(ctx, Merge, []Item{ib})
+	waitFor(t, func() bool {
+		r.mu.Lock()
+		defer r.mu.Unlock()
+		return len(r.lanes["acme/api"]) == 2
+	})
+	_, parent := r.Start(ctx, Merge, []Item{ia})
+	merged(t, drainAll(t, holder, child, parent), ix, ia, ib)
+	if pos(f, "merge acme/api#1") > pos(f, "merge acme/api#2") {
+		t.Errorf("the child went first: %v", f.calls)
+	}
+}

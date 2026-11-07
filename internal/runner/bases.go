@@ -118,6 +118,14 @@ func (r *Runner) waitForBase(ctx context.Context, k model.PRKey) baseWait {
 	}
 }
 
+// basePending reports whether k may not write yet for a merge at work.
+func (r *Runner) basePending(k model.PRKey) bool {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	on, cycle := r.waitsOn(k)
+	return on != nil || cycle
+}
+
 // waitsOn is what k must wait for, nil for nothing, or whether its bases
 // lead back to it. Called with mu held.
 func (r *Runner) waitsOn(k model.PRKey) (<-chan struct{}, bool) {
