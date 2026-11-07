@@ -8,6 +8,6 @@ How to use gh-desk, a step of the day at a time. Each guide shows the keys and s
 - [Approving and merging](approve-and-merge.md): the confirm popup, and what a merge does and waits for
 - [Closing](closing.md): closing with a comment, and the head branches it deletes or keeps
 - [Claude](ask-claude.md): asking about one pull request, asking about the tab, and what Claude may do
-- [Configuration](configuration.md): the config file, and the changes most people make first
+- [Configuration](configuration.md): changing the settings on a page or in the file, and what most people change first
 
 New to gh-desk? Start with [Getting started](../getting-started.md).

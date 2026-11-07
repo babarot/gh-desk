@@ -104,10 +104,20 @@ Open the config file in review.editor, $VISUAL or $EDITOR, then check it.
 
 With --ui, open a page in the browser instead, with the settings of the
 file and gh-desk drawn as they change. It is served on this machine for as
-long as this runs. Saving on the page checks the file as gh-desk checks it
-at start and replaces it, keeping the old one beside it, with .bak added to
-its name. Comments do not carry over. A change to anything but how things
-are drawn is listed here first, and saved only if it is answered with y.
+long as this runs. The list is the one gh-desk last read, as of the time it
+shows, under the account that read it, and nothing goes to GitHub; before
+anything was read, the page shows made-up pull requests and says so.
+
+Saving on the page checks the file as gh-desk checks it at start and
+replaces it, keeping the old one beside it, with .bak added to its name.
+Settings not touched stay as they are, even where they match the default;
+comments do not carry over. A file that cannot be written, as one from the
+Nix store, is left as it is, and the page shows the new one under New file.
+
+A change to anything but how things are drawn is listed here first, and
+saved only if it is answered with y; any other answer leaves the file as it
+is and the page open. The values of an MCP server's env and headers show as
+(hidden). Without a terminal such a change is not saved, and the page says so.
 
 Closing the page, or ctrl+c, leaves without saving, and writes nothing.
 

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Builds the demo on the site into demo/site/web: gh-desk.wasm, the
-# wasm_exec.js of the Go that built it, and play/, the page on the whole
-# window.
+# wasm_exec.js of the Go that built it, play/, the page on the whole
+# window, and settings/, the settings page as the docs embed it.
 #
 # Bubble Tea and atotto/clipboard have no files for js, so each is copied
 # out of the module cache with the file in demo/site/patch added, and the build
@@ -40,4 +40,5 @@ install -m 0644 "$(go env GOROOT)/lib/wasm/wasm_exec.js" web/wasm_exec.js
 # where it is served, with a base so its files are read from above.
 mkdir -p web/play
 awk '{ print } /<head>/ { print "<base href=\"../\">" }' web/index.html >web/play/index.html
+go run ./settings web/settings/index.html
 ls -lh web/gh-desk.wasm

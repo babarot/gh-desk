@@ -344,21 +344,33 @@
     });
   });
 
-  // The theme follows the OS until the visitor picks one. A change
-  // restarts gh-desk, which reads the terminal's background as it starts.
+  // Each click goes on to the next of system, light and dark, as in the
+  // docs, whose key keeps it. A change of what is drawn restarts gh-desk,
+  // which reads the terminal's background as it starts.
   const themeBtn = $('theme');
-  const label = () => { themeBtn.textContent = dark() ? 'light' : 'dark'; };
+  const showMode = () => { themeBtn.dataset.mode = root.dataset.theme || 'system'; };
   themeBtn.addEventListener('click', () => {
-    root.dataset.theme = dark() ? 'light' : 'dark';
-    // color-theme is the docs' key, so the docs open in the theme picked here.
-    try {
-      localStorage.setItem('gh-desk-theme', root.dataset.theme);
-      localStorage.setItem('color-theme', root.dataset.theme);
-    } catch (e) {}
-    label();
-    start();
+    const was = dark();
+    const next = { system: 'light', light: 'dark', dark: 'system' }[root.dataset.theme || 'system'];
+    if (next === 'system') delete root.dataset.theme;
+    else root.dataset.theme = next;
+    try { localStorage.setItem('color-theme', next); } catch (e) {}
+    showMode();
+    if (dark() !== was) start();
   });
-  label();
+  matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+    if (!root.dataset.theme) start();
+  });
+  // Switched somewhere else: in the docs around this frame, or in another tab.
+  addEventListener('storage', e => {
+    if (e.key !== 'color-theme') return;
+    const was = dark();
+    if (e.newValue === 'dark' || e.newValue === 'light') root.dataset.theme = e.newValue;
+    else delete root.dataset.theme;
+    showMode();
+    if (dark() !== was) start();
+  });
+  showMode();
 
   document.fonts.load('13px "JetBrains Mono"').finally(start);
 
