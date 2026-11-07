@@ -57,3 +57,4 @@ input.txt,input.num,select,textarea{background:var(--ctl);border:1px solid var(-
 .mh{display:flex;align-items:flex-start;gap:16px;padding:14px 16px 12px 24px;border-bottom:1px solid var(--line)}.mh>div:first-child{flex:1;min-width:0}.mh .lead{margin:0}
 .ctl{display:flex;align-items:center;gap:6px;flex:none}
 .close{display:flex;align-items:center;justify-content:center;min-width:30px;height:30px;border-radius:7px;color:var(--sub);background:var(--raise);box-shadow:inset 0 0 0 1px var(--line)}.close:hover{color:var(--fg);box-shadow:inset 0 0 0 1px var(--dim)}.close.ask{padding:0 10px;font-size:13px;font-weight:550;color:var(--bad);box-shadow:inset 0 0 0 1px var(--bad)}
+.asof{opacity:.75}.tabpick{margin-left:auto;font:inherit;font-size:12px;color:inherit;background:transparent;border:1px solid var(--line);border-radius:6px;padding:1px 4px}

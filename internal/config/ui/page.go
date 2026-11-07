@@ -1,7 +1,7 @@
-// Package ui makes the settings page, one HTML file that
-// holds the settings, the config file as it was read, and the code, and
-// serves it on this machine until it gives a file back. Nothing here writes
-// the config file: gh desk config apply does (ADR-099).
+// Package ui makes the settings page, one HTML file that holds the
+// settings, the config file as it was read, the lists last read and the
+// code, and serves it on this machine until a file is saved. Replacing the
+// file and judging a rule are given to it by the caller (ADR-101, ADR-102).
 package ui
 
 import (
@@ -10,6 +10,7 @@ import (
 	"encoding/json"
 	"html/template"
 	"strings"
+	"time"
 
 	"github.com/babarot/gh-desk/internal/config"
 )
@@ -35,8 +36,55 @@ var appJS string
 //go:embed web/icons.json
 var iconsJSON string
 
+// SamplePRs are the made-up pull requests shown when no list was read yet,
+// as model.PR in JSON, updated relative to SampleTime.
+//
 //go:embed web/prs.json
-var prsJSON string
+var SamplePRs []byte
+
+// SampleTime is the time SamplePRs are as of.
+var SampleTime = time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+
+// PR is a row as the page draws and counts it. Index tells it apart in what
+// a rule is judged to.
+type PR struct {
+	Index    int    `json:"i"`
+	Repo     string `json:"repo"`
+	N        int    `json:"n"`
+	Author   string `json:"author"`
+	Bot      bool   `json:"bot,omitempty"`
+	Title    string `json:"title"`
+	Add      int    `json:"add"`
+	Del      int    `json:"del"`
+	Files    int    `json:"files"`
+	Draft    bool   `json:"draft,omitempty"`
+	State    string `json:"state"`
+	Checks   string `json:"checks"`
+	Decision string `json:"decision"`
+	// Heavy says the size, checks and review were read for the head shown.
+	Heavy   bool    `json:"heavy"`
+	Group   string  `json:"group"`
+	Why     string  `json:"why"`
+	Review  string  `json:"review,omitempty"`
+	Age     string  `json:"age"`
+	Updated int     `json:"updated"`
+	At      float64 `json:"at"`
+}
+
+// List is the rows of a tab, and when they were read.
+type List struct {
+	Read time.Time `json:"read"`
+	PRs  []PR      `json:"prs"`
+}
+
+// Lists are what the preview draws: the lists last read by their search,
+// or Sample, made up, with no list read.
+type Lists struct {
+	Viewer string          `json:"viewer"`
+	Tabs   map[string]List `json:"tabs"`
+	Inbox  *List           `json:"inbox"`
+	Sample []PR            `json:"sample"`
+}
 
 // Key is a key action as the page lists it.
 type Key struct {
@@ -60,6 +108,7 @@ type Input struct {
 	Keys     []Key
 	Themes   any
 	Spinners any
+	Lists    Lists
 }
 
 type boot struct {
@@ -99,14 +148,14 @@ func dataJS(in Input, file map[string]any) (string, error) {
 	for _, v := range []struct {
 		name string
 		v    any
-	}{{"DATA", config.UI()}, {"KEYS", in.Keys}, {"THEMES", in.Themes}, {"SPIN", in.Spinners}, {"BOOT", boot{in.File.Path, file}}} {
+	}{{"DATA", config.UI()}, {"KEYS", in.Keys}, {"THEMES", in.Themes}, {"SPIN", in.Spinners}, {"BOOT", boot{in.File.Path, file}}, {"LISTS", in.Lists}} {
 		j, err := json.Marshal(v.v)
 		if err != nil {
 			return "", err
 		}
 		b.WriteString("const " + v.name + "=" + string(j) + ";\n")
 	}
-	b.WriteString("const ICONS=" + strings.TrimSpace(iconsJSON) + ";\nconst PRS=" + strings.TrimSpace(prsJSON) + ";\n")
+	b.WriteString("const ICONS=" + strings.TrimSpace(iconsJSON) + ";\n")
 	return b.String(), nil
 }
 

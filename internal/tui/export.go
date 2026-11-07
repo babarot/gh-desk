@@ -4,6 +4,10 @@ import (
 	"fmt"
 	"image/color"
 	"slices"
+	"strings"
+	"time"
+
+	"github.com/babarot/gh-desk/internal/model"
 )
 
 // SpinnerFrames is a spinner as the settings page draws it.
@@ -27,7 +31,7 @@ func hex(c color.Color) string {
 }
 
 // Palettes are the themes by name, each color by its role, so that the
-// page of config ui draws the list in them.
+// settings page draws the list in them.
 func Palettes() map[string]map[string]any {
 	out := map[string]map[string]any{}
 	for n, p := range themes {
@@ -36,4 +40,23 @@ func Palettes() map[string]map[string]any {
 			"blue": hex(p.blue), "mauve": hex(p.mauve), "green": hex(p.green), "yellow": hex(p.yellow), "peach": hex(p.peach), "red": hex(p.red), "teal": hex(p.teal)}
 	}
 	return out
+}
+
+// RowText is how a row of the list spells what the settings page draws
+// again, so that the page need not work it out differently.
+type RowText struct {
+	Title, Why, Age, Review string
+}
+
+// Row is p as a row spells it for viewer, reason being the reason of its
+// notification in the inbox.
+func Row(p model.PR, viewer, reason string, now time.Time) RowText {
+	t := RowText{Title: shownTitle(p.Title), Why: searchWhy(p, viewer), Age: shortAge(now.Sub(p.Updated))}
+	if reason != "" {
+		t.Why = strings.TrimSuffix(reason, "_requested")
+	}
+	if r, ok := p.ReviewBy(viewer); ok && viewer != "" {
+		t.Review = "me" + reviewMark[r.State]
+	}
+	return t
 }

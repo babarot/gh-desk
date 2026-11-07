@@ -8,9 +8,9 @@ import { fileURLToPath } from 'node:url';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const read = p => readFileSync(join(here, p), 'utf8');
-const { DATA, KEYS } = JSON.parse(read('testdata/data.json'));
-const PRS = JSON.parse(read('web/prs.json'));
-const mod = new Function('DATA', 'KEYS', 'PRS', read('web/model.js') + read('web/tui.js') + ';return {load,clone,genToml,problems,drawTui,defaultTabs,COLS,LINES};')(DATA, KEYS, PRS);
+const { DATA, KEYS, LISTS } = JSON.parse(read('testdata/data.json'));
+const prs = LISTS.sample;
+const mod = new Function('DATA', 'KEYS', 'LISTS', read('web/model.js') + read('web/tui.js') + ';return {load,clone,genToml,problems,drawTui,defaultTabs,COLS,LINES};')(DATA, KEYS, LISTS);
 
 let failed = false;
 const fail = m => { failed = true; console.error(m); };
@@ -19,22 +19,30 @@ const fail = m => { failed = true; console.error(m); };
 const p = new Proxy({}, { get: () => '#000000' });
 const def = k => DATA.settings.find(s => s.key === k).defv;
 const tabs = mod.defaultTabs();
-const rows = mod.drawTui({ p, all: true, cols: def('list.columns'), tabs, exclude: [], owners: [], stale: def('list.stale_days') }).text().slice(1);
+const rows = mod.drawTui({ p, prs, all: true, cols: def('list.columns'), tabs, exclude: [], owners: [], stale: def('list.stale_days') }).text().slice(1);
 const got = rows.join('\n') + '\n';
 const want = read('testdata/list.golden');
 if (got !== want) fail(`the list is not what gh-desk draws:\n--- gh-desk\n${want}--- page\n${got}`);
 
 // The cursor stays at the start of the line, wherever the columns are.
-const moved = mod.drawTui({ p, all: true, cols: ['title', 'pr', 'author'], tabs, exclude: [], owners: [], stale: def('list.stale_days') }).text();
+const moved = mod.drawTui({ p, prs, all: true, cols: ['title', 'pr', 'author'], tabs, exclude: [], owners: [], stale: def('list.stale_days') }).text();
 const atCursor = moved.find(l => l.startsWith('▎'));
 if (!atCursor || atCursor.indexOf('acme/web#228') < atCursor.indexOf('Add a dark')) fail(`the cursor moved with its column: ${atCursor}`);
+
+// A row whose size, checks and review are not read yet says so, as gh-desk does (ADR-050).
+const unread = mod.drawTui({ p, prs: [{ ...prs[0], heavy: false }], all: true, cols: ['ci', 'review', 'size'], tabs: [{ name: 'x' }], exclude: [], owners: [], stale: 7 }).text().find(l => l.startsWith('▎'));
+if (!/^▎\s+⋅\s+⋅\s+⋅/.test(unread)) fail(`a row not read: ${unread}`);
+
+// A tab whose search was not read shows that, and no made-up rows.
+const none = mod.drawTui({ p, all: true, cols: def('list.columns'), tabs: [{ name: 'x' }], exclude: [], owners: [], stale: 7 }).text().join('\n');
+if (!none.includes('Not read yet') || none.includes('acme/')) fail(`a tab not read:\n${none}`);
 
 // The popups the same way, frame and text, wherever they are on the screen.
 const crop = lines => { const y = lines.findIndex(l => l.includes('╭')), x = lines[y].indexOf('╭'), w = lines[y].indexOf('╮') - x + 1; const out = []; for (const l of lines.slice(y)) { out.push(l.slice(x, x + w)); if (l[x] === '╰') break; } return out.join('\n').replace(/ +(\n|$)/g, '$1'); };
 const scenes = Object.fromEntries(read('testdata/scenes.golden').split(/^=== /m).slice(1).map(s => { const i = s.indexOf('\n'); return [s.slice(0, i), s.slice(i + 1).trimEnd()]; }));
 const k = a => (KEYS.find(x => x.action === a)?.keys || [])[0];
 for (const scene of Object.keys(scenes)) {
-  const lines = mod.drawTui({ p, cols: def('list.columns'), tabs, exclude: [], owners: [], stale: def('list.stale_days'), scene, key: k, menu: def('menu.actions') }).text().slice(1);
+  const lines = mod.drawTui({ p, prs, cols: def('list.columns'), tabs, exclude: [], owners: [], stale: def('list.stale_days'), scene, key: k, menu: def('menu.actions') }).text().slice(1);
   const page = crop(lines);
   if (page !== scenes[scene]) fail(`the popup ${scene} is not what gh-desk draws:\n--- gh-desk\n${scenes[scene]}\n--- page\n${page}`);
 }

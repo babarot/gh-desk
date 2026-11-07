@@ -106,3 +106,33 @@ func TestBrokenFile(t *testing.T) {
 		t.Errorf("a broken file is not written over: %v", err)
 	}
 }
+
+func TestLastReadsWhoeverWroteIt(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "lists.json")
+	if got, err := Last(path); err != nil || got.Viewer != "" {
+		t.Errorf("no file: %+v, %v", got, err)
+	}
+	c, err := Open(path, "github.com", "them")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := c.PutList(List{Query: "q", Total: 1, PRs: []model.PR{{Key: model.PRKey{Owner: "o", Repo: "r", Number: 1}, Title: "t"}}}); err != nil {
+		t.Fatal(err)
+	}
+	got, err := Last(path)
+	if err != nil || got.Viewer != "them" || got.Host != "github.com" || len(got.Lists) != 1 || got.Lists[0].PRs[0].Title != "t" {
+		t.Errorf("%+v, %v", got, err)
+	}
+	if err := os.WriteFile(path, []byte(`{"version":99,"viewer":"them"}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if got, err := Last(path); err != nil || got.Viewer != "" {
+		t.Errorf("another format: %+v, %v", got, err)
+	}
+	if err := os.WriteFile(path, []byte("not json"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Last(path); err == nil {
+		t.Error("no error for a broken file")
+	}
+}

@@ -15,25 +15,9 @@ import (
 )
 
 // the settings page draws the list again in JavaScript. This writes
-// what gh-desk draws from the same pull requests, for scripts/ui.mjs
+// what gh-desk draws from the same pull requests, for check.mjs
 // to compare the page's drawing with (mise run config-ui:test).
 const configuiGolden = "../config/ui/testdata/list.golden"
-
-type configuiPR struct {
-	Repo         string   `json:"repo"`
-	N            int      `json:"n"`
-	Author       string   `json:"author"`
-	Bot          bool     `json:"bot"`
-	Title        string   `json:"title"`
-	Add          int      `json:"add"`
-	Del          int      `json:"del"`
-	Files        int      `json:"files"`
-	Draft        bool     `json:"draft"`
-	Checks       string   `json:"checks"`
-	Decision     string   `json:"decision"`
-	Requested    []string `json:"requested"`
-	UpdatedHours int      `json:"updatedHours"`
-}
 
 func configuiFixture(t *testing.T) *fakeSource {
 	t.Helper()
@@ -41,25 +25,14 @@ func configuiFixture(t *testing.T) *fakeSource {
 	if err != nil {
 		t.Fatal(err)
 	}
-	var ps []configuiPR
-	if err := json.Unmarshal(b, &ps); err != nil {
+	var prs []model.PR
+	if err := json.Unmarshal(b, &prs); err != nil {
 		t.Fatal(err)
 	}
-	var prs []model.PR
-	for i, p := range ps {
-		owner, repo, _ := strings.Cut(p.Repo, "/")
-		pr := model.PR{ID: p.Repo + string(rune('a'+i)), Key: key(owner, repo, p.N), HeadOID: fmt.Sprintf("head%d", i), Title: p.Title, Author: p.Author, AuthorIsBot: p.Bot, State: model.StateOpen,
-			Draft: p.Draft, Additions: p.Add, Deletions: p.Del, ChangedFiles: p.Files, Updated: now.Add(-time.Duration(p.UpdatedHours) * time.Hour),
-			Checks:   map[string]model.CheckState{"passing": model.CheckSuccess, "failing": model.CheckFailure, "pending": model.CheckPending}[p.Checks],
-			Decision: map[string]model.ReviewDecision{"approved": model.DecisionApproved, "changes_requested": model.DecisionChangesRequested, "review_required": model.DecisionReviewRequired}[p.Decision]}
-		for _, r := range p.Requested {
-			if team, ok := strings.CutPrefix(r, "@"); ok {
-				pr.Requested = append(pr.Requested, model.Reviewer{Login: team, Team: true})
-			} else {
-				pr.Requested = append(pr.Requested, model.Reviewer{Login: r})
-			}
-		}
-		prs = append(prs, pr)
+	// As if read now; ui.SampleTime is the time the file is as of.
+	shift := now.Sub(time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC))
+	for i := range prs {
+		prs[i].Updated, prs[i].Created = prs[i].Updated.Add(shift), prs[i].Created.Add(shift)
 	}
 	return &fakeSource{searches: map[string][]model.PR{"review": prs}}
 }
