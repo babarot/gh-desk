@@ -1,5 +1,17 @@
 # Changelog
 
+## [v0.14.1](https://github.com/babarot/gh-desk/compare/v0.14.0...v0.14.1) - 2026-11-07
+### Bug fixes
+- Update the branch of a merge that falls behind while it waits by @babarot in https://github.com/babarot/gh-desk/pull/105
+- Renumber the ADR of the shared read to 105 by @babarot in https://github.com/babarot/gh-desk/pull/108
+### Improvements
+- Build the configuration guide around the settings page by @babarot in https://github.com/babarot/gh-desk/pull/103
+- Share one light read among the waits of a repository by @babarot in https://github.com/babarot/gh-desk/pull/106
+- Take the lane of a repository when a merge is ready to write by @babarot in https://github.com/babarot/gh-desk/pull/107
+- Give the landing page, the docs and the playground pages of their own by @babarot in https://github.com/babarot/gh-desk/pull/109
+- Show the settings panel and the file it writes on the landing page by @babarot in https://github.com/babarot/gh-desk/pull/111
+- Switch the settings page between gh-desk and the file it makes by @babarot in https://github.com/babarot/gh-desk/pull/112
+
 ## [v0.14.0](https://github.com/babarot/gh-desk/compare/v0.13.0...v0.14.0) - 2026-11-07
 ### New Features
 - Replace the config file from standard input with config apply by @babarot in https://github.com/babarot/gh-desk/pull/100
