@@ -1,4 +1,4 @@
-// Writes the settings page as the site shows it to the file named by its
+// Writes the settings playground to the file named by its
 // argument. demo/site/build.sh runs it, on the machine that builds the site
 // and not in WebAssembly: the page is HTML, drawn by its own JavaScript.
 package main
@@ -19,7 +19,7 @@ func main() {
 }
 
 func write(path string) error {
-	page, err := app.SettingsDemo()
+	page, err := app.SettingsPlayground()
 	if err != nil {
 		return err
 	}

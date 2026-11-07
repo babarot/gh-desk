@@ -1,7 +1,7 @@
 //go:build js && wasm
 
-// The demo on the site: gh-desk compiled to WebAssembly, run against the
-// made-up GitHub of demo/internal/playground, in a terminal the page draws
+// The playground: gh-desk compiled to WebAssembly, run against the
+// made-up GitHub of demo/internal/playground, in a terminal its page draws
 // with xterm.js.
 //
 // The page calls ghDesk.start(cols, rows, write, opts) once the wasm is

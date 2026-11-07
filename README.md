@@ -17,7 +17,7 @@ It opens the pull requests asked of you, yours, the ones you are involved in, an
 
 ![gh-desk with a made-up organization: a question to Claude about a pull request, and the dependency updates approved and merged together](docs/demo.gif)
 
-Try it in your browser, against a made-up GitHub, at [babarot.me/gh-desk](https://babarot.me/gh-desk/). The [docs](https://babarot.me/gh-desk/docs/) explain the rest: what gh-desk aims for, how to use it, and every setting and key.
+[babarot.me/gh-desk](https://babarot.me/gh-desk/) shows what it does, and [the playground](https://babarot.me/gh-desk/play/) runs it in your browser, against a made-up GitHub. The [docs](https://babarot.me/gh-desk/docs/) explain the rest: what gh-desk aims for, how to use it, and every setting and key.
 
 ## Install
 
@@ -55,39 +55,25 @@ gh-desk reads GitHub with the account gh is logged in to (`gh auth login`). Aski
 | `i` | ask Claude about the pull request |
 | `/` | filter |
 
-Keys are bound by the name of their action, and can be changed in the config file.
+Keys are bound by the name of their action, and can be changed on the settings page.
 
-## Config
+## Make it yours
 
-The first launch writes `~/.config/gh-desk/config.toml` (or under `$XDG_CONFIG_HOME`), with no settings in it. A setting left out takes its default, so write only what you change: the tabs and their searches, the columns, the rules for selecting, how to merge, the theme, and the keys. A mistake in it is reported with where it is.
+There is no file to write. This opens a page in your browser, with gh-desk drawn above the settings and following each change before you save it:
 
 ```sh
-gh desk config edit --ui    # edit the settings on a page, with gh-desk drawn above them
-gh desk config reference    # every setting, with what it does and its default
-gh desk config check        # read it and print its mistakes, without starting
-gh desk config show --diff  # the settings that differ from the defaults
-gh desk config edit         # open it in $EDITOR, then check it
+gh desk config edit --ui
 ```
 
-`gh desk config schema` prints its JSON Schema, which the file names for editors that read it.
+On it you can add a tab for your repository, write the rules for what is safe to merge and see what they catch among your own pull requests, and choose how to merge, what Claude is told, the keys and the theme. [The settings playground](https://babarot.me/gh-desk/play/settings/) shows the page with made-up pull requests.
+
+Everything on the page can also be written by hand in `~/.config/gh-desk/config.toml`, which suits a file kept in your dotfiles. The [configuration guide](https://babarot.me/gh-desk/docs/guides/configuration/) shows how.
 
 ## Claude
 
 Claude Code runs on a worktree of the pull request at the head you saw, made from gh-desk's own clone in `~/.cache/gh-desk`; your clones are not touched. It runs in restricted mode with only the tools that read (`Read`, `Grep`, `Glob`, and `WebFetch` if you allow it), with no hooks, settings, MCP servers or slash commands of the pull request's repository. It reaches GitHub only through gh-desk's own tools, which read the pull request's repository and nothing else: its checks and CI logs, after the merge too, and its issues and pull requests. A review it drafts goes into the review popup, for you to read and send.
 
-MCP servers of your own can be given to the conversation in `[claude.mcp]`. With [claude-recall](https://github.com/babarot/claude-recall), Claude searches your past Claude Code sessions while it reviews, held to the pull request's repository:
-
-```toml
-[claude.mcp]
-builtin = true  # to be written when you give servers of your own
-
-[claude.mcp.servers.recall]
-command = "recall"
-args    = ["mcp", "--repo", "${GH_DESK_URL}"]  # the pull request's repository
-tools   = ["recall_search", "recall_list", "recall_export"]
-```
-
-The tools under `tools` run without a prompt, on whatever the pull request's text asks. Do not allow `WebFetch` together with a server that reads your own data.
+MCP servers of your own and the skills of your plugins can be given to the conversation, as can [claude-recall](https://github.com/babarot/claude-recall) to search your past Claude Code sessions; [the guide](https://babarot.me/gh-desk/docs/guides/ask-claude/#mcp-servers-and-skills) shows how. Do not allow `WebFetch` together with a server that reads your own data.
 
 `gh desk gc` removes the worktrees of pull requests that are merged or closed.
 

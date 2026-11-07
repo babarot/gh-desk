@@ -16,33 +16,20 @@
 <link rel="icon" href="docs/favicon-32x32.png" type="image/png" sizes="32x32">
 <link rel="apple-touch-icon" href="docs/apple-touch-icon.png" sizes="180x180">
 <script>
-// ?theme=dark|light overrides the theme picked on this site, ?embed=1
-// shows only the terminal, for a page that embeds it, play/ (a copy of
-// this page that demo/site/build.sh writes) shows only the terminal on the
-// whole window, as a page of its own, and ?watch=1 only shows; they are
-// set before the page is drawn, so it does not flash.
+// The site keeps the theme as color-theme, Hextra's key, which may also be
+// "system". It is set before the page is drawn, so it does not flash.
 (() => {
-  const root = document.documentElement, q = new URLSearchParams(location.search);
-  // The docs under docs/ keep the theme as color-theme (Hextra's key, which
-  // may also be "system"); the one picked last on either page is used.
   try {
     const t = localStorage.getItem('color-theme');
-    if (t === 'dark' || t === 'light') root.dataset.theme = t;
+    if (t === 'dark' || t === 'light') document.documentElement.dataset.theme = t;
   } catch (e) {}
-  if (q.get('theme') === 'dark' || q.get('theme') === 'light') root.dataset.theme = q.get('theme');
-  if (q.has('embed') && q.get('embed') !== '0') root.classList.add('embed');
-  // play/, the whole window: laid out as embedded, with the ways out of it.
-  if (/\/play\/(index\.html)?$/.test(location.pathname)) root.classList.add('embed', 'whole');
-  // ?watch=1 only shows: the keys and clicks of the visitor do not reach
-  // gh-desk, and a scenario plays like a video.
-  if (q.has('watch') && q.get('watch') !== '0') root.classList.add('watch');
 })();
 </script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Inter:wght@400;600;800&display=swap">
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/css/xterm.min.css">
 <link rel="stylesheet" href="site.css">
+<link rel="stylesheet" href="landing.css">
 </head>
 <body>
 <header class="wrap top">
@@ -64,41 +51,11 @@
   <section class="wrap hero">
     <h1>The pull requests that reach you, <em>at one desk.</em></h1>
     <p class="lede">gh-desk is a <code>gh</code> extension. The pull requests waiting for your review, your own, and your notifications sit in one terminal screen. Read the diff, approve and merge a dozen at once, and ask Claude about the one you are unsure of.</p>
-    <p class="hint">Below is gh-desk itself, compiled to WebAssembly and running in your browser against a made-up GitHub. Nothing you do here leaves the page.</p>
+    <p class="hint">Below is gh-desk itself, compiled to WebAssembly and running in your browser against a made-up GitHub. Click it and type; nothing you do here leaves the page.</p>
   </section>
 
   <section class="wrap" id="try">
-    <div class="term">
-      <div class="term-bar">
-        <div class="dots"><i></i><i></i><i></i></div>
-        <span class="title">~ — gh desk</span>
-        <a class="full" id="full" href="./" target="_blank" rel="noopener">Open the playground ↗</a>
-        <nav class="out"><a href="./">About gh-desk</a><a href="docs/">Docs</a></nav>
-        <button id="restart" type="button">Restart</button>
-      </div>
-      <div class="screen" id="screen" aria-label="Terminal running gh-desk. Click it and type."></div>
-      <div class="loading" id="loading">Loading gh-desk…</div>
-      <div class="player" id="player" hidden>
-        <button class="pp" id="pp" type="button" aria-label="Pause">❚❚</button>
-        <div class="track" id="track" title="Go to a step"><div class="fill" id="fill"></div></div>
-        <span class="now" id="now"></span>
-        <button class="again" id="again" type="button" aria-label="Play from the start" title="Play from the start">↺</button>
-      </div>
-      <div class="caption" id="caption" aria-live="polite" hidden></div>
-    </div>
-
-    <div class="keys" id="keys">
-      <button data-k="j">↓ j</button><button data-k="k">↑ k</button>
-      <button data-k="\t">tab</button><button data-k="\r">enter</button>
-      <button data-k=" ">space</button><button data-k="p">p</button><button data-k="v">v</button>
-      <button data-k="]">]</button><button data-k="[">[</button>
-      <button data-k="J">J</button><button data-k="K">K</button>
-      <button data-k="b">b</button><button data-k="S">S</button><button data-k="d">d</button>
-      <button data-k="4">4</button><button data-k="i">i</button>
-      <button data-k="\x18">ctrl+x</button><button data-k="C">C</button><button data-k="M">M</button>
-      <button data-k="?">?</button><button data-k="\x1b">esc</button>
-      <span>or click the terminal and type</span>
-    </div>
+    <div class="frame"><iframe id="playground" src="play/" title="The playground: gh-desk running in your browser"></iframe></div>
   </section>
 
   <section class="wrap tours">
@@ -107,32 +64,32 @@
       <article>
         <h3>Look before you merge</h3>
         <p><kbd>p</kbd> opens the pane under the list: the description beside the checks and reviews. <kbd>v</kbd> switches it to the diff, <kbd>]</kbd> and <kbd>[</kbd> move between files, and <kbd>J</kbd> <kbd>K</kbd> scroll it.</p>
-        <p class="more"><a href="?watch=1&amp;scenario=diff#try">Show me</a><a href="docs/guides/reading/">Read more</a></p>
+        <p class="more"><a href="play/?scenario=diff" data-scenario="diff">Show me</a><a href="docs/guides/reading/">Read more</a></p>
       </article>
       <article>
         <h3>Merge the bots in one go</h3>
         <p>Move to the bots and press <kbd>b</kbd> to unfold them, <kbd>S</kbd> to pick the rule <em>dependency bots</em>, then <kbd>M</kbd>. The popup says how each will be merged, and Claude reads the release notes for the ones that need care.</p>
-        <p class="more"><a href="?watch=1&amp;scenario=merge#try">Show me</a><a href="docs/guides/approve-and-merge/">Read more</a></p>
+        <p class="more"><a href="play/?scenario=merge" data-scenario="merge">Show me</a><a href="docs/guides/approve-and-merge/">Read more</a></p>
       </article>
       <article>
         <h3>Ask Claude about one</h3>
         <p><kbd>i</kbd> on a pull request asks Claude to review it, in a worktree of its head. <kbd>ctrl+x</kbd> then drafts the review to post. Here the answers are written in advance.</p>
-        <p class="more"><a href="?watch=1&amp;scenario=claude#try">Show me</a><a href="docs/guides/ask-claude/">Read more</a></p>
+        <p class="more"><a href="play/?scenario=claude" data-scenario="claude">Show me</a><a href="docs/guides/ask-claude/">Read more</a></p>
       </article>
       <article>
         <h3>Or tell Claude what you want</h3>
         <p><kbd>C</kbd> and type <em>merge the bots with passing checks</em>. Claude plans what to show and select; <kbd>enter</kbd> applies it, and nothing is sent until you confirm.</p>
-        <p class="more"><a href="?watch=1&amp;scenario=triage#try">Show me</a><a href="docs/guides/ask-claude/#about-the-tab">Read more</a></p>
+        <p class="more"><a href="play/?scenario=triage" data-scenario="triage">Show me</a><a href="docs/guides/ask-claude/#about-the-tab">Read more</a></p>
       </article>
       <article>
         <h3>Your notifications</h3>
         <p><kbd>4</kbd> or <kbd>tab</kbd> goes to the inbox: the pull requests in your notifications, with why each is there. <kbd>d</kbd> marks one done.</p>
-        <p class="more"><a href="?watch=1&amp;scenario=inbox#try">Show me</a><a href="docs/guides/tabs/#the-inbox">Read more</a></p>
+        <p class="more"><a href="play/?scenario=inbox" data-scenario="inbox">Show me</a><a href="docs/guides/tabs/#the-inbox">Read more</a></p>
       </article>
       <article>
         <h3>Every key</h3>
-        <p><kbd>?</kbd> lists the keys of the screen you are on. They are bound by action name, and each can be changed in the config file.</p>
-        <p class="more"><a href="?watch=1&amp;scenario=help#try">Show me</a><a href="docs/reference/keys/">Read more</a></p>
+        <p><kbd>?</kbd> lists the keys of the screen you are on. They are bound by action name, and each can be changed on the settings page.</p>
+        <p class="more"><a href="play/?scenario=help" data-scenario="help">Show me</a><a href="docs/reference/keys/">Read more</a></p>
       </article>
     </div>
   </section>
@@ -140,61 +97,44 @@
   <section class="sec" id="config">
     <div class="wrap">
       <h2>Make it yours</h2>
-      <p class="sub">Everything lives in one file, <code>~/.config/gh-desk/config.toml</code>. The first run writes it with every setting described and commented out, so you change a line, not a blank page. A mistake is reported at its line, with what was likely meant.</p>
+      <p class="sub">There is no file to write. One command opens a page in your browser, with gh-desk drawn above the settings and following each change before you save it.</p>
+      <div class="install"><pre>gh desk config edit --ui</pre></div>
 
-      <div class="conf">
-        <div class="conf-text">
+      <div class="frame tall"><iframe src="play/settings/" loading="lazy" title="The settings page, with made-up pull requests"></iframe></div>
+      <p class="sub note">Try a theme, or change the columns or a key: this is that page, with made-up pull requests, and it saves nothing. Run the command, and the list is your own.</p>
+
+      <div class="cards">
+        <article>
           <h3>Tabs are searches</h3>
           <p>Each tab is a GitHub search, split into groups by whom a review is asked of: you, a team of yours, or neither, with the bots apart. Add a tab for the repository you own, fold the groups you look at last.</p>
-        </div>
-<pre class="code"><span class="t">[[tabs]]</span>
-<span class="k">name</span>   = <span class="s">"review"</span>
-<span class="k">query</span>  = <span class="s">"is:open is:pr review-requested:@me archived:false"</span>
-<span class="k">groups</span> = [<span class="s">"you"</span>, <span class="s">"team"</span>, <span class="s">"bots"</span>]
-<span class="k">folded</span> = [<span class="s">"bots"</span>]
-
-<span class="t">[[tabs]]</span>
-<span class="k">name</span>  = <span class="s">"infra"</span>
-<span class="k">query</span> = <span class="s">"is:open is:pr repo:acme/infra archived:false"</span>
-
-<span class="t">[[tabs]]</span>
-<span class="k">kind</span> = <span class="s">"inbox"</span>
-<span class="k">name</span> = <span class="s">"inbox"</span></pre>
-      </div>
-
-      <div class="conf">
-        <div class="conf-text">
+          <p class="more"><a href="docs/guides/tabs/">Read more</a></p>
+        </article>
+        <article>
           <h3>Rules pick what is safe to merge</h3>
-          <p><kbd>S</kbd> offers your rules. A rule can name the bots, the packages a bump may touch (read from its description), the size, the age, and whether the checks pass. Pick one, look at what it caught, merge.</p>
-        </div>
-<pre class="code"><span class="t">[[select]]</span>
-<span class="k">name</span>      = <span class="s">"safe bumps"</span>
-<span class="k">authors</span>   = [<span class="s">"renovate"</span>]
-<span class="k">packages</span>  = [<span class="s">"golang.org/x/net"</span>, <span class="s">"actions/checkout"</span>]
-<span class="k">checks</span>    = <span class="s">"passing"</span>
-<span class="k">max_lines</span> = <span class="n">50</span>
-
-<span class="t">[merge]</span>
-<span class="c"># the first the repository allows is used</span>
-<span class="k">methods</span>       = [<span class="s">"squash"</span>, <span class="s">"merge"</span>]
-<span class="k">update_branch</span> = <span class="s">"humans"</span></pre>
-      </div>
-
-      <div class="conf">
-        <div class="conf-text">
+          <p>A rule can name the bots, the packages a bump may touch, the size, the age, and whether the checks pass. The page the command opens judges it with gh-desk's own code as you write it, and counts what it would catch among your pull requests.</p>
+          <p class="more"><a href="docs/guides/selecting/">Read more</a></p>
+        </article>
+        <article>
+          <h3>Merging, your way</h3>
+          <p>Choose the methods to try in order, whether to use GitHub's auto-merge, and whose branches to update when they fall behind.</p>
+          <p class="more"><a href="docs/guides/approve-and-merge/">Read more</a></p>
+        </article>
+        <article>
           <h3>Claude, on your terms</h3>
-          <p>Claude Code answers in your language and follows instructions of your own in every review. It runs with read-only tools in a worktree of the pull request; MCP servers and the skills of your plugins can be given to it too, as below.</p>
-        </div>
-<pre class="code"><span class="t">[claude]</span>
-<span class="k">model</span>        = <span class="s">"opus"</span>
-<span class="k">language</span>     = <span class="s">"Japanese"</span>
-<span class="k">instructions</span> = <span class="s">"Point out changes that have no tests."</span></pre>
+          <p>Claude Code answers in your language and follows instructions of your own in every review, with read-only tools in a worktree of the pull request.</p>
+          <p class="more"><a href="docs/guides/ask-claude/">Read more</a></p>
+        </article>
+        <article>
+          <h3>Your keys, your colors</h3>
+          <p>Every key is bound to an action by name, and the hints and the <kbd>?</kbd> list follow what you bind. Pick one theme for a dark terminal and one for a light one.</p>
+          <p class="more"><a href="docs/reference/keys/">Read more</a></p>
+        </article>
       </div>
 
       <div class="conf">
         <div class="conf-text">
           <h3>Claude remembers how you got here</h3>
-          <p>Give the conversation <a href="https://github.com/babarot/claude-recall">claude-recall</a> as an MCP server, and Claude searches your past Claude Code sessions while it reviews: why the code was written this way, what was tried and dropped. <code>--repo</code> holds the search to the pull request's repository, so a review never reads the sessions of another. The tools under <code>tools</code> run without a prompt; keep <code>WebFetch</code> off with a server that reads your own data.</p>
+          <p>Give the conversation <a href="https://github.com/babarot/claude-recall">claude-recall</a> as an MCP server, and Claude searches your past Claude Code sessions while it reviews: why the code was written this way, what was tried and dropped. <code>--repo</code> holds the search to the pull request's repository, so a review never reads the sessions of another. The tools under <code>tools</code> run without a prompt; keep <code>WebFetch</code> off with a server that reads your own data. This one goes in the file: the page shows MCP servers and removes them.</p>
         </div>
 <pre class="code"><span class="t">[claude.mcp]</span>
 <span class="k">builtin</span> = <span class="n">true</span>
@@ -206,21 +146,7 @@
 <span class="k">tools</span>   = [<span class="s">"recall_search"</span>, <span class="s">"recall_list"</span>, <span class="s">"recall_export"</span>]</pre>
       </div>
 
-      <div class="conf">
-        <div class="conf-text">
-          <h3>Your keys, your colors</h3>
-          <p>Every key is bound to an action by name, and the hints and the <kbd>?</kbd> list follow what you bind. Nine themes, one for a dark terminal and one for a light one, picked by the terminal's background.</p>
-        </div>
-<pre class="code"><span class="t">[keys]</span>
-<span class="k">merge</span>   = <span class="s">"m"</span>
-<span class="k">approve</span> = [<span class="s">"A"</span>, <span class="s">"ctrl+a"</span>]
-
-<span class="t">[theme]</span>
-<span class="k">dark</span>  = <span class="s">"tokyonight"</span>
-<span class="k">light</span> = <span class="s">"github-light"</span></pre>
-      </div>
-
-      <p class="sub cmds"><code>gh desk config check</code> finds the mistakes without starting, <code>gh desk config show --diff</code> prints what you changed from the defaults, and <code>gh desk config edit</code> opens the file and checks it when you close it. Every setting is described in <a href="docs/reference/configuration/">the configuration reference</a>.</p>
+      <p class="sub cmds">Rather keep a file, in your dotfiles say? Everything on the page can be written by hand in <code>~/.config/gh-desk/config.toml</code>; write only what you change. <a href="docs/guides/configuration/">The configuration guide</a> shows how, and <a href="docs/reference/configuration/">the reference</a> has every setting.</p>
     </div>
   </section>
 
@@ -290,11 +216,6 @@
   <a href="https://github.com/babarot/gh-desk">github.com/babarot/gh-desk</a>
 </footer>
 
-<script src="https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/lib/xterm.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@xterm/addon-fit@0.10.0/lib/addon-fit.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@xterm/addon-unicode11@0.8.0/lib/addon-unicode11.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@xterm/addon-webgl@0.18.0/lib/addon-webgl.min.js"></script>
-<script src="wasm_exec.js"></script>
-<script src="site.js"></script>
+<script src="landing.js"></script>
 </body>
 </html>

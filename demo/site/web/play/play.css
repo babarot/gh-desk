@@ -1,0 +1,92 @@
+/* The playground fills its window, which is a frame where a page embeds it. */
+body { background: var(--term-bg); overflow: hidden; }
+.play { height: 100vh; display: flex; flex-direction: column; }
+.term { position: relative; flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: hidden; background: var(--term-bg); }
+.term-bar {
+  display: flex; align-items: center; gap: 12px; height: 36px; padding: 0 12px;
+  background: var(--bar); border-bottom: 1px solid var(--line); font-size: 13px; color: var(--mid);
+}
+.dots { display: flex; gap: 6px; }
+.dots i { width: 11px; height: 11px; border-radius: 50%; background: #ff5f57; }
+.dots i:nth-child(2) { background: #febc2e; }
+.dots i:nth-child(3) { background: #28c840; }
+.term-bar .title { flex: 1; text-align: center; font-family: "JetBrains Mono", monospace; }
+.term-bar button {
+  font: inherit; color: var(--mid); background: none; border: 1px solid var(--line);
+  border-radius: 6px; padding: 1px 8px; cursor: pointer;
+}
+/* content-box: the fit addon takes the computed width and height as the
+   room for the cells, so the padding must not be in them */
+.screen { box-sizing: content-box; flex: 1; min-height: 0; padding: 10px 12px 6px; overflow: hidden; }
+/* narrower than the terminal's least columns (play.js): scroll sideways */
+.screen { overflow-x: auto; }
+.screen .xterm-viewport { background: transparent !important; overflow-y: hidden !important; }
+.loading {
+  position: absolute; inset: 36px 0 0; display: grid; place-items: center;
+  color: var(--mid); font-family: "JetBrains Mono", monospace; background: var(--term-bg);
+}
+.loading[hidden] { display: none; }
+
+/* the step of a scenario just typed (?scenario=), over the terminal's
+   bottom right corner */
+.caption {
+  position: absolute; right: 14px; bottom: 12px; display: flex; gap: 8px; align-items: center;
+  padding: 6px 12px; border: 1px solid var(--line); border-radius: 8px;
+  background: var(--card); color: var(--fg); box-shadow: var(--shadow-soft);
+  font: 13px "JetBrains Mono", monospace; pointer-events: none;
+  transition: opacity .3s;
+}
+.caption[hidden] { display: flex; opacity: 0; }
+.caption .help { color: var(--mid); }
+
+/* In a frame the bar leads out of it; watching on the whole window, to
+   where the visitor drives. Otherwise it leads to the rest of the site. */
+.term-bar .full { display: none; color: var(--mid); }
+.embed .term-bar .full, .watch .term-bar .full { display: inline; }
+.term-bar .out { display: flex; gap: 14px; }
+.embed .term-bar .out { display: none; }
+.term-bar .out a { color: var(--mid); text-decoration: none; }
+.term-bar .out a:hover { color: var(--fg); }
+
+.keys { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; padding: 8px 12px; border-top: 1px solid var(--line); background: var(--bar); }
+.keys button {
+  font: 13px "JetBrains Mono", monospace; color: var(--fg); background: var(--card);
+  border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 6px; padding: 3px 10px; cursor: pointer;
+}
+.keys button:active { transform: translateY(1px); }
+
+/* The player of a scenario (?scenario=), under the terminal like the
+   controls of a video: pause, the steps on a track, and play again. */
+.player {
+  display: flex; align-items: center; gap: 10px; padding: 8px 12px;
+  border-top: 1px solid var(--line); background: var(--bar);
+  font: 12px "JetBrains Mono", monospace; color: var(--mid);
+}
+.player[hidden] { display: none; }
+.player button {
+  font: inherit; color: var(--fg); background: none; border: 1px solid var(--line);
+  border-radius: 6px; width: 28px; height: 24px; cursor: pointer; flex: none;
+}
+.player .track {
+  position: relative; flex: 1; height: 6px; border-radius: 3px; cursor: pointer;
+  background: var(--line);
+}
+.player .track::before { content: ""; position: absolute; inset: -9px 0; } /* a taller target */
+.player .fill { position: absolute; inset: 0 auto 0 0; width: 0; border-radius: 3px; background: var(--accent); }
+.player .mark {
+  position: absolute; top: 50%; width: 10px; height: 10px; margin: -5px 0 0 -5px;
+  border-radius: 50%; background: var(--card); border: 2px solid var(--line);
+}
+.player .mark.past { border-color: var(--accent); background: var(--accent); }
+.player .mark { transition: transform .1s; }
+.player .mark:hover { transform: scale(1.5); }
+/* a fixed width, so the track does not move as the words of a step change */
+.player .now { flex: none; width: 26ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@media (max-width: 600px) { .player .now { width: 12ch; } }
+.player .now kbd { color: var(--fg); }
+.player:not([hidden]) ~ .caption { bottom: 52px; }
+
+/* ?watch=1: what is shown cannot be typed into or clicked */
+.watch .keys { display: none; }
+.watch .screen { pointer-events: none; }
+.watch .screen .xterm { cursor: default; }

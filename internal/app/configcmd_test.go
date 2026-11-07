@@ -410,12 +410,12 @@ func TestConfigUIData(t *testing.T) {
 // The page on the site says so, and the command's does not: it is what keeps
 // the page from asking a server that is not there.
 func TestSettingsDemo(t *testing.T) {
-	page, err := SettingsDemo()
+	page, err := SettingsPlayground()
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !bytes.Contains(page, []byte("const DEMO=true;")) {
-		t.Error("the page for the site does not say it is the demo")
+	if !bytes.Contains(page, []byte("const PLAYGROUND=true;")) {
+		t.Error("the page for the site does not say it is the playground")
 	}
 	shown, err := samplePreview(ui.SampleTime)
 	if err != nil {
@@ -425,8 +425,8 @@ func TestSettingsDemo(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !bytes.Contains(own, []byte("const DEMO=false;")) {
-		t.Error("the page of the command says it is the demo")
+	if !bytes.Contains(own, []byte("const PLAYGROUND=false;")) {
+		t.Error("the page of the command says it is the playground")
 	}
 }
 

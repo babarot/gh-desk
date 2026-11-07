@@ -45,7 +45,7 @@ description = "Record the demo with VHS in Docker into docs/demo.gif: mise run d
 file = "demo/recording/tapes/record.sh"
 
 [tasks."site:build"]
-description = "Build the demo on the site (gh-desk compiled to WebAssembly) into demo/site/web"
+description = "Build the landing page and the playground (gh-desk compiled to WebAssembly) into demo/site/web"
 run = "demo/site/build.sh"
 
 [tasks."site:serve"]
@@ -69,7 +69,7 @@ description = "Build the docs site (Hugo with Hextra) from docs/ into ./site"
 run = "docs/site/build.sh"
 
 [tasks."docs:serve"]
-description = "Build the playground and the docs as published, and serve them on http://localhost:8080/gh-desk/"
+description = "Build the landing page, the playground and the docs as published, and serve them on http://localhost:8080/gh-desk/"
 run = "docs/site/preview.sh"
 
 [tasks."docs:test"]

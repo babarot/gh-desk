@@ -6,7 +6,7 @@ An approval or a merge cannot be taken back on GitHub, so every write goes throu
 
 The popup reads each pull request again and lists what will be done to it, and why the rest is skipped: closed, conflicting, required checks failing, a job failed, no merge method the repository allows. It marks the pull requests that change files in `bulk.attention_paths`, such as workflows, and with `claude.release_notes_check`, the dependency updates whose release notes call for care.
 
-[The bots' updates, selected by a rule, approved and merged](https://babarot.me/gh-desk/?scenario=merge "playground")
+[The bots' updates, selected by a rule, approved and merged](https://babarot.me/gh-desk/play/?scenario=merge "playground")
 
 ## Only the head you saw
 
