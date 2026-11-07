@@ -3,11 +3,11 @@
 // step with internal/plan from information read just before the step, and
 // acts only on the head the user confirmed.
 //
-// Pull requests of different repositories go side by side; those of one
-// repository go one at a time, since merging one can leave the next behind
-// its base or in conflict. Merges of one repository wait their turn
-// across batches too, in the order they were started. Progress is
-// reported as Events on a channel;
+// Pull requests of different repositories go side by side. Merges of one
+// repository wait for their jobs side by side, and take a lane for the
+// writes that may move the base, since merging one can leave the next
+// behind its base or in conflict; the other actions on a repository go one
+// at a time. Progress is reported as Events on a channel;
 // the runner knows nothing of the TUI.
 package runner
 
@@ -295,10 +295,12 @@ type Runner struct {
 	// the same record.
 	mu   sync.Mutex
 	busy map[model.PRKey]bool
-	// lanes are, by repository, the merges waiting their turn, in the
-	// order their batches started; the first is the one at work. Guarded
-	// by mu.
+	// lanes are, by repository, the merges ready to write, in the order
+	// they got ready; the first is the one at work. Guarded by mu.
 	lanes map[string][]*ticket
+	// merges are, by repository, the merges at work, from their claim
+	// until they are released. Guarded by mu.
+	merges map[string]map[model.PRKey]*activeMerge
 	// reads are, by repository, the waits sharing a read. Guarded by mu.
 	reads map[string]*repoReads
 	// wmu guards store and canWait, which Adopt sets after the start.
@@ -329,6 +331,7 @@ func (r *Runner) release(k model.PRKey) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	delete(r.busy, k)
+	r.untrack(k)
 }
 
 // ticket is a merge's place in the lane of its repository.
@@ -364,6 +367,7 @@ func (r *Runner) leave(t *ticket) {
 	}
 	t.left = true
 	repo := t.key.Repository()
+	r.readSoon(repo)
 	q := r.lanes[repo]
 	i := slices.Index(q, t)
 	if i < 0 {
@@ -380,15 +384,22 @@ func (r *Runner) leave(t *ticket) {
 	}
 }
 
-// inLane reports whether a pull request of a batch waits its turn in its
-// repository's lane: a merge, or a recorded merge resumed, but not one
-// only watched on auto-merge or an approval that waits, which go aside.
+// inLane reports whether a pull request of a batch takes its repository's
+// lane: a merge, or a recorded merge resumed, but not one only watched on
+// auto-merge or an approval that waits, which go aside.
 func inLane(kind Kind, resume map[model.PRKey]model.Pending, k model.PRKey) bool {
+	p, ok := resume[k]
+	return isMerge(kind, resume, k) && (!ok || !p.Watching)
+}
+
+// isMerge reports whether a pull request of a batch is being merged, one
+// watched on auto-merge included.
+func isMerge(kind Kind, resume map[model.PRKey]model.Pending, k model.PRKey) bool {
 	if kind != Merge {
 		return false
 	}
 	p, ok := resume[k]
-	return !ok || (p.Kind != model.PendingApprove && !p.Watching)
+	return !ok || p.Kind != model.PendingApprove
 }
 
 // Wait waits for every batch to end. After its context is canceled, a
@@ -397,7 +408,7 @@ func (r *Runner) Wait() { r.active.Wait() }
 
 // New returns a Runner.
 func New(gh GitHub, log *slog.Logger, opt Options) *Runner {
-	return &Runner{gh: gh, opt: opt.withDefaults(), log: log, busy: map[model.PRKey]bool{}, lanes: map[string][]*ticket{}, reads: map[string]*repoReads{}, store: opt.Store, canWait: opt.CanWait}
+	return &Runner{gh: gh, opt: opt.withDefaults(), log: log, busy: map[model.PRKey]bool{}, lanes: map[string][]*ticket{}, merges: map[string]map[model.PRKey]*activeMerge{}, reads: map[string]*repoReads{}, store: opt.Store, canWait: opt.CanWait}
 }
 
 // StartReview runs a batch that sends rv to each pull request, as Start
@@ -477,16 +488,16 @@ func (r *Runner) run(ctx context.Context, kind Kind, items []Item, resume map[mo
 		case <-ctx.Done():
 		}
 	}
-	// Every pull request is claimed, and every merge takes its place in
-	// its repository's lane, before the batch is returned: a batch started
-	// later queues behind this one and cannot take what this one waits
-	// to act on.
+	// Every pull request is claimed, and every merge is known as at work,
+	// before the batch is returned: a batch started later cannot take what
+	// this one acts on, and waits for a base among its merges.
 	type slot struct {
 		it      Item
 		claimed bool
-		started bool
-		t       *ticket
-		ahead   *model.PRKey
+		// merge is set on a merge at work; lane on one that takes the lane.
+		merge, lane bool
+		// unread says why its branches could not be read.
+		unread string
 	}
 	slots := map[string][]*slot{}
 	r.mu.Lock()
@@ -495,87 +506,86 @@ func (r *Runner) run(ctx context.Context, kind Kind, items []Item, resume map[mo
 			s := &slot{it: it, claimed: !r.busy[it.PR.Key]}
 			if s.claimed {
 				r.busy[it.PR.Key] = true
-				if inLane(kind, resume, it.PR.Key) {
-					s.t, s.ahead = r.enter(it.PR.Key)
+				s.lane = inLane(kind, resume, it.PR.Key)
+				if s.merge = isMerge(kind, resume, it.PR.Key); s.merge {
+					r.track(it.PR.Key)
 				}
 			}
 			slots[repo] = append(slots[repo], s)
 		}
 	}
 	r.mu.Unlock()
+	runOne := func(s *slot) {
+		it := s.it
+		if ctx.Err() != nil {
+			if s.claimed {
+				r.release(it.PR.Key)
+			}
+			return
+		}
+		store, canWait := r.waiting()
+		j := &job{r: r, ctx: ctx, log: log.With(logging.KeyPR, it.PR.Key.String()), it: it, head: it.Head, emit: emit, wg: &wg,
+			store: store, canWait: canWait, record: kind == Merge && store != nil}
+		j.trigger = plan.Trigger{At: confirmed, For: r.opt.Quiet}
+		if resume != nil {
+			// What gh-desk wrote before it quit (marking ready,
+			// updating the branch) may have started workflows not
+			// shown yet; when, is not recorded.
+			j.trigger.Always = true
+		}
+		if !s.claimed {
+			// Its record belongs to the job already on it.
+			j.record = false
+			j.say(Skipped, "already being merged or watched")
+			return
+		}
+		switch p, ok := resume[it.PR.Key]; {
+		case s.unread != "":
+			// Nothing is written: which merge it waits for is not known.
+			// A new merge has no record to keep.
+			j.record = j.record && ok
+			j.unsure("could not read it: " + s.unread)
+		case ok:
+			j.pend, j.approved = p, p.Approved
+			j.resume()
+		case kind == Review:
+			j.review(rv)
+		case kind == Ready:
+			j.markReady()
+		case kind == Close:
+			j.closePR(ct)
+		case kind == Comment:
+			j.comment(ct.Body)
+		default:
+			j.merge()
+		}
+		if !j.watching {
+			r.release(it.PR.Key)
+		}
+	}
 	for _, repo := range repos {
 		ss := slots[repo]
 		wg.Go(func() {
-			defer func() {
-				// What was never reached gives up its claim and its place.
-				for _, s := range ss {
-					if s.t != nil {
-						r.leave(s.t)
-					}
-					if s.claimed && !s.started {
-						r.release(s.it.PR.Key)
-					}
+			var merges []*slot
+			var prs []model.PR
+			for _, s := range ss {
+				if s.merge {
+					merges, prs = append(merges, s), append(prs, s.it.PR)
 				}
-			}()
+			}
+			r.readBranches(ctx, prs, func(i int, why string) { merges[i].unread = why })
 			for i, s := range ss {
-				switch {
-				case s.ahead != nil:
-					emit(Event{Key: s.it.PR.Key, Text: fmt.Sprintf("after #%d", s.ahead.Number)})
-				case i > 0:
+				if i > 0 && !s.lane {
 					emit(Event{Key: s.it.PR.Key, Text: fmt.Sprintf("after #%d", ss[i-1].it.PR.Key.Number)})
 				}
 			}
 			for _, s := range ss {
-				it := s.it
-				if ctx.Err() != nil {
-					return
-				}
-				if s.t != nil {
-					select {
-					case <-s.t.turn:
-					case <-ctx.Done():
-						return
-					}
-				}
-				store, canWait := r.waiting()
-				j := &job{r: r, ctx: ctx, log: log.With(logging.KeyPR, it.PR.Key.String()), it: it, head: it.Head, emit: emit, wg: &wg,
-					store: store, canWait: canWait, record: kind == Merge && store != nil}
-				j.trigger = plan.Trigger{At: confirmed, For: r.opt.Quiet}
-				if resume != nil {
-					// What gh-desk wrote before it quit (marking ready,
-					// updating the branch) may have started workflows not
-					// shown yet; when, is not recorded.
-					j.trigger.Always = true
-				}
-				if !s.claimed {
-					// Its record belongs to the job already on it.
-					j.record = false
-					j.say(Skipped, "already being merged or watched")
-					continue
-				}
-				s.started = true
-				switch p, ok := resume[it.PR.Key]; {
-				case ok:
-					j.pend, j.approved = p, p.Approved
-					j.resume()
-				case kind == Review:
-					j.review(rv)
-				case kind == Ready:
-					j.markReady()
-				case kind == Close:
-					j.closePR(ct)
-				case kind == Comment:
-					j.comment(ct.Body)
-				default:
-					j.merge()
-				}
-				if !j.watching {
-					r.release(it.PR.Key)
-				}
-				// The lane goes on once the merge is done with: merged,
-				// given up, or handed to GitHub's auto-merge to watch.
-				if s.t != nil {
-					r.leave(s.t)
+				// Merges wait side by side; what moves the base takes
+				// the lane.
+				if s.lane {
+					wg.Go(func() { runOne(s) })
+				} else {
+					runOne(s)
 				}
 			}
 		})
@@ -1094,7 +1104,7 @@ func (j *job) merge() {
 	if d.Approve {
 		// An approval is not taken back, so it goes once the jobs passed:
 		// a job that fails stops the merge before it.
-		if mi, d, ok = j.jobsEnd(); !ok {
+		if _, d, ok = j.jobsEnd(); !ok {
 			return
 		}
 		if d.Step == plan.StepSkip {
@@ -1126,18 +1136,105 @@ func (j *job) merge() {
 		j.forecast(ahead(d))
 	}
 	switch d.Step {
-	case plan.StepMerge:
-		j.mergeDecided(d)
-	case plan.StepAutoMerge:
-		j.autoMerge(d.Method)
-	case plan.StepUpdate:
-		if j.updateBranch(mi.BaseOID) {
-			j.wait()
-		}
+	case plan.StepMerge, plan.StepAutoMerge, plan.StepUpdate:
 	case plan.StepWait:
-		j.wait()
+		if !j.wait() {
+			return
+		}
 	default:
 		j.say(Skipped, d.Reason)
+		return
+	}
+	j.write()
+}
+
+// write takes the lane of the repository for what may move the base, and
+// comes back to wait when it finds it must wait after all.
+func (j *job) write() {
+	for {
+		t, ok := j.enterLane()
+		if !ok {
+			return
+		}
+		again := j.inTurn()
+		j.r.leave(t)
+		if !again || !j.wait() {
+			return
+		}
+	}
+}
+
+// enterLane waits for a merge the pull request is based on, then for its
+// turn in the lane.
+func (j *job) enterLane() (*ticket, bool) {
+	switch j.r.waitForBase(j.ctx, j.it.PR.Key) {
+	case baseCanceled:
+		return nil, false
+	case baseCycle:
+		j.say(Stopped, "its base waits for it · confirm one at a time")
+		return nil, false
+	}
+	j.r.mu.Lock()
+	t, ahead := j.r.enter(j.it.PR.Key)
+	j.r.mu.Unlock()
+	if ahead != nil {
+		j.emit(Event{Key: j.it.PR.Key, Text: fmt.Sprintf("after #%d", ahead.Number)})
+	}
+	select {
+	case <-t.turn:
+		return t, true
+	case <-j.ctx.Done():
+		j.r.leave(t)
+		return nil, false
+	}
+}
+
+// inTurn reads the pull request again and writes, holding the lane. It
+// reports true when the pull request must wait after all. One whose branch
+// it updated keeps the lane until it is merged or given up: another merge
+// passing it would leave it behind again.
+func (j *job) inTurn() (again bool) {
+	updated := false
+	for {
+		mi, d, ok := j.decide()
+		if !ok {
+			return false
+		}
+		if d.Step == plan.StepAutoMerge && !j.it.AutoMerge {
+			d.Step = plan.StepWait
+		}
+		d = j.hold(mi, d)
+		jobs := plan.JobsRunning(mi, j.trigger, time.Now())
+		switch {
+		case d.Step == plan.StepSkip:
+			j.say(Skipped, d.Reason)
+			return false
+		case d.Step == plan.StepMerge && !jobs:
+			j.forecast(ahead(d))
+			j.mergeDecided(d)
+			return false
+		case d.Step == plan.StepAutoMerge && !jobs:
+			j.forecast(ahead(d))
+			j.autoMerge(d.Method)
+			return false
+		}
+		if waits(d.Step) && !j.canWait {
+			j.locked("locked by another gh-desk")
+			return false
+		}
+		switch {
+		case d.Step == plan.StepUpdate && !jobs:
+			j.forecast(ahead(d))
+			if !j.updateBranch(mi.BaseOID) {
+				return false
+			}
+			updated = true
+		case !updated:
+			return true
+		}
+		if !j.wait() {
+			return false
+		}
 	}
 }
 
@@ -1542,10 +1639,12 @@ func (j *job) jobsEnd() (model.MergeInfo, plan.Decision, bool) {
 	}
 }
 
-// wait reads the pull request until it can be merged, then merges it. It
-// gives up when jobs, or the required checks, run past WaitTimeout, or
-// when it stays blocked BlockedTimeout after they finished.
-func (j *job) wait() {
+// wait reads the pull request until it is ready to write: no job is at
+// work on its head, and it was decided to merge, to turn on auto-merge or
+// to update its branch. It reports false when the job ended, as it does
+// when jobs, or the required checks, run past WaitTimeout, or when it stays
+// blocked BlockedTimeout after they finished.
+func (j *job) wait() bool {
 	// The times waited carry on from a record, so time gh-desk was not
 	// running is not counted.
 	last := time.Now()
@@ -1554,7 +1653,7 @@ func (j *job) wait() {
 		mi, d, ok := j.decide()
 		if !ok {
 			w.end("stopped")
-			return
+			return false
 		}
 		w.read(mi)
 		jobs := plan.JobsRunning(mi, j.trigger, time.Now())
@@ -1562,40 +1661,32 @@ func (j *job) wait() {
 		case plan.StepMerge:
 			if !jobs {
 				w.end("ready")
-				j.forecast([]Step{StepMerge})
-				j.mergeDecided(d)
-				return
+				return true
 			}
 		case plan.StepSkip:
 			w.end("skipped")
 			j.say(Skipped, d.Reason)
-			return
+			return false
 		case plan.StepAutoMerge:
 			// The jobs are done and the popup said this one goes to
 			// auto-merge: GitHub merges once its rules allow. Otherwise
 			// waiting here is what was asked, so keep waiting.
 			if j.it.AutoMerge && !jobs {
 				w.end("ready")
-				j.forecast([]Step{StepAutoMerge})
-				j.autoMerge(d.Method)
-				return
+				return true
 			}
 		case plan.StepUpdate:
 			// The base moved during the wait. The jobs at work go first:
 			// one that fails stops the merge without running them again.
 			if !jobs {
 				w.end("behind")
-				j.forecast(ahead(d))
-				if !j.updateBranch(mi.BaseOID) {
-					return
-				}
-				continue
+				return true
 			}
 		}
 		switch {
 		case jobs || plan.ChecksRunning(mi, j.r.opt.Settings.ApprovalChecks):
 			if !j.waitedForChecks(mi, &last, w) {
-				return
+				return false
 			}
 			j.waitingFor(mi, w)
 			j.forecast([]Step{StepMerge})
@@ -1607,7 +1698,7 @@ func (j *job) wait() {
 			if j.pend.BlockedWaited > j.r.opt.BlockedTimeout {
 				w.end("timed-out")
 				j.say(Stopped, "blocked by another rule")
-				return
+				return false
 			}
 			what, text, s := "blocked", "waiting", StepWaitBlocked
 			var checks []string
@@ -1620,7 +1711,7 @@ func (j *job) wait() {
 			j.forecast([]Step{StepMerge})
 		}
 		if !j.pause(w, mi) {
-			return
+			return false
 		}
 	}
 }

@@ -20,7 +20,7 @@ import (
 const infoFields = `
   id number state isDraft headRefOid baseRefOid mergeStateStatus reviewDecision
   viewerCanMergeAsAdmin autoMergeRequest { enabledAt }
-  viewerCanClose locked headRefName headRef { id } isCrossRepository viewerCanDeleteHeadRef
+  viewerCanClose locked headRefName baseRefName headRef { id } isCrossRepository viewerCanDeleteHeadRef
   repository { nameWithOwner mergeCommitAllowed squashMergeAllowed rebaseMergeAllowed autoMergeAllowed viewerPermission }
   latestReviews(first: 20) { nodes { author { login } state } }
   viewerLatestReview { state commit { oid } }
@@ -66,6 +66,7 @@ type infoNode struct {
 	ViewerCanClose        bool
 	Locked                bool
 	HeadRefName           string
+	BaseRefName           string
 	HeadRef               *struct{ ID string }
 	IsCrossRepository     bool
 	// ViewerCanDeleteHeadRef is whether the viewer can delete the head
@@ -102,7 +103,7 @@ func (n infoNode) toModel() model.MergeInfo {
 		AdminMerge: n.ViewerCanMergeAsAdmin,
 		Repo:       model.RepoMerge{AutoMerge: n.Repository.AutoMergeAllowed},
 		CanClose:   n.ViewerCanClose, Locked: n.Locked, HeadInFork: n.IsCrossRepository, CanDeleteHead: n.ViewerCanDeleteHeadRef,
-		Head:     model.Branch{Owner: owner, Repo: repo, Name: n.HeadRefName},
+		Head: model.Branch{Owner: owner, Repo: repo, Name: n.HeadRefName}, BaseRef: n.BaseRefName,
 		CanWrite: slices.Contains([]string{"WRITE", "MAINTAIN", "ADMIN"}, n.Repository.ViewerPermission),
 	}
 	if n.HeadRef != nil {

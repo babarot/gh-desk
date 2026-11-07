@@ -297,6 +297,8 @@ type MergeInfo struct {
 	Locked bool
 	// Head is its head branch; its ID is empty when the branch is gone.
 	Head Branch
+	// BaseRef is the name of its base branch.
+	BaseRef string
 	// HeadRefID is the node ID of the head branch, empty when it is gone.
 	HeadRefID string
 	// HeadInFork is whether the head branch is in another repository.

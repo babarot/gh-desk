@@ -141,6 +141,20 @@ func (r *Runner) readWaits(ctx context.Context, repo string, rr *repoReads) {
 	}
 }
 
+// readSoon has the waits of a repository read now, since its base may have
+// moved. Called with the runner's mu held.
+func (r *Runner) readSoon(repo string) {
+	rr := r.reads[repo]
+	if rr == nil {
+		return
+	}
+	now := time.Now()
+	for w := range rr.waiters {
+		w.due = now
+	}
+	rr.poke()
+}
+
 // wakeUp ends w's sleep. Called with the runner's mu held.
 func (rr *repoReads) wakeUp(w *waiter) {
 	delete(rr.waiters, w)
