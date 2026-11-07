@@ -40,7 +40,7 @@ The rows a tab is narrowed to with `f` are kept per tab, and matched again at ev
 
 ## Trying a rule on your pull requests
 
-On the [settings page](configuration.md#on-a-page), Selection rules tries a rule as you write it, on the lists gh-desk last read. Pick a tab above it to try another; a tab whose search gh-desk has not read yet says so.
+On the [settings page](configuration.md#on-a-page), Selection rules tries a rule as you write it, on the lists gh-desk last read. Click a tab in the list above it to try another; a tab whose search gh-desk has not read yet says so.
 
 A rule is judged by gh-desk's own code, so its count is what `S` would select in that tab. `?` counts the pull requests it cannot tell yet: the description is not kept with the lists, so `packages` is always `?`, as are conditions on what was not read. The count of an `[[auto_approve]]` rule is of that tab; the rule itself searches on its own.
 
