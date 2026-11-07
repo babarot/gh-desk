@@ -2,11 +2,16 @@
   ▾ requested from you 2
 ▎   acme/web#228              Add a dark theme to the settings page    mika            ●   ○        you         +601 −39       2h
     acme/infra#74             Update terraform modules for the new r…  sora            ✓   ±        you         +150 −60      3mo
-  ▾ other 2
+  ▾ other 7
     acme/docs#58              Explain the config reference             babarot         ✓   ✓                    +88 −2         5h
+    acme/web#301              設定画面のタイトルを日本語に直す         mika            ✓   ·                    +3 −1          8d
+    acme/api#302              🚀 Ship the new search                   mika            ✓   ·                    +3 −1          8d
+    acme/api#303              Fix the retry of a read                  mika            ✓   ·                    +3 −1          9d
+    acme/web#304              Already in merged                        mika            ✓   ·                    +3 −1          9d
+    acme/web#305              Reviewed by me                           mika            ✓   ± me±                +3 −1         11d
     acme/web#219              WIP: rework the cart                     ren             ✗   ·                    +1400 −420    12d
   ▾ bots 4
     acme/web#231              Bump vite from 7.1.2 to 7.1.4            dependabot      ✗   ○        @frontend   +18 −12        4h
-    acme/api#412              chore(deps): update golang.org/x/net t…  renovate        ✓   ·        you         +8 −4          1d
-    acme/infra#77             Update Helm release datadog to v3.120.0  renovate        ✓   ✓                    +2 −2          2d
+    acme/api#412              chore(deps): update golang.org/x/net t…  renovate        ✓   · me✓    you         +8 −4          1d
+    acme/infra#77             Update Helm release datadog to v3.120.0  renovate        ✓   ✓ me✓                +2 −2          2d
     acme/api#409              Lock file maintenance                    renovate        ✓   ·        you         +420 −420      3d

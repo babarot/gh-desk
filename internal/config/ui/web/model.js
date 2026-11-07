@@ -54,17 +54,5 @@ function problems(d){const ps=[];
   if(d.arr.tabs){const t=d.arr.tabs;if(t.filter(x=>x.kind==='inbox').length!==1)ps.push({at:'tabs',msg:'Keep one inbox tab.'});if(t.length>9)ps.push({at:'tabs',msg:'Keep nine tabs or fewer.'});t.forEach((x,i)=>{if(x.kind!=='inbox'&&!x.query)ps.push({at:`tabs/${i}`,msg:'A tab needs a search.'})})}
   const seen={};for(const k of KEYS){const v=d.keys[k.action];if(!v)continue;for(const key of[].concat(v)){const id=k.scope+'/'+key;if(seen[id])ps.push({at:'key/'+k.action,msg:`${key} is also set for ${seen[id].replace(/_/g,' ')}.`});seen[id]=k.action}}
   return ps}
-function matchRule(r,p){for(const[k,v]of Object.entries(r))switch(k){
-  case'authors':if(!v.includes(p.author))return false;break;
-  case'repos':if(!v.some(g=>new RegExp('^'+g.replace(/[.+]/g,'\\$&').replace(/\*/g,'[^/]*')+'$').test(p.repo)))return false;break;
-  case'title':try{if(!goRe(v).test(p.title))return false}catch(e){return false}break;
-  case'max_files':if(p.files>v)return false;break;case'min_files':if(p.files<v)return false;break;
-  case'max_lines':if(p.lines>v)return false;break;case'min_lines':if(p.lines<v)return false;break;
-  case'updated_within_days':if(p.updated>v)return false;break;case'created_within_days':if(p.created>v)return false;break;
-  case'updated_before_days':if(p.updated<v)return false;break;case'created_before_days':if(p.created<v)return false;break;
-  case'bot':case'mine':case'draft':case'approved_by_me':case'reviewed_by_me':if(!!p[k]!==v)return false;break;
-  case'state':if(v.length&&!v.includes(p.state))return false;break;case'checks':if(v.length&&!v.includes(p.checks))return false;break;
-  case'decision':if(v.length&&!v.includes(p.decision))return false;break;
-  case'labels':if(v.length&&!v.some(l=>p.labels.includes(l)))return false;break;
-  case'requested':if(v.length&&!v.some(x=>p.requested.includes(x)))return false;break}
-  return true}
+// The rows of a tab: made up when no list was read, null when its search was not.
+function listOf(t){if(LISTS.sample)return{prs:LISTS.sample};return(t.kind==='inbox'?LISTS.inbox:LISTS.tabs[t.query])||null}

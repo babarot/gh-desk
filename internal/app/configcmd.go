@@ -15,6 +15,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/cli/go-gh/v2/pkg/browser"
 	"github.com/spf13/cobra"
@@ -280,14 +281,20 @@ func uiConfig(ctx context.Context, path string, debug bool, ask confirmer, open 
 		return 1
 	}
 	exists := err == nil
+	cfg := config.Default()
 	if exists {
-		if _, _, _, err := load(path, debug, new(slog.LevelVar)); err != nil {
+		if cfg, _, _, err = load(path, debug, new(slog.LevelVar)); err != nil {
 			fmt.Fprintln(stderr, err)
 			return 1
 		}
 	}
+	shown, err := newPreview(cfg, time.Now(), slog.New(slog.DiscardHandler))
+	if err != nil {
+		fmt.Fprintf(stderr, "gh-desk: %v\n", err)
+		return 1
+	}
 	page, err := ui.Page(ui.Input{File: ui.File{Path: config.TildePath(path), Src: src}, Keys: uiKeys(),
-		Themes: tui.Palettes(), Spinners: tui.Spinners()})
+		Themes: tui.Palettes(), Spinners: tui.Spinners(), Lists: shown.lists})
 	if err != nil {
 		fmt.Fprintf(stderr, "gh-desk: %v\n", err)
 		return 1
@@ -299,7 +306,7 @@ func uiConfig(ctx context.Context, path string, debug bool, ask confirmer, open 
 		}
 		return nil
 	}
-	srv := &ui.Server{Page: page, Save: func(ctx context.Context, made []byte) error {
+	srv := &ui.Server{Page: page, Judge: func(src []byte) ([]byte, error) { return shown.judge(src, time.Now()) }, Save: func(ctx context.Context, made []byte) error {
 		now, err := os.ReadFile(path)
 		if err != nil && !errors.Is(err, fs.ErrNotExist) {
 			return err

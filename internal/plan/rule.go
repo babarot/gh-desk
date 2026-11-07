@@ -143,10 +143,12 @@ func (r Rule) NeedsHeavy() bool {
 // request, not a draft, that the rule says Yes of. S acts on what it
 // selects, so a pull request the rule cannot tell yet is not selected.
 func (r Rule) Match(pr model.PR, viewer string, f Facts) bool {
-	if pr.Draft || pr.State != model.StateOpen && pr.State != "" {
-		return false
-	}
-	return r.Judge(pr, viewer, f) == Yes
+	return Selectable(pr) && r.Judge(pr, viewer, f) == Yes
+}
+
+// Selectable reports whether S can select pr at all, whatever the rule.
+func Selectable(pr model.PR) bool {
+	return !pr.Draft && (pr.State == model.StateOpen || pr.State == "")
 }
 
 // Judge says whether pr meets every condition of the rule for viewer. The

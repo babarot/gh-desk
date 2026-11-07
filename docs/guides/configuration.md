@@ -62,6 +62,10 @@ Any other answer leaves the file as it is and the page open. Secrets are not pri
 
 Closing the page, with its Close button or by closing the tab, leaves without saving, as does ctrl+c. The page is served on this machine for as long as the command runs. When the file cannot be written, as one from the Nix store, the page says so and shows the new file under New file.
 
+The list on the page is the one gh-desk last read, as of the time it shows, under the account that read it; nothing goes to GitHub. Pick a tab above it to try a rule on that tab. A tab whose search gh-desk has not read yet says so, and before gh-desk has read anything the page shows made-up pull requests and says that too, until you run `gh desk` once.
+
+A rule is judged by gh-desk's own code, so its count is what `S` would select in that tab. `?` counts the pull requests it cannot tell yet: the description is not kept with the lists, so `packages` is always `?`, as are conditions on what was not read. The count of an `[[auto_approve]]` rule is of that tab; the rule itself searches on its own.
+
 MCP servers are shown and removed there; to add or change one, edit the file.
 
 ## After an update

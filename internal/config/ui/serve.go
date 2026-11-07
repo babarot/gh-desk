@@ -35,6 +35,9 @@ type Server struct {
 	// the page, which stays open to fix it. It may wait for an answer in
 	// the terminal, until ctx is canceled; one runs at a time.
 	Save func(ctx context.Context, src []byte) error
+	// Judge says what the rules of a file sent make of the rows, as JSON.
+	// It writes nothing. Its error means the file does not read yet.
+	Judge func(src []byte) ([]byte, error)
 
 	token string
 	host  string
@@ -98,7 +101,7 @@ func (s *Server) Serve(ctx context.Context, open func(url string)) (bool, error)
 	return saved, err
 }
 
-// ServeHTTP answers only the page's own two requests.
+// ServeHTTP answers only the page's own requests.
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if r.Host != s.host {
 		http.Error(w, "wrong host", http.StatusForbidden)
@@ -124,6 +127,8 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		_, _ = w.Write(s.Page)
 	case r.Method == http.MethodPost && rest == "save":
 		s.save(w, r)
+	case r.Method == http.MethodPost && rest == "judge":
+		s.judge(w, r)
 	case r.Method == http.MethodPost && rest == "close":
 		s.closePage(w, r)
 	case r.Method == http.MethodPost && rest == "gone":
@@ -222,6 +227,24 @@ func (s *Server) save(w http.ResponseWriter, r *http.Request) {
 	}
 	s.finish(true)
 	fmt.Fprintln(w, "ok")
+}
+
+func (s *Server) judge(w http.ResponseWriter, r *http.Request) {
+	if !s.ownOrigin(w, r) {
+		return
+	}
+	src, err := io.ReadAll(http.MaxBytesReader(w, r.Body, maxFile))
+	if err != nil {
+		http.Error(w, "too large", http.StatusRequestEntityTooLarge)
+		return
+	}
+	got, err := s.Judge(src)
+	if err != nil {
+		refuse(w, http.StatusUnprocessableEntity, err)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	_, _ = w.Write(got)
 }
 
 // refuse tells the page why, in words it shows.

@@ -14,6 +14,7 @@ import (
 	"testing"
 
 	"github.com/babarot/gh-desk/internal/config"
+	"github.com/babarot/gh-desk/internal/config/ui"
 	"github.com/babarot/gh-desk/internal/release"
 )
 
@@ -386,7 +387,11 @@ func TestConfigUIData(t *testing.T) {
 	const path = "../config/ui/testdata/data.json"
 	// cache.dir defaults to a path under the home of whoever runs this.
 	t.Setenv("XDG_CACHE_HOME", "/home/you/.cache")
-	want, err := json.MarshalIndent(map[string]any{"DATA": config.UI(), "KEYS": uiKeys()}, "", " ")
+	shown, err := samplePreview(ui.SampleTime)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want, err := json.MarshalIndent(map[string]any{"DATA": config.UI(), "KEYS": uiKeys(), "LISTS": shown.lists}, "", " ")
 	if err != nil {
 		t.Fatal(err)
 	}

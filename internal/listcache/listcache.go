@@ -69,6 +69,25 @@ func Open(path, host, viewer string) (*Cache, error) {
 	return c, nil
 }
 
+// Saved is all the file holds.
+type Saved struct {
+	Host, Viewer string
+	Lists        []List
+	Inbox        *Inbox
+}
+
+// Last reads the file at path, whoever it was written for, for what only
+// shows it: nothing may be done in the viewer's name, which is the account
+// that last wrote it and not one just read. A missing file, or one of
+// another format, gives nothing.
+func Last(path string) (Saved, error) {
+	f, err := read(path)
+	if err != nil || f.Version != version {
+		return Saved{}, err
+	}
+	return Saved{Host: f.Host, Viewer: f.Viewer, Lists: f.Lists, Inbox: f.Inbox}, nil
+}
+
 func (c *Cache) own(f file) bool {
 	return f.Version == version && f.Host == c.host && f.Viewer == c.viewer
 }

@@ -984,11 +984,15 @@ func (m *Model) why(r row) string {
 	if r.notif != nil {
 		return strings.TrimSuffix(r.notif.Reason, "_requested")
 	}
-	if r.pr.RequestedFrom(m.viewer) {
+	return searchWhy(r.pr, m.viewer)
+}
+
+func searchWhy(p model.PR, viewer string) string {
+	if p.RequestedFrom(viewer) {
 		return "you"
 	}
 	var teams []string
-	for _, rq := range r.pr.Requested {
+	for _, rq := range p.Requested {
 		if rq.Team {
 			teams = append(teams, "@"+rq.Login)
 		}

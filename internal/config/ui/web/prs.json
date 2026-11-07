@@ -1,189 +1,325 @@
 [
  {
-  "repo": "acme/api",
-  "n": 412,
-  "author": "renovate",
-  "bot": true,
-  "title": "chore(deps): update golang.org/x/net to v0.34.1",
-  "lines": 12,
-  "add": 8,
-  "del": 4,
-  "files": 2,
-  "state": "open",
-  "checks": "passing",
-  "decision": "none",
-  "labels": [
+  "ID": "sample0",
+  "Key": "acme/api#412",
+  "Title": "chore(deps): update golang.org/x/net to v0.34.1",
+  "State": "OPEN",
+  "Draft": false,
+  "Author": "renovate",
+  "AuthorIsBot": true,
+  "Created": "2025-12-30T00:00:00Z",
+  "Updated": "2025-12-31T00:00:00Z",
+  "HeadOID": "head0",
+  "HeavyHead": "head0",
+  "Additions": 8,
+  "Deletions": 4,
+  "ChangedFiles": 2,
+  "Decision": "",
+  "Checks": "SUCCESS",
+  "Labels": [
    "deps"
   ],
-  "updated": 1,
-  "created": 2,
-  "approved_by_me": true,
-  "reviewed_by_me": true,
-  "requested": [
-   "me"
+  "Requested": [
+   {
+    "Login": "me"
+   }
   ],
-  "why": "you",
-  "updatedHours": 24
+  "Reviews": [
+   {
+    "Author": "me",
+    "State": "APPROVED"
+   }
+  ]
  },
  {
-  "repo": "acme/api",
-  "n": 409,
-  "author": "renovate",
-  "bot": true,
-  "title": "Lock file maintenance",
-  "lines": 840,
-  "add": 420,
-  "del": 420,
-  "files": 1,
-  "state": "open",
-  "checks": "passing",
-  "decision": "none",
-  "labels": [
+  "ID": "sample1",
+  "Key": "acme/api#409",
+  "Title": "Lock file maintenance",
+  "State": "OPEN",
+  "Draft": false,
+  "Author": "renovate",
+  "AuthorIsBot": true,
+  "Created": "2025-12-29T00:00:00Z",
+  "Updated": "2025-12-29T00:00:00Z",
+  "HeadOID": "head1",
+  "HeavyHead": "head1",
+  "Additions": 420,
+  "Deletions": 420,
+  "ChangedFiles": 1,
+  "Decision": "",
+  "Checks": "SUCCESS",
+  "Labels": [
    "deps"
   ],
-  "updated": 3,
-  "created": 3,
-  "requested": [
-   "me"
+  "Requested": [
+   {
+    "Login": "me"
+   }
   ],
-  "why": "you",
-  "updatedHours": 72
+  "Reviews": null
  },
  {
-  "repo": "acme/web",
-  "n": 231,
-  "author": "dependabot",
-  "bot": true,
-  "title": "Bump vite from 7.1.2 to 7.1.4",
-  "lines": 30,
-  "add": 18,
-  "del": 12,
-  "files": 2,
-  "state": "open",
-  "checks": "failing",
-  "decision": "review_required",
-  "labels": [
+  "ID": "sample2",
+  "Key": "acme/web#231",
+  "Title": "Bump vite from 7.1.2 to 7.1.4",
+  "State": "OPEN",
+  "Draft": false,
+  "Author": "dependabot",
+  "AuthorIsBot": true,
+  "Created": "2025-12-31T00:00:00Z",
+  "Updated": "2025-12-31T20:00:00Z",
+  "HeadOID": "head2",
+  "HeavyHead": "head2",
+  "Additions": 18,
+  "Deletions": 12,
+  "ChangedFiles": 2,
+  "Decision": "REVIEW_REQUIRED",
+  "Checks": "FAILURE",
+  "Labels": [
    "deps"
   ],
-  "updated": 0,
-  "created": 1,
-  "requested": [
-   "@frontend"
+  "Requested": [
+   {
+    "Login": "frontend",
+    "Team": true
+   }
   ],
-  "why": "@frontend",
-  "updatedHours": 4
+  "Reviews": null
  },
  {
-  "repo": "acme/web",
-  "n": 228,
-  "author": "mika",
-  "title": "Add a dark theme to the settings page",
-  "lines": 640,
-  "add": 601,
-  "del": 39,
-  "files": 14,
-  "state": "open",
-  "checks": "pending",
-  "decision": "review_required",
-  "labels": [
+  "ID": "sample3",
+  "Key": "acme/web#228",
+  "Title": "Add a dark theme to the settings page",
+  "State": "OPEN",
+  "Draft": false,
+  "Author": "mika",
+  "AuthorIsBot": false,
+  "Created": "2025-12-28T00:00:00Z",
+  "Updated": "2025-12-31T22:00:00Z",
+  "HeadOID": "head3",
+  "HeavyHead": "head3",
+  "Additions": 601,
+  "Deletions": 39,
+  "ChangedFiles": 14,
+  "Decision": "REVIEW_REQUIRED",
+  "Checks": "PENDING",
+  "Labels": [
    "ui"
   ],
-  "updated": 0,
-  "created": 4,
-  "requested": [
-   "me"
+  "Requested": [
+   {
+    "Login": "me"
+   }
   ],
-  "why": "you",
-  "updatedHours": 2
+  "Reviews": null
  },
  {
-  "repo": "acme/web",
-  "n": 219,
-  "author": "ren",
-  "title": "WIP: rework the cart",
-  "lines": 1820,
-  "add": 1400,
-  "del": 420,
-  "files": 41,
-  "draft": true,
-  "state": "open",
-  "checks": "failing",
-  "decision": "none",
-  "labels": [
+  "ID": "sample4",
+  "Key": "acme/web#219",
+  "Title": "WIP: rework the cart",
+  "State": "OPEN",
+  "Draft": true,
+  "Author": "ren",
+  "AuthorIsBot": false,
+  "Created": "2025-12-02T00:00:00Z",
+  "Updated": "2025-12-20T00:00:00Z",
+  "HeadOID": "head4",
+  "HeavyHead": "head4",
+  "Additions": 1400,
+  "Deletions": 420,
+  "ChangedFiles": 41,
+  "Decision": "",
+  "Checks": "FAILURE",
+  "Labels": [
    "wip"
   ],
-  "updated": 12,
-  "created": 30,
-  "requested": [],
-  "why": "",
-  "updatedHours": 288
+  "Requested": [],
+  "Reviews": null
  },
  {
-  "repo": "acme/infra",
-  "n": 77,
-  "author": "renovate",
-  "bot": true,
-  "title": "Update Helm release datadog to v3.120.0",
-  "lines": 4,
-  "add": 2,
-  "del": 2,
-  "files": 1,
-  "state": "open",
-  "checks": "passing",
-  "decision": "approved",
-  "labels": [
+  "ID": "sample5",
+  "Key": "acme/infra#77",
+  "Title": "Update Helm release datadog to v3.120.0",
+  "State": "OPEN",
+  "Draft": false,
+  "Author": "renovate",
+  "AuthorIsBot": true,
+  "Created": "2025-12-26T00:00:00Z",
+  "Updated": "2025-12-30T00:00:00Z",
+  "HeadOID": "head5",
+  "HeavyHead": "head5",
+  "Additions": 2,
+  "Deletions": 2,
+  "ChangedFiles": 1,
+  "Decision": "APPROVED",
+  "Checks": "SUCCESS",
+  "Labels": [
    "deps"
   ],
-  "updated": 2,
-  "created": 6,
-  "approved_by_me": true,
-  "reviewed_by_me": true,
-  "requested": [],
-  "why": "",
-  "updatedHours": 48
+  "Requested": [],
+  "Reviews": [
+   {
+    "Author": "me",
+    "State": "APPROVED"
+   }
+  ]
  },
  {
-  "repo": "acme/infra",
-  "n": 74,
-  "author": "sora",
-  "title": "Update terraform modules for the new region",
-  "lines": 210,
-  "add": 150,
-  "del": 60,
-  "files": 9,
-  "state": "open",
-  "checks": "passing",
-  "decision": "changes_requested",
-  "labels": [],
-  "updated": 95,
-  "created": 400,
-  "reviewed_by_me": true,
-  "requested": [
-   "me"
+  "ID": "sample6",
+  "Key": "acme/infra#74",
+  "Title": "Update terraform modules for the new region",
+  "State": "OPEN",
+  "Draft": false,
+  "Author": "sora",
+  "AuthorIsBot": false,
+  "Created": "2024-11-27T00:00:00Z",
+  "Updated": "2025-09-28T00:00:00Z",
+  "HeadOID": "head6",
+  "HeavyHead": "head6",
+  "Additions": 150,
+  "Deletions": 60,
+  "ChangedFiles": 9,
+  "Decision": "CHANGES_REQUESTED",
+  "Checks": "SUCCESS",
+  "Labels": null,
+  "Requested": [
+   {
+    "Login": "me"
+   }
   ],
-  "why": "you",
-  "updatedHours": 2280
+  "Reviews": null
  },
  {
-  "repo": "acme/docs",
-  "n": 58,
-  "author": "babarot",
-  "mine": true,
-  "title": "Explain the config reference",
-  "lines": 90,
-  "add": 88,
-  "del": 2,
-  "files": 3,
-  "state": "open",
-  "checks": "passing",
-  "decision": "approved",
-  "labels": [
+  "ID": "sample7",
+  "Key": "acme/docs#58",
+  "Title": "Explain the config reference",
+  "State": "OPEN",
+  "Draft": false,
+  "Author": "babarot",
+  "AuthorIsBot": false,
+  "Created": "2025-12-31T00:00:00Z",
+  "Updated": "2025-12-31T19:00:00Z",
+  "HeadOID": "head7",
+  "HeavyHead": "head7",
+  "Additions": 88,
+  "Deletions": 2,
+  "ChangedFiles": 3,
+  "Decision": "APPROVED",
+  "Checks": "SUCCESS",
+  "Labels": [
    "docs"
   ],
-  "updated": 0,
-  "created": 1,
-  "requested": [],
-  "why": "",
-  "updatedHours": 5
+  "Requested": [],
+  "Reviews": null
+ },
+ {
+  "ID": "sample8",
+  "Key": "acme/web#301",
+  "Title": "設定画面のタイトルを日本語に直す",
+  "State": "OPEN",
+  "Draft": false,
+  "Author": "mika",
+  "AuthorIsBot": false,
+  "Created": "2025-12-20T00:00:00Z",
+  "Updated": "2025-12-23T16:00:00Z",
+  "HeadOID": "head8",
+  "HeavyHead": "head8",
+  "Additions": 3,
+  "Deletions": 1,
+  "ChangedFiles": 1,
+  "Decision": "",
+  "Checks": "SUCCESS",
+  "Labels": null,
+  "Requested": [],
+  "Reviews": null
+ },
+ {
+  "ID": "sample9",
+  "Key": "acme/api#302",
+  "Title": ":rocket: Ship the new search",
+  "State": "OPEN",
+  "Draft": false,
+  "Author": "mika",
+  "AuthorIsBot": false,
+  "Created": "2025-12-20T00:00:00Z",
+  "Updated": "2025-12-23T06:00:00Z",
+  "HeadOID": "head9",
+  "HeavyHead": "head9",
+  "Additions": 3,
+  "Deletions": 1,
+  "ChangedFiles": 1,
+  "Decision": "",
+  "Checks": "SUCCESS",
+  "Labels": null,
+  "Requested": [],
+  "Reviews": null
+ },
+ {
+  "ID": "sample10",
+  "Key": "acme/api#303",
+  "Title": "Fix the retry of a read",
+  "State": "OPEN",
+  "Draft": false,
+  "Author": "mika",
+  "AuthorIsBot": false,
+  "Created": "2025-12-20T00:00:00Z",
+  "Updated": "2025-12-22T20:00:00Z",
+  "HeadOID": "head10",
+  "HeavyHead": "head10",
+  "Additions": 3,
+  "Deletions": 1,
+  "ChangedFiles": 1,
+  "Decision": "",
+  "Checks": "SUCCESS",
+  "Labels": null,
+  "Requested": [],
+  "Reviews": null
+ },
+ {
+  "ID": "sample11",
+  "Key": "acme/web#304",
+  "Title": "Already in",
+  "State": "MERGED",
+  "Draft": false,
+  "Author": "mika",
+  "AuthorIsBot": false,
+  "Created": "2025-12-20T00:00:00Z",
+  "Updated": "2025-12-22T10:00:00Z",
+  "HeadOID": "head11",
+  "HeavyHead": "head11",
+  "Additions": 3,
+  "Deletions": 1,
+  "ChangedFiles": 1,
+  "Decision": "",
+  "Checks": "SUCCESS",
+  "Labels": null,
+  "Requested": [],
+  "Reviews": null
+ },
+ {
+  "ID": "sample12",
+  "Key": "acme/web#305",
+  "Title": "Reviewed by me",
+  "State": "OPEN",
+  "Draft": false,
+  "Author": "mika",
+  "AuthorIsBot": false,
+  "Created": "2025-12-20T00:00:00Z",
+  "Updated": "2025-12-21T00:00:00Z",
+  "HeadOID": "head12",
+  "HeavyHead": "head12",
+  "Additions": 3,
+  "Deletions": 1,
+  "ChangedFiles": 1,
+  "Decision": "CHANGES_REQUESTED",
+  "Checks": "SUCCESS",
+  "Labels": null,
+  "Requested": [],
+  "Reviews": [
+   {
+    "Author": "me",
+    "State": "CHANGES_REQUESTED"
+   }
+  ]
  }
 ]

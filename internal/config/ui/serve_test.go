@@ -162,6 +162,42 @@ func TestATabThatGoesDuringTheQuestion(t *testing.T) {
 	}
 }
 
+func TestJudgeWritesNothing(t *testing.T) {
+	const host, origin = "127.0.0.1:1", "http://127.0.0.1:1"
+	s := testServer(func([]byte) error { t.Error("saved"); return nil })
+	s.Judge = func(src []byte) ([]byte, error) {
+		if string(src) == "wrong" {
+			return nil, errors.New("does not read")
+		}
+		return []byte(`{"a":1}`), nil
+	}
+	if w := ask(s, http.MethodPost, "/secret/judge", host, origin, "ok"); w.Code != http.StatusOK || w.Body.String() != `{"a":1}` {
+		t.Errorf("%d %s", w.Code, w.Body)
+	}
+	if w := ask(s, http.MethodPost, "/secret/judge", host, origin, "wrong"); w.Code != http.StatusUnprocessableEntity {
+		t.Errorf("%d %s", w.Code, w.Body)
+	}
+	if w := ask(s, http.MethodPost, "/secret/judge", host, "https://evil.example", "ok"); w.Code != http.StatusForbidden {
+		t.Errorf("from another site: %d", w.Code)
+	}
+	if w := ask(s, http.MethodPost, "/wrong/judge", host, origin, "ok"); w.Code != http.StatusNotFound {
+		t.Errorf("with a wrong token: %d", w.Code)
+	}
+	if len(s.done) != 0 {
+		t.Error("it ended")
+	}
+}
+
+func TestATitleCannotLeaveItsScript(t *testing.T) {
+	page, err := Page(Input{Lists: Lists{Sample: []PR{{Title: `</script><script>alert(1)</script>`}}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(page), "<script>alert(1)") {
+		t.Error("the title ends the script")
+	}
+}
+
 func TestThePageCannotBeFramed(t *testing.T) {
 	s := testServer(func([]byte) error { return nil })
 	w := ask(s, http.MethodGet, "/secret/", "127.0.0.1:1", "", "")

@@ -32,7 +32,7 @@ var layers = []layer{
 	{"internal/tui/statusline", 0, nil, nil, "What the status line shows: events for a moment, work in progress, the row's result"},
 	{"internal/config", 1, []string{"internal/near"}, []string{"github.com/pelletier/go-toml/v2"}, "Reading the config file and reporting its mistakes"},
 	{"internal/tui/keymap", 1, []string{"internal/near"}, nil, "Keys bound to actions by name"},
-	{"internal/config/ui", 2, []string{"internal/config"}, nil, "The settings page, one HTML file made from the settings, served on this machine"},
+	{"internal/config/ui", 2, []string{"internal/config"}, nil, "The settings page, one HTML file made from the settings and the lists last read, served on this machine"},
 	{"internal/plan", 1, []string{"internal/model"}, nil, "Deciding how to merge each pull request; selection rules"},
 	{"internal/diff", 1, nil, nil, "Reading patches and the words that changed"},
 	{"internal/github", 2, []string{"internal/model", "internal/logging"}, []string{"github.com/cli/go-gh/v2"}, "GitHub's GraphQL and REST APIs"},
