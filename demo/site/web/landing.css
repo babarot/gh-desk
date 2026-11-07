@@ -50,7 +50,24 @@ h3 { letter-spacing: -.01em; }
   overflow: hidden; background: var(--term-bg); box-shadow: var(--shadow);
 }
 .frame iframe { display: block; width: 100%; height: clamp(500px, calc(70vh + 96px), 716px); border: 0; }
-.frame.tall iframe { height: 46rem; }
+/* The settings as the command shows them, and the file they write. */
+/* The panel keeps its sidebar above 820px, as the command draws it, so the
+   two may reach past the column. */
+.split {
+  --width: min(1320px, 100vw - 48px);
+  display: grid; grid-template-columns: minmax(832px, 1fr) minmax(0, 340px); gap: 20px;
+  width: var(--width); margin: 24px 0 0 calc((100% - var(--width)) / 2);
+}
+.split .frame { margin-top: 0; }
+.split iframe { height: 724px; }
+.file { display: flex; flex-direction: column; min-height: 0; margin: 0; height: 724px; }
+.file figcaption { margin-bottom: 8px; color: var(--mid); font: 13px "JetBrains Mono", monospace; }
+.file .code { flex: 1; min-height: 0; overflow: auto; white-space: pre-wrap; word-break: break-word; }
+@media (max-width: 1179px) {
+  .split { grid-template-columns: minmax(0, 1fr); width: auto; margin-left: 0; }
+  .split iframe { height: 640px; }
+  .file { height: 320px; }
+}
 #config .install { max-width: 420px; }
 .sub.note { margin: 20px 0 48px; font-size: 15px; }
 

@@ -100,8 +100,14 @@
       <p class="sub">There is no file to write. One command opens a page in your browser, with gh-desk drawn above the settings and following each change before you save it.</p>
       <div class="install"><pre>gh desk config edit --ui</pre></div>
 
-      <div class="frame tall"><iframe src="play/settings/" loading="lazy" title="The settings page, with made-up pull requests"></iframe></div>
-      <p class="sub note">Try a theme, or change the columns or a key: this is that page, with made-up pull requests, and it saves nothing. Run the command, and the list is your own.</p>
+      <div class="split">
+        <div class="frame"><iframe id="panel" src="play/settings/?panel=1" loading="lazy" title="The settings of gh-desk"></iframe></div>
+        <figure class="file">
+          <figcaption>config.toml</figcaption>
+          <pre class="code" id="toml"></pre>
+        </figure>
+      </div>
+      <p class="sub note">Every setting is here, and the file shows what it would write; nothing is saved. Run the command, and gh-desk is drawn above the page, with your own pull requests.</p>
 
       <div class="cards">
         <article>
