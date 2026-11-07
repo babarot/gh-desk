@@ -496,3 +496,63 @@ func TestWatchLogsTheMergeState(t *testing.T) {
 		t.Errorf("watch lines = %q, want %q", got, want)
 	}
 }
+
+// A base that moves during the wait leaves the pull request behind, once
+// its jobs ended. Its branch is updated, as at the start of a merge, and it
+// does not wait out merge.blocked_timeout as if another rule held it.
+func TestBehindDuringTheWaitUpdatesTheBranch(t *testing.T) {
+	mi, it := pr("1", "api", 1, "me")
+	mi.MergeState = model.MergeUnstable
+	mi.Checks = []model.Check{checkRun("test", "IN_PROGRESS", "")}
+	f := newFake(mi)
+	f.commits["h-1-updated"] = Commit{Parents: []string{"h-1", "base"}, ViaWeb: true, Author: "me"}
+	var updatedAt int
+	f.onRead = func(_ string, mi *model.MergeInfo, n int) {
+		switch {
+		case mi.HeadOID == "h-1-updated":
+			if updatedAt == 0 {
+				updatedAt = n
+				mi.Checks = []model.Check{checkRun("test", "IN_PROGRESS", "")}
+			}
+			if n > updatedAt+8 {
+				mi.Checks = []model.Check{checkRun("test", model.RunCompleted, model.CheckSuccess)}
+				mi.MergeState = model.MergeClean
+			}
+		case n == 6:
+			// Behind while the job still runs: no update yet.
+			mi.MergeState = model.MergeBehind
+		case n == 10:
+			mi.Checks = []model.Check{checkRun("test", model.RunCompleted, model.CheckSuccess)}
+		}
+	}
+	evs := runBatch(t, f, Merge, it)
+	if e := last(evs[it.PR.Key]); e.Result != Merged {
+		t.Fatalf("last event = %+v (calls %v)", e, f.calls)
+	}
+	if !slices.Contains(f.calls, "merge acme/api#1 h-1-updated MERGE") {
+		t.Errorf("did not merge the updated head: %v", f.calls)
+	}
+}
+
+// A failed job stops a pull request that fell behind, without updating it.
+func TestBehindDuringTheWaitWithAFailedJobIsNotUpdated(t *testing.T) {
+	mi, it := pr("1", "api", 1, "me")
+	mi.MergeState = model.MergeUnstable
+	mi.Checks = []model.Check{checkRun("test", "IN_PROGRESS", "")}
+	f := newFake(mi)
+	f.onRead = func(_ string, mi *model.MergeInfo, n int) {
+		switch n {
+		case 6:
+			mi.MergeState = model.MergeBehind
+		case 10:
+			mi.Checks = []model.Check{checkRun("test", model.RunCompleted, model.CheckFailure)}
+		}
+	}
+	evs := runBatch(t, f, Merge, it)
+	if e := last(evs[it.PR.Key]); e.Result != Skipped {
+		t.Errorf("last event = %+v (calls %v)", e, f.calls)
+	}
+	if strings.Contains(strings.Join(f.calls, ","), "update") {
+		t.Errorf("updated a pull request whose job failed: %v", f.calls)
+	}
+}

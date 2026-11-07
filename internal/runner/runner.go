@@ -1566,6 +1566,17 @@ func (j *job) wait() {
 				j.autoMerge(d.Method)
 				return
 			}
+		case plan.StepUpdate:
+			// The base moved during the wait. The jobs at work go first:
+			// one that fails stops the merge without running them again.
+			if !jobs {
+				w.end("behind")
+				j.forecast(ahead(d))
+				if !j.updateBranch(mi.BaseOID) {
+					return
+				}
+				continue
+			}
 		}
 		switch {
 		case jobs || plan.ChecksRunning(mi, j.r.opt.Settings.ApprovalChecks):
