@@ -87,6 +87,9 @@ type Options struct {
 	// PollFast is how often a waiting pull request is read in its first
 	// minute, PollSlow after it and while watching auto-merge.
 	PollFast, PollSlow time.Duration
+	// FullRead is the longest a waiting pull request goes without a full
+	// read when the light read leaves it asleep; 5m unless set.
+	FullRead time.Duration
 	// Recheck is how often, and RecheckFor how long, a pull request whose
 	// merge state GitHub is still working out is read again.
 	Recheck, RecheckFor time.Duration
@@ -110,6 +113,9 @@ func (o Options) withDefaults() Options {
 	}
 	if o.WatchTimeout == 0 {
 		o.WatchTimeout = 24 * time.Hour
+	}
+	if o.FullRead == 0 {
+		o.FullRead = 5 * time.Minute
 	}
 	if o.Recheck == 0 {
 		o.Recheck = 3 * time.Second
@@ -293,6 +299,8 @@ type Runner struct {
 	// order their batches started; the first is the one at work. Guarded
 	// by mu.
 	lanes map[string][]*ticket
+	// reads are, by repository, the waits sharing a read. Guarded by mu.
+	reads map[string]*repoReads
 	// wmu guards store and canWait, which Adopt sets after the start.
 	wmu     sync.Mutex
 	store   Store
@@ -389,7 +397,7 @@ func (r *Runner) Wait() { r.active.Wait() }
 
 // New returns a Runner.
 func New(gh GitHub, log *slog.Logger, opt Options) *Runner {
-	return &Runner{gh: gh, opt: opt.withDefaults(), log: log, busy: map[model.PRKey]bool{}, lanes: map[string][]*ticket{}, store: opt.Store, canWait: opt.CanWait}
+	return &Runner{gh: gh, opt: opt.withDefaults(), log: log, busy: map[model.PRKey]bool{}, lanes: map[string][]*ticket{}, reads: map[string]*repoReads{}, store: opt.Store, canWait: opt.CanWait}
 }
 
 // StartReview runs a batch that sends rv to each pull request, as Start
@@ -835,7 +843,7 @@ func (j *job) approveAfterJobs() {
 			}
 			j.waitingFor(mi, w)
 			j.forecast([]Step{StepApprove})
-			if !j.pause(w) {
+			if !j.pause(w, mi) {
 				return
 			}
 			continue
@@ -1483,13 +1491,19 @@ func (j *job) waitedForChecks(mi model.MergeInfo, last *time.Time, w *waitLog) b
 }
 
 // pause sleeps until the next read: often in the first minute of waiting,
-// seldom after. It reports false when the batch is canceled.
-func (j *job) pause(w *waitLog) bool {
+// seldom after. While only jobs are at work, as mi read last shows, the
+// waits of the repository share a light read that wakes it when they end.
+// It reports false when the batch is canceled.
+func (j *job) pause(w *waitLog, mi model.MergeInfo) bool {
 	every := j.r.opt.PollFast
 	if j.pend.ChecksWaited+j.pend.BlockedWaited > time.Minute {
 		every = j.r.opt.PollSlow
 	}
-	if !j.sleep(every) {
+	now := time.Now()
+	left := max(j.r.opt.WaitTimeout-j.pend.ChecksWaited, 0)
+	sleeper := &waiter{id: j.it.PR.ID, head: j.head, light: onlyJobsAtWork(mi), every: every,
+		due: now.Add(every), force: now.Add(min(j.r.opt.FullRead, left)), wake: make(chan struct{})}
+	if !j.r.awaitRead(j.ctx, j.it.PR.Key.Repository(), sleeper) {
 		w.end("canceled")
 		return false
 	}
@@ -1522,7 +1536,7 @@ func (j *job) jobsEnd() (model.MergeInfo, plan.Decision, bool) {
 		}
 		j.waitingFor(mi, w)
 		j.forecast(ahead(d))
-		if !j.pause(w) {
+		if !j.pause(w, mi) {
 			return mi, d, false
 		}
 	}
@@ -1605,7 +1619,7 @@ func (j *job) wait() {
 			j.step(s, text, checks...)
 			j.forecast([]Step{StepMerge})
 		}
-		if !j.pause(w) {
+		if !j.pause(w, mi) {
 			return
 		}
 	}

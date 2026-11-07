@@ -164,10 +164,10 @@ func (n infoNode) toModel() model.MergeInfo {
 // node IDs, in one query. With details it also reads each one's checks
 // (with whether they are required), its changed files and the workflow
 // runs of its head, which makes a larger query and a request for each
-// pull request. Deciding a merge needs them, so a merge that waits reads
-// them at every poll; watching auto-merge, and reading a pull request
-// again to tell what happened to it, leave them out. A pull request that
-// cannot be read is left out of the result.
+// pull request. Deciding a merge needs them; watching auto-merge, reading a
+// pull request again to tell what happened to it, and telling whom to wake
+// among the waits of a repository (ADR-103) leave them out. A pull request
+// that cannot be read is left out of the result.
 func (c *Client) MergeInfo(ctx context.Context, ids []string, details bool) (map[string]model.MergeInfo, error) {
 	out := map[string]model.MergeInfo{}
 	if len(ids) == 0 {
