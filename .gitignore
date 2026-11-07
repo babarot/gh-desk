@@ -5,7 +5,4 @@ coverage.out
 /demo/recording/tapes/.gh-desk-demo
 /demo/recording/tapes/*.mp4
 /demo/recording/tapes/*.gif
-/demo/site/web/play/gh-desk.wasm
-/demo/site/web/play/wasm_exec.js
-/demo/site/web/play/settings/
 /site/

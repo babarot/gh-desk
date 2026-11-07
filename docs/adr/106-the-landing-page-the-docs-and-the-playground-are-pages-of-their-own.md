@@ -23,9 +23,11 @@ This replaces three sentences. Of ADR-052: "`play/` is the playground on the who
 - The playground is what runs, not an address: gh-desk in the browser against a made-up GitHub. The landing page and the docs embed it. "The settings page" is the one the command opens.
 - Each of these is its own page in [demo/site/web](../../demo/site/web). The landing page runs no terminal, and frames the playground as the docs do, so there is one way to embed it.
 - The playground takes being in a frame from where it is, not from a parameter.
+- The site is built by one script, [demo/site/build.sh](../../demo/site/build.sh), into a directory of its own. Sources are not mixed with what is built, and the sources stay where ADR-049 and ADR-054 put them.
 - The landing page shows how to change gh-desk with the settings page, and embeds the settings playground. It keeps TOML only for what the settings page cannot do.
 - Rejected: `settings/` beside `play/`. It would be a fourth part for what is the same kind of thing as the playground, and the address would read as the page that saves.
 - Rejected: `playground/` as the address. `play/` is shorter to share and is what other playgrounds use.
+- Rejected: a `site/` at the top of the repository holding all of it. The program of the playground has to stay under `demo/` to import `demo/internal/playground`, as ADR-049 says, and moving the made-up world out with it would undo that ADR for tidiness alone.
 - Rejected: "home" for the landing page. Hugo's home is the first page of the docs.
 - Rejected: one HTML file for the landing page and the playground. The copy, its base, and the styles that hid the landing page were what made them hard to change apart.
 

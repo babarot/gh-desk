@@ -26,4 +26,4 @@ tagpr makes the release tag with the workflow's own token, and a tag pushed that
 
 - A change merged to main reaches the site only at the next release; until then the site shows the last release.
 - A change to the site alone (a typo in the docs, the playground's page) waits for a release too. Running the Pages workflow by hand on main publishes it sooner, together with whatever else main has that is not released.
-- The Pages workflow does not run on its own, so a change that breaks the site's build is caught by the Test workflow's `site` and `docs` jobs, before a release.
+- The Pages workflow does not run on its own, so a change that breaks the site's build is caught by the Test workflow's `site` job, before a release.
