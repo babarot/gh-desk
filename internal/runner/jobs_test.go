@@ -457,9 +457,9 @@ func TestWatchLogsTheMergeState(t *testing.T) {
 	f := newFake(mi)
 	f.onRead = func(_ string, mi *model.MergeInfo, n int) {
 		switch {
-		case n == 3:
+		case n == 4:
 			mi.MergeState = model.MergeUnstable
-		case n >= 5:
+		case n >= 6:
 			mi.State = model.StateMerged
 		}
 	}

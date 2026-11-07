@@ -8,6 +8,7 @@ Partly replaced by ADR-068
 Partly replaced by ADR-082
 Partly replaced by ADR-093
 Partly replaced by ADR-094
+Partly replaced by ADR-104
 
 ## Context
 
