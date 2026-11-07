@@ -11,7 +11,7 @@
     if (!b.isConnected) return;
     const f = document.createElement('iframe');
     const theme = document.documentElement.classList.contains('dark') ? 'dark' : 'light';
-    f.src = b.dataset.src + '&theme=' + theme;
+    f.src = b.dataset.src + (b.dataset.src.includes('?') ? '&' : '?') + 'theme=' + theme;
     f.title = b.dataset.title;
     f.allow = 'clipboard-write';
     b.closest('.desk-pg').replaceChildren(f);

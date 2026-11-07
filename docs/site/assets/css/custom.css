@@ -106,6 +106,9 @@ kbd {
   height: 36rem;
   border: 0;
 }
+/* The settings page holds the list and a panel under it. */
+.desk-pg-tall .desk-pg-run,
+.desk-pg-tall iframe { height: 46rem; }
 
 /* The player's bar under the card, as the embedded page draws it, so the
    card reads as a video before it plays. */

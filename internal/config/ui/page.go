@@ -2,6 +2,7 @@
 // settings, the config file as it was read, the lists last read and the
 // code, and serves it on this machine until a file is saved. Replacing the
 // file and judging a rule are given to it by the caller (ADR-101, ADR-102).
+// The site shows the same page with Demo set, served by nothing (ADR-103).
 package ui
 
 import (
@@ -109,6 +110,9 @@ type Input struct {
 	Themes   any
 	Spinners any
 	Lists    Lists
+	// Demo makes the page for the site: no gh-desk answers it, so it shows
+	// only what needs none, and saves nothing.
+	Demo bool
 }
 
 type boot struct {
@@ -148,7 +152,7 @@ func dataJS(in Input, file map[string]any) (string, error) {
 	for _, v := range []struct {
 		name string
 		v    any
-	}{{"DATA", config.UI()}, {"KEYS", in.Keys}, {"THEMES", in.Themes}, {"SPIN", in.Spinners}, {"BOOT", boot{in.File.Path, file}}, {"LISTS", in.Lists}} {
+	}{{"DATA", config.UI()}, {"KEYS", in.Keys}, {"THEMES", in.Themes}, {"SPIN", in.Spinners}, {"BOOT", boot{in.File.Path, file}}, {"LISTS", in.Lists}, {"DEMO", in.Demo}} {
 		j, err := json.Marshal(v.v)
 		if err != nil {
 			return "", err

@@ -14,7 +14,7 @@ gh-desk is split into packages by layer. A package imports only packages of lowe
 | 0 | `internal/tui/statusline` | What the status line shows: events for a moment, work in progress, the row's result | - | - |
 | 1 | `internal/config` | Reading the config file and reporting its mistakes | `internal/near` | `github.com/pelletier/go-toml/v2` |
 | 1 | `internal/tui/keymap` | Keys bound to actions by name | `internal/near` | - |
-| 2 | `internal/config/ui` | The settings page, one HTML file made from the settings and the lists last read, served on this machine | `internal/config` | - |
+| 2 | `internal/config/ui` | The settings page, one HTML file made from the settings and the lists last read, served on this machine, and shown on the site with made-up pull requests | `internal/config` | - |
 | 1 | `internal/plan` | Deciding how to merge each pull request; selection rules | `internal/model` | - |
 | 1 | `internal/diff` | Reading patches and the words that changed | - | - |
 | 2 | `internal/github` | GitHub's GraphQL and REST APIs | `internal/model`, `internal/logging` | `github.com/cli/go-gh/v2` |

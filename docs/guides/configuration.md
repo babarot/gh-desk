@@ -2,6 +2,37 @@
 
 Everything you can change lives in one file, `~/.config/gh-desk/config.toml` (or under `$XDG_CONFIG_HOME`). This page shows how to work with it and the changes most people make first; every setting is listed in the [configuration reference](../reference/configuration.md).
 
+## On a page
+
+`gh desk config edit --ui` opens a page in your browser with the settings of the file, and gh-desk drawn above them as they change. Rules, tabs, keys and themes are easier to try there.
+
+[The settings page, with made-up pull requests](https://babarot.me/gh-desk/settings/ "settings")
+
+That is the page itself, without gh-desk behind it: pick a theme or change the columns and the list follows, and See the file shows what would be written. Nothing is saved there. It holds the settings that need nothing else; the rest, with your own pull requests and the rules judged on them, are on the page gh-desk opens.
+
+Saving on the page checks the file as gh-desk does at start and replaces it, keeping the old file beside the new one as `config.toml.bak`. Settings you did not touch stay as they are, even where they match the default; your comments do not carry over.
+
+A change to anything but how things are drawn is listed in the terminal first, and saved only if you answer `y` there:
+
+```console
+the page asks to save:
+
+  claude.command: "claude" -> "my-claude"
+  and 1 that change only how things are drawn
+
+save them to ~/.config/gh-desk/config.toml? [y/N]
+```
+
+Any other answer leaves the file as it is and the page open. Secrets are not printed: the values of an MCP server's `env` and `headers` show as `(hidden)`. Without a terminal such a change is not saved; the page says so.
+
+Closing the page, with its Close button or by closing the tab, leaves without saving, as does ctrl+c. The page is served on this machine for as long as the command runs. When the file cannot be written, as one from the Nix store, the page says so and shows the new file under New file.
+
+The list on the page is the one gh-desk last read, as of the time it shows, under the account that read it; nothing goes to GitHub. Pick a tab above it to try a rule on that tab. A tab whose search gh-desk has not read yet says so, and before gh-desk has read anything the page shows made-up pull requests and says that too, until you run `gh desk` once.
+
+A rule is judged by gh-desk's own code, so its count is what `S` would select in that tab. `?` counts the pull requests it cannot tell yet: the description is not kept with the lists, so `packages` is always `?`, as are conditions on what was not read. The count of an `[[auto_approve]]` rule is of that tab; the rule itself searches on its own.
+
+MCP servers are shown and removed there; to add or change one, edit the file.
+
 ## The file
 
 The first run writes a short file with no settings in it. A setting left out takes its default, so write only what you change, and a default improved in a later version still reaches you.
@@ -40,33 +71,6 @@ $ gh desk config check
 ```
 
 A warning (something that is likely not what you meant, but does not stop gh-desk) is shown the same way, and gh-desk starts anyway.
-
-## On a page
-
-`gh desk config edit --ui` opens a page in your browser with the settings of the file, and gh-desk drawn above them as they change. Rules, tabs, keys and themes are easier to try there.
-
-Saving on the page checks the file as gh-desk does at start and replaces it, keeping the old file beside the new one as `config.toml.bak`. Settings you did not touch stay as they are, even where they match the default; your comments do not carry over.
-
-A change to anything but how things are drawn is listed in the terminal first, and saved only if you answer `y` there:
-
-```console
-the page asks to save:
-
-  claude.command: "claude" -> "my-claude"
-  and 1 that change only how things are drawn
-
-save them to ~/.config/gh-desk/config.toml? [y/N]
-```
-
-Any other answer leaves the file as it is and the page open. Secrets are not printed: the values of an MCP server's `env` and `headers` show as `(hidden)`. Without a terminal such a change is not saved; the page says so.
-
-Closing the page, with its Close button or by closing the tab, leaves without saving, as does ctrl+c. The page is served on this machine for as long as the command runs. When the file cannot be written, as one from the Nix store, the page says so and shows the new file under New file.
-
-The list on the page is the one gh-desk last read, as of the time it shows, under the account that read it; nothing goes to GitHub. Pick a tab above it to try a rule on that tab. A tab whose search gh-desk has not read yet says so, and before gh-desk has read anything the page shows made-up pull requests and says that too, until you run `gh desk` once.
-
-A rule is judged by gh-desk's own code, so its count is what `S` would select in that tab. `?` counts the pull requests it cannot tell yet: the description is not kept with the lists, so `packages` is always `?`, as are conditions on what was not read. The count of an `[[auto_approve]]` rule is of that tab; the rule itself searches on its own.
-
-MCP servers are shown and removed there; to add or change one, edit the file.
 
 ## After an update
 

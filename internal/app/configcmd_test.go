@@ -16,6 +16,7 @@ import (
 	"github.com/babarot/gh-desk/internal/config"
 	"github.com/babarot/gh-desk/internal/config/ui"
 	"github.com/babarot/gh-desk/internal/release"
+	"github.com/babarot/gh-desk/internal/tui"
 )
 
 // runConfig runs gh desk --config path config args.
@@ -403,6 +404,29 @@ func TestConfigUIData(t *testing.T) {
 	}
 	if got, err := os.ReadFile(path); err != nil || !bytes.Equal(got, want) {
 		t.Errorf("%s is not up to date; run go test ./internal/app -run TestConfigUIData -update", path)
+	}
+}
+
+// The page on the site says so, and the command's does not: it is what keeps
+// the page from asking a server that is not there.
+func TestSettingsDemo(t *testing.T) {
+	page, err := SettingsDemo()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Contains(page, []byte("const DEMO=true;")) {
+		t.Error("the page for the site does not say it is the demo")
+	}
+	shown, err := samplePreview(ui.SampleTime)
+	if err != nil {
+		t.Fatal(err)
+	}
+	own, err := ui.Page(ui.Input{Keys: uiKeys(), Themes: tui.Palettes(), Spinners: tui.Spinners(), Lists: shown.lists})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Contains(own, []byte("const DEMO=false;")) {
+		t.Error("the page of the command says it is the demo")
 	}
 }
 
