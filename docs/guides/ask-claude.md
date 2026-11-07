@@ -64,6 +64,8 @@ tools   = ["recall_search", "recall_list", "recall_export"]
 
 What the pull request says may call these tools. A server that reads private data, together with `WebFetch`, lets it send the data out, so keep `WebFetch` off with such a server.
 
+The [settings page](configuration.md#on-a-page) shows these servers and removes them; to add or change one, edit the file.
+
 The worktrees are kept while the pull request is open, so a conversation can be resumed; `gh desk gc` removes those of pull requests merged or closed.
 
 See [`[claude]`](../reference/configuration.md#claude) for the settings.

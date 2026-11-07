@@ -12,7 +12,7 @@ Accepted
 
 - The site publishes the page at `settings/`, and the configuration guide embeds it. `demo/site/build.sh` makes it with `app.SettingsDemo`, the same `ui.Page` the command uses, so it is the page of the release the site is of (ADR-055).
 - `ui.Input.Demo` makes this page. It draws the made-up pull requests, holds no file, and asks nothing of a server. A page on the site answers no one, so it takes this from what it was made with, not from its address.
-- It shows only what needs no gh-desk: Appearance, List and Tabs, in a layout that fits the column of a docs page. It keeps the list above them, which is what it is there to show.
+- It shows only what needs no gh-desk and what most people change first: Appearance, List, Tabs, Merging and Keys, in a layout that fits the column of a docs page. It keeps the list above them, which is what it is there to show.
 - It saves nothing. In place of saving it shows the file that would be written, and names the command.
 - Rejected: the pages of the rules without their counts. A rule that matches nothing because nothing judged it reads as a result (ADR-102).
 - Rejected: judging the rules in the browser with `gh-desk.wasm`. It loads the whole of gh-desk for a count on a docs page.

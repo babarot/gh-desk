@@ -38,4 +38,10 @@ Checking rules is AND; adding to the selection is OR, so (A and B) or C is chose
 
 The rows a tab is narrowed to with `f` are kept per tab, and matched again at every draw: a pull request approved, merged or pushed to shows or leaves as the rules say of it now. `esc` takes the narrowing away, together with the filter typed.
 
+## Trying a rule on your pull requests
+
+On the [settings page](configuration.md#on-a-page), Selection rules tries a rule as you write it, on the lists gh-desk last read. Pick a tab above it to try another; a tab whose search gh-desk has not read yet says so.
+
+A rule is judged by gh-desk's own code, so its count is what `S` would select in that tab. `?` counts the pull requests it cannot tell yet: the description is not kept with the lists, so `packages` is always `?`, as are conditions on what was not read. The count of an `[[auto_approve]]` rule is of that tab; the rule itself searches on its own.
+
 See [`[[select]]`](../reference/configuration.md#select) for every key of a rule.

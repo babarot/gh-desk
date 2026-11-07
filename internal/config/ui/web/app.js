@@ -18,7 +18,7 @@ const ic=(n,s=16)=>html`<svg class="i" width=${s} height=${s} viewBox="0 0 24 24
 const dark=matchMedia('(prefers-color-scheme: dark)'),resolved=m=>m==='auto'?(dark.matches?'dark':'light'):m;
 const S={file:null,d:null,ptab:0,page:'appearance',q:'',pref:'auto',mode:resolved('auto'),open:{},review:false,capture:null,infos:{},toast:'',scene:{}};
 // The page on the site (ADR-103): no gh-desk behind it, so only what needs none, in the frame of a docs page.
-const DEMO_PAGES=['appearance','list','tabs'];
+const DEMO_PAGES=['appearance','list','tabs','merge','keys'];
 if(DEMO){const t=new URLSearchParams(location.search).get('theme');if(t==='dark'||t==='light'){S.pref=t;S.mode=t}document.documentElement.classList.add('demo')}
 let bump=()=>{};
 dark.addEventListener('change',()=>{if(S.pref==='auto'){S.mode=resolved('auto');bump()}});
