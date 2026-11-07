@@ -10,8 +10,13 @@
   const load = b => {
     if (!b.isConnected) return;
     const f = document.createElement('iframe');
-    const theme = document.documentElement.classList.contains('dark') ? 'dark' : 'light';
-    f.src = b.dataset.src + (b.dataset.src.includes('?') ? '&' : '?') + 'theme=' + theme;
+    // A frame reads the key the theme is kept under, and hears of a switch
+    // through it; on system the frame follows the OS by itself.
+    const theme = localStorage.getItem('color-theme');
+    f.src = b.dataset.src;
+    if (theme === 'dark' || theme === 'light') {
+      f.src += (b.dataset.src.includes('?') ? '&' : '?') + 'theme=' + theme;
+    }
     f.title = b.dataset.title;
     f.allow = 'clipboard-write';
     b.closest('.desk-pg').replaceChildren(f);

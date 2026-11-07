@@ -19,7 +19,9 @@ const dark=matchMedia('(prefers-color-scheme: dark)'),resolved=m=>m==='auto'?(da
 const S={file:null,d:null,ptab:0,page:'appearance',q:'',pref:'auto',mode:resolved('auto'),open:{},review:false,capture:null,infos:{},toast:'',scene:{}};
 // The page on the site (ADR-103): no gh-desk behind it, so only what needs none, in the frame of a docs page.
 const DEMO_PAGES=['appearance','list','tabs','merge','keys'];
-if(DEMO){const t=new URLSearchParams(location.search).get('theme');if(t==='dark'||t==='light'){S.pref=t;S.mode=t}document.documentElement.classList.add('demo')}
+if(DEMO){const take=t=>{S.pref=t==='dark'||t==='light'?t:'auto';S.mode=resolved(S.pref)};let t=new URLSearchParams(location.search).get('theme');if(!t)try{t=localStorage.getItem('color-theme')}catch(e){}take(t);document.documentElement.classList.add('demo');
+  // Switched in the docs around this frame, or in another tab.
+  addEventListener('storage',e=>{if(e.key==='color-theme'){take(e.newValue);bump()}})}
 let bump=()=>{};
 dark.addEventListener('change',()=>{if(S.pref==='auto'){S.mode=resolved('auto');bump()}});
 const set=f=>{f(S);bump();judgeSoon()};

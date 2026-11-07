@@ -361,6 +361,15 @@
   matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
     if (!root.dataset.theme) start();
   });
+  // Switched somewhere else: in the docs around this frame, or in another tab.
+  addEventListener('storage', e => {
+    if (e.key !== 'color-theme') return;
+    const was = dark();
+    if (e.newValue === 'dark' || e.newValue === 'light') root.dataset.theme = e.newValue;
+    else delete root.dataset.theme;
+    showMode();
+    if (dark() !== was) start();
+  });
   showMode();
 
   document.fonts.load('13px "JetBrains Mono"').finally(start);
