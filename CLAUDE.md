@@ -43,7 +43,7 @@
 - Never edit the pages in `docs/reference` by hand, but its `README.md`; the tests write them from the code (ADR-051)
 - A directory's `README.md` is the page of its section on the site, as GitHub shows it with the directory
 - Never name a page `claude.md`: on a filesystem that ignores case, Claude Code reads it as its instructions
-- `mise run docs:serve` shows the docs with the playground as they are published; `mise run docs:test` is what CI checks
+- `mise run site:serve` shows the site as it is published; `mise run site:test` is what CI checks
 
 ## Test data
 

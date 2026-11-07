@@ -76,8 +76,10 @@ jobs:
           version: 2026.9.18
       - run: mise run vuln
 
-  # The demo on the site imports the internal packages from a module of its
-  # own, which go test ./... leaves out; a change that breaks it shows here
+  # The playground imports the internal packages from a module of its own,
+  # which go test ./... leaves out; a change that breaks it shows here. Hugo
+  # stops the build on a link in docs/ that leads to no page, and on any
+  # warning
   site:
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -93,28 +95,8 @@ jobs:
           cache-dependency-path: |
             go.sum
             demo/site/go.sum
+            docs/site/go.sum
       - uses: jdx/mise-action@6be3c7ed4c21d4f76b208d351d95aac273ebb76d # v5.2.4
         with:
           version: 2026.9.18
       - run: mise run site:test
-
-  # The docs site: Hugo stops the build on a link in docs/ that leads to no
-  # page, and on any warning
-  docs:
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    permissions:
-      contents: read
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      # Hugo reads the Hextra theme as a Go module
-      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
-        with:
-          go-version-file: go.mod
-          cache-dependency-path: docs/site/go.sum
-      - uses: jdx/mise-action@6be3c7ed4c21d4f76b208d351d95aac273ebb76d # v5.2.4
-        with:
-          version: 2026.9.18
-      - run: mise run docs:test

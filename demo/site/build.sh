@@ -1,7 +1,10 @@
 #!/usr/bin/env bash
-# Builds what the pages of the site need into demo/site/web: in play/,
-# gh-desk.wasm and the wasm_exec.js of the Go that built it, and in
-# play/settings/, the settings playground.
+# Builds the whole site into the directory given (by default ./site under
+# the repository, which is ignored and made anew): the pages in
+# demo/site/web, and what they need that is not kept in git. In play/,
+# gh-desk.wasm and the wasm_exec.js of the Go that built it; in
+# play/settings/, the settings playground; in docs/, the docs, which
+# docs/site/build.sh makes.
 #
 # Bubble Tea and atotto/clipboard have no files for js, so each is copied
 # out of the module cache with the file in demo/site/patch added, and the build
@@ -10,6 +13,14 @@
 set -euo pipefail
 
 site=$(cd "$(dirname "$0")" && pwd)
+repo=$(cd "$site/../.." && pwd)
+if [ $# -eq 0 ]; then
+  rm -rf "$repo/site"
+fi
+out=${1:-"$repo/site"}
+mkdir -p "$out"
+out=$(cd "$out" && pwd -P)
+cp -R "$site/web/." "$out/"
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
 cd "$site"
@@ -34,7 +45,8 @@ go mod edit -modfile="$work/go.mod" \
   "$(patched github.com/atotto/clipboard clipboard)"
 
 GOOS=js GOARCH=wasm CGO_ENABLED=0 go build -modfile="$work/go.mod" -trimpath -ldflags="-s -w" \
-  -o web/play/gh-desk.wasm ./wasm
-install -m 0644 "$(go env GOROOT)/lib/wasm/wasm_exec.js" web/play/wasm_exec.js
-go run ./settings web/play/settings/index.html
-ls -lh web/play/gh-desk.wasm
+  -o "$out/play/gh-desk.wasm" ./wasm
+install -m 0644 "$(go env GOROOT)/lib/wasm/wasm_exec.js" "$out/play/wasm_exec.js"
+go run ./settings "$out/play/settings/index.html"
+"$repo/docs/site/build.sh" "$out/docs"
+ls -lh "$out/play/gh-desk.wasm"

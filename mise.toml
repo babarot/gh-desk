@@ -45,37 +45,22 @@ description = "Record the demo with VHS in Docker into docs/demo.gif: mise run d
 file = "demo/recording/tapes/record.sh"
 
 [tasks."site:build"]
-description = "Build the landing page and the playground (gh-desk compiled to WebAssembly) into demo/site/web"
+description = "Build the whole site, the landing page, the playground and the docs, into ./site"
 run = "demo/site/build.sh"
 
 [tasks."site:serve"]
-description = "Build the site and serve it on http://127.0.0.1:8080"
-depends = ["site:build"]
-run = "python3 -m http.server 8080 --bind 127.0.0.1 --directory demo/site/web"
+description = "Build the site and serve it as published on http://localhost:8080/gh-desk/"
+run = "demo/site/serve.sh"
 
 [tasks."site:test"]
-description = "Check that the site builds: gh-desk compiled to WebAssembly against demo/internal/playground"
+description = "Check that the site builds: gh-desk compiled to WebAssembly against demo/internal/playground, every link of the docs leads to a page, and Hugo warns of nothing"
 run = '''
 test -z "$(gofmt -l demo/site)" || { gofmt -l demo/site; echo "gofmt: the files above are not formatted"; exit 1; }
-demo/site/build.sh
+out=$(mktemp -d)
+trap 'rm -rf "$out"' EXIT
+demo/site/build.sh "$out"
 '''
 
 [tasks."config-ui:test"]
 description = "Check the settings page without a browser: its list against gh-desk's, and what it writes"
 run = "node internal/config/ui/check.mjs"
-
-[tasks."docs:build"]
-description = "Build the docs site (Hugo with Hextra) from docs/ into ./site"
-run = "docs/site/build.sh"
-
-[tasks."docs:serve"]
-description = "Build the landing page, the playground and the docs as published, and serve them on http://localhost:8080/gh-desk/"
-run = "docs/site/preview.sh"
-
-[tasks."docs:test"]
-description = "Check that the docs site builds: every link leads to a page, and Hugo warns of nothing"
-run = '''
-out=$(mktemp -d)
-trap 'rm -rf "$out"' EXIT
-docs/site/build.sh "$out"
-'''

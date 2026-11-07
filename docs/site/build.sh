@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Builds the documentation site into the directory given (by default
-# ./site under the repository), with Hugo and the Hextra theme.
+# Builds the docs into the directory given, with Hugo and the Hextra
+# theme. demo/site/build.sh runs it for the whole site.
 #
 # The pages are the Markdown files of docs/, written to be read on GitHub
 # as well: a page starts with its "# title" and has no front matter. A
@@ -10,14 +10,14 @@
 # front matter Hugo needs. docs/adr, docs/architecture.md and docs/site
 # are not pages; a link to them leads to GitHub (layouts/_markup).
 #
-# A base URL other than hugo.yaml's is given with BASE_URL, as preview.sh
-# does.
+# A base URL other than hugo.yaml's is given with BASE_URL, as
+# demo/site/serve.sh does.
 set -euo pipefail
 
 site_dir=$(cd "$(dirname "$0")" && pwd)
 docs_dir=$(cd "$site_dir/.." && pwd)
 repo_dir=$(cd "$docs_dir/.." && pwd)
-out=${1:-"$repo_dir/site"}
+out=${1:?the directory to build into}
 mkdir -p "$out"
 out=$(cd "$out" && pwd -P)
 case "$out" in
