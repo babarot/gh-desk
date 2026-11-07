@@ -29,6 +29,6 @@ These replace, in ADR-082, "A merge takes its place when its batch starts, so th
 - The order of merges follows when their jobs end. It cannot be chosen by confirming in an order, nor told in advance, and which of two pull requests that touch the same files stops on a conflict depends on it.
 - In a repository that requires branches to be up to date, merges run one after the other as before, and jobs at work on a pull request that falls behind are wasted.
 - Approvals go out as soon as jobs end, not in the turn of the merge, so more of them stay on a pull request whose merge stops later.
-- Every waiting merge reads at once, which the shared read of ADR-103 keeps to one read a repository.
+- Every waiting merge reads at once, which the shared read of ADR-105 keeps to one read a repository.
 - A new step that moves the base must be inside the lane; a new wait must stay outside it.
 - [lanes_test.go](../../internal/runner/lanes_test.go) checks that a merge passes one whose jobs are at work, that merges of a repository do not overlap, and that a stacked pull request waits for its base.

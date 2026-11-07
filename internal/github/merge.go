@@ -167,7 +167,7 @@ func (n infoNode) toModel() model.MergeInfo {
 // runs of its head, which makes a larger query and a request for each
 // pull request. Deciding a merge needs them; watching auto-merge, reading a
 // pull request again to tell what happened to it, and telling whom to wake
-// among the waits of a repository (ADR-103) leave them out. A pull request
+// among the waits of a repository (ADR-105) leave them out. A pull request
 // that cannot be read is left out of the result.
 func (c *Client) MergeInfo(ctx context.Context, ids []string, details bool) (map[string]model.MergeInfo, error) {
 	out := map[string]model.MergeInfo{}

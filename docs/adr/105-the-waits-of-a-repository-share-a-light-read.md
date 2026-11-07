@@ -1,4 +1,4 @@
-# ADR-103: The waits of a repository share a light read
+# ADR-105: The waits of a repository share a light read
 
 ## Status
 
