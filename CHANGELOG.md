@@ -1,5 +1,13 @@
 # Changelog
 
+## [v0.14.0](https://github.com/babarot/gh-desk/compare/v0.13.0...v0.14.0) - 2026-11-07
+### New Features
+- Replace the config file from standard input with config apply by @babarot in https://github.com/babarot/gh-desk/pull/100
+- Edit the settings on a page with gh desk config edit --ui by @babarot in https://github.com/babarot/gh-desk/pull/101
+- Show the lists last read on the settings page by @babarot in https://github.com/babarot/gh-desk/pull/102
+### Bug fixes
+- Keep the cursor and the mark at the start of the line by @babarot in https://github.com/babarot/gh-desk/pull/98
+
 ## [v0.13.0](https://github.com/babarot/gh-desk/compare/v0.12.0...v0.13.0) - 2026-11-06
 ### New Features
 - Keep the questions of a triage and recall them from the text box by @babarot in https://github.com/babarot/gh-desk/pull/95
