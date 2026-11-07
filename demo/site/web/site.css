@@ -86,7 +86,8 @@ kbd {
 .theme:hover { color: var(--fg); background: var(--band); }
 .theme svg { display: none; width: 14px; height: 14px; }
 .theme[data-mode="light"] .for-light,
-.theme[data-mode="dark"] .for-dark { display: block; }
+.theme[data-mode="dark"] .for-dark,
+.theme[data-mode="system"] .for-system { display: block; }
 
 .hero { padding: 56px 24px 32px; max-width: 900px; margin-left: max(0px, calc((100vw - 1180px) / 2)); }
 h1 { font-size: clamp(34px, 5.5vw, 60px); line-height: 1.05; letter-spacing: -.03em; margin: 0 0 20px; font-weight: 800; }

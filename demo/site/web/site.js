@@ -344,21 +344,22 @@
     });
   });
 
-  // The theme follows the OS until the visitor switches it, here or in
-  // the docs, whose key keeps it. A change restarts gh-desk, which reads
-  // the terminal's background as it starts.
+  // Each click goes on to the next of system, light and dark, as in the
+  // docs, whose key keeps it. A change of what is drawn restarts gh-desk,
+  // which reads the terminal's background as it starts.
   const themeBtn = $('theme');
-  const showMode = () => { themeBtn.dataset.mode = dark() ? 'dark' : 'light'; };
+  const showMode = () => { themeBtn.dataset.mode = root.dataset.theme || 'system'; };
   themeBtn.addEventListener('click', () => {
-    root.dataset.theme = dark() ? 'light' : 'dark';
-    try { localStorage.setItem('color-theme', root.dataset.theme); } catch (e) {}
+    const was = dark();
+    const next = { system: 'light', light: 'dark', dark: 'system' }[root.dataset.theme || 'system'];
+    if (next === 'system') delete root.dataset.theme;
+    else root.dataset.theme = next;
+    try { localStorage.setItem('color-theme', next); } catch (e) {}
     showMode();
-    start();
+    if (dark() !== was) start();
   });
   matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
-    if (root.dataset.theme) return;
-    showMode();
-    start();
+    if (!root.dataset.theme) start();
   });
   showMode();
 

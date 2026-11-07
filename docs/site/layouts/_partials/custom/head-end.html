@@ -32,29 +32,26 @@
 })();
 </script>
 <script>
-// One click switches between light and dark, as on the playground, in place
-// of Hextra's menu. Its items do the switching, so what they keep is
-// Hextra's own; the theme follows the OS until it is switched, and the icon
-// always shows the theme in use.
+// Each click goes on to the next of system, light and dark, as on the
+// playground, in place of Hextra's menu. Its items do the switching, so what
+// they keep and the icon they set are Hextra's own.
 (() => {
-  const now = () => document.documentElement.classList.contains('dark') ? 'dark' : 'light';
-  const show = () => document.querySelectorAll('.hextra-theme-toggle').forEach(b => {
-    b.parentElement.dataset.theme = now();
-    b.removeAttribute('aria-haspopup');
-    b.removeAttribute('aria-expanded');
-  });
   document.addEventListener('click', e => {
     if (!e.target.closest('.hextra-theme-toggle')) return;
     e.preventDefault();
     e.stopImmediatePropagation();
-    const next = now() === 'dark' ? 'light' : 'dark';
+    const now = localStorage.getItem('color-theme');
+    const next = { light: 'dark', dark: 'system' }[now] || 'light';
     document.querySelector(`.hextra-theme-toggle-options [data-item=${next}]`).click();
   }, true);
-  document.addEventListener('DOMContentLoaded', show);
+  document.addEventListener('DOMContentLoaded', () => {
+    document.querySelectorAll('.hextra-theme-toggle').forEach(b => {
+      b.removeAttribute('aria-haspopup');
+      b.removeAttribute('aria-expanded');
+    });
+  });
   matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
-    if (localStorage.getItem('color-theme') !== 'system') return;
-    setTheme('system');
-    show();
+    if (localStorage.getItem('color-theme') === 'system') setTheme('system');
   });
 })();
 </script>
