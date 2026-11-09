@@ -618,10 +618,12 @@ type job struct {
 	head string
 	emit func(Event)
 	wg   *sync.WaitGroup
-	// approved is set once this job sent an approval.
-	approved bool
-	// readied is set once this job marked the draft ready.
-	readied bool
+	// approved is set once this job sent an approval, at approvedAt.
+	approved   bool
+	approvedAt time.Time
+	// readied is set once this job marked the draft ready, at readiedAt.
+	readied   bool
+	readiedAt time.Time
 	// closed is set once this job closed the pull request.
 	closed bool
 	// watching is set once the pull request is handed to watch, which
@@ -1054,13 +1056,15 @@ func (j *job) sendApproval(body string) bool {
 		return false
 	}
 	j.approved, j.pend.Approving = true, false
+	j.approvedAt = time.Now()
 	j.save()
 	return true
 }
 
 // decide reads the pull request and decides its next step, reading again
-// while GitHub works out whether it can be merged. Every read stops the job
-// if it finds the recorded approval dismissed.
+// while GitHub works out whether it can be merged, and while what this job
+// just wrote does not show yet. Every read stops the job if it finds the
+// recorded approval dismissed.
 func (j *job) decide() (model.MergeInfo, plan.Decision, bool) {
 	deadline := time.Now().Add(j.r.opt.RecheckFor)
 	// Reading again while GitHub works out whether it can be merged is a
@@ -1078,6 +1082,18 @@ func (j *job) decide() (model.MergeInfo, plan.Decision, bool) {
 		}
 		d := plan.ForMerge(mi, j.it.PR, j.r.opt.Viewer, j.r.opt.Settings)
 		j.log.Debug("decided", logging.KeyStep, string(d.Step), logging.KeyMergeState, string(mi.MergeState), "approve", d.Approve)
+		if j.unseen(d) {
+			// A read just after a write may not show it yet: the
+			// approval or ready this job sent looks taken back, and
+			// stopping would make the user confirm again for nothing.
+			w.at("visible", mi, nil)
+			j.say(Running, "checking")
+			if !j.sleep(j.r.opt.Recheck) {
+				w.end("canceled")
+				return mi, d, false
+			}
+			continue
+		}
 		if j.dismissed(d) || j.redrafted(d) {
 			w.end("stopped")
 			return mi, d, false
@@ -1311,9 +1327,17 @@ func (j *job) readyToMerge() bool {
 		j.unsure("ready for review failed: " + short(err))
 		return false
 	}
-	j.readied = true
+	j.readied, j.readiedAt = true, time.Now()
 	j.trigger = plan.Trigger{At: time.Now(), Always: true, For: j.r.opt.Quiet}
 	return true
+}
+
+// unseen reports whether a decision asks again for what this job wrote a
+// moment ago (RecheckFor): GitHub may answer a read just after a write from
+// before it. Past that time, dismissed and redrafted take it as undone.
+func (j *job) unseen(d plan.Decision) bool {
+	recent := func(at time.Time) bool { return !at.IsZero() && time.Since(at) < j.r.opt.RecheckFor }
+	return (d.Approve && j.approved && recent(j.approvedAt)) || (d.Ready && j.readied && recent(j.readiedAt))
 }
 
 // dismissed stops the job when a decision asks to approve although the
