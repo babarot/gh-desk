@@ -73,10 +73,12 @@ $XDG_CONFIG_HOME/gh-desk/config.toml, or ~/.config/gh-desk/config.toml.`,
 		Long: `Open the config file in review.editor, $VISUAL or $EDITOR, then check it.
 
 With --ui, open a page in the browser instead, with the settings of the
-file and gh-desk drawn as they change. It is served on this machine for as
-long as this runs. The list is the one gh-desk last read, as of the time it
-shows, under the account that read it, and nothing goes to GitHub; before
-anything was read, the page shows made-up pull requests and says so.
+file and gh-desk itself above them, following them as they change. It is
+served on this machine for as long as this runs. gh-desk there shows the
+lists it last read, as of the time it shows, under the account that read
+them; it reads nothing from GitHub and writes nothing, so approving,
+merging and the like do nothing there. Before anything was read, it shows
+made-up pull requests and says so.
 
 Saving on the page checks the file as gh-desk checks it at start and
 replaces it, keeping the old one beside it, with .bak added to its name.
@@ -291,9 +293,9 @@ func uiConfig(ctx context.Context, path string, debug bool, ask confirmer, open 
 		return 1
 	}
 	exists := err == nil
-	cfg := config.Default()
+	cfg, km := config.Default(), keymap.Default()
 	if exists {
-		if cfg, _, _, err = load(path, debug, new(slog.LevelVar)); err != nil {
+		if cfg, km, _, err = load(path, debug, new(slog.LevelVar)); err != nil {
 			fmt.Fprintln(stderr, err)
 			return 1
 		}
@@ -304,7 +306,7 @@ func uiConfig(ctx context.Context, path string, debug bool, ask confirmer, open 
 		return 1
 	}
 	page, err := ui.Page(ui.Input{File: ui.File{Path: config.TildePath(path), Src: src}, Keys: uiKeys(),
-		Themes: tui.Palettes(), Spinners: tui.Spinners(), Lists: shown.lists})
+		Themes: tui.Palettes(), Spinners: tui.Spinners(), Lists: shown.lists, Live: true})
 	if err != nil {
 		fmt.Fprintf(stderr, "gh-desk: %v\n", err)
 		return 1
@@ -316,7 +318,7 @@ func uiConfig(ctx context.Context, path string, debug bool, ask confirmer, open 
 		}
 		return nil
 	}
-	srv := &ui.Server{Page: page, Judge: func(src []byte) ([]byte, error) { return shown.judge(src, time.Now()) }, Save: func(ctx context.Context, made []byte) error {
+	srv := &ui.Server{Page: page, Terminal: newPreviewTerminal(shown, cfg, km), Judge: func(src []byte) ([]byte, error) { return shown.judge(src, time.Now()) }, Save: func(ctx context.Context, made []byte) error {
 		now, err := os.ReadFile(path)
 		if err != nil && !errors.Is(err, fs.ErrNotExist) {
 			return err

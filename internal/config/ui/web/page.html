@@ -1,7 +1,8 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>gh-desk settings</title>
-<style>{{.CSS}}</style></head><body><div id="root"></div>
+<style>{{.CSS}}</style>{{if .Live}}<style>{{.XtermCSS}}</style>{{end}}</head><body><div id="root"></div>
 <script>{{.Data}}</script>
 <script>{{.Vendor}}</script>
+{{if .Live}}<script>{{.Xterm}}</script>{{end}}
 <script type="module">{{.App}}</script>
 </body></html>
