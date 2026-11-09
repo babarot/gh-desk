@@ -42,7 +42,7 @@ const crop = lines => { const y = lines.findIndex(l => l.includes('╭')), x = l
 const scenes = Object.fromEntries(read('testdata/scenes.golden').split(/^=== /m).slice(1).map(s => { const i = s.indexOf('\n'); return [s.slice(0, i), s.slice(i + 1).trimEnd()]; }));
 const k = a => (KEYS.find(x => x.action === a)?.keys || [])[0];
 for (const scene of Object.keys(scenes)) {
-  const lines = mod.drawTui({ p, prs, cols: def('list.columns'), tabs, exclude: [], owners: [], stale: def('list.stale_days'), scene, key: k, menu: def('menu.actions') }).text().slice(1);
+  const lines = mod.drawTui({ p, prs, cols: def('list.columns'), tabs, exclude: [], owners: [], stale: def('list.stale_days'), scene, key: k }).text().slice(1);
   const page = crop(lines);
   if (page !== scenes[scene]) fail(`the popup ${scene} is not what gh-desk draws:\n--- gh-desk\n${scenes[scene]}\n--- page\n${page}`);
 }
