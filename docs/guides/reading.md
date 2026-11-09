@@ -21,3 +21,7 @@ The overview tab draws the description as Markdown (headings, lists, code, quote
 ## Checks
 
 The CI column sums up the checks. Checks that pass only after an approval, such as a policy bot's, can be named in `checks.approval`: while only they are pending, CI shows ◌, and they count as passing when a merge is decided.
+
+## Conflicts
+
+The MERGE column marks a pull request that conflicts with its base with ✗, and one behind its base with ↓; · is GitHub still working it out. It is read again with each reading of the list, so a pull request that comes to conflict when its base moves is marked at the next one. The pane's merge line says what a merge would do to the pull request it shows, such as "conflicts" or "wait for checks → merge".

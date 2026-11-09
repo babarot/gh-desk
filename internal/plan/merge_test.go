@@ -231,6 +231,12 @@ func TestForMergeDraft(t *testing.T) {
 	if d := ForMerge(failing, model.PR{Author: "me"}, "me", set); d.Step != StepSkip || d.Ready {
 		t.Errorf("failing draft: %+v", d)
 	}
+	// One that conflicts is left a draft.
+	dirty := draft(false)
+	dirty.MergeState = model.MergeDirty
+	if d := ForMerge(dirty, model.PR{Author: "me"}, "me", set); d.Step != StepSkip || d.Ready || d.Reason != "conflicts" {
+		t.Errorf("conflicting draft: %+v", d)
+	}
 }
 
 func TestAttentionNoteNamesPatterns(t *testing.T) {

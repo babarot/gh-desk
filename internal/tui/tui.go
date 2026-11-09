@@ -453,7 +453,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	// act on another one it was moved onto unseen.
 	var back func()
 	switch msg.(type) {
-	case heavyMsg, checksMsg, bodiesMsg, notifsMsg, inboxFirstMsg, inboxPRsMsg:
+	case heavyMsg, checksMsg, infoMsg, infoAgainMsg, bodiesMsg, notifsMsg, inboxFirstMsg, inboxPRsMsg:
 		back = m.holdCursor(m.tab())
 	}
 	_, cmd := m.update(msg)

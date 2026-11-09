@@ -1,8 +1,8 @@
 -- screen --
 desk // @me    1 review (3)   2 mine (1)   3 involved (0)   4 inbox (1)                           1 to you · 1 to a team · 1 bots
-    PR                        TITLE                                  AUTHOR          CI  REVIEW   WHY         SIZE          AGE
+    PR                        TITLE                           AUTHOR          CI  MERGE  REVIEW   WHY         SIZE          AGE
   ▾ requested from you 1
-▎ ● api#12                    Add retries to the client              alice           ✓   ○        you         +40 −3         3h   
+▎ ● api#12                    Add retries to the client       alice           ✓          ○        you         +40 −3         3h   
   ▸ requested from a team 1
   ▸ bots 1
 
@@ -53,9 +53,9 @@ L3 23-24 fg=#616e88
 L4 0-4 fg=#81a1c1 bg=#3b4252
 L4 4-7 fg=#e5e9f0 bg=#3b4252
 L4 7-30 fg=#7b88a1 bg=#3b4252
-L4 30-69 fg=#eceff4 bg=#3b4252
-L4 69-85 fg=#d8dee9 bg=#3b4252
-L4 85-89 fg=#a3be8c bg=#3b4252
+L4 30-62 fg=#eceff4 bg=#3b4252
+L4 62-78 fg=#d8dee9 bg=#3b4252
+L4 78-89 fg=#a3be8c bg=#3b4252
 L4 89-98 fg=#7b88a1 bg=#3b4252
 L4 98-110 fg=#d08770 bg=#3b4252 bold
 L4 110-114 fg=#a3be8c bg=#3b4252

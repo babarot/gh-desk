@@ -10,6 +10,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/babarot/gh-desk/internal/diff"
+	"github.com/babarot/gh-desk/internal/logging"
 	"github.com/babarot/gh-desk/internal/model"
 	"github.com/babarot/gh-desk/internal/plan"
 )
@@ -463,8 +464,14 @@ type entry[T any] struct {
 // cache holds what is read for one pull request when it is looked at.
 type cache struct {
 	// info is what deciding a merge needs, with single checks, read for
-	// the pull requests whose checks are pending and for a confirm popup.
+	// the pull request the pane shows, those whose checks are pending and
+	// for a confirm popup; infoRead are the pull requests the pane asked it
+	// for, kept after a failed read so it is not asked again until r.
 	info     map[model.PRKey]model.MergeInfo
+	infoRead map[model.PRKey]bool
+	// unknown counts the reads of each pull request's merge information
+	// that found GitHub still working out whether it can be merged.
+	unknown  map[model.PRKey]int
 	bodies   map[model.PRKey]string
 	diffs    map[string]*entry[[]diff.File]
 	details  map[model.PRKey]*entry[model.Detail]
@@ -472,7 +479,7 @@ type cache struct {
 }
 
 func newCache() cache {
-	return cache{info: map[model.PRKey]model.MergeInfo{}, bodies: map[model.PRKey]string{}, diffs: map[string]*entry[[]diff.File]{}, details: map[model.PRKey]*entry[model.Detail]{},
+	return cache{info: map[model.PRKey]model.MergeInfo{}, infoRead: map[model.PRKey]bool{}, unknown: map[model.PRKey]int{}, bodies: map[model.PRKey]string{}, diffs: map[string]*entry[[]diff.File]{}, details: map[model.PRKey]*entry[model.Detail]{},
 		comments: map[string]*entry[model.Comment]{}}
 }
 
@@ -707,6 +714,14 @@ func (m *Model) handleData(msg tea.Msg) tea.Cmd {
 		return m.bodies(msg)
 	case checksMsg:
 		maps.Copy(m.cache.info, msg.got)
+	case infoMsg:
+		return m.infoRead(msg)
+	case infoAgainMsg:
+		// Still unknown: read it again, if the pane still shows it.
+		if mi, ok := m.cache.info[msg.key]; ok && mi.MergeState == model.MergeUnknown {
+			delete(m.cache.info, msg.key)
+			return m.ensure()
+		}
 	}
 	return nil
 }
@@ -736,6 +751,9 @@ func (m *Model) ensure() tea.Cmd {
 		return nil
 	}
 	cmds = append(cmds, m.ensureDiff(p))
+	if m.pane.on {
+		cmds = append(cmds, m.ensureInfo(p))
+	}
 	if p.AuthorIsBot || m.pane.mode == paneOverview {
 		cmds = append(cmds, m.ensureDetail(p.Key))
 	}
@@ -781,6 +799,57 @@ func (m *Model) ensureDetail(k model.PRKey) tea.Cmd {
 		d, err := m.src.Detail(m.ctx, k)
 		return detailMsg{key: k, e: e, d: d, err: err}
 	}
+}
+
+// infoMsg is what deciding a merge needs of the pull request the pane
+// shows.
+type infoMsg struct {
+	key model.PRKey
+	mi  model.MergeInfo
+	ok  bool
+}
+
+// ensureInfo reads what deciding a merge needs of an open pull request, so
+// the pane says what a merge would do: that it conflicts, is behind its
+// base, or waits for checks.
+func (m *Model) ensureInfo(p model.PR) tea.Cmd {
+	if _, ok := m.cache.info[p.Key]; ok || m.cache.infoRead[p.Key] || p.ID == "" || p.State != model.StateOpen {
+		return nil
+	}
+	m.cache.infoRead[p.Key] = true
+	return func() tea.Msg {
+		got, err := m.src.MergeInfo(m.ctx, []string{p.ID}, true)
+		if err != nil {
+			m.log.Warn("merge info", logging.KeyPR, p.Key.String(), "err", err.Error())
+		}
+		mi, ok := got[p.ID]
+		return infoMsg{key: p.Key, mi: mi, ok: ok}
+	}
+}
+
+// infoAgainMsg asks for a pull request's merge information again, read
+// while GitHub was still working out whether it can be merged.
+type infoAgainMsg struct{ key model.PRKey }
+
+// GitHub works out whether a pull request can be merged when it is first
+// asked, and says it does not know yet meanwhile: such a read is tried
+// again after unknownWait, up to unknownTries times.
+const (
+	unknownWait  = 3 * time.Second
+	unknownTries = 3
+)
+
+func (m *Model) infoRead(msg infoMsg) tea.Cmd {
+	if !msg.ok {
+		return nil
+	}
+	m.cache.info[msg.key] = msg.mi
+	delete(m.cache.infoRead, msg.key)
+	if msg.mi.MergeState != model.MergeUnknown || m.cache.unknown[msg.key] >= unknownTries {
+		return nil
+	}
+	m.cache.unknown[msg.key]++
+	return m.after(unknownWait, infoAgainMsg{msg.key})
 }
 
 func (m *Model) ensureComment(url string) tea.Cmd {
@@ -892,6 +961,8 @@ func (m *Model) tabRead(msg tabMsg) tea.Cmd {
 	for _, p := range msg.prs {
 		if mi, ok := m.cache.info[p.Key]; ok && mi.HeadOID != p.HeadOID {
 			delete(m.cache.info, p.Key)
+			delete(m.cache.infoRead, p.Key)
+			delete(m.cache.unknown, p.Key)
 		}
 	}
 	t.want = min(msg.total, t.limit)

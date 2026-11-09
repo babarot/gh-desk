@@ -660,7 +660,7 @@ func TestColumns(t *testing.T) {
 	wantErrs(t, "[list]\ncolumns = [\"pr\", \"age\", \"age\", \"authr\"]\n",
 		`config.toml:2:25: list.columns names "age" twice`,
 		`list.columns must have "title"`,
-		`list.columns[3] must be one of "pr", "title", "author", "ci", "review", "why", "size", "age", got "authr"; did you mean "author"?`)
+		`list.columns[3] must be one of "pr", "title", "author", "ci", "merge", "review", "why", "size", "age", got "authr"; did you mean "author"?`)
 }
 
 func TestMenuActions(t *testing.T) {

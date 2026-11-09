@@ -100,11 +100,14 @@ type PR struct {
 	Comments     int
 	Decision     ReviewDecision
 	Checks       CheckState
-	Requested    []Reviewer
-	Reviews      []Review
-	Labels       []string
+	// Merge is whether GitHub would merge it now, and if not, why:
+	// whether it conflicts with its base or is behind it.
+	Merge     MergeState
+	Requested []Reviewer
+	Reviews   []Review
+	Labels    []string
 	// HeavyHead is the head the heavy fields (Additions, Deletions,
-	// ChangedFiles, Comments, Decision, Checks, Labels) were read for;
+	// ChangedFiles, Comments, Decision, Checks, Merge, Labels) were read for;
 	// empty until they are. A list's search reads only the light fields.
 	HeavyHead string
 }
@@ -122,19 +125,20 @@ type Heavy struct {
 	Comments     int
 	Decision     ReviewDecision
 	Checks       CheckState
+	Merge        MergeState
 	Labels       []string
 }
 
 // SetHeavy puts h in p.
 func (p *PR) SetHeavy(h Heavy) {
 	p.Additions, p.Deletions, p.ChangedFiles, p.Comments = h.Additions, h.Deletions, h.ChangedFiles, h.Comments
-	p.Decision, p.Checks, p.Labels, p.HeavyHead = h.Decision, h.Checks, h.Labels, h.HeadOID
+	p.Decision, p.Checks, p.Merge, p.Labels, p.HeavyHead = h.Decision, h.Checks, h.Merge, h.Labels, h.HeadOID
 }
 
 // Heavy is p's heavy fields.
 func (p PR) Heavy() Heavy {
 	return Heavy{HeadOID: p.HeavyHead, Additions: p.Additions, Deletions: p.Deletions, ChangedFiles: p.ChangedFiles,
-		Comments: p.Comments, Decision: p.Decision, Checks: p.Checks, Labels: p.Labels}
+		Comments: p.Comments, Decision: p.Decision, Checks: p.Checks, Merge: p.Merge, Labels: p.Labels}
 }
 
 // ReviewBy is login's latest review, if there is one.

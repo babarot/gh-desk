@@ -143,6 +143,8 @@ func TestDescriptionPaneParts(t *testing.T) {
 func TestNarrowPaneHasFactsAbove(t *testing.T) {
 	m := start(t, fixture(), keymap.Default())
 	m.Update(tea.WindowSizeMsg{Width: 90, Height: 40})
+	// Room for the facts, the merge line among them, and the first part.
+	m.resizePane(m.pane.height + 2)
 	s := screen(m)
 	if strings.Contains(s, " │ status") {
 		t.Fatalf("a column of facts at 90 cells:\n%s", s)
@@ -186,7 +188,7 @@ func TestFactsWrapAndCountWhatIsCut(t *testing.T) {
 	}
 	// Six lines left in the pane: the last says what is cut.
 	press(m, "-", "-", "-", "-", "-", "-")
-	if s := screen(m); !strings.Contains(s, "│ +1 more") {
+	if s := screen(m); !strings.Contains(s, "│ +2 more") {
 		t.Errorf("no count of the facts cut:\n%s", s)
 	}
 }

@@ -130,6 +130,7 @@
   "ChangedFiles": 41,
   "Decision": "",
   "Checks": "FAILURE",
+  "Merge": "DIRTY",
   "Labels": [
    "wip"
   ],
@@ -153,6 +154,7 @@
   "ChangedFiles": 1,
   "Decision": "APPROVED",
   "Checks": "SUCCESS",
+  "Merge": "BEHIND",
   "Labels": [
    "deps"
   ],

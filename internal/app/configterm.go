@@ -1,6 +1,7 @@
 package app
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"io"
@@ -126,9 +127,9 @@ func (s previewSource) MarkDone(context.Context, model.Notification) error { ret
 func (s previewSource) Browse(string) error                                { return errPreviewWrites }
 
 // MergeInfo is what the lists say of each pull request. The repository's
-// merge methods and whether the pull request can merge are not in them: the
-// preview takes every method and auto-merge as allowed and the pull request
-// as clean, and the confirm says so.
+// merge methods are not in them: the preview takes every method and
+// auto-merge as allowed, and a pull request whose merge state the lists
+// leave out as clean, and the confirm says so.
 func (s previewSource) MergeInfo(_ context.Context, ids []string, _ bool) (map[string]model.MergeInfo, error) {
 	out := map[string]model.MergeInfo{}
 	for _, id := range ids {
@@ -137,7 +138,7 @@ func (s previewSource) MergeInfo(_ context.Context, ids []string, _ bool) (map[s
 			continue
 		}
 		mi := model.MergeInfo{Key: p.Key, ID: p.ID, State: p.State, Draft: p.Draft, HeadOID: p.HeadOID,
-			MergeState: model.MergeClean, Decision: p.Decision, Rollup: p.Checks, Reviews: p.Reviews,
+			MergeState: cmp.Or(p.Merge, model.MergeClean), Decision: p.Decision, Rollup: p.Checks, Reviews: p.Reviews,
 			Repo: model.RepoMerge{Methods: []model.MergeMethod{model.MethodMerge, model.MethodSquash, model.MethodRebase}, AutoMerge: true}}
 		if mi.State == "" {
 			mi.State = model.StateOpen

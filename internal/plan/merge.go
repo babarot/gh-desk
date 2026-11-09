@@ -337,6 +337,11 @@ func ForMerge(mi model.MergeInfo, pr model.PR, viewer string, set Settings) Deci
 		if !OwnOrBot(pr, viewer) {
 			return skip("someone else's draft")
 		}
+		// GitHub may say a draft conflicts rather than that it is one;
+		// marking it ready would not make it mergeable.
+		if mi.MergeState == model.MergeDirty {
+			return skip("conflicts")
+		}
 		d.Ready = true
 	}
 	if Failing(mi) {

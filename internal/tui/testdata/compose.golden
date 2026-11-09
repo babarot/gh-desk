@@ -1,6 +1,6 @@
 -- screen --
 desk // @me    1 review (3)   2 mine (1)   3 involved (0)   4 inbox (1)                           1 to you · 1 to a team · 1 bots
-    PR                        TITLE                                  AUTHOR          CI  REVIEW   WHY         SIZE          AGE
+    PR                        TITLE                           AUTHOR          CI  MERGE  REVIEW   WHY         SIZE          AGE
   ▾ requested f╭ acme/api#12 · review ────────────────────────────────────────────────────────────────────────────╮
 ▎ ● api#12     │ Add retries to the client                                                                        │3         3h
   ▸ requested f│  comment   approve   request changes                                                             │
@@ -21,13 +21,13 @@ desk // @me    1 review (3)   2 mine (1)   3 involved (0)   4 inbox (1)         
 
 ╭  overview   diff (2)  ────────────────────────────────────────────────────────────────────────────────── acme/api#12 · J/K · v ╮
 │ #12 Add retries to the client                                                       alice │ status    open                     │
-│ ▾ description ─────────────────────────────────────────────────────────────────────────── │ requested me @core                 │
-│ │ What                                                                                    │ checks    ✓1                       │
-│ │ Retry failed requests.                                                                  │ size      +40 −3 · 2 files         │
-│ ╵                                                                                         │ branch    retries                  │
-│                                                                                           │           → main                   │
-│ ▾ checks (1)  ✓1 ──────────────────────────────────────────────────────────────────────── │ updated   3h ago                   │
-│ │ ✓ test                                                                                  │                                    │
+│ ▾ description ─────────────────────────────────────────────────────────────────────────── │ merge     approve → merge now      │
+│ │ What                                                                                    │ requested me @core                 │
+│ │ Retry failed requests.                                                                  │ checks    ✓1                       │
+│ ╵                                                                                         │ size      +40 −3 · 2 files         │
+│                                                                                           │ branch    retries                  │
+│ ▾ checks (1)  ✓1 ──────────────────────────────────────────────────────────────────────── │           → main                   │
+│ │ ✓ test                                                                                  │ updated   3h ago                   │
 │ ╵                                                                                         │                                    │
 │                                                                                           │                                    │
 ╰────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯

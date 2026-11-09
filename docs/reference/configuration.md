@@ -191,7 +191,7 @@ Owners whose name is left out of the PR column, such as your company.
 
 ### list.columns
 
-list of `pr`, `title`, `author`, `ci`, `review`, `why`, `size`, `age` · Default: `["pr", "title", "author", "ci", "review", "why", "size", "age"]`
+list of `pr`, `title`, `author`, `ci`, `merge`, `review`, `why`, `size`, `age` · Default: `["pr", "title", "author", "ci", "merge", "review", "why", "size", "age"]`
 
 The columns shown, in the order given; "pr" and "title" are needed. WHY shows on grouped tabs and the inbox only, and AUTHOR not on a tab of your own pull requests. On a narrow terminal SIZE goes first, then AUTHOR.
 
