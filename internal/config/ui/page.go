@@ -38,6 +38,12 @@ var appJS string
 //go:embed web/icons.json
 var iconsJSON string
 
+//go:embed web/xterm.js
+var xtermJS string
+
+//go:embed web/xterm.css
+var xtermCSS string
+
 // SamplePRs are the made-up pull requests shown when no list was read yet,
 // as model.PR in JSON, updated relative to SampleTime.
 //
@@ -114,6 +120,9 @@ type Input struct {
 	// Playground makes the settings playground: no gh-desk answers it, so it shows
 	// only what needs none, and saves nothing.
 	Playground bool
+	// Live has the page show gh-desk itself, which the server's Terminal
+	// runs, in place of the list drawn again (ADR-109).
+	Live bool
 }
 
 type boot struct {
@@ -140,10 +149,13 @@ func Page(in Input) ([]byte, error) {
 	}
 	var b bytes.Buffer
 	err = t.Execute(&b, map[string]any{
-		"CSS":    template.CSS(appCSS),
-		"Data":   template.JS(data),
-		"Vendor": template.JS(htmJS),
-		"App":    template.JS(modelJS + "\n" + tuiJS + "\n" + appJS),
+		"CSS":      template.CSS(appCSS),
+		"Data":     template.JS(data),
+		"Vendor":   template.JS(htmJS),
+		"App":      template.JS(modelJS + "\n" + tuiJS + "\n" + appJS),
+		"Live":     in.Live && !in.Playground,
+		"XtermCSS": template.CSS(xtermCSS),
+		"Xterm":    template.JS(xtermJS),
 	})
 	return b.Bytes(), err
 }
@@ -153,7 +165,7 @@ func dataJS(in Input, file map[string]any) (string, error) {
 	for _, v := range []struct {
 		name string
 		v    any
-	}{{"DATA", config.UI()}, {"KEYS", in.Keys}, {"THEMES", in.Themes}, {"SPIN", in.Spinners}, {"BOOT", boot{in.File.Path, file}}, {"LISTS", in.Lists}, {"PLAYGROUND", in.Playground}} {
+	}{{"DATA", config.UI()}, {"KEYS", in.Keys}, {"THEMES", in.Themes}, {"SPIN", in.Spinners}, {"BOOT", boot{in.File.Path, file}}, {"LISTS", in.Lists}, {"PLAYGROUND", in.Playground}, {"LIVE", in.Live && !in.Playground}} {
 		j, err := json.Marshal(v.v)
 		if err != nil {
 			return "", err

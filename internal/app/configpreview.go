@@ -29,6 +29,8 @@ type preview struct {
 	lists  ui.Lists
 	viewer string
 	rows   []previewRow
+	// shown are the same lists for gh-desk itself on the page.
+	shown *previewLists
 }
 
 func (p *preview) row(pr model.PR, reason string, now time.Time) ui.PR {
@@ -55,7 +57,7 @@ func newPreview(cfg config.File, now time.Time, log *slog.Logger) (*preview, err
 	if len(saved.Lists) == 0 && saved.Inbox == nil {
 		return samplePreview(now)
 	}
-	p := &preview{viewer: saved.Viewer}
+	p := &preview{viewer: saved.Viewer, shown: savedLists(saved)}
 	p.lists = ui.Lists{Viewer: saved.Viewer, Tabs: map[string]ui.List{}}
 	for _, l := range saved.Lists {
 		p.lists.Tabs[l.Query] = p.list(l.PRs, l.Read, now)
@@ -91,7 +93,7 @@ func samplePreview(now time.Time) (*preview, error) {
 	if err != nil {
 		return nil, err
 	}
-	p := &preview{viewer: sampleViewer}
+	p := &preview{viewer: sampleViewer, shown: &previewLists{every: &listcache.List{Total: len(prs), Read: now, PRs: prs}}}
 	p.lists = ui.Lists{Viewer: sampleViewer, Sample: p.list(prs, now, now).PRs}
 	return p, nil
 }

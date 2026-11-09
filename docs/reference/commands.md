@@ -103,10 +103,12 @@ Global Flags:
 Open the config file in review.editor, $VISUAL or $EDITOR, then check it.
 
 With --ui, open a page in the browser instead, with the settings of the
-file and gh-desk drawn as they change. It is served on this machine for as
-long as this runs. The list is the one gh-desk last read, as of the time it
-shows, under the account that read it, and nothing goes to GitHub; before
-anything was read, the page shows made-up pull requests and says so.
+file and gh-desk itself above them, following them as they change. It is
+served on this machine for as long as this runs. gh-desk there shows the
+lists it last read, as of the time it shows, under the account that read
+them; it reads nothing from GitHub and writes nothing, so approving,
+merging and the like do nothing there. Before anything was read, it shows
+made-up pull requests and says so.
 
 Saving on the page checks the file as gh-desk checks it at start and
 replaces it, keeping the old one beside it, with .bak added to its name.
