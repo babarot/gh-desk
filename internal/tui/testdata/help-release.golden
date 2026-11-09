@@ -1,8 +1,8 @@
 -- screen --
 desk // @me    1 review (3)   2 mine (1)   3 involved (0)   4 inbox (1)                           1 to you · 1 to a team · 1 bots
-    PR                        TITLE                                  AUTHOR          CI  REVIEW   WHY         SIZE          AGE
+    PR                        TITLE                           AUTHOR          CI  MERGE  REVIEW   WHY         SIZE          AGE
   ▾ requested from you 1
-▎ ● api#12                    Add retries to the client              alice           ✓   ○        you         +40 −3         3h
+▎ ● api#12                    Add retries to the client       alice           ✓          ○        you         +40 −3         3h
   ▸ requested from a team 1
   ▸ bots 1                       ╭ keys · z fold · ? esc close ─────────────────────────────────╮
                                  │           gh-desk 0.7.0 · https://github.com/babarot/gh-desk │
@@ -21,13 +21,13 @@ desk // @me    1 review (3)   2 mine (1)   3 involved (0)   4 inbox (1)         
                                  │   S               select by rule                             │
 ╭  overview   diff (2)  ─────────│   u               clear / restore selection                  │───────── acme/api#12 · J/K · v ╮
 │ #12 Add retries to the client  │   A               approve                                    │tus    open                     │
-│ ▾ description ─────────────────│   M               merge                                      │uested me @core                 │
-│ │ What                         │   D               draft / ready                              │cks    ✓1                       │
-│ │ Retry failed requests.       │   c               comment                                    │e      +40 −3 · 2 files         │
-│ ╵                              │   R               review                                     │nch    retries                  │
-│                                │   C               triage with claude                         │       → main                   │
-│ ▾ checks (1)  ✓1 ──────────────╰─────────────────────────────────────────── ↓ 26 · j k wheel ─╯ated   3h ago                   │
-│ │ ✓ test                                                                                  │                                    │
+│ ▾ description ─────────────────│   M               merge                                      │ge     approve → merge now      │
+│ │ What                         │   D               draft / ready                              │uested me @core                 │
+│ │ Retry failed requests.       │   c               comment                                    │cks    ✓1                       │
+│ ╵                              │   R               review                                     │e      +40 −3 · 2 files         │
+│                                │   C               triage with claude                         │nch    retries                  │
+│ ▾ checks (1)  ✓1 ──────────────╰─────────────────────────────────────────── ↓ 26 · j k wheel ─╯       → main                   │
+│ │ ✓ test                                                                                  │ updated   3h ago                   │
 │ ╵                                                                                         │                                    │
 │                                                                                           │                                    │
 ╰────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
@@ -138,12 +138,12 @@ L27 33-34 fg=#96bfff
 L27 37-38 fg=#96bfff bold
 L27 53-71 fg=#8888a4
 L27 96-97 fg=#96bfff
-L27 104-130 fg=#706f87
+L27 97-130 fg=#706f87
 L28 0-33 fg=#706f87
 L28 33-77 fg=#96bfff
 L28 78-94 fg=#706f87
 L28 95-97 fg=#96bfff
-L28 97-130 fg=#706f87
+L28 104-130 fg=#706f87
 L29 0-130 fg=#706f87
 L30 0-130 fg=#706f87
 L31 0-130 fg=#706f87

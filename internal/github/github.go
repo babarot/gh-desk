@@ -135,7 +135,8 @@ func (c *Client) Viewer(ctx context.Context) (string, error) {
 }
 
 // The fields of a pull request come in two parts. GitHub works out the
-// heavy ones (the review decision, the checks' rollup, the line counts)
+// heavy ones (the review decision, the checks' rollup, whether it can be
+// merged, the line counts)
 // for each pull request, which makes a search of 50 take seconds longer, so
 // a list's search reads only the light ones and the heavy ones are read
 // after, by node ID (Heavy).
@@ -154,7 +155,7 @@ fragment light on PullRequest {
 // points.
 const heavyFields = `
 fragment heavy on PullRequest {
-  headRefOid additions deletions changedFiles reviewDecision
+  headRefOid additions deletions changedFiles reviewDecision mergeStateStatus
   labels(first: 100) { nodes { name } }
   comments { totalCount }
   commits(last: 1) { nodes { commit { statusCheckRollup { state } } } }
@@ -165,23 +166,24 @@ const prFields = `
 fragment pr on PullRequest { ...light ...heavy }` + lightFields + heavyFields
 
 type prNode struct {
-	ID             string
-	Number         int
-	Title          string
-	URL            string
-	State          string
-	IsDraft        bool
-	CreatedAt      time.Time
-	UpdatedAt      time.Time
-	HeadRefName    string
-	HeadRefOid     string
-	BaseRefName    string
-	HeadRepository *struct{ NameWithOwner string }
-	Additions      int
-	Deletions      int
-	ChangedFiles   int
-	ReviewDecision string
-	Author         *struct {
+	ID               string
+	Number           int
+	Title            string
+	URL              string
+	State            string
+	IsDraft          bool
+	CreatedAt        time.Time
+	UpdatedAt        time.Time
+	HeadRefName      string
+	HeadRefOid       string
+	BaseRefName      string
+	HeadRepository   *struct{ NameWithOwner string }
+	Additions        int
+	Deletions        int
+	ChangedFiles     int
+	ReviewDecision   string
+	MergeStateStatus string
+	Author           *struct {
 		Login    string
 		Typename string `json:"__typename"`
 	}
@@ -223,7 +225,7 @@ func (n prNode) toModel(heavy bool) (model.PR, bool) {
 		Title: n.Title, URL: n.URL, State: model.PRState(n.State), Draft: n.IsDraft,
 		Created: n.CreatedAt, Updated: n.UpdatedAt, HeadRef: n.HeadRefName, HeadOID: n.HeadRefOid, BaseRef: n.BaseRefName,
 		Additions: n.Additions, Deletions: n.Deletions, ChangedFiles: n.ChangedFiles, Comments: n.Comments.TotalCount,
-		Decision: model.ReviewDecision(n.ReviewDecision),
+		Decision: model.ReviewDecision(n.ReviewDecision), Merge: model.MergeState(n.MergeStateStatus),
 	}
 	if n.HeadRepository != nil {
 		p.HeadRepo = n.HeadRepository.NameWithOwner

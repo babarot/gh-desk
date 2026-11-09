@@ -72,6 +72,7 @@ func (m *Model) refresh() tea.Cmd {
 	// so may the pane's description, checks and comments, read once a pull
 	// request.
 	clear(m.cache.info)
+	clear(m.cache.infoRead)
 	clear(m.cache.details)
 	clear(m.cache.comments)
 	n := m.clearResults()

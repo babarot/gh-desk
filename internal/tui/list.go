@@ -129,6 +129,7 @@ func (m *Model) listKey(k string) tea.Cmd {
 		return m.openLog()
 	case is("preview"):
 		m.pane.on = !m.pane.on
+		return m.ensure()
 	case is("preview_grow"):
 		return m.resizePane(m.pane.height + 1)
 	case is("preview_shrink"):
@@ -451,7 +452,7 @@ type column struct {
 // columnDefs are every column, in the default order.
 var columnDefs = []column{
 	{id: "pr", title: "PR", width: 24}, {id: "title", title: "TITLE"}, {id: "author", title: "AUTHOR", width: 14},
-	{id: "ci", title: "CI", width: 2}, {id: "review", title: "REVIEW", width: 7}, {id: "why", title: "WHY", width: 10},
+	{id: "ci", title: "CI", width: 2}, {id: "merge", title: "MERGE", width: 5}, {id: "review", title: "REVIEW", width: 7}, {id: "why", title: "WHY", width: 10},
 	{id: "size", title: "SIZE", width: 11}, {id: "age", title: "AGE", width: 4, right: true},
 }
 
@@ -462,7 +463,7 @@ const rowLead = 4
 
 // dropFirst are the columns left out on a narrow terminal, first to last,
 // while TITLE would be narrower than minTitle; the others are never left
-// out (ADR-017). minTitle keeps SIZE down to 120 columns with all the
+// out (ADR-017). minTitle keeps SIZE down to 127 columns with all the
 // columns on a grouped tab.
 var dropFirst = []string{"size", "author"}
 
@@ -877,7 +878,7 @@ func (m *Model) cell(id string, r row, sel bool, n int) string {
 		return st.text.Render(shownTitle(p.Title))
 	case "author":
 		return m.author(p).text
-	case "ci", "review", "size":
+	case "ci", "merge", "review", "size":
 		if !p.HeavyRead() {
 			// Nothing in a cell moves: the status line tells how far the
 			// reading is (ADR-050). ⋅, not ·, which is East Asian
@@ -892,6 +893,11 @@ func (m *Model) cell(id string, r row, sel bool, n int) string {
 			return st.muted.Render("◌")
 		}
 		return m.ciMark(p.Checks)
+	case "merge":
+		if p.State != model.StateOpen {
+			return ""
+		}
+		return m.mergeMark(p.Merge)
 	case "review":
 		s := m.decisionMark(p.Decision)
 		if r, ok := p.ReviewBy(m.viewer); ok && m.viewer != "" {
@@ -941,6 +947,22 @@ func (m *Model) ciMark(c model.CheckState) string {
 		return m.st.yellow.Render("●")
 	}
 	return m.st.dim.Render("·")
+}
+
+// mergeMark says what keeps GitHub from merging a pull request that its
+// other columns do not: a conflict with its base, or being behind it. What
+// blocks it otherwise (reviews, checks) is in CI and REVIEW, and one that
+// would merge shows nothing. Unknown is GitHub still working it out.
+func (m *Model) mergeMark(s model.MergeState) string {
+	switch s {
+	case model.MergeDirty:
+		return m.st.red.Render("✗")
+	case model.MergeBehind:
+		return m.st.yellow.Render("↓")
+	case model.MergeUnknown:
+		return m.st.dim.Render("·")
+	}
+	return ""
 }
 
 func (m *Model) decisionMark(d model.ReviewDecision) string {

@@ -46,7 +46,7 @@ var (
 	DescriptionStyles = []string{"rendered", "plain"}
 	MergeMethods      = []string{"merge", "squash", "rebase"}
 	// Columns are the list's columns, in their default order.
-	Columns = []string{"pr", "title", "author", "ci", "review", "why", "size", "age"}
+	Columns = []string{"pr", "title", "author", "ci", "merge", "review", "why", "size", "age"}
 	// MenuActions are the actions the menu of enter offers, in their
 	// default order; a test in internal/app keeps them the TUI's.
 	MenuActions        = []string{"ask_claude", "browse", "review", "comment", "approve", "merge", "draft", "close", "hide"}

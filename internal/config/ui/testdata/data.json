@@ -42,12 +42,13 @@
     "doc": "The columns shown, in the order given; \"pr\" and \"title\" are needed. WHY shows on grouped tabs and the inbox only, and AUTHOR not on a tab of your own pull requests. On a narrow terminal SIZE goes first, then AUTHOR.",
     "kind": {
      "type": "config.listKind",
-     "name": "list of `pr`, `title`, `author`, `ci`, `review`, `why`, `size`, `age`",
+     "name": "list of `pr`, `title`, `author`, `ci`, `merge`, `review`, `why`, `size`, `age`",
      "values": [
       "pr",
       "title",
       "author",
       "ci",
+      "merge",
       "review",
       "why",
       "size",
@@ -60,6 +61,7 @@
      "title",
      "author",
      "ci",
+     "merge",
      "review",
      "why",
      "size",

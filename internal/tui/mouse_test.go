@@ -441,7 +441,7 @@ func TestCloseMouse(t *testing.T) {
 func TestClickCIMark(t *testing.T) {
 	f := fixture()
 	m := start(t, f, keymap.Default())
-	cx, _ := lineOf(t, m, "CI  REVIEW")
+	cx, _ := lineOf(t, m, "CI  MERGE")
 	_, y := lineOf(t, m, "Add retries")
 	clickTwice(m, cx, y)
 	if want := "https://github.com/acme/api/pull/12/checks"; strings.Join(f.browsed, " ") != want {

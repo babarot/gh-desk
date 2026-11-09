@@ -6,7 +6,9 @@ import (
 
 	"github.com/charmbracelet/x/ansi"
 
+	"github.com/babarot/gh-desk/internal/model"
 	"github.com/babarot/gh-desk/internal/runner"
+	"github.com/babarot/gh-desk/internal/tui/keymap"
 )
 
 // columnsLine is the line of the list's column titles.
@@ -36,16 +38,17 @@ func TestColumnsInTheOrderGiven(t *testing.T) {
 }
 
 func TestNarrowTerminalLeavesOutSizeThenAuthor(t *testing.T) {
-	// A grouped tab, all the columns: as before, SIZE goes below 120 and
-	// AUTHOR below 107 (110 before, when the widths were fixed).
+	// A grouped tab, all the columns: SIZE goes below 127 and AUTHOR below
+	// 114 (120 and 107 before MERGE, 110 for AUTHOR when the widths were
+	// fixed).
 	for _, tt := range []struct {
 		width int
 		want  string
 	}{
-		{120, "PR TITLE AUTHOR CI REVIEW WHY SIZE AGE"},
-		{119, "PR TITLE AUTHOR CI REVIEW WHY AGE"},
-		{107, "PR TITLE AUTHOR CI REVIEW WHY AGE"},
-		{106, "PR TITLE CI REVIEW WHY AGE"},
+		{127, "PR TITLE AUTHOR CI MERGE REVIEW WHY SIZE AGE"},
+		{126, "PR TITLE AUTHOR CI MERGE REVIEW WHY AGE"},
+		{114, "PR TITLE AUTHOR CI MERGE REVIEW WHY AGE"},
+		{113, "PR TITLE CI MERGE REVIEW WHY AGE"},
 	} {
 		m := startSet(t, testSettings(), tt.width)
 		if got := columnsLine(t, m); got != tt.want {
@@ -53,10 +56,10 @@ func TestNarrowTerminalLeavesOutSizeThenAuthor(t *testing.T) {
 		}
 	}
 	// A tab with no WHY has room for SIZE for longer.
-	m := startSet(t, testSettings(), 110)
+	m := startSet(t, testSettings(), 117)
 	press(m, "3")
-	if got, want := columnsLine(t, m), "PR TITLE AUTHOR CI REVIEW SIZE AGE"; got != want {
-		t.Errorf("involved at 110: columns = %q, want %q", got, want)
+	if got, want := columnsLine(t, m), "PR TITLE AUTHOR CI MERGE REVIEW SIZE AGE"; got != want {
+		t.Errorf("involved at 117: columns = %q, want %q", got, want)
 	}
 }
 
@@ -85,5 +88,47 @@ func TestProgressShowsWhateverTheColumns(t *testing.T) {
 		if w := ansi.StringWidth(strings.TrimRight(line, " ")); w > 130 {
 			t.Errorf("columns %v: the row is %d wide", cols, w)
 		}
+	}
+}
+
+// MERGE marks a pull request that conflicts with its base or is behind it,
+// as the heavy fields read it, and says nothing of one that would merge.
+func TestMergeColumnMarksConflictAndBehind(t *testing.T) {
+	for _, tt := range []struct {
+		state model.MergeState
+		want  string
+	}{
+		{model.MergeDirty, "✓   ✗      ○"},
+		{model.MergeBehind, "✓   ↓      ○"},
+		{model.MergeClean, "✓          ○"},
+	} {
+		f := fixture()
+		f.searches["review"][0].Merge = tt.state
+		m := start(t, f, keymap.Default())
+		_, y := lineOf(t, m, "Add retries")
+		if l := strings.Split(screen(m), "\n")[y]; !strings.Contains(l, tt.want) {
+			t.Errorf("%s: row %q, want %q in it", tt.state, l, tt.want)
+		}
+	}
+}
+
+// The pane reads what a merge would do of the pull request it shows, and
+// reads it again after r.
+func TestPaneReadsWhatAMergeWouldDo(t *testing.T) {
+	f := fixture()
+	k := f.searches["review"][0].Key
+	f.info = map[model.PRKey]func(*model.MergeInfo){k: func(mi *model.MergeInfo) { mi.MergeState = model.MergeDirty }}
+	m := start(t, f, keymap.Default())
+	if s := screen(m); !strings.Contains(s, "merge     conflicts") {
+		t.Fatalf("the pane does not say it conflicts:\n%s", s)
+	}
+	reads := len(f.infoReads)
+	f.info = nil
+	press(m, "r")
+	if len(f.infoReads) == reads {
+		t.Fatal("r did not read it again")
+	}
+	if s := screen(m); !strings.Contains(s, "merge     approve → merge now") {
+		t.Errorf("the pane kept what it read before r:\n%s", s)
 	}
 }
