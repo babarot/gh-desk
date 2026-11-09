@@ -1,5 +1,17 @@
 # Changelog
 
+## [v0.16.0](https://github.com/babarot/gh-desk/compare/v0.15.0...v0.16.0) - 2026-11-09
+### New Features
+- Let the TUI run offline, take new settings, and draw on a given terminal by @babarot in https://github.com/babarot/gh-desk/pull/117
+- Run gh-desk itself on the settings page by @babarot in https://github.com/babarot/gh-desk/pull/119
+- Tell, condition by condition, what a rule makes of a pull request by @babarot in https://github.com/babarot/gh-desk/pull/124
+- List what a rule on the settings page matches, and where by @babarot in https://github.com/babarot/gh-desk/pull/125
+### Bug fixes
+- Wait for every wait before judging that reads are shared by @babarot in https://github.com/babarot/gh-desk/pull/120
+- Read a condition left empty as none by @babarot in https://github.com/babarot/gh-desk/pull/123
+### Refactorings
+- Keep the drawing of gh-desk to what the site shows by @babarot in https://github.com/babarot/gh-desk/pull/122
+
 ## [v0.15.0](https://github.com/babarot/gh-desk/compare/v0.14.1...v0.15.0) - 2026-11-09
 ### New Features
 - Merge through the merge queue where the base branch has one by @babarot in https://github.com/babarot/gh-desk/pull/113
