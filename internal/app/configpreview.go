@@ -132,6 +132,15 @@ func pagePR(i int, pr model.PR, viewer, reason string, now time.Time) ui.PR {
 	case model.CheckPending, model.CheckExpected:
 		checks = "pending"
 	}
+	merge := ""
+	switch pr.Merge {
+	case model.MergeDirty:
+		merge = "dirty"
+	case model.MergeBehind:
+		merge = "behind"
+	case model.MergeUnknown:
+		merge = "unknown"
+	}
 	decision := "none"
 	switch pr.Decision {
 	case model.DecisionApproved:
@@ -142,7 +151,7 @@ func pagePR(i int, pr model.PR, viewer, reason string, now time.Time) ui.PR {
 		decision = "review_required"
 	}
 	return ui.PR{Index: i, Repo: pr.Key.Repository(), N: pr.Key.Number, Author: pr.Author, Bot: pr.AuthorIsBot, Title: t.Title,
-		Add: pr.Additions, Del: pr.Deletions, Files: pr.ChangedFiles, Draft: pr.Draft, State: state, Checks: checks, Decision: decision,
+		Add: pr.Additions, Del: pr.Deletions, Files: pr.ChangedFiles, Draft: pr.Draft, State: state, Checks: checks, Merge: merge, Decision: decision,
 		Heavy: pr.HeavyRead(), Group: string(plan.GroupOf(pr, viewer)), Why: t.Why, Review: t.Review, Age: t.Age,
 		Updated: int(now.Sub(pr.Updated).Hours() / 24), At: float64(pr.Updated.Unix())}
 }

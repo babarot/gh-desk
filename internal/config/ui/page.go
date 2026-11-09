@@ -56,18 +56,21 @@ var SampleTime = time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 // PR is a row as the page draws and counts it. Index tells it apart in what
 // a rule is judged to.
 type PR struct {
-	Index    int    `json:"i"`
-	Repo     string `json:"repo"`
-	N        int    `json:"n"`
-	Author   string `json:"author"`
-	Bot      bool   `json:"bot,omitempty"`
-	Title    string `json:"title"`
-	Add      int    `json:"add"`
-	Del      int    `json:"del"`
-	Files    int    `json:"files"`
-	Draft    bool   `json:"draft,omitempty"`
-	State    string `json:"state"`
-	Checks   string `json:"checks"`
+	Index  int    `json:"i"`
+	Repo   string `json:"repo"`
+	N      int    `json:"n"`
+	Author string `json:"author"`
+	Bot    bool   `json:"bot,omitempty"`
+	Title  string `json:"title"`
+	Add    int    `json:"add"`
+	Del    int    `json:"del"`
+	Files  int    `json:"files"`
+	Draft  bool   `json:"draft,omitempty"`
+	State  string `json:"state"`
+	Checks string `json:"checks"`
+	// Merge is what keeps it from merging that CI and REVIEW do not say:
+	// "dirty" (it conflicts), "behind" or "unknown"; empty for none.
+	Merge    string `json:"merge,omitempty"`
 	Decision string `json:"decision"`
 	// Heavy says the size, checks and review were read for the head shown.
 	Heavy   bool    `json:"heavy"`

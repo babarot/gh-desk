@@ -4,7 +4,7 @@
 // the text with what gh-desk draws from the same pull requests.
 const COLS=132,LINES=18;
 // As columnDefs in internal/tui/list.go.
-const LEAD=4,CW={pr:24,author:14,ci:2,review:7,why:10,size:11,age:4};
+const LEAD=4,CW={pr:24,author:14,ci:2,merge:5,review:7,why:10,size:11,age:4};
 const GROUPS={you:'requested from you',team:'requested from a team',other:'other',bots:'bots'};
 const BOXES={'─':'h','│':'v','╵':'tv','╭':'rdr','╮':'rdl','╰':'rur','╯':'rul','▎':'rail','┃':'thick','└':'ur'};
 function cw(ch){const c=ch.codePointAt(0);return c>=0x1100&&(c<=0x115f||(c>=0x2e80&&c<=0xa4cf)||(c>=0xac00&&c<=0xd7a3)||(c>=0xf900&&c<=0xfaff)||(c>=0xfe30&&c<=0xfe4f)||(c>=0xff00&&c<=0xff60)||(c>=0xffe0&&c<=0xffe6)||(c>=0x1f300&&c<=0x1faff))?2:1}
@@ -46,6 +46,7 @@ function drawTui(o){const p=o.p,prs=o.prs||[],v=o.v||(()=>'n'),at=o.at||0,hidden
     case'pr':{const own=z.repo.split('/')[0],r=o.owners.includes(own)?z.repo.split('/')[1]:z.repo,num='#'+z.n,n=z.draft||dim;return[[r,n?p.dim:p.subtext1],[num,n?p.dim:p.overlay]]}
     case'title':{const done=z.state==='merged'||z.state==='closed';return[[fit(done?`${z.title} ${z.state}`:z.title,W.title),z.draft||done?p.dim:d(p.text)]]}case'author':return[[fit(z.author,W.author),d(p.subtext1)]];
     case'ci':{if(!z.heavy)return[['⋅',p.dim]];const m={passing:['✓',p.green],failing:['✗',p.red],pending:['●',p.yellow]}[z.checks]||['·',p.dim];return[[m[0],d(m[1])]]}
+    case'merge':{if(!z.heavy)return[['⋅',p.dim]];if(z.state!=='open')return[['']];const m={dirty:['✗',p.red],behind:['↓',p.yellow],unknown:['·',p.dim]}[z.merge];return m?[[m[0],d(m[1])]]:[['']]}
     case'review':{if(!z.heavy)return[['⋅',p.dim]];const m={approved:['✓',p.green],changes_requested:['±',p.red],review_required:['○',p.overlay],none:['·',p.dim]}[z.decision];return[[m[0],d(m[1])],...(z.review?[[' '],[z.review,d(p.subtext1)]]:[])]}
     case'why':return[[fit(z.why,W.why),d(p.peach)]];
     case'size':{if(!z.heavy)return[['⋅',p.dim]];const a='+'+z.add,b='−'+z.del;return[[a,d(p.green)],[' '],[b,d(p.red)]]}
