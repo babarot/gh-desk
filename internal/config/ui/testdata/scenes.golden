@@ -1,37 +1,3 @@
-=== menu
-╭ acme/web#228 ────────────────────────────────────────────────────────────────────╮
-│ Add a dark theme to the settings page                                            │
-│                                                                                  │
-│ ▎ ask claude about it   i      talk with claude about its diff                   │
-│   browser               o      open it on github.com                             │
-│   review                R      comment, approve or request changes in a review   │
-│   comment               c      comment on its conversation                       │
-│   approve               A      send an approving review                          │
-│   merge                 M      merge it, as the next popup decides               │
-│   ready for review      D      not a draft                                       │
-│   close                        close it, as the next popup says                  │
-│   hide / done           d      hide it from this tab                             │
-│                                                                                  │
-│ enter run · or the action's key · esc close                                      │
-╰──────────────────────────────────────────────────────────────────────────────────╯
-=== compose
-╭ acme/web#228 · review ───────────────────────────────────────────────────────────────────────────╮
-│ Add a dark theme to the settings page                                                            │
-│  comment   approve   request changes                                                             │
-│                                                                                                  │
-│ ┃ Write the review (markdown)                                                                    │
-│ ┃                                                                                                │
-│ ┃                                                                                                │
-│ ┃                                                                                                │
-│ ┃                                                                                                │
-│ ┃                                                                                                │
-│ ┃                                                                                                │
-│ ┃                                                                                                │
-│ ┃                                                                                                │
-│ ┃                                                                                                │
-│                                                                                                  │
-│ ctrl+s post · tab kind · ctrl+e $EDITOR · esc discard                                            │
-╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
 === merge
 ╭ approve and merge ─────────────────────────────────────────────────────────────────────────────────────────────────────────╮
 │ ✓ acme/web#228 Add a dark theme to the settings page                                                                       │
