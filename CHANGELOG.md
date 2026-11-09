@@ -1,5 +1,12 @@
 # Changelog
 
+## [v0.15.0](https://github.com/babarot/gh-desk/compare/v0.14.1...v0.15.0) - 2026-11-09
+### New Features
+- Merge through the merge queue where the base branch has one by @babarot in https://github.com/babarot/gh-desk/pull/113
+### Bug fixes
+- Read again when a merge's own approval does not show yet by @babarot in https://github.com/babarot/gh-desk/pull/116
+- Keep the menu of Add a condition in view on the settings page by @babarot in https://github.com/babarot/gh-desk/pull/115
+
 ## [v0.14.1](https://github.com/babarot/gh-desk/compare/v0.14.0...v0.14.1) - 2026-11-07
 ### Bug fixes
 - Update the branch of a merge that falls behind while it waits by @babarot in https://github.com/babarot/gh-desk/pull/105
