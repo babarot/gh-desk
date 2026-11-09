@@ -14,7 +14,8 @@ Changing gh-desk to show this, such as keeping the excluded rows dimmed while th
 
 ## Decision
 
-- An open rule on the settings page lists the pull requests it matches in every list last read, and those it cannot tell yet, and says for each what every condition made of it: the values it was judged on, the part of the title the pattern matched, and for what cannot be told, what it waits for. gh-desk on the page is not changed for it.
+- An open rule on the settings page lists the pull requests it matches in every list last read, and those it cannot tell yet. gh-desk on the page is not changed for it.
+- Of a pull request it matches, the page says only what the rule does not: the part of the title the pattern matched, which of the values a condition names it has, and where it is on a count or in days the rule bounds. Every condition holds of it, so repeating them says nothing. Of one it cannot tell, the page says what each condition waits for, and which already fail.
 - What matched is told by the code that judges, not judged again on the page: [internal/plan](../../internal/plan) says it condition by condition beside its verdict, sharing each comparison with the verdict, and a test there checks that the two never disagree. The `judge` route returns it with the rows it already returned.
 - A rule is judged per row, as gh-desk judges it: the same pull request in the inbox and in a tab can differ, by the notification's reason or by what was read with each list. The page lists a pull request once and names the lists where it matched.
 - The count beside a rule is of the pull requests in every list last read, the same set the list shows.
