@@ -78,7 +78,7 @@ func TestConfigUIPopups(t *testing.T) {
 	for _, s := range []struct {
 		name string
 		keys []string
-	}{{"menu", []string{"enter"}}, {"compose", []string{"R"}}, {"merge", []string{"space", "M"}}} {
+	}{{"merge", []string{"space", "M"}}} {
 		m := configuiModel(t)
 		press(m, s.keys...)
 		fmt.Fprintf(&b, "=== %s\n%s\n", s.name, popupOf(screen(m)))

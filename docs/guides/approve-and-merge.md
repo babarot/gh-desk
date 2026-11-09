@@ -27,6 +27,8 @@ For each pull request, gh-desk decides the steps from what is true when it acts.
 
 Commit statuses, such as a policy bot's, are not jobs: gh-desk waits for them only where GitHub blocks the merge on them.
 
+Where the base branch has a merge queue, merging it means putting it in the queue: gh-desk never merges it itself, which GitHub refuses there. A pull request already in the queue is only followed. Its branch is not updated when it is behind, since the queue tests it on the latest base. Auto-merge on such a branch puts it in the queue once it can be merged. gh-desk then follows it in the queue until the queue merges it or takes it out, and the queue merges by the method its own settings name.
+
 The method is the first of `merge.methods` the repository allows, and the popup shows it. A draft of yours or of a bot is marked ready for review first. Your own pull request that GitHub lets you merge as an admin is merged as one, after its required checks pass, and the popup says so first.
 
 ## Drafts

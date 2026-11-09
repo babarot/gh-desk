@@ -19,7 +19,7 @@ import (
 
 const infoFields = `
   id number state isDraft headRefOid baseRefOid mergeStateStatus reviewDecision
-  viewerCanMergeAsAdmin autoMergeRequest { enabledAt }
+  viewerCanMergeAsAdmin autoMergeRequest { enabledAt } isMergeQueueEnabled isInMergeQueue
   viewerCanClose locked headRefName baseRefName headRef { id } isCrossRepository viewerCanDeleteHeadRef
   repository { nameWithOwner mergeCommitAllowed squashMergeAllowed rebaseMergeAllowed autoMergeAllowed viewerPermission }
   latestReviews(first: 20) { nodes { author { login } state } }
@@ -63,6 +63,8 @@ type infoNode struct {
 	// branch's rules.
 	ViewerCanMergeAsAdmin bool
 	AutoMergeRequest      *struct{ EnabledAt time.Time }
+	IsMergeQueueEnabled   bool
+	IsInMergeQueue        bool
 	ViewerCanClose        bool
 	Locked                bool
 	HeadRefName           string
@@ -100,6 +102,7 @@ func (n infoNode) toModel() model.MergeInfo {
 		Key: model.PRKey{Owner: owner, Repo: repo, Number: n.Number}, ID: n.ID, State: model.PRState(n.State),
 		Draft: n.IsDraft, HeadOID: n.HeadRefOid, BaseOID: n.BaseRefOid, MergeState: model.MergeState(n.MergeStateStatus),
 		Decision: model.ReviewDecision(n.ReviewDecision), AutoMerge: n.AutoMergeRequest != nil,
+		Queue: n.IsMergeQueueEnabled, InQueue: n.IsInMergeQueue,
 		AdminMerge: n.ViewerCanMergeAsAdmin,
 		Repo:       model.RepoMerge{AutoMerge: n.Repository.AutoMergeAllowed},
 		CanClose:   n.ViewerCanClose, Locked: n.Locked, HeadInFork: n.IsCrossRepository, CanDeleteHead: n.ViewerCanDeleteHeadRef,
@@ -346,6 +349,16 @@ func (c *Client) EnableAutoMerge(ctx context.Context, key model.PRKey, id, head 
 		`mutation($id: ID!, $head: GitObjectID, $method: PullRequestMergeMethod!) {
   enablePullRequestAutoMerge(input: {pullRequestId: $id, expectedHeadOid: $head, mergeMethod: $method}) { clientMutationId }
 }`, map[string]any{"id": id, "head": head, "method": string(method)})
+}
+
+// Enqueue puts the pull request in its base branch's merge queue, only if
+// its head is still head. The queue merges it by the method its
+// configuration names, so none is given.
+func (c *Client) Enqueue(ctx context.Context, key model.PRKey, id, head string) error {
+	return c.write(ctx, "enqueue", key, head,
+		`mutation($id: ID!, $head: GitObjectID!) {
+  enqueuePullRequest(input: {pullRequestId: $id, expectedHeadOid: $head}) { clientMutationId }
+}`, map[string]any{"id": id, "head": head})
 }
 
 // MarkReady marks a draft pull request ready for review. GitHub takes no

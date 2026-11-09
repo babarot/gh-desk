@@ -1,4 +1,4 @@
-# ADR-108: The draft key turns a pull request of the user's or of a bot either way
+# ADR-113: The draft key turns a pull request of the user's or of a bot either way
 
 ## Status
 

@@ -28,6 +28,7 @@ type fakeGH struct {
 	onRead       func(id string, mi *model.MergeInfo, reads int)
 	reads        map[string]int
 	autoMergeErr error
+	enqueueErr   error
 	commits      map[string]Commit
 	// bodies are the bodies of the reviews sent, by pull request ID.
 	bodies map[string]string
@@ -137,6 +138,20 @@ func (f *fakeGH) EnableAutoMerge(_ context.Context, k model.PRKey, id, head stri
 	return nil
 }
 
+func (f *fakeGH) Enqueue(_ context.Context, k model.PRKey, id, head string) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.log(fmt.Sprintf("enqueue %s %s", k, head))
+	if f.enqueueErr != nil {
+		return f.enqueueErr
+	}
+	if f.prs[id].HeadOID != head {
+		return fmt.Errorf("head branch was modified")
+	}
+	f.prs[id].InQueue = true
+	return nil
+}
+
 func (f *fakeGH) UpdateBranch(_ context.Context, k model.PRKey, id, head string) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
@@ -230,6 +245,79 @@ func TestMergeNowApprovesFirst(t *testing.T) {
 		t.Errorf("last event = %+v", e)
 	}
 	if want := "review acme/api#1 APPROVE h-1,merge acme/api#1 h-1 MERGE"; strings.Join(f.calls, ",") != want {
+		t.Errorf("calls = %v", f.calls)
+	}
+}
+
+// A read just after the approval that does not show it yet is GitHub
+// answering from before the write: the merge reads again instead of
+// taking the approval as dismissed, and does not approve twice.
+func TestApprovalNotShownYet(t *testing.T) {
+	mi, it := pr("1", "api", 1, "alice")
+	f := newFake(mi)
+	// The fake keeps what a read returns, so the hidden approval is
+	// put back before the next read.
+	var hidden int
+	var kept []model.Review
+	f.onRead = func(_ string, mi *model.MergeInfo, _ int) {
+		if kept != nil {
+			mi.Reviews, kept = kept, nil
+		}
+		if len(mi.Reviews) > 0 && hidden < 2 {
+			hidden++
+			kept, mi.Reviews = mi.Reviews, nil
+		}
+	}
+	evs := runBatch(t, f, Merge, it)
+	if e := last(evs[it.PR.Key]); e.Result != Merged || !e.Approved || hidden != 2 {
+		t.Errorf("last event = %+v, hidden %d", e, hidden)
+	}
+	if want := "review acme/api#1 APPROVE h-1,merge acme/api#1 h-1 MERGE"; strings.Join(f.calls, ",") != want {
+		t.Errorf("calls = %v", f.calls)
+	}
+}
+
+// An approval that never shows after it was sent was taken back: the
+// merge stops once RecheckFor has passed, without approving again.
+func TestApprovalNeverShown(t *testing.T) {
+	mi, it := pr("1", "api", 1, "alice")
+	f := newFake(mi)
+	f.onRead = func(_ string, mi *model.MergeInfo, _ int) { mi.Reviews = nil }
+	evs := runBatch(t, f, Merge, it)
+	if e := last(evs[it.PR.Key]); e.Result != Stopped || !strings.Contains(e.Text, "dismissed") {
+		t.Errorf("last event = %+v", e)
+	}
+	if want := "review acme/api#1 APPROVE h-1"; strings.Join(f.calls, ",") != want {
+		t.Errorf("calls = %v", f.calls)
+	}
+}
+
+// A draft marked ready that still reads as a draft just after is read
+// again, as an approval is.
+func TestReadyNotShownYet(t *testing.T) {
+	mi, it := pr("1", "api", 1, "me")
+	mi.Draft, mi.MergeState = true, model.MergeDraft
+	f := newFake(mi)
+	var hidden int
+	var readied bool
+	f.onRead = func(_ string, mi *model.MergeInfo, _ int) {
+		if readied {
+			mi.Draft = false
+		}
+		readied = !mi.Draft
+		switch {
+		case readied && hidden < 2:
+			hidden++
+			mi.Draft = true
+		case readied:
+			mi.MergeState = model.MergeClean
+		}
+	}
+	evs := runBatch(t, f, Merge, it)
+	if e := last(evs[it.PR.Key]); e.Result != Merged || hidden != 2 {
+		t.Errorf("last event = %+v, hidden %d", e, hidden)
+	}
+	if want := "ready acme/api#1 h-1,merge acme/api#1 h-1 MERGE"; strings.Join(f.calls, ",") != want {
 		t.Errorf("calls = %v", f.calls)
 	}
 }
@@ -1020,7 +1108,7 @@ func TestReadyOnly(t *testing.T) {
 	}
 }
 
-// Someone else's draft is left, as merge leaves it (ADR-108).
+// Someone else's draft is left, as merge leaves it (ADR-113).
 func TestReadyLeavesSomeoneElses(t *testing.T) {
 	draft, it := pr("1", "api", 1, "alice")
 	draft.Draft, draft.MergeState = true, model.MergeDraft

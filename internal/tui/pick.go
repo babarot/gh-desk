@@ -75,6 +75,9 @@ func needsBody(rs []plan.Rule) bool {
 // fetchBodies reads the bodies of the bot pull requests of tab i not read
 // yet; nil when there are none.
 func (m *Model) fetchBodies(i int) tea.Cmd {
+	if m.set.Offline {
+		return nil
+	}
 	t := m.tabs[i]
 	var ids []string
 	keys := map[string]model.PRKey{}

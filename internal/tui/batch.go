@@ -242,7 +242,7 @@ func (m *Model) event(msg eventMsg) tea.Cmd {
 		m.markReviewed(ev.Key, reviewStates[bs.review.Event])
 	}
 	switch ev.Result {
-	case runner.Approved, runner.Reviewed, runner.Merged, runner.AutoMergeOn:
+	case runner.Approved, runner.Reviewed, runner.Merged, runner.AutoMergeOn, runner.Queued:
 		cmds = append(cmds, m.doneAfterReview(ev.Key))
 	}
 	if bs == nil {
@@ -250,7 +250,12 @@ func (m *Model) event(msg eventMsg) tea.Cmd {
 	}
 	if ev.Watch {
 		icon, title := "✓", "merged by auto-merge"
-		if ev.Result != runner.Merged {
+		switch {
+		case ev.Result == runner.Merged && ev.Queued:
+			title = "merged by the merge queue"
+		case ev.Result != runner.Merged && ev.Queued:
+			icon, title = "✗", "merge queue: "+ev.Text
+		case ev.Result != runner.Merged:
 			icon, title = "✗", "auto-merge stopped: "+ev.Text
 		}
 		cmds = append(cmds, m.pushNote(icon, title, []noteItem{{key: ev.Key, text: ev.Text, result: ev.Result}}))
@@ -353,6 +358,9 @@ func (m *Model) noteBatch(bs *batchState) tea.Cmd {
 		parts = append(parts, fmt.Sprintf("merged %d", count[runner.Merged]))
 		if n := count[runner.AutoMergeOn]; n > 0 {
 			parts = append(parts, fmt.Sprintf("%d on auto-merge", n))
+		}
+		if n := count[runner.Queued]; n > 0 {
+			parts = append(parts, fmt.Sprintf("%d in the merge queue", n))
 		}
 	}
 	if n := count[runner.Stopped] + count[runner.Failed]; n > 0 {
@@ -668,7 +676,7 @@ func (m *Model) resultStyle(r runner.Result) lipgloss.Style {
 	switch r {
 	case runner.Merged, runner.Approved, runner.Readied, runner.Drafted, runner.Closed, runner.CommentSent:
 		return m.st.green
-	case runner.AutoMergeOn:
+	case runner.AutoMergeOn, runner.Queued:
 		return m.st.teal
 	case runner.Skipped, runner.Stopped, runner.Failed:
 		return m.st.red
@@ -678,7 +686,7 @@ func (m *Model) resultStyle(r runner.Result) lipgloss.Style {
 
 // progressText is a row's progress, short enough for the cells it takes.
 func (m *Model) progressText(p progress) string {
-	icon := map[runner.Result]string{runner.Running: "◌", runner.Approved: "✓", runner.Merged: "✓", runner.Readied: "✓", runner.Drafted: "✓", runner.Closed: "✓", runner.CommentSent: "✓", runner.AutoMergeOn: "⧗",
+	icon := map[runner.Result]string{runner.Running: "◌", runner.Approved: "✓", runner.Merged: "✓", runner.Readied: "✓", runner.Drafted: "✓", runner.Closed: "✓", runner.CommentSent: "✓", runner.AutoMergeOn: "⧗", runner.Queued: "⧗",
 		runner.Skipped: "–", runner.Stopped: "✗", runner.Failed: "✗"}[p.result]
 	text := p.text
 	if after, ok := strings.CutPrefix(text, "– "); ok {
@@ -752,7 +760,7 @@ func (m *Model) tally() string {
 		count[p.result]++
 	}
 	var parts []string
-	for _, r := range []runner.Result{runner.Merged, runner.Approved, runner.Readied, runner.Drafted, runner.Closed, runner.CommentSent, runner.AutoMergeOn, runner.Running, runner.Skipped, runner.Stopped, runner.Failed} {
+	for _, r := range []runner.Result{runner.Merged, runner.Approved, runner.Readied, runner.Drafted, runner.Closed, runner.CommentSent, runner.AutoMergeOn, runner.Queued, runner.Running, runner.Skipped, runner.Stopped, runner.Failed} {
 		if count[r] == 0 {
 			continue
 		}
@@ -762,7 +770,7 @@ func (m *Model) tally() string {
 }
 
 func (m *Model) progressTextIcon(r runner.Result, n int) string {
-	icon := map[runner.Result]string{runner.Running: "◌", runner.Approved: "✓", runner.Merged: "✓", runner.Readied: "✓", runner.Drafted: "✓", runner.Closed: "✓", runner.CommentSent: "✓", runner.AutoMergeOn: "⧗",
+	icon := map[runner.Result]string{runner.Running: "◌", runner.Approved: "✓", runner.Merged: "✓", runner.Readied: "✓", runner.Drafted: "✓", runner.Closed: "✓", runner.CommentSent: "✓", runner.AutoMergeOn: "⧗", runner.Queued: "⧗",
 		runner.Skipped: "–", runner.Stopped: "✗", runner.Failed: "✗"}[r]
 	return m.resultStyle(r).Render(fmt.Sprintf("%s%d", icon, n))
 }

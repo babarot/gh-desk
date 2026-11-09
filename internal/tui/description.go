@@ -169,7 +169,7 @@ func (m *Model) descLines(p model.PR, width int) []line {
 		case d == nil || d.loading:
 			out = append(out, line{text: gutter + st.dim.Render("reading the description…")})
 		case d.err != nil:
-			out = append(out, line{text: gutter + st.red.Render(d.err.Error())})
+			out = append(out, line{text: gutter + m.errText(d.err)})
 		default:
 			indent(m.bodyLines(d.val.Body, width-2), "")
 		}

@@ -647,7 +647,7 @@
     },
     {
      "key": "title",
-     "doc": "A regular expression the title must match, as written: a shortcode such as `:arrow_up:` is matched as itself, not as its emoji.",
+     "doc": "A regular expression the title must match, as written: a shortcode such as `:arrow_up:` is matched as itself, not as its emoji. An empty one sets no condition.",
      "kind": {
       "type": "config.stringKind",
       "name": "string"
@@ -886,7 +886,7 @@
     },
     {
      "key": "title",
-     "doc": "A regular expression the title must match, as written: a shortcode such as `:arrow_up:` is matched as itself, not as its emoji.",
+     "doc": "A regular expression the title must match, as written: a shortcode such as `:arrow_up:` is matched as itself, not as its emoji. An empty one sets no condition.",
      "kind": {
       "type": "config.stringKind",
       "name": "string"
@@ -1134,7 +1134,7 @@
     },
     {
      "key": "title",
-     "doc": "A regular expression the title must match, as written: a shortcode such as `:arrow_up:` is matched as itself, not as its emoji.",
+     "doc": "A regular expression the title must match, as written: a shortcode such as `:arrow_up:` is matched as itself, not as its emoji. An empty one sets no condition.",
      "kind": {
       "type": "config.stringKind",
       "name": "string"

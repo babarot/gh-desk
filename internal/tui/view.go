@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"errors"
 	"fmt"
 	"slices"
 	"strings"
@@ -295,6 +296,8 @@ func (m *Model) tabLabel(i int) string {
 	count := "…"
 	narrowed := false
 	switch {
+	case errors.Is(t.err, errNotRead):
+		count = "-"
 	case t.loaded && (t.inbox || t.err == nil) && m.narrowed(t):
 		count, narrowed = fmt.Sprint(m.narrowedCount(t)), true
 	case t.inbox && t.loaded:

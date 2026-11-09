@@ -553,6 +553,10 @@ func (m *Model) renderBulk() []string {
 	}
 	inner := w - 4
 	var lines []string
+	if m.set.Offline && b.kind == runner.Merge {
+		lines = append(lines, wrapped(st.dim, previewAssumes, inner)...)
+		lines = append(lines, "")
+	}
 	if b.tookOver {
 		lines = append(lines, wrapped(st.teal, "↻ The other gh-desk quit; this one runs the merges that wait now.", inner)...)
 		lines = append(lines, "")
@@ -571,12 +575,13 @@ func (m *Model) renderBulk() []string {
 	goes := 0
 	// The steps taken by any pull request that goes, said once below the
 	// list rather than under each.
-	auto, readies, admin := false, false, false
+	auto, readies, admin, queue := false, false, false, false
 	failing := 0
 	for _, it := range b.items {
 		if it.goes() {
 			goes++
 			auto = auto || it.d.Step == plan.StepAutoMerge
+			queue = queue || b.kind == runner.Merge && it.d.Queue
 			if b.kind == runner.Merge {
 				readies = readies || it.d.Ready
 				admin = admin || it.d.Admin || it.d.AdminLater
@@ -685,6 +690,9 @@ func (m *Model) renderBulk() []string {
 	}
 	if auto {
 		prose(st.dim, "Auto-merge also merges commits pushed after it is on, as GitHub does.")
+	}
+	if queue {
+		prose(st.dim, "The merge queue merges after its own checks, by the method its settings name.")
 	}
 	if b.approves() && failing > 0 && !b.loading {
 		state := "left out"
@@ -923,9 +931,9 @@ var bulkVerbs = map[runner.Kind]string{runner.Merge: "merge", runner.Ready: "mar
 
 func (m *Model) stepStyle(s plan.Step) styleFn {
 	switch s {
-	case plan.StepMerge:
+	case plan.StepMerge, plan.StepEnqueue:
 		return m.st.green
-	case plan.StepAutoMerge:
+	case plan.StepAutoMerge, plan.StepQueued:
 		return m.st.teal
 	}
 	return m.st.yellow

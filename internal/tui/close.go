@@ -124,6 +124,9 @@ type basedOnMsg struct {
 // popup could delete, so it can say which it keeps before the user says
 // yes. The popup stays reading until they are back.
 func (m *Model) readBasedOn(b *bulk) tea.Cmd {
+	if m.set.Offline {
+		return nil
+	}
 	var bs []model.Branch
 	for _, it := range b.items {
 		mi := it.mi

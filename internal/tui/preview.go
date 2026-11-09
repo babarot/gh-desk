@@ -598,7 +598,7 @@ func (m *Model) paneBody(p model.PR, n *model.Notification, e *entry[[]diff.File
 	case e == nil || e.loading:
 		ls = []line{{text: st.dim.Render("reading the diff…")}}
 	case e.err != nil:
-		ls = []line{{text: st.red.Render(e.err.Error())}}
+		ls = []line{{text: m.errText(e.err)}}
 	default:
 		ls = m.paneDiffLines(p, files)
 	}

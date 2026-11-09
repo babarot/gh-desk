@@ -38,10 +38,17 @@ type Server struct {
 	// Judge says what the rules of a file sent make of the rows, as JSON.
 	// It writes nothing. Its error means the file does not read yet.
 	Judge func(src []byte) ([]byte, error)
+	// Terminal is gh-desk itself, drawn in the page; nil has the page draw
+	// the list again in JavaScript.
+	Terminal Terminal
 
 	token string
 	host  string
 	ctx   context.Context
+	// live ends the streams of the terminal when Serve returns, which
+	// would keep the server from stopping.
+	live    context.Context
+	endLive context.CancelFunc
 
 	mu sync.Mutex
 	// ended is true once done has its value.
@@ -71,6 +78,7 @@ func (s *Server) Serve(ctx context.Context, open func(url string)) (bool, error)
 		return false, err
 	}
 	s.token, s.host, s.ctx, s.done = hex.EncodeToString(b), l.Addr().String(), ctx, make(chan bool, 1)
+	s.live, s.endLive = context.WithCancel(ctx)
 	if s.grace == 0 {
 		s.grace = closeGrace
 	}
@@ -84,6 +92,7 @@ func (s *Server) Serve(ctx context.Context, open func(url string)) (bool, error)
 	case <-ctx.Done():
 		err = ctx.Err()
 	}
+	s.endLive()
 	// Lets the answer to the page finish.
 	stop, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
@@ -133,6 +142,12 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		s.closePage(w, r)
 	case r.Method == http.MethodPost && rest == "gone":
 		s.pageGone(w, r)
+	case s.Terminal != nil && r.Method == http.MethodGet && rest == "tty":
+		s.tty(w, r)
+	case s.Terminal != nil && r.Method == http.MethodPost && rest == "tty/in":
+		s.ttyInput(w, r)
+	case s.Terminal != nil && r.Method == http.MethodPost && rest == "tty/apply":
+		s.ttyApply(w, r)
 	default:
 		http.NotFound(w, r)
 	}

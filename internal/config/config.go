@@ -1078,7 +1078,9 @@ func conditionsFrom(d conditionDoc, packages []string, name string, r elemReport
 			r.item("reasons", j, "%q is not a reason GitHub gives: %s", reason, strings.Join(Reasons, ", "))
 		}
 	}
-	if d.Title != nil {
+	// A title left empty sets no condition, as a list left empty does: it
+	// would match every title.
+	if d.Title != nil && d.Title.raw != "" {
 		if d.Title.err != nil {
 			at("title", "is not a regular expression: %v", d.Title.err)
 		}
@@ -1123,9 +1125,10 @@ func conditionsFrom(d conditionDoc, packages []string, name string, r elemReport
 // reportNoCondition reports a rule named name that sets no condition, and
 // so matches every pull request.
 func reportNoCondition(d conditionDoc, packages []string, name string, r elemReporter) {
-	// A list left empty sets no condition: the rule reads it as none.
+	// A list or a title left empty sets no condition: the rule reads it as
+	// none.
 	if len(d.Repos) == 0 && len(d.Authors) == 0 && len(packages) == 0 && len(d.Labels) == 0 && len(d.Requested) == 0 && len(d.Reasons) == 0 && len(d.States) == 0 &&
-		len(d.Checks) == 0 && len(d.Decision) == 0 && d.Title == nil &&
+		len(d.Checks) == 0 && len(d.Decision) == 0 && (d.Title == nil || d.Title.raw == "") &&
 		d.MaxFiles == nil && d.MaxLines == nil && d.MinFiles == nil && d.MinLines == nil &&
 		d.UpdatedIn == nil && d.CreatedIn == nil && d.UpdatedBefore == nil && d.CreatedBefore == nil &&
 		d.Bot == nil && d.Mine == nil && d.Draft == nil && d.ApprovedByMe == nil && d.ReviewedByMe == nil {

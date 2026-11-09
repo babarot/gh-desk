@@ -8,11 +8,11 @@ gh desk config edit --ui
 
 ## On a page
 
-The command opens a page in your browser, with gh-desk drawn above the settings and following each change before you save it. The list is your own, as gh-desk last read it; nothing goes to GitHub.
+The command opens a page in your browser, with gh-desk itself above the settings, following each change before you save it. Click it to use it as you would in your terminal: scroll the list, press `a` to see what a rule hides, or `S` to try a rule. The lists are your own, as gh-desk last read them, and it reads nothing from GitHub and writes nothing: approving, merging and the like do nothing there.
 
 [The settings playground, with made-up pull requests](https://babarot.me/gh-desk/play/settings/ "settings")
 
-That is the page itself, with made-up pull requests, as the settings playground. Try a theme, or change the columns or a key, and See the file shows what would be written. Nothing is saved here. Rules are only on the page the command opens, where gh-desk judges them on your pull requests.
+That is the same page, with made-up pull requests and a drawing of gh-desk in place of gh-desk itself, as the settings playground. Try a theme, or change the columns or a key, and See the file shows what would be written. Nothing is saved here. Rules are only on the page the command opens, where gh-desk judges them on your pull requests.
 
 To keep your changes, choose Review changes, then Save and finish. A change to anything but how things are drawn is confirmed in your terminal, so answer `y` there. The file is then replaced and the old one kept as `config.toml.bak`; your comments do not carry over. Closing the page leaves the file as it is.
 

@@ -21,6 +21,7 @@ var stepWords = map[runner.Step]string{
 	runner.StepWait: "wait", runner.StepWaitChecks: "checks", runner.StepWaitWorkflows: "workflows",
 	runner.StepWaitApproval: "approval checks",
 	runner.StepWaitBlocked:  "blocked", runner.StepMerge: "merge", runner.StepAutoMerge: "auto-merge",
+	runner.StepEnqueue: "merge queue",
 	runner.StepComment: "comment", runner.StepClose: "close", runner.StepDeleteRef: "delete branch",
 }
 

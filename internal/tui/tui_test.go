@@ -1183,7 +1183,7 @@ func TestMarkReady(t *testing.T) {
 }
 
 // Someone else's pull request is not the user's to turn either way
-// (ADR-108).
+// (ADR-113).
 func TestDraftRefusesSomeoneElses(t *testing.T) {
 	m, r := startWith(t, fixture(), keymap.Default())
 	press(m, "D")
@@ -1215,7 +1215,7 @@ func TestConvertToDraft(t *testing.T) {
 }
 
 // On a selection, another person's pull request is skipped and the rest
-// go; those that go must all go the same way (ADR-108).
+// go; those that go must all go the same way (ADR-113).
 func TestDraftOnASelection(t *testing.T) {
 	f := fixture()
 	f.searches["review"][1].Author = "me"

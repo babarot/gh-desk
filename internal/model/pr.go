@@ -269,6 +269,11 @@ type MergeInfo struct {
 	Decision   ReviewDecision
 	// AutoMerge is whether auto-merge is on.
 	AutoMerge bool
+	// Queue is whether its base branch merges through a merge queue:
+	// GitHub refuses to merge it any other way.
+	Queue bool
+	// InQueue is whether it is in the merge queue.
+	InQueue bool
 	// AdminMerge is whether the viewer can merge it as an admin, past the
 	// rules of its base branch.
 	AdminMerge bool
@@ -360,8 +365,12 @@ type Pending struct {
 	AuthorIsBot bool   `json:"author_is_bot"`
 	// AutoMerge is whether the user agreed to auto-merge for it.
 	AutoMerge bool `json:"auto_merge"`
-	// Watching is set once auto-merge is on and it is only followed.
+	// Watching is set once auto-merge is on or it is in the merge queue,
+	// and it is only followed.
 	Watching bool `json:"watching"`
+	// Queued is set once it is seen in the merge queue, so leaving the
+	// queue unmerged tells from auto-merge being turned off.
+	Queued bool `json:"queued,omitempty"`
 	// Approved is set when the user's approval was on it, sent by
 	// gh-desk or there before the merge started; an approval dismissed
 	// meanwhile stops it at the next launch.

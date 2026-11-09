@@ -246,7 +246,7 @@ func (m *Model) cannotApprove(p model.PR) (string, bool) {
 // tells; the popup reads them again before it acts. Only a pull request of
 // the viewer's or of a bot counts, and n is how many; another person's is
 // skipped. When those that count are not all drafts or all ready, which
-// way is not known, and why says so (ADR-108).
+// way is not known, and why says so (ADR-113).
 func (m *Model) draftOf(prs []model.PR) (kind runner.Kind, n int, why string) {
 	open, drafts := 0, 0
 	for _, p := range prs {

@@ -62,7 +62,7 @@ Nothing is written to GitHub without a confirm popup that lists what will be don
 
 ## Make it yours
 
-There is no file to write. This opens a page in your browser, with gh-desk drawn above the settings and following each change before you save it:
+There is no file to write. This opens a page in your browser, with gh-desk itself above the settings, following each change before you save it:
 
 ```sh
 gh desk config edit --ui
