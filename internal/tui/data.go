@@ -756,6 +756,10 @@ func (m *Model) ensureDiff(p model.PR) tea.Cmd {
 	if _, ok := m.cache.diffs[id]; ok || p.HeadOID == "" {
 		return nil
 	}
+	if m.set.Offline {
+		m.cache.diffs[id] = &entry[[]diff.File]{err: errNotRead}
+		return nil
+	}
 	m.cache.diffs[id] = &entry[[]diff.File]{loading: true}
 	return func() tea.Msg {
 		b, err := m.src.Diff(m.ctx, p)
@@ -765,6 +769,10 @@ func (m *Model) ensureDiff(p model.PR) tea.Cmd {
 
 func (m *Model) ensureDetail(k model.PRKey) tea.Cmd {
 	if _, ok := m.cache.details[k]; ok {
+		return nil
+	}
+	if m.set.Offline {
+		m.cache.details[k] = &entry[model.Detail]{err: errNotRead}
 		return nil
 	}
 	e := &entry[model.Detail]{loading: true}
@@ -777,6 +785,10 @@ func (m *Model) ensureDetail(k model.PRKey) tea.Cmd {
 
 func (m *Model) ensureComment(url string) tea.Cmd {
 	if _, ok := m.cache.comments[url]; ok {
+		return nil
+	}
+	if m.set.Offline {
+		m.cache.comments[url] = &entry[model.Comment]{err: errNotRead}
 		return nil
 	}
 	e := &entry[model.Comment]{loading: true}

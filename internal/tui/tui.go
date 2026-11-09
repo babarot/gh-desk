@@ -195,6 +195,10 @@ type Settings struct {
 	// Release has gh-desk tell of its own releases; nil tells of none, as
 	// for a build that is not a release or with release.check off.
 	Release *Release
+	// Offline reads nothing: the lists are those in Lists, as of when they
+	// were read, and what would be read stands as not read. The settings
+	// page's preview runs gh-desk so.
+	Offline bool
 }
 
 // LogRecords are the latest records of the log, the same the log file
@@ -330,6 +334,9 @@ type Model struct {
 	spinStyle spinnerStyle
 	// lastTheme is the theme of Clawd's last scene, -1 before the first.
 	lastTheme int
+	// light is whether the terminal said its background is light, for the
+	// theme of settings given while running.
+	light bool
 	// fresh are the rows a reading again added or changed, marked until
 	// the time given; freshGen tells the last mark's end from earlier ones.
 	fresh    map[model.PRKey]time.Time
@@ -369,6 +376,9 @@ func New(src Source, run Runner, cl Claude, km keymap.Map, log *slog.Logger, set
 	m.auto = autoState{tried: map[autoTry]bool{}, toldMany: map[int]bool{}}
 	m.viewer = set.Viewer
 	m.loadCached()
+	if set.Offline {
+		m.markNotRead()
+	}
 	m.chatState.LoadKeys()
 	return m
 }
@@ -385,6 +395,12 @@ func Run(ctx context.Context, src Source, run Runner, cl Claude, km keymap.Map, 
 	m.ctx = ctx
 	_, err := tea.NewProgram(m, tea.WithContext(ctx)).Run()
 	cancel()
+	m.waitClaude()
+	return err
+}
+
+// waitClaude waits a moment for Claude to stop, once the program ended.
+func (m *Model) waitClaude() {
 	done := make(chan struct{})
 	go func() {
 		m.chatState.Asking().Wait()
@@ -394,16 +410,20 @@ func Run(ctx context.Context, src Source, run Runner, cl Claude, km keymap.Map, 
 	case <-done:
 	case <-time.After(quitWait):
 	}
-	return err
 }
 
 // Init asks for the terminal's background, the viewer, and every tab.
 func (m *Model) Init() tea.Cmd {
-	cmds := []tea.Cmd{m.tick(), m.resume(), m.configNote(), m.releaseStart(), m.takeLock(), m.autoApprove()}
-	if m.viewer == "" {
-		cmds = append(cmds, m.loadViewer())
-	} else {
-		cmds = append(cmds, m.loadAll())
+	cmds := []tea.Cmd{m.tick(), m.resume(), m.configNote(), m.releaseStart(), m.takeLock()}
+	switch {
+	case m.set.Offline:
+		// Nothing is read: the lists last read are what is shown, and
+		// the pane says what it would have read.
+		cmds = append(cmds, m.ensure())
+	case m.viewer == "":
+		cmds = append(cmds, m.autoApprove(), m.loadViewer())
+	default:
+		cmds = append(cmds, m.autoApprove(), m.loadAll())
 	}
 	if m.set.ThemeLight != m.set.ThemeDark {
 		cmds = append(cmds, tea.RequestBackgroundColor)
@@ -462,10 +482,11 @@ func (m *Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 	case tea.BackgroundColorMsg:
-		if !msg.IsDark() {
-			m.st = newStyles(theme(m.set.ThemeLight))
-		}
+		m.light = !msg.IsDark()
+		m.st = newStyles(theme(m.themeName()))
 		return m, nil
+	case settingsMsg:
+		return m, m.applySettings(msg)
 	case tea.KeyPressMsg:
 		return m, m.key(msg)
 	case tickMsg:

@@ -14,7 +14,7 @@ type tickMsg struct{}
 
 // tick asks for the next automatic refresh.
 func (m *Model) tick() tea.Cmd {
-	if m.set.Refresh <= 0 {
+	if m.set.Refresh <= 0 || m.set.Offline {
 		return nil
 	}
 	return m.after(m.set.Refresh, tickMsg{})
@@ -64,6 +64,10 @@ type refreshRun struct {
 // refresh is r: read the shown tab and the notifications again, and put
 // away the results on the rows.
 func (m *Model) refresh() tea.Cmd {
+	if m.set.Offline {
+		m.refuse("the preview reads nothing: it shows the lists last read")
+		return nil
+	}
 	// Checks read for ◌ and the preview's merge line may have moved on, and
 	// so may the pane's description, checks and comments, read once a pull
 	// request.

@@ -554,7 +554,7 @@ func (m *Model) renderList(b *strings.Builder, height int) {
 		}
 		return
 	case t.err != nil:
-		b.WriteString(m.st.red.Render("  "+t.err.Error()) + "\n")
+		b.WriteString("  " + m.errText(t.err) + "\n")
 		lines++
 	case len(rs) == 0:
 		b.WriteString(m.st.muted.Render("  nothing here") + "\n")
