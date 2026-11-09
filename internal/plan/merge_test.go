@@ -85,6 +85,55 @@ func TestForMerge(t *testing.T) {
 	}
 }
 
+// A pull request whose base branch has a merge queue goes into the queue
+// rather than being merged, and one in the queue is only followed: GitHub
+// says UNKNOWN of it while it is there.
+func TestForMergeQueue(t *testing.T) {
+	human := model.PR{Author: "alice"}
+	queued := func(state model.MergeState) model.MergeInfo {
+		mi := info(state)
+		mi.Queue = true
+		return mi
+	}
+	running := model.Check{Name: "build", State: model.CheckPending, Required: true}
+	tests := []struct {
+		name    string
+		mi      func() model.MergeInfo
+		step    Step
+		approve bool
+		reason  string
+	}{
+		{"clean goes into the queue", func() model.MergeInfo { return queued(model.MergeClean) }, StepEnqueue, true, "add to the merge queue"},
+		{"in the queue is followed", func() model.MergeInfo {
+			mi := queued(model.MergeUnknown)
+			mi.InQueue = true
+			return mi
+		}, StepQueued, false, "in the merge queue"},
+		{"behind goes into the queue without an update", func() model.MergeInfo { return queued(model.MergeBehind) }, StepEnqueue, true, "add to the merge queue"},
+		{"unknown out of the queue rechecks", func() model.MergeInfo { return queued(model.MergeUnknown) }, StepRecheck, true, ""},
+		{"blocked turns on auto-merge", func() model.MergeInfo {
+			mi := queued(model.MergeBlocked)
+			mi.Repo.AutoMerge = true
+			return mi
+		}, StepAutoMerge, true, "turn on auto-merge"},
+		{"blocked without auto-merge waits for the queue", func() model.MergeInfo { return queued(model.MergeBlocked) }, StepWait, true, "wait for checks → merge queue"},
+		{"blocked by running checks with auto-merge", func() model.MergeInfo {
+			mi := queued(model.MergeBlocked)
+			mi.Repo.AutoMerge, mi.Checks = true, []model.Check{running}
+			return mi
+		}, StepAutoMerge, true, "turn on auto-merge"},
+		{"conflicts are skipped", func() model.MergeInfo { return queued(model.MergeDirty) }, StepSkip, false, "conflicts"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			d := ForMerge(tt.mi(), human, "me", set)
+			if d.Step != tt.step || d.Approve != tt.approve || !d.Queue || (tt.reason != "" && d.Reason != tt.reason) {
+				t.Errorf("ForMerge = %+v; want step %s approve %v reason %q", d, tt.step, tt.approve, tt.reason)
+			}
+		})
+	}
+}
+
 // The viewer's own blocked pull request is merged as an admin when GitHub
 // says the viewer can, once its required checks have finished; another
 // person's, or one the viewer cannot merge as an admin, waits as before.

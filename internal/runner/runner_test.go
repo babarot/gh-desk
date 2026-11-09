@@ -28,6 +28,7 @@ type fakeGH struct {
 	onRead       func(id string, mi *model.MergeInfo, reads int)
 	reads        map[string]int
 	autoMergeErr error
+	enqueueErr   error
 	commits      map[string]Commit
 	// bodies are the bodies of the reviews sent, by pull request ID.
 	bodies map[string]string
@@ -134,6 +135,20 @@ func (f *fakeGH) EnableAutoMerge(_ context.Context, k model.PRKey, id, head stri
 		return f.autoMergeErr
 	}
 	f.prs[id].AutoMerge = true
+	return nil
+}
+
+func (f *fakeGH) Enqueue(_ context.Context, k model.PRKey, id, head string) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.log(fmt.Sprintf("enqueue %s %s", k, head))
+	if f.enqueueErr != nil {
+		return f.enqueueErr
+	}
+	if f.prs[id].HeadOID != head {
+		return fmt.Errorf("head branch was modified")
+	}
+	f.prs[id].InQueue = true
 	return nil
 }
 

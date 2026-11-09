@@ -585,6 +585,11 @@ func (r Runner) EnableAutoMerge(_ context.Context, key model.PRKey, _, head stri
 	return nil
 }
 
+// Enqueue merges at once: no repository of the demo has a merge queue.
+func (r Runner) Enqueue(ctx context.Context, key model.PRKey, id, head string) error {
+	return r.Merge(ctx, key, id, head, model.MethodMerge)
+}
+
 func (r Runner) UpdateBranch(_ context.Context, key model.PRKey, _, head string) error {
 	r.w.pause(900 * time.Millisecond)
 	r.w.mu.Lock()

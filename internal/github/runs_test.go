@@ -16,6 +16,7 @@ const detailsBody = `{"data": {
   "rateLimit": {"cost": 1, "remaining": 4999},
   "n0": {"id": "PR_1", "number": 7, "state": "OPEN", "isDraft": false, "headRefOid": "abc123", "baseRefOid": "def456",
     "mergeStateStatus": "UNSTABLE", "reviewDecision": "", "viewerCanMergeAsAdmin": false, "autoMergeRequest": null,
+    "isMergeQueueEnabled": true, "isInMergeQueue": true,
     "repository": {"nameWithOwner": "acme/tool", "mergeCommitAllowed": true, "squashMergeAllowed": false, "rebaseMergeAllowed": false, "autoMergeAllowed": false},
     "latestReviews": {"nodes": []},
     "commits": {"nodes": [{"commit": {"statusCheckRollup": {"state": "PENDING"}}}]},
@@ -50,6 +51,9 @@ func TestMergeInfoDetailsReadsJobs(t *testing.T) {
 		{Name: "lint", State: model.CheckSuccess, Kind: model.KindCheckRun, Run: model.RunCompleted},
 		{Name: "test (ubuntu-latest)", State: model.CheckPending, Kind: model.KindCheckRun, Run: "IN_PROGRESS"},
 		{Name: "policy-bot: main", State: model.CheckPending, Required: true, Kind: model.KindStatus},
+	}
+	if !mi.Queue || !mi.InQueue {
+		t.Errorf("queue = %v, in queue = %v; want both", mi.Queue, mi.InQueue)
 	}
 	if !slices.Equal(mi.Checks, want) {
 		t.Errorf("checks = %+v; want %+v", mi.Checks, want)
