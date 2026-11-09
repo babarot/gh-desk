@@ -10,7 +10,6 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/babarot/gh-desk/internal/model"
 	"github.com/babarot/gh-desk/internal/tui/keymap"
 )
 
@@ -93,11 +92,7 @@ func (m *Model) applySettings(msg settingsMsg) tea.Cmd {
 	m.st = newStyles(theme(m.themeName()))
 	m.spinStyle = spinner(set.Spinner)
 
-	type was struct {
-		t   *tab
-		key model.PRKey
-	}
-	old := map[string]was{}
+	old := map[string]*tab{}
 	keyOf := func(t *tab) string {
 		if t.inbox {
 			return "\x00inbox"
@@ -105,11 +100,7 @@ func (m *Model) applySettings(msg settingsMsg) tea.Cmd {
 		return t.query
 	}
 	for _, t := range m.tabs {
-		w := was{t: t}
-		if rs := m.rows(t); t.sel >= 0 && t.sel < len(rs) && rs[t.sel].kind == rowPR {
-			w.key = rs[t.sel].pr.Key
-		}
-		old[keyOf(t)] = w
+		old[keyOf(t)] = t
 	}
 	shown := keyOf(m.tab())
 	m.tabs, m.inbox, m.cur = nil, 0, min(m.cur, max(len(set.Tabs)-1, 0))
@@ -119,9 +110,9 @@ func (m *Model) applySettings(msg settingsMsg) tea.Cmd {
 			m.inbox = i
 		}
 		if w, ok := old[keyOf(t)]; ok {
-			t.sel, t.offset, t.hidden, t.showExcluded, t.folded, t.keep = w.t.sel, w.t.offset, w.t.hidden, w.t.showExcluded, w.t.folded, w.key
+			t.sel, t.offset, t.hidden, t.showExcluded, t.folded, t.at, t.seen, t.gone = w.sel, w.offset, w.hidden, w.showExcluded, w.folded, w.at, w.seen, w.gone
 			if !rulesChanged {
-				t.ruleFilter = w.t.ruleFilter
+				t.ruleFilter = w.ruleFilter
 			}
 			if keyOf(t) == shown {
 				m.cur = i
@@ -135,9 +126,12 @@ func (m *Model) applySettings(msg settingsMsg) tea.Cmd {
 		m.markNotRead()
 	}
 	for _, t := range m.tabs {
-		if w, ok := old[keyOf(t)]; ok {
-			m.putCursorBack(t, w.t.sel)
-			t.keep = model.PRKey{}
+		if _, ok := old[keyOf(t)]; ok {
+			m.settle(t, true)
+			if t.at == nil {
+				m.toFirstPR(t)
+				m.moved(t)
+			}
 		}
 	}
 	if m.picker != nil && rulesChanged {
@@ -148,24 +142,4 @@ func (m *Model) applySettings(msg settingsMsg) tea.Cmd {
 		m.decideBulk()
 	}
 	return m.ensure()
-}
-
-// putCursorBack puts t's cursor on the pull request it was on, or at the
-// line it was at, on a pull request.
-func (m *Model) putCursorBack(t *tab, at int) {
-	rs := m.rows(t)
-	if len(rs) == 0 {
-		t.sel, t.offset = 0, 0
-		return
-	}
-	for i, r := range rs {
-		if r.kind == rowPR && r.pr.Key == t.keep {
-			t.sel = i
-			return
-		}
-	}
-	t.sel = min(at, len(rs)-1)
-	if t.sel < 0 || rs[t.sel].kind != rowPR {
-		m.toFirstPR(t)
-	}
 }

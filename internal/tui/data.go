@@ -67,8 +67,15 @@ type tab struct {
 	bodiesFailing bool
 
 	sel, offset int
-	// keep is the pull request the cursor was on when a reading started.
-	keep model.PRKey
+	// at is the row of the pull request the cursor is on, as last shown;
+	// nil on a group's header or with no rows. seen is set once the user
+	// has pressed a key or used the mouse with the cursor on it: only then
+	// does the cursor follow it. gone is set while that pull request has
+	// left the rows: its row stays, as last shown, on line goneAt, until
+	// the cursor leaves it (ADR-115).
+	at         *row
+	seen, gone bool
+	goneAt     int
 
 	// readAt is when the rows were read, and asOf the same while they are
 	// not what GitHub has now: from the cache until read again, or after a
@@ -132,10 +139,27 @@ type row struct {
 	// ex is why the row is excluded, shown only while the tab shows the
 	// excluded, and whether an exclusion rule waits to tell.
 	ex exclusion
+	// gone is set on the row of the pull request the cursor is on, kept
+	// after it left the rows.
+	gone bool
 }
 
-// rows are the lines of t as shown: filtered, sorted, grouped and folded.
-func (m *Model) rows(t *tab) []row { return m.rowsOf(t, m.filter, t.ruleFilter, t.folded) }
+// rows are the lines of t as shown: filtered, sorted, grouped and folded,
+// with the row the cursor stays on after its pull request left them.
+func (m *Model) rows(t *tab) []row {
+	rs := m.rowsOf(t, m.filter, t.ruleFilter, t.folded)
+	if !t.gone || !m.stays(t) || slices.ContainsFunc(rs, isPR(t.at.pr.Key)) {
+		return rs
+	}
+	r := *t.at
+	r.gone = true
+	return slices.Insert(rs, min(t.goneAt, len(rs)), r)
+}
+
+// isPR reports whether a row is that of the pull request k.
+func isPR(k model.PRKey) func(row) bool {
+	return func(r row) bool { return r.kind == rowPR && r.pr.Key == k }
+}
 
 // listed are the pull requests of t in the order its rows show them, with
 // no filter and no group folded; hidden ones are left out.
@@ -982,7 +1006,7 @@ func (m *Model) tabRead(msg tabMsg) tea.Cmd {
 		t.warnings = append(t.warnings, msg.warnings...)
 	} else {
 		t.prs, t.warnings, t.kept = prs, msg.warnings, nil
-		m.restoreCursor(t)
+		m.firstRows(t)
 	}
 	cmds := []tea.Cmd{m.ensure(), m.queueHeavy(msg.tab, msg.gen, prs)}
 	if msg.next != "" && len(t.prs) < t.limit {
@@ -1007,11 +1031,6 @@ func (m *Model) swap(i int) tea.Cmd {
 	p := t.pend
 	t.pend = nil
 	now := m.set.Now()
-	// The cursor stays on the pull request it is on now, which may not be
-	// the one it was on when the reading started.
-	if rs := m.rows(t); t.sel >= 0 && t.sel < len(rs) && rs[t.sel].kind == rowPR {
-		t.keep = rs[t.sel].pr.Key
-	}
 	old := map[model.PRKey]model.PR{}
 	for _, o := range t.prs {
 		old[o.Key] = o
@@ -1044,7 +1063,7 @@ func (m *Model) swap(i int) tea.Cmd {
 	t.prs, t.total, t.warnings = rows, p.total, p.warnings
 	t.loading, t.loaded, t.err, t.asOf, t.readAt, t.failing = false, true, nil, time.Time{}, now, false
 	m.refreshed[i] = now
-	m.restoreCursor(t)
+	m.firstRows(t)
 	cmds := []tea.Cmd{m.ensure(), m.queueHeavy(i, t.gen, p.prs), m.dropGone(t), m.readBodies(i)}
 	if m.tabDone(t) {
 		cmds = append(cmds, m.saveTab(i))

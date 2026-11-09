@@ -190,6 +190,9 @@ func (m *Model) rowResult() string {
 	p := r.pr
 	pg, ok := m.progress[p.Key]
 	if !ok {
+		if r.gone {
+			return "no longer in this list · kept until the cursor leaves it"
+		}
 		// A row shown with a, which the exclusion leaves out, says by
 		// what.
 		if r.ex.excluded() {

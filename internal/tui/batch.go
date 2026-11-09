@@ -603,6 +603,9 @@ func (m *Model) jumpTo(k model.PRKey) tea.Cmd {
 		for j, r := range m.rows(t) {
 			if r.kind == rowPR && r.pr.Key == k {
 				m.cur, t.sel = i, j
+				// Put there by the user, in a tab that may not be shown.
+				m.moved(t)
+				t.seen = true
 				m.pane.scroll = 0
 				return m.ensure()
 			}

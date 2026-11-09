@@ -2,12 +2,14 @@ package tui
 
 import (
 	"fmt"
+	"slices"
 	"time"
 
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/babarot/gh-desk/internal/logging"
 	"github.com/babarot/gh-desk/internal/model"
+	"github.com/babarot/gh-desk/internal/plan"
 )
 
 type tickMsg struct{}
@@ -77,6 +79,12 @@ func (m *Model) refresh() tea.Cmd {
 	clear(m.cache.details)
 	clear(m.cache.comments)
 	n := m.clearResults()
+	// The rows kept for the cursor are put away with the results.
+	for _, t := range m.tabs {
+		if t.gone {
+			t.at, t.seen, t.gone = nil, false, false
+		}
+	}
 	tabs := m.reloadTabs()
 	m.refreshing = &refreshRun{tabs: tabs, cleared: n}
 	m.rereading = &rereading{by: "r", start: m.set.Now(), tabs: tabs}
@@ -140,53 +148,88 @@ func (m *Model) refreshActivity() string {
 	return text
 }
 
-// reload reads the shown tab again, keeping the cursor on the pull
-// request it is on, and the notifications.
+// reload reads the shown tab again, and the notifications. The cursor
+// stays on its pull request (ADR-115).
 func (m *Model) reload() tea.Cmd {
-	t := m.tab()
-	t.keep = model.PRKey{}
-	if r, ok := m.current(); ok && r.kind == rowPR {
-		t.keep = r.pr.Key
-	}
 	cmds := []tea.Cmd{m.loadTab(m.cur)}
-	if !t.inbox {
+	if !m.tab().inbox {
 		cmds = append(cmds, m.loadTab(m.inbox))
 	}
 	return tea.Batch(cmds...)
 }
 
-// holdCursor notes the pull request under t's cursor. The func it returns
-// puts the cursor back on that pull request when a row still shows it, and
-// leaves it at its line otherwise, so that rows coming and going above it
-// do not move it onto another pull request.
-func (m *Model) holdCursor(t *tab) func() {
-	rs := m.rows(t)
-	if t.sel < 0 || t.sel >= len(rs) || rs[t.sel].kind != rowPR {
-		return func() {}
+// settle puts t's cursor back on the pull request the user has seen it on
+// after the rows changed under it, rows coming and going above it or
+// sorting again. When none of the rows is that pull request any more, its
+// row stays where the cursor is, if left is set or it stays already;
+// otherwise, and before the user has seen it, the cursor stays at its
+// line, on whatever row is there (ADR-115).
+func (m *Model) settle(t *tab, left bool) {
+	if t.at == nil || !t.seen {
+		m.moved(t)
+		return
 	}
-	k := rs[t.sel].pr.Key
-	return func() {
-		for i, r := range m.rows(t) {
-			if r.kind == rowPR && r.pr.Key == k {
-				t.sel = i
-				return
-			}
+	was := t.gone
+	t.gone = false
+	rs := m.rows(t)
+	if i := slices.IndexFunc(rs, isPR(t.at.pr.Key)); i >= 0 {
+		t.sel, t.at = i, &rs[i]
+		return
+	}
+	if (left || was) && m.stays(t) {
+		t.gone = true
+		t.sel = min(max(t.sel, 0), len(rs))
+		t.goneAt = t.sel
+		return
+	}
+	m.moved(t)
+}
+
+// moved takes the row under t's cursor as the one it is on, where the
+// user or something they did put it.
+func (m *Model) moved(t *tab) {
+	rs := m.rows(t)
+	if len(rs) == 0 {
+		t.at, t.seen, t.gone = nil, false, false
+		return
+	}
+	t.sel = min(max(t.sel, 0), len(rs)-1)
+	r := rs[t.sel]
+	if r.gone {
+		return
+	}
+	t.at, t.seen = nil, false
+	if t.gone {
+		// The row kept is let go: the rows below it move up a line.
+		t.gone = false
+		if r.kind == rowPR {
+			t.sel = slices.IndexFunc(m.rows(t), isPR(r.pr.Key))
+		} else {
+			t.sel = slices.IndexFunc(m.rows(t), func(o row) bool { return o.kind == rowGroup && o.group == r.group })
 		}
+	}
+	if r.kind == rowPR {
+		t.at = &r
 	}
 }
 
-// restoreCursor puts the cursor back on the pull request it was on before
-// a reading, or on the row it was at when that one is gone.
-func (m *Model) restoreCursor(t *tab) {
-	if t.keep == (model.PRKey{}) {
-		m.toFirstPR(t)
-		return
+// stays reports whether the row of the pull request t's cursor is on may
+// stay after it left the rows: not when what the user did leaves it out,
+// put away with d or h, filtered out by what is typed, or in a group
+// folded.
+func (m *Model) stays(t *tab) bool {
+	p := t.at.pr
+	if t.hidden[p.Key] || !matches(p, m.filter) {
+		return false
 	}
-	for i, r := range m.rows(t) {
-		if r.kind == rowPR && r.pr.Key == t.keep {
-			t.sel = i
-			return
-		}
+	return !t.grouped || !t.folded[plan.GroupOf(p, m.viewer)]
+}
+
+// firstRows puts the cursor of a tab just read on its first pull request,
+// unless it is on one already.
+func (m *Model) firstRows(t *tab) {
+	if t.at == nil {
+		m.toFirstPR(t)
 	}
 }
 

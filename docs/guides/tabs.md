@@ -22,6 +22,8 @@ name = "inbox"
 
 A tab is read in pages: a small first page so it appears in a few seconds, then larger ones up to its `limit`. What only one pull request needs, such as its description and its diff, is read when it is under the cursor.
 
+Once you move the cursor or press a key, it stays on its pull request while the list changes under it: rows read again, rows a rule leaves out or lets back, rows sorting again. If that pull request leaves the list, its row stays where it is, dimmed and marked −, until you move off it, and `r` puts it away.
+
 ## Groups
 
 A search tab can be split into groups with `groups`. A group states a fact of the pull request, whatever the query is, and the first that holds wins:
