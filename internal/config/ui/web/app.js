@@ -144,8 +144,9 @@ const whyWords=c=>{const label=COND[c.key]?.[0]||c.key,vs=(c.values||[]).join(',
 const markedTitle=(x,why)=>{const t=why.find(c=>c.key==='title'&&c.title)?.title;return t?html`${t[0]}<mark>${t[1]}</mark>${t[2]}`:x.title};
 // A list longer than this shows its first ones until it is opened, so that one rule does not fill the page.
 const MATCHES_SHOWN=5;
-// What a matched pull request adds to the rule: which of the several values a condition names it has. A condition of one value, a flag, a count or the title says nothing the rule does not, and the repository is in the row already.
-const picked=(r,why)=>why.filter(c=>c.state==='yes'&&c.key!=='repos'&&Array.isArray(r[c.key])&&r[c.key].length>1).map(c=>(c.key==='requested'?c.matched:c.values)||[]).flat();
+// What a matched pull request adds to the rule: which of the several values a condition names it has, and how far it is on a count or in days, which the rule bounds without saying. A condition of one value, a flag or the title says nothing the rule does not, and the repository is in the row already.
+const measured=c=>{const v=(c.values||[])[0];if(v===undefined)return[];return/_days$/.test(c.key)?[`${v}d`]:/_lines$/.test(c.key)?[`${v} lines`]:/_files$/.test(c.key)?[`${v} files`]:[]};
+const picked=(r,why)=>[...new Set(why.filter(c=>c.state==='yes').flatMap(c=>/_(days|lines|files)$/.test(c.key)?measured(c):c.key!=='repos'&&Array.isArray(r[c.key])&&r[c.key].length>1?(c.key==='requested'?c.matched:c.values)||[]:[]))];
 function Matches({n,m,r}){const[more,setMore]=useState({});if(!judged)return null;
   const one=(g,list)=>{const vs=[];for(const row of list){const k=JSON.stringify(list===g.yes?picked(r,row.why):row.why),same=vs.find(v=>v.k===k);if(same)same.where.push(row.where);else vs.push({k,why:row.why,where:[row.where]})}
     const yes=list===g.yes,chips=v=>yes?[]:v.why.filter(c=>c.state!=='yes'),tabs=v=>[...(yes?picked(r,v.why):[]),...v.where.filter(Boolean)].join(' · ');
