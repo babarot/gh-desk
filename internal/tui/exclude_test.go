@@ -358,3 +358,39 @@ func TestStateRuleIsNotTheInboxSettled(t *testing.T) {
 		t.Errorf("status = %q", got)
 	}
 }
+
+// The pane's read of what a merge would do can tell that a pull request
+// waits only for an approval, which an exclusion rule on its checks reads:
+// a row leaving above the cursor does not move the cursor onto another.
+func TestPaneReadKeepsTheCursor(t *testing.T) {
+	f := fixture()
+	waiting := model.PR{ID: "9", Key: key("acme", "api", 20), Title: "Deploy the client", Author: "dave", State: model.StateOpen,
+		HeadRef: "deploy", HeadOID: "fffffff9", BaseRef: "main", Checks: model.CheckPending, Requested: []model.Reviewer{{Login: "me"}},
+		Updated: now.Add(-10 * time.Minute)}
+	f.searches["review"] = append(f.searches["review"], waiting)
+	f.info = map[model.PRKey]func(*model.MergeInfo){waiting.Key: func(mi *model.MergeInfo) {
+		mi.Checks = []model.Check{{Name: "deploy/prod", State: model.CheckPending}}
+	}}
+	set := excluding(plan.Rule{Checks: []plan.Checks{plan.ChecksPassing}, Authors: []string{"dave"}})
+	set.Plan.ApprovalChecks = []string{"deploy/*"}
+	m := startSource(t, f, set)
+	// As if its read were still on the way: it is not known to wait only
+	// for an approval, so it is shown, above the cursor. Moving the cursor
+	// past it would read it, so the cursor is put on b.
+	delete(m.cache.info, waiting.Key)
+	b := f.searches["review"][0].Key
+	for i, r := range m.rows(m.tab()) {
+		if r.kind == rowPR && r.pr.Key == b {
+			m.tab().sel = i
+		}
+	}
+	if !strings.Contains(screen(m), "Deploy the client") {
+		t.Fatalf("not shown before the read:\n%s", screen(m))
+	}
+	got, _ := f.MergeInfo(t.Context(), []string{waiting.ID}, true)
+	_, cmd := m.Update(infoMsg{key: waiting.Key, mi: got[waiting.ID], ok: true})
+	run(m, cmd)
+	if r, ok := m.current(); !ok || r.pr.Key != b {
+		t.Errorf("the cursor moved off %s:\n%s", b, screen(m))
+	}
+}
