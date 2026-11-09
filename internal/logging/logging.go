@@ -41,6 +41,8 @@ const (
 	// KeyWas what it was before.
 	KeyMergeState = "merge_state"
 	KeyWas        = "was"
+	// KeyInQueue is whether a watched pull request is in the merge queue.
+	KeyInQueue = "in_queue"
 	// KeyRule names the [[auto_approve]] rule that asked for an approval,
 	// and KeyHead the head it judged.
 	KeyRule = "rule"

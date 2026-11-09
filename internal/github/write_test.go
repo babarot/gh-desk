@@ -60,6 +60,13 @@ func TestWritesAreSentAndLogged(t *testing.T) {
 			ok:       "enable-auto-merge done", failed: "enable-auto-merge failed", step: "enable-auto-merge",
 		},
 		{
+			name:     "enqueue",
+			call:     func(c *Client) error { return c.Enqueue(context.Background(), writeKey, "PR_1", "abc123") },
+			mutation: "enqueuePullRequest",
+			vars:     map[string]any{"id": "PR_1", "head": "abc123"},
+			ok:       "enqueue done", failed: "enqueue failed", step: "enqueue",
+		},
+		{
 			name:     "ready for review",
 			call:     func(c *Client) error { return c.MarkReady(context.Background(), writeKey, "PR_1", "abc123") },
 			mutation: "markPullRequestReadyForReview",

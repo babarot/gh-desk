@@ -241,6 +241,11 @@ func (g *GitHub) EnableAutoMerge(ctx context.Context, k model.PRKey, id, head st
 	return runner.ErrCleanStatus
 }
 
+// Enqueue merges at once, as the queue would after its checks.
+func (g *GitHub) Enqueue(ctx context.Context, k model.PRKey, id, head string) error {
+	return g.Merge(ctx, k, id, head, model.MethodMerge)
+}
+
 func (g *GitHub) UpdateBranch(ctx context.Context, k model.PRKey, id, head string) error {
 	return g.wait(ctx, 600)
 }

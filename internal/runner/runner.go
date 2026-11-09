@@ -32,6 +32,7 @@ type GitHub interface {
 	Review(ctx context.Context, pr model.PR, event model.ReviewEvent, body string) error
 	Merge(ctx context.Context, key model.PRKey, id, head string, method model.MergeMethod) error
 	EnableAutoMerge(ctx context.Context, key model.PRKey, id, head string, method model.MergeMethod) error
+	Enqueue(ctx context.Context, key model.PRKey, id, head string) error
 	UpdateBranch(ctx context.Context, key model.PRKey, id, head string) error
 	MarkReady(ctx context.Context, key model.PRKey, id, head string) error
 	PostComment(ctx context.Context, pr model.PR, body string) error
@@ -193,6 +194,9 @@ const (
 	Approved
 	Merged
 	AutoMergeOn
+	// Queued is a pull request in its base branch's merge queue, which
+	// merges it.
+	Queued
 	// Readied is a draft marked ready for review.
 	Readied
 	// Reviewed is a review sent that is not an approval.
@@ -208,7 +212,8 @@ const (
 )
 
 // Final reports whether the result ends the pull request's part in the
-// batch. AutoMergeOn does: GitHub merges it, and a later Event says so.
+// batch. AutoMergeOn and Queued do: GitHub merges it, and a later Event
+// says so.
 func (r Result) Final() bool { return r != Running }
 
 // Event is a step of one pull request.
@@ -231,9 +236,12 @@ type Event struct {
 	Closed bool
 	// Method is how it was merged, on a Merged event gh-desk made.
 	Method model.MergeMethod
-	// Watch is set on events of a pull request put on auto-merge, after
-	// its batch has ended.
+	// Watch is set on events of a pull request put on auto-merge or in
+	// the merge queue, after its batch has ended.
 	Watch bool
+	// Queued is set on a Watch event of a pull request seen in the merge
+	// queue.
+	Queued bool
 	// Locked is set on a skip because the merge would wait while another
 	// gh-desk holds the record of pending merges.
 	Locked bool
@@ -273,9 +281,11 @@ const (
 	StepWaitBlocked Step = "wait-blocked"
 	StepMerge       Step = "merge"
 	StepAutoMerge   Step = "auto-merge"
-	StepComment     Step = "comment"
-	StepClose       Step = "close"
-	StepDeleteRef   Step = "delete-branch"
+	// StepEnqueue puts it in the merge queue.
+	StepEnqueue   Step = "enqueue"
+	StepComment   Step = "comment"
+	StepClose     Step = "close"
+	StepDeleteRef Step = "delete-branch"
 )
 
 // Waits reports whether s is a wait.
@@ -646,10 +656,14 @@ func (j *job) say(res Result, text string) {
 	// The record goes only with an end that is known: not when gh-desk
 	// is quitting, not when a read or a write failed midway, and not when
 	// GitHub's auto-merge is left to watch.
-	if res != AutoMergeOn && !j.keep && j.ctx.Err() == nil {
+	if !watched(res) && !j.keep && j.ctx.Err() == nil {
 		j.forget()
 	}
 }
+
+// watched reports whether a result leaves the pull request to GitHub,
+// watched with its record kept.
+func watched(res Result) bool { return res == AutoMergeOn || res == Queued }
 
 // step says the job starts or goes on with a step.
 func (j *job) step(s Step, text string, checks ...string) {
@@ -675,17 +689,30 @@ func ahead(d plan.Decision) []Step {
 	if d.Approve {
 		out = append(out, StepApprove)
 	}
+	last := StepMerge
+	if d.Queue {
+		last = StepEnqueue
+	}
 	switch d.Step {
-	case plan.StepMerge:
-		out = append(out, StepMerge)
+	case plan.StepMerge, plan.StepEnqueue:
+		out = append(out, last)
 	case plan.StepAutoMerge:
 		out = append(out, StepAutoMerge)
 	case plan.StepUpdate:
-		out = append(out, StepUpdate, StepWait, StepMerge)
+		out = append(out, StepUpdate, StepWait, last)
 	case plan.StepWait:
-		out = append(out, StepWait, StepMerge)
+		out = append(out, StepWait, last)
 	}
 	return out
+}
+
+// lastStep is the write that merges the pull request: putting it in the
+// merge queue where its base has one.
+func lastStep(mi model.MergeInfo) Step {
+	if mi.Queue {
+		return StepEnqueue
+	}
+	return StepMerge
 }
 
 // locked skips a merge that would wait without the record of pending
@@ -768,7 +795,11 @@ func (j *job) resume() {
 		j.approved, j.pend.Approving = true, false
 	}
 	if j.pend.Watching {
-		j.say(AutoMergeOn, "auto-merge on")
+		if mi.InQueue {
+			j.say(Queued, "in the merge queue")
+		} else {
+			j.say(AutoMergeOn, "auto-merge on")
+		}
 		// Watched aside, as after turning auto-merge on, so the next
 		// pull request of the repository does not wait for it.
 		j.startWatch()
@@ -911,7 +942,7 @@ func approvedBy(mi model.MergeInfo, login string) bool {
 	return false
 }
 
-var resultWord = map[Result]string{Running: "running", Approved: "approved", Merged: "merged", AutoMergeOn: "auto-merge-on", Readied: "readied", Reviewed: "reviewed", Closed: "closed", CommentSent: "comment-sent",
+var resultWord = map[Result]string{Running: "running", Approved: "approved", Merged: "merged", AutoMergeOn: "auto-merge-on", Queued: "queued", Readied: "readied", Reviewed: "reviewed", Closed: "closed", CommentSent: "comment-sent",
 	Skipped: "skipped", Stopped: "stopped", Failed: "failed"}
 
 // read reads the pull request and checks its head is the one confirmed.
@@ -1074,8 +1105,12 @@ func (j *job) merge() {
 	if !ok {
 		return
 	}
-	if d.Step == plan.StepSkip {
+	switch d.Step {
+	case plan.StepSkip:
 		j.say(Skipped, d.Reason)
+		return
+	case plan.StepQueued:
+		j.queued()
 		return
 	}
 	if d.Step == plan.StepAutoMerge && !j.it.AutoMerge {
@@ -1136,7 +1171,7 @@ func (j *job) merge() {
 		j.forecast(ahead(d))
 	}
 	switch d.Step {
-	case plan.StepMerge, plan.StepAutoMerge, plan.StepUpdate:
+	case plan.StepMerge, plan.StepEnqueue, plan.StepQueued, plan.StepAutoMerge, plan.StepUpdate:
 	case plan.StepWait:
 		if !j.wait() {
 			return
@@ -1214,13 +1249,20 @@ func (j *job) inTurn() (again bool) {
 		case d.Step == plan.StepSkip:
 			j.say(Skipped, d.Reason)
 			return false
+		case d.Step == plan.StepQueued:
+			j.queued()
+			return false
 		case d.Step == plan.StepMerge && !jobs:
 			j.forecast(ahead(d))
 			j.mergeDecided(d)
 			return false
+		case d.Step == plan.StepEnqueue && !jobs:
+			j.forecast(ahead(d))
+			j.enqueue()
+			return false
 		case d.Step == plan.StepAutoMerge && !jobs:
 			j.forecast(ahead(d))
-			j.autoMerge(d.Method)
+			j.autoMerge(d.Method, mi.Queue)
 			return false
 		}
 		if waits(d.Step) && !j.canWait {
@@ -1311,17 +1353,60 @@ func (j *job) mergeNow(method model.MergeMethod) bool {
 	case mi.State == model.StateMerged:
 		j.say(Merged, "merged")
 		return true
+	case mi.InQueue:
+		j.queued()
 	default:
 		j.say(Failed, "merge failed: "+short(err))
 	}
 	return false
 }
 
-func (j *job) autoMerge(method model.MergeMethod) {
+// enqueue puts the pull request in its base branch's merge queue, on the
+// confirmed head, and watches it there.
+func (j *job) enqueue() {
+	j.step(StepEnqueue, "adding to the merge queue")
+	err := j.r.gh.Enqueue(j.ctx, j.it.PR.Key, j.it.PR.ID, j.head)
+	if err == nil {
+		j.queued()
+		return
+	}
+	// A refused one is read again to tell why: it was merged meanwhile,
+	// or someone put it in the queue first.
+	mi, ok := j.read(false)
+	switch {
+	case !ok:
+	case mi.State == model.StateMerged:
+		j.say(Merged, "merged")
+	case mi.InQueue:
+		j.queued()
+	default:
+		j.say(Failed, "could not add to the merge queue: "+short(err))
+	}
+}
+
+// queued ends the job's part with the pull request in the merge queue,
+// and watches it there when this gh-desk holds the record; without it the
+// queue merges it unwatched.
+func (j *job) queued() {
+	if !j.canWait {
+		j.say(Queued, "in the merge queue")
+		return
+	}
+	j.pend.Watching, j.pend.Queued = true, true
+	j.save()
+	j.say(Queued, "in the merge queue")
+	j.startWatch()
+}
+
+func (j *job) autoMerge(method model.MergeMethod, queue bool) {
 	j.step(StepAutoMerge, "turning on auto-merge")
 	err := j.r.gh.EnableAutoMerge(j.ctx, j.it.PR.Key, j.it.PR.ID, j.head, method)
 	if errors.Is(err, ErrCleanStatus) {
-		j.mergeNow(method)
+		if queue {
+			j.enqueue()
+		} else {
+			j.mergeNow(method)
+		}
 		return
 	}
 	if err != nil {
@@ -1344,26 +1429,30 @@ func (j *job) startWatch() {
 	})
 }
 
-// watch follows a pull request put on auto-merge until GitHub merges it,
-// it is closed, auto-merge is turned off, or the watch times out.
+// watch follows a pull request put on auto-merge or in the merge queue
+// until GitHub merges it, it is closed, auto-merge is turned off, it leaves
+// the queue unmerged, or the watch times out. On a branch with a merge
+// queue, auto-merge puts it in the queue once it can be merged, and is
+// off from then on.
 func (j *job) watch() {
 	last := time.Now()
 	// state is GitHub's merge state as last seen; a change is logged, so
 	// the log tells what GitHub's auto-merge is waiting on.
 	var state model.MergeState
+	var inQueue, seen bool
 	for j.sleep(j.r.opt.PollSlow) {
 		got, err := j.r.gh.MergeInfo(j.ctx, []string{j.it.PR.ID}, false)
 		mi, ok := got[j.it.PR.ID]
-		if err == nil && ok && mi.State == model.StateOpen && mi.MergeState != state {
-			if state == "" {
-				j.log.Info("watch start", logging.KeyMergeState, strings.ToLower(string(mi.MergeState)))
+		if err == nil && ok && mi.State == model.StateOpen && (mi.MergeState != state || mi.InQueue != inQueue || !seen) {
+			if !seen {
+				j.log.Info("watch start", logging.KeyMergeState, strings.ToLower(string(mi.MergeState)), logging.KeyInQueue, mi.InQueue)
 			} else {
-				j.log.Info("watch progress", logging.KeyMergeState, strings.ToLower(string(mi.MergeState)), logging.KeyWas, strings.ToLower(string(state)))
+				j.log.Info("watch progress", logging.KeyMergeState, strings.ToLower(string(mi.MergeState)), logging.KeyWas, strings.ToLower(string(state)), logging.KeyInQueue, mi.InQueue)
 			}
-			state = mi.MergeState
+			state, inQueue, seen = mi.MergeState, mi.InQueue, true
 		}
 		say := func(res Result, text string) {
-			j.emit(Event{Key: j.it.PR.Key, Result: res, Text: text, Watch: true})
+			j.emit(Event{Key: j.it.PR.Key, Result: res, Text: text, Watch: true, Queued: j.pend.Queued})
 			j.log.Info("watch end", logging.KeyStep, resultWord[res], "why", text)
 			j.forget()
 		}
@@ -1372,16 +1461,27 @@ func (j *job) watch() {
 		last = now
 		j.save()
 		switch {
+		case j.pend.Watched > j.r.opt.WatchTimeout && inQueue:
+			say(Stopped, "stopped watching after "+j.r.opt.WatchTimeout.String()+" · it stays in the merge queue")
+			return
 		case j.pend.Watched > j.r.opt.WatchTimeout:
 			say(Stopped, "stopped watching after "+j.r.opt.WatchTimeout.String()+" · auto-merge stays on")
 			return
 		case err != nil || !ok:
 			continue
+		case mi.State == model.StateMerged && j.pend.Queued:
+			say(Merged, "merged by the merge queue")
+			return
 		case mi.State == model.StateMerged:
 			say(Merged, "merged by auto-merge")
 			return
 		case mi.State == model.StateClosed:
 			say(Stopped, "closed")
+			return
+		case mi.InQueue:
+			j.pend.Queued = true
+		case !mi.AutoMerge && j.pend.Queued:
+			say(Stopped, "left the merge queue unmerged")
 			return
 		case !mi.AutoMerge:
 			say(Stopped, "auto-merge was turned off")
@@ -1389,7 +1489,7 @@ func (j *job) watch() {
 		case mi.MergeState == model.MergeDirty:
 			say(Stopped, "auto-merge stuck: conflicts")
 			return
-		case mi.MergeState == model.MergeBehind:
+		case mi.MergeState == model.MergeBehind && !mi.Queue:
 			// GitHub's auto-merge does not update a branch; one that must
 			// be up to date waits forever.
 			say(Stopped, "auto-merge stuck: behind its base")
@@ -1443,8 +1543,11 @@ func (j *job) updateBranch(base string) bool {
 // while jobs may still start on the head: what ForMerge cannot know, the
 // quiet time after what gh-desk or the user did last.
 func (j *job) hold(mi model.MergeInfo, d plan.Decision) plan.Decision {
-	if (d.Step == plan.StepMerge || d.Step == plan.StepAutoMerge) && plan.JobsRunning(mi, j.trigger, time.Now()) {
+	if (d.Step == plan.StepMerge || d.Step == plan.StepEnqueue || d.Step == plan.StepAutoMerge) && plan.JobsRunning(mi, j.trigger, time.Now()) {
 		d.Step, d.Reason = plan.StepWait, "wait for checks → merge"
+		if mi.Queue {
+			d.Reason = "wait for checks → merge queue"
+		}
 		if d.Admin {
 			d.Reason, d.AdminLater = "wait for checks → merge as admin", true
 		}
@@ -1663,11 +1766,14 @@ func (j *job) wait() bool {
 		w.read(mi)
 		jobs := plan.JobsRunning(mi, j.trigger, time.Now())
 		switch d.Step {
-		case plan.StepMerge:
+		case plan.StepMerge, plan.StepEnqueue:
 			if !jobs {
 				w.end("ready")
 				return true
 			}
+		case plan.StepQueued:
+			w.end("queued")
+			return true
 		case plan.StepSkip:
 			w.end("skipped")
 			j.say(Skipped, d.Reason)
@@ -1694,7 +1800,7 @@ func (j *job) wait() bool {
 				return false
 			}
 			j.waitingFor(mi, w)
-			j.forecast([]Step{StepMerge})
+			j.forecast([]Step{lastStep(mi)})
 		default:
 			now := time.Now()
 			j.pend.BlockedWaited += now.Sub(last)
@@ -1713,7 +1819,7 @@ func (j *job) wait() bool {
 			}
 			w.at(what, mi, checks)
 			j.step(s, text, checks...)
-			j.forecast([]Step{StepMerge})
+			j.forecast([]Step{lastStep(mi)})
 		}
 		if !j.pause(w, mi) {
 			return false

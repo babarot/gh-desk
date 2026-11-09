@@ -19,6 +19,11 @@ const (
 	StepAutoMerge Step = "auto-merge"
 	// StepWait waits for its checks and rules, then merges.
 	StepWait Step = "wait"
+	// StepEnqueue puts it in its base branch's merge queue, which merges
+	// it.
+	StepEnqueue Step = "enqueue"
+	// StepQueued only follows it: it is in the merge queue already.
+	StepQueued Step = "queued"
 	// StepUpdate updates its branch with the base, then waits.
 	StepUpdate Step = "update-branch"
 	// StepRecheck reads it again: GitHub is still working out whether it
@@ -64,6 +69,9 @@ type Decision struct {
 	// AdminLater is whether the merge it waits for goes as an admin (for a
 	// draft, if it is still blocked once it is ready).
 	AdminLater bool
+	// Queue is whether its base branch merges through a merge queue: the
+	// merge it ends with puts it in the queue.
+	Queue bool
 	// Notes are what the user should know of this pull request before
 	// saying yes. What a step means, the same for every pull request that
 	// takes it, is not a note: the confirm popup says it once.
@@ -295,6 +303,13 @@ func ForMerge(mi model.MergeInfo, pr model.PR, viewer string, set Settings) Deci
 	if mi.State != model.StateOpen {
 		return skip(stateWord(mi.State))
 	}
+	d.Queue = mi.Queue
+	if mi.InQueue {
+		// GitHub says nothing of whether it can be merged while it is in
+		// the queue; the queue merges it or takes it out.
+		d.Step, d.Reason = StepQueued, "in the merge queue"
+		return d
+	}
 	if mi.Draft {
 		if pr.Author != viewer && !pr.AuthorIsBot {
 			return skip("someone else's draft")
@@ -338,12 +353,19 @@ func ForMerge(mi model.MergeInfo, pr model.PR, viewer string, set Settings) Deci
 		d.Step, d.Reason = StepRecheck, "checking whether it can be merged"
 	case model.MergeClean, model.MergeUnstable, model.MergeHasHooks:
 		if jobs {
-			d.Step, d.Reason = StepWait, "wait for checks → merge"
+			d.Step, d.Reason = StepWait, "wait for checks → "+mergeWord(mi)
 		} else {
-			d.Step, d.Reason = StepMerge, "merge now"
+			d = mergeStep(d, mi)
 		}
 	case model.MergeBehind:
 		switch {
+		case mi.Queue && jobs:
+			// The queue builds on the latest base: its branch need not
+			// be updated.
+			d.Step, d.Reason = StepWait, "wait for checks → merge queue"
+			return d
+		case mi.Queue:
+			return mergeStep(d, mi)
 		case set.UpdateBranch == "never":
 			return skip("behind its base")
 		case pr.AuthorIsBot && set.UpdateBranch != "all":
@@ -361,6 +383,25 @@ func ForMerge(mi model.MergeInfo, pr model.PR, viewer string, set Settings) Deci
 	return d
 }
 
+// mergeStep is the step of a pull request that can be merged now: into
+// the merge queue where its base has one, a merge otherwise.
+func mergeStep(d Decision, mi model.MergeInfo) Decision {
+	if mi.Queue {
+		d.Step, d.Reason = StepEnqueue, "add to the merge queue"
+	} else {
+		d.Step, d.Reason = StepMerge, "merge now"
+	}
+	return d
+}
+
+// mergeWord is how a wait says the merge that follows it.
+func mergeWord(mi model.MergeInfo) string {
+	if mi.Queue {
+		return "merge queue"
+	}
+	return "merge"
+}
+
 // blocked is the step of a pull request that waits for its checks or
 // rules: auto-merge where the repository allows it, waiting otherwise.
 // While jobs are at work it waits: GitHub's auto-merge waits only for the
@@ -369,7 +410,7 @@ func blocked(d Decision, mi model.MergeInfo, set Settings, jobs bool) Decision {
 	if set.AutoMerge && mi.Repo.AutoMerge && !jobs {
 		d.Step, d.Reason = StepAutoMerge, "turn on auto-merge"
 	} else {
-		d.Step, d.Reason = StepWait, "wait for checks → merge"
+		d.Step, d.Reason = StepWait, "wait for checks → "+mergeWord(mi)
 	}
 	return d
 }
