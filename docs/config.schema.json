@@ -626,7 +626,7 @@
               "comment",
               "approve",
               "merge",
-              "ready_for_review",
+              "draft",
               "close",
               "hide"
             ],

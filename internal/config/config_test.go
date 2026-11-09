@@ -670,7 +670,9 @@ func TestMenuActions(t *testing.T) {
 	}
 	wantErrs(t, "[menu]\nactions = [\"merge\", \"merge\", \"aprove\"]\n",
 		`config.toml:2:21: menu.actions names "merge" twice`,
-		`menu.actions[2] must be one of "ask_claude", "browse", "review", "comment", "approve", "merge", "ready_for_review", "close", "hide", got "aprove"; did you mean "approve"?`)
+		`menu.actions[2] must be one of "ask_claude", "browse", "review", "comment", "approve", "merge", "draft", "close", "hide", got "aprove"; did you mean "approve"?`)
+	wantErrs(t, "[menu]\nactions = [\"merge\", \"ready_for_review\"]\n",
+		`menu.actions[1]: "ready_for_review" was renamed to "draft"`)
 	wantErrs(t, "[menu]\nactions = []\n", `menu.actions must name at least one of`)
 }
 

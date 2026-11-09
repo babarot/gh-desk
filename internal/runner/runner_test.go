@@ -169,6 +169,14 @@ func (f *fakeGH) MarkReady(_ context.Context, k model.PRKey, id, head string) er
 	return nil
 }
 
+func (f *fakeGH) ConvertToDraft(_ context.Context, k model.PRKey, id, head string) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.log(fmt.Sprintf("draft %s %s", k, head))
+	f.prs[id].Draft = true
+	return nil
+}
+
 func (f *fakeGH) CommitInfo(_ context.Context, _ model.PRKey, oid string) (Commit, error) {
 	return f.commits[oid], nil
 }
@@ -1096,6 +1104,48 @@ func TestReadyOnly(t *testing.T) {
 		t.Errorf("moved: last event = %+v", e)
 	}
 	if want := "ready acme/api#1 h-1"; strings.Join(f.calls, ",") != want {
+		t.Errorf("calls = %v", f.calls)
+	}
+}
+
+// Someone else's draft is left, as merge leaves it (ADR-113).
+func TestReadyLeavesSomeoneElses(t *testing.T) {
+	draft, it := pr("1", "api", 1, "alice")
+	draft.Draft, draft.MergeState = true, model.MergeDraft
+	f := newFake(draft)
+	evs := runBatch(t, f, Ready, it)
+	if e := last(evs[it.PR.Key]); e.Result != Skipped || e.Text != "someone else's pull request" || len(f.calls) != 0 {
+		t.Errorf("last event = %+v, calls %v", e, f.calls)
+	}
+}
+
+func TestToDraft(t *testing.T) {
+	ready, it := pr("1", "api", 1, "me")
+	bots, it2 := pr("2", "web", 2, "renovate")
+	it2.PR.AuthorIsBot = true
+	theirs, it3 := pr("3", "cli", 3, "alice")
+	already, it4 := pr("4", "doc", 4, "me")
+	already.Draft, already.MergeState = true, model.MergeDraft
+	moved, it5 := pr("5", "app", 5, "me")
+	moved.HeadOID = "pushed-later"
+	f := newFake(ready, bots, theirs, already, moved)
+	evs := runBatch(t, f, ToDraft, it, it2, it3, it4, it5)
+	for _, k := range []model.PRKey{it.PR.Key, it2.PR.Key} {
+		if e := last(evs[k]); e.Result != Drafted {
+			t.Errorf("%s: last event = %+v", k, e)
+		}
+	}
+	if e := last(evs[it3.PR.Key]); e.Result != Skipped || e.Text != "someone else's pull request" {
+		t.Errorf("someone else's: last event = %+v", e)
+	}
+	if e := last(evs[it4.PR.Key]); e.Result != Skipped || e.Text != "already a draft" {
+		t.Errorf("already a draft: last event = %+v", e)
+	}
+	if e := last(evs[it5.PR.Key]); e.Result != Stopped || !strings.Contains(e.Text, "head changed") {
+		t.Errorf("moved: last event = %+v", e)
+	}
+	got := strings.Join(f.calls, ",")
+	if !strings.Contains(got, "draft acme/api#1 h-1") || !strings.Contains(got, "draft acme/web#2 h-2") || strings.Count(got, "draft ") != 2 {
 		t.Errorf("calls = %v", f.calls)
 	}
 }

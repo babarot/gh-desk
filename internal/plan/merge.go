@@ -275,17 +275,40 @@ func ForReview(mi model.MergeInfo, pr model.PR, viewer string, event model.Revie
 	return Decision{Reason: "comment"}
 }
 
-// ForReady decides marking a draft pull request ready for review. Whether
-// the viewer may (the author, or one who can write to the repository) is
-// GitHub's to say.
-func ForReady(mi model.MergeInfo) Decision {
+// ForReady decides marking a draft pull request ready for review. Only a
+// draft of the viewer's or of a bot is: another person's says that person
+// does not want it reviewed yet (ADR-113). Whether GitHub lets the viewer
+// is GitHub's to say.
+func ForReady(mi model.MergeInfo, pr model.PR, viewer string) Decision {
 	switch {
 	case mi.State != model.StateOpen:
 		return Decision{Step: StepSkip, Reason: stateWord(mi.State)}
+	case !OwnOrBot(pr, viewer):
+		return Decision{Step: StepSkip, Reason: "someone else's pull request"}
 	case !mi.Draft:
 		return Decision{Step: StepSkip, Reason: "not a draft"}
 	}
 	return Decision{Reason: "mark ready for review"}
+}
+
+// ForDraft decides turning a pull request back into a draft, which only a
+// pull request of the viewer's or of a bot is (ADR-113).
+func ForDraft(mi model.MergeInfo, pr model.PR, viewer string) Decision {
+	switch {
+	case mi.State != model.StateOpen:
+		return Decision{Step: StepSkip, Reason: stateWord(mi.State)}
+	case !OwnOrBot(pr, viewer):
+		return Decision{Step: StepSkip, Reason: "someone else's pull request"}
+	case mi.Draft:
+		return Decision{Step: StepSkip, Reason: "already a draft"}
+	}
+	return Decision{Reason: "convert to draft"}
+}
+
+// OwnOrBot reports whether pr is the viewer's or a bot's: whose draft
+// state gh-desk changes (ADR-046, ADR-113).
+func OwnOrBot(pr model.PR, viewer string) bool {
+	return pr.Author == viewer || pr.AuthorIsBot
 }
 
 // ForMerge decides merging a pull request, marking it ready for review
@@ -311,7 +334,7 @@ func ForMerge(mi model.MergeInfo, pr model.PR, viewer string, set Settings) Deci
 		return d
 	}
 	if mi.Draft {
-		if pr.Author != viewer && !pr.AuthorIsBot {
+		if !OwnOrBot(pr, viewer) {
 			return skip("someone else's draft")
 		}
 		d.Ready = true

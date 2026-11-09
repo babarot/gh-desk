@@ -205,7 +205,7 @@ Ring the terminal's bell when a reading of the inbox finds a notification newly 
 
 ### menu.actions
 
-list of `ask_claude`, `browse`, `review`, `comment`, `approve`, `merge`, `ready_for_review`, `close`, `hide` · Default: `["ask_claude", "browse", "review", "comment", "approve", "merge", "ready_for_review", "close", "hide"]`
+list of `ask_claude`, `browse`, `review`, `comment`, `approve`, `merge`, `draft`, `close`, `hide` · Default: `["ask_claude", "browse", "review", "comment", "approve", "merge", "draft", "close", "hide"]`
 
 The actions the menu of enter offers, in the order given. One left out is not in the menu; its key still runs it from the list.
 

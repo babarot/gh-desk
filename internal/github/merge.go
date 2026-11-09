@@ -371,6 +371,16 @@ func (c *Client) MarkReady(ctx context.Context, key model.PRKey, id, head string
 }`, map[string]any{"id": id})
 }
 
+// ConvertToDraft turns an open pull request back into a draft. GitHub
+// takes no expected head for it; head is logged only, the runner having
+// checked it just before.
+func (c *Client) ConvertToDraft(ctx context.Context, key model.PRKey, id, head string) error {
+	return c.write(ctx, "convert-to-draft", key, head,
+		`mutation($id: ID!) {
+  convertPullRequestToDraft(input: {pullRequestId: $id}) { clientMutationId }
+}`, map[string]any{"id": id})
+}
+
 // Close closes the pull request. GitHub takes no expected head for it;
 // head is logged only, the runner having checked it just before.
 func (c *Client) Close(ctx context.Context, key model.PRKey, id, head string) error {

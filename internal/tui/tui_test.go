@@ -266,6 +266,8 @@ func (r *fakeRunner) start(kind runner.Kind, rv runner.ReviewText, items []runne
 				ev = runner.Event{Result: runner.Reviewed, Text: "sent"}
 			case kind == runner.Ready:
 				ev = runner.Event{Result: runner.Readied, Text: "ready for review"}
+			case kind == runner.ToDraft:
+				ev = runner.Event{Result: runner.Drafted, Text: "converted to draft"}
 			}
 		}
 		ev.Key = it.PR.Key
@@ -1154,6 +1156,7 @@ func TestHeadMovedIsNotSent(t *testing.T) {
 func TestMarkReady(t *testing.T) {
 	f := fixture()
 	draft := key("acme", "web", 7)
+	f.searches["review"][1].Author = "me"
 	f.info = map[model.PRKey]func(*model.MergeInfo){draft: func(mi *model.MergeInfo) { mi.Draft = true }}
 	m, r := startWith(t, f, keymap.Default())
 	m.tab().folded[plan.GroupTeam] = false
@@ -1179,13 +1182,67 @@ func TestMarkReady(t *testing.T) {
 	}
 }
 
-func TestMarkReadySkipsNonDraft(t *testing.T) {
+// Someone else's pull request is not the user's to turn either way
+// (ADR-113).
+func TestDraftRefusesSomeoneElses(t *testing.T) {
 	m, r := startWith(t, fixture(), keymap.Default())
 	press(m, "D")
-	if !strings.Contains(screen(m), "not a draft") {
-		t.Errorf("popup does not say why:\n%s", screen(m))
+	if m.bulk != nil || !strings.Contains(screen(m), "someone else's pull request") {
+		t.Errorf("not refused:\n%s", screen(m))
+	}
+	if len(r.items) != 0 {
+		t.Errorf("sent: %+v", r.items)
+	}
+}
+
+func TestConvertToDraft(t *testing.T) {
+	m, r := startWith(t, fixture(), keymap.Default())
+	press(m, "2", "D")
+	if !strings.Contains(screen(m), "convert to draft this pull request?") {
+		t.Fatalf("no popup:\n%s", screen(m))
 	}
 	press(m, "y")
+	mine := key("me", "tool", 3)
+	if len(r.kinds) != 1 || r.kinds[0] != runner.ToDraft || r.items[0][0].PR.Key != mine {
+		t.Fatalf("batches = %v %+v", r.kinds, r.items)
+	}
+	if p, _ := m.knownPR(mine); !p.Draft {
+		t.Error("the row does not say draft")
+	}
+	if !strings.Contains(m.notes[0].title, "converted to draft 1") {
+		t.Errorf("notes = %+v", m.notes)
+	}
+}
+
+// On a selection, another person's pull request is skipped and the rest
+// go; those that go must all go the same way (ADR-113).
+func TestDraftOnASelection(t *testing.T) {
+	f := fixture()
+	f.searches["review"][1].Author = "me"
+	f.searches["review"][1].Draft = false
+	m, r := startWith(t, f, keymap.Default())
+	for _, k := range []model.PRKey{key("acme", "api", 12), key("acme", "web", 7), key("acme", "api", 30)} {
+		m.selected[k] = byHand
+	}
+	press(m, "D")
+	if !strings.Contains(screen(m), "convert to draft 2 of 3?") || !strings.Contains(screen(m), "someone else's pull request") {
+		t.Fatalf("popup:\n%s", screen(m))
+	}
+	press(m, "y")
+	if len(r.kinds) != 1 || r.kinds[0] != runner.ToDraft || len(r.items[0]) != 2 {
+		t.Fatalf("batches = %v %+v", r.kinds, r.items)
+	}
+
+	f = fixture()
+	f.searches["review"][1].Author = "me"
+	m, r = startWith(t, f, keymap.Default())
+	for _, k := range []model.PRKey{key("acme", "web", 7), key("acme", "api", 30)} {
+		m.selected[k] = byHand
+	}
+	press(m, "D")
+	if m.bulk != nil || !strings.Contains(screen(m), "some are drafts and some are not") {
+		t.Errorf("a mixed selection was not refused:\n%s", screen(m))
+	}
 	if len(r.items) != 0 {
 		t.Errorf("sent: %+v", r.items)
 	}

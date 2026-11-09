@@ -102,8 +102,8 @@ func (m *Model) listKey(k string) tea.Cmd {
 		return m.startApprove()
 	case is("merge"):
 		return m.startBulk(runner.Merge)
-	case is("ready_for_review"):
-		return m.startBulk(runner.Ready)
+	case is("draft"):
+		return m.startDraft()
 	case is("close"):
 		return m.startClose()
 	case is("comment"):

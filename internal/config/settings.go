@@ -142,10 +142,12 @@ type (
 	// enumKind is one of Values.
 	enumKind struct{ Values []string }
 	// listKind is a list of strings, each among Values when there are
-	// some, and at least one when NonEmpty.
+	// some, and at least one when NonEmpty. Renamed are values that were
+	// renamed, by their old name, with the new one: not read, but told.
 	listKind struct {
 		Values   []string
 		NonEmpty bool
+		Renamed  map[string]string
 	}
 	// durationKind is a Duration, or "off" when Off.
 	durationKind struct{ Off bool }
@@ -220,6 +222,11 @@ func (k listKind) check(key string, v any) Problems {
 	}
 	if len(k.Values) > 0 {
 		for i, s := range ss {
+			if to, ok := k.Renamed[s]; ok {
+				ps = append(ps, Problem{Key: strings.Split(key, "."), Index: i,
+					Message: fmt.Sprintf("%s[%d]: %q was renamed to %q", key, i, s, to)})
+				continue
+			}
 			if !slices.Contains(k.Values, s) {
 				ps = append(ps, Problem{Key: strings.Split(key, "."), Index: i,
 					Message: fmt.Sprintf("%s[%d] must be one of %s, got %q%s", key, i, quoted(k.Values), s, didYouMean(s, k.Values))})
@@ -445,7 +452,7 @@ var settings = []setting{
 	{Key: "list.bell", Display: true, Kind: boolKind{}, Value: func(f File) any { return f.List.Bell },
 		Doc: "Ring the terminal's bell when a reading of the inbox finds a notification newly unread: new, read before, or updated since. The first reading after start does not ring it, nor one of the excluded. The terminal rings, flashes or stays quiet as it is set to."},
 
-	{Key: "menu.actions", Kind: listKind{Values: MenuActions, NonEmpty: true}, Value: func(f File) any { return f.Menu.Actions },
+	{Key: "menu.actions", Kind: listKind{Values: MenuActions, NonEmpty: true, Renamed: map[string]string{"ready_for_review": "draft"}}, Value: func(f File) any { return f.Menu.Actions },
 		Doc: `The actions the menu of enter offers, in the order given. One left out is not in the menu; its key still runs it from the list.`},
 
 	{Key: "preview.height", Display: true, Kind: intKind{Min: 0}, Value: func(f File) any { return f.Preview.Height },

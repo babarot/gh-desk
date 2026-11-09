@@ -35,6 +35,7 @@ type GitHub interface {
 	Enqueue(ctx context.Context, key model.PRKey, id, head string) error
 	UpdateBranch(ctx context.Context, key model.PRKey, id, head string) error
 	MarkReady(ctx context.Context, key model.PRKey, id, head string) error
+	ConvertToDraft(ctx context.Context, key model.PRKey, id, head string) error
 	PostComment(ctx context.Context, pr model.PR, body string) error
 	Close(ctx context.Context, key model.PRKey, id, head string) error
 	DeleteBranch(ctx context.Context, key model.PRKey, refID, head string) error
@@ -140,6 +141,8 @@ const (
 	Merge
 	// Ready marks drafts ready for review.
 	Ready
+	// ToDraft turns pull requests back into drafts.
+	ToDraft
 	// Close closes pull requests, with the comment and the deletion of
 	// their branches StartClose is given.
 	Close
@@ -199,6 +202,8 @@ const (
 	Queued
 	// Readied is a draft marked ready for review.
 	Readied
+	// Drafted is a pull request turned back into a draft.
+	Drafted
 	// Reviewed is a review sent that is not an approval.
 	Reviewed
 	// Closed is a pull request closed; its Text says what became of its
@@ -265,6 +270,7 @@ type Step string
 
 const (
 	StepReady   Step = "ready"
+	StepDraft   Step = "draft"
 	StepApprove Step = "approve"
 	// StepReview sends a review other than an approval.
 	StepReview Step = "review"
@@ -474,7 +480,7 @@ func (r *Runner) run(ctx context.Context, kind Kind, items []Item, resume map[mo
 		}
 		byRepo[repo] = append(byRepo[repo], it)
 	}
-	verb := map[Kind]string{Review: "review", Merge: "merge", Ready: "ready", Close: "close", Comment: "comment"}[kind]
+	verb := map[Kind]string{Review: "review", Merge: "merge", Ready: "ready", ToDraft: "draft", Close: "close", Comment: "comment"}[kind]
 	if resume != nil {
 		verb = "resume"
 	}
@@ -562,6 +568,8 @@ func (r *Runner) run(ctx context.Context, kind Kind, items []Item, resume map[mo
 			j.review(rv)
 		case kind == Ready:
 			j.markReady()
+		case kind == ToDraft:
+			j.convertToDraft()
 		case kind == Close:
 			j.closePR(ct)
 		case kind == Comment:
@@ -944,7 +952,7 @@ func approvedBy(mi model.MergeInfo, login string) bool {
 	return false
 }
 
-var resultWord = map[Result]string{Running: "running", Approved: "approved", Merged: "merged", AutoMergeOn: "auto-merge-on", Queued: "queued", Readied: "readied", Reviewed: "reviewed", Closed: "closed", CommentSent: "comment-sent",
+var resultWord = map[Result]string{Running: "running", Approved: "approved", Merged: "merged", AutoMergeOn: "auto-merge-on", Queued: "queued", Readied: "readied", Drafted: "drafted", Reviewed: "reviewed", Closed: "closed", CommentSent: "comment-sent",
 	Skipped: "skipped", Stopped: "stopped", Failed: "failed"}
 
 // read reads the pull request and checks its head is the one confirmed.
@@ -1025,7 +1033,7 @@ func (j *job) markReady() {
 	if !ok {
 		return
 	}
-	if d := plan.ForReady(mi); d.Step == plan.StepSkip {
+	if d := plan.ForReady(mi, j.it.PR, j.r.opt.Viewer); d.Step == plan.StepSkip {
 		j.say(Skipped, d.Reason)
 		return
 	}
@@ -1036,6 +1044,26 @@ func (j *job) markReady() {
 		return
 	}
 	j.say(Readied, "ready for review")
+}
+
+// convertToDraft turns a pull request back into a draft, on the head the
+// user saw.
+func (j *job) convertToDraft() {
+	mi, ok := j.read(false)
+	if !ok {
+		return
+	}
+	if d := plan.ForDraft(mi, j.it.PR, j.r.opt.Viewer); d.Step == plan.StepSkip {
+		j.say(Skipped, d.Reason)
+		return
+	}
+	j.forecast([]Step{StepDraft})
+	j.step(StepDraft, "converting to draft")
+	if err := j.r.gh.ConvertToDraft(j.ctx, j.it.PR.Key, j.it.PR.ID, j.head); err != nil {
+		j.say(Failed, "convert to draft failed: "+short(err))
+		return
+	}
+	j.say(Drafted, "converted to draft")
 }
 
 // sendApproval approves with body, which may be empty.

@@ -74,6 +74,13 @@ func TestWritesAreSentAndLogged(t *testing.T) {
 			ok:       "ready-for-review done", failed: "ready-for-review failed", step: "ready-for-review",
 		},
 		{
+			name:     "convert to draft",
+			call:     func(c *Client) error { return c.ConvertToDraft(context.Background(), writeKey, "PR_1", "abc123") },
+			mutation: "convertPullRequestToDraft",
+			vars:     map[string]any{"id": "PR_1"},
+			ok:       "convert-to-draft done", failed: "convert-to-draft failed", step: "convert-to-draft",
+		},
+		{
 			name:     "update branch",
 			call:     func(c *Client) error { return c.UpdateBranch(context.Background(), writeKey, "PR_1", "abc123") },
 			mutation: "updatePullRequestBranch",

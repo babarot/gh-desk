@@ -93,7 +93,7 @@ var Defaults = []Def{
 	{"retry", ScopeList, []string{"."}, "try again"},
 	{"approve", ScopeList, []string{"A"}, "approve"},
 	{"merge", ScopeList, []string{"M"}, "merge"},
-	{"ready_for_review", ScopeList, []string{"D"}, "ready for review"},
+	{"draft", ScopeList, []string{"D"}, "draft / ready"},
 	// No key of its own: one stray key press would start closing pull
 	// requests. It is reached from the menu (ADR-066).
 	{"close", ScopeList, nil, "close"},
@@ -166,20 +166,21 @@ var Defaults = []Def{
 // entry under an old name is a mistake that names the new one; the old name
 // is not read (ADR-023).
 var renamed = map[string]Action{
-	"open":            "menu",
-	"fill_suggestion": "complete",
-	"claude":          "triage",
-	"pr_claude":       "ask_claude",
-	"unfold":          "fold",
-	"toggle_bots":     "fold_bots",
-	"toggle_pane":     "preview",
-	"show_settled":    "show_excluded",
-	"pane_tab":        "preview_tab",
-	"pane_grow":       "preview_grow",
-	"pane_shrink":     "preview_shrink",
-	"pane_down":       "preview_down",
-	"pane_up":         "preview_up",
-	"notifications":   "events",
+	"open":             "menu",
+	"ready_for_review": "draft",
+	"fill_suggestion":  "complete",
+	"claude":           "triage",
+	"pr_claude":        "ask_claude",
+	"unfold":           "fold",
+	"toggle_bots":      "fold_bots",
+	"toggle_pane":      "preview",
+	"show_settled":     "show_excluded",
+	"pane_tab":         "preview_tab",
+	"pane_grow":        "preview_grow",
+	"pane_shrink":      "preview_shrink",
+	"pane_down":        "preview_down",
+	"pane_up":          "preview_up",
+	"notifications":    "events",
 }
 
 // The fixed keys are read before any action and cannot be bound.

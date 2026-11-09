@@ -325,20 +325,55 @@ func TestForReady(t *testing.T) {
 	draft.Draft = true
 	merged := draft
 	merged.State = model.StateMerged
+	mine := model.PR{Author: "me"}
+	bot := model.PR{Author: "renovate", AuthorIsBot: true}
+	theirs := model.PR{Author: "alice"}
 	tests := []struct {
 		name   string
 		mi     model.MergeInfo
+		pr     model.PR
 		skip   bool
 		reason string
 	}{
-		{"draft", draft, false, "mark ready for review"},
-		{"not a draft", info(model.MergeClean), true, "not a draft"},
-		{"merged", merged, true, "merged"},
+		{"draft", draft, mine, false, "mark ready for review"},
+		{"a bot's draft", draft, bot, false, "mark ready for review"},
+		{"someone else's draft", draft, theirs, true, "someone else's pull request"},
+		{"not a draft", info(model.MergeClean), mine, true, "not a draft"},
+		{"merged", merged, mine, true, "merged"},
 	}
 	for _, tt := range tests {
-		d := ForReady(tt.mi)
+		d := ForReady(tt.mi, tt.pr, "me")
 		if (d.Step == StepSkip) != tt.skip || d.Reason != tt.reason || d.Approve {
 			t.Errorf("%s: ForReady = %+v", tt.name, d)
+		}
+	}
+}
+
+func TestForDraft(t *testing.T) {
+	draft := info(model.MergeDraft)
+	draft.Draft = true
+	closed := info(model.MergeClean)
+	closed.State = model.StateClosed
+	mine := model.PR{Author: "me"}
+	bot := model.PR{Author: "renovate", AuthorIsBot: true}
+	theirs := model.PR{Author: "alice"}
+	tests := []struct {
+		name   string
+		mi     model.MergeInfo
+		pr     model.PR
+		skip   bool
+		reason string
+	}{
+		{"ready", info(model.MergeClean), mine, false, "convert to draft"},
+		{"a bot's", info(model.MergeClean), bot, false, "convert to draft"},
+		{"someone else's", info(model.MergeClean), theirs, true, "someone else's pull request"},
+		{"already a draft", draft, mine, true, "already a draft"},
+		{"closed", closed, mine, true, "closed"},
+	}
+	for _, tt := range tests {
+		d := ForDraft(tt.mi, tt.pr, "me")
+		if (d.Step == StepSkip) != tt.skip || d.Reason != tt.reason {
+			t.Errorf("%s: ForDraft = %+v", tt.name, d)
 		}
 	}
 }
