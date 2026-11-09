@@ -228,6 +228,9 @@ func (m *Model) event(msg eventMsg) tea.Cmd {
 	if ev.Result == runner.Readied || ev.Readied {
 		m.markReady(ev.Key)
 	}
+	if ev.Result == runner.Drafted {
+		m.markDrafted(ev.Key)
+	}
 	if ev.Result == runner.Closed || ev.Closed {
 		m.markClosed(ev.Key)
 	}
@@ -299,6 +302,14 @@ func (m *Model) markReady(k model.PRKey) {
 	}
 }
 
+// markDrafted shows a pull request turned back into a draft as one.
+func (m *Model) markDrafted(k model.PRKey) {
+	if p, ok := m.knownPR(k); ok {
+		p.Draft = true
+		m.updatePR(p)
+	}
+}
+
 // doneAfterReview marks the pull request's notification done when the
 // settings say so.
 func (m *Model) doneAfterReview(k model.PRKey) tea.Cmd {
@@ -332,6 +343,8 @@ func (m *Model) noteBatch(bs *batchState) tea.Cmd {
 		parts = append(parts, fmt.Sprintf("sent %d", count[runner.Reviewed]))
 	case bs.kind == runner.Ready:
 		parts = append(parts, fmt.Sprintf("marked ready %d", count[runner.Readied]))
+	case bs.kind == runner.ToDraft:
+		parts = append(parts, fmt.Sprintf("converted to draft %d", count[runner.Drafted]))
 	case bs.kind == runner.Close:
 		parts = append(parts, fmt.Sprintf("closed %d", count[runner.Closed]))
 	case bs.kind == runner.Comment:
@@ -653,7 +666,7 @@ func (m *Model) noteIcon(icon string) string {
 
 func (m *Model) resultStyle(r runner.Result) lipgloss.Style {
 	switch r {
-	case runner.Merged, runner.Approved, runner.Readied, runner.Closed, runner.CommentSent:
+	case runner.Merged, runner.Approved, runner.Readied, runner.Drafted, runner.Closed, runner.CommentSent:
 		return m.st.green
 	case runner.AutoMergeOn:
 		return m.st.teal
@@ -665,7 +678,7 @@ func (m *Model) resultStyle(r runner.Result) lipgloss.Style {
 
 // progressText is a row's progress, short enough for the cells it takes.
 func (m *Model) progressText(p progress) string {
-	icon := map[runner.Result]string{runner.Running: "◌", runner.Approved: "✓", runner.Merged: "✓", runner.Readied: "✓", runner.Closed: "✓", runner.CommentSent: "✓", runner.AutoMergeOn: "⧗",
+	icon := map[runner.Result]string{runner.Running: "◌", runner.Approved: "✓", runner.Merged: "✓", runner.Readied: "✓", runner.Drafted: "✓", runner.Closed: "✓", runner.CommentSent: "✓", runner.AutoMergeOn: "⧗",
 		runner.Skipped: "–", runner.Stopped: "✗", runner.Failed: "✗"}[p.result]
 	text := p.text
 	if after, ok := strings.CutPrefix(text, "– "); ok {
@@ -739,7 +752,7 @@ func (m *Model) tally() string {
 		count[p.result]++
 	}
 	var parts []string
-	for _, r := range []runner.Result{runner.Merged, runner.Approved, runner.Readied, runner.Closed, runner.CommentSent, runner.AutoMergeOn, runner.Running, runner.Skipped, runner.Stopped, runner.Failed} {
+	for _, r := range []runner.Result{runner.Merged, runner.Approved, runner.Readied, runner.Drafted, runner.Closed, runner.CommentSent, runner.AutoMergeOn, runner.Running, runner.Skipped, runner.Stopped, runner.Failed} {
 		if count[r] == 0 {
 			continue
 		}
@@ -749,7 +762,7 @@ func (m *Model) tally() string {
 }
 
 func (m *Model) progressTextIcon(r runner.Result, n int) string {
-	icon := map[runner.Result]string{runner.Running: "◌", runner.Approved: "✓", runner.Merged: "✓", runner.Readied: "✓", runner.Closed: "✓", runner.CommentSent: "✓", runner.AutoMergeOn: "⧗",
+	icon := map[runner.Result]string{runner.Running: "◌", runner.Approved: "✓", runner.Merged: "✓", runner.Readied: "✓", runner.Drafted: "✓", runner.Closed: "✓", runner.CommentSent: "✓", runner.AutoMergeOn: "⧗",
 		runner.Skipped: "–", runner.Stopped: "✗", runner.Failed: "✗"}[r]
 	return m.resultStyle(r).Render(fmt.Sprintf("%s%d", icon, n))
 }

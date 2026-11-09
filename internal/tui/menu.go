@@ -23,7 +23,7 @@ type actionMenu struct {
 
 // menuActions are the actions the menu can offer, in their default order:
 // what reads a pull request, then what answers it, then what finishes it.
-var menuActions = []keymap.Action{"ask_claude", "browse", "review", "comment", "approve", "merge", "ready_for_review", "close", "hide"}
+var menuActions = []keymap.Action{"ask_claude", "browse", "review", "comment", "approve", "merge", "draft", "close", "hide"}
 
 // MenuActions are the actions the menu can offer, in their default order.
 func MenuActions() []string {
@@ -119,8 +119,14 @@ func (m *Model) aboutOne(a keymap.Action, p model.PR) (string, bool) {
 			return d.Reason, true
 		}
 		return m.mergeHow(d), false
-	case "ready_for_review":
-		return m.aboutReady(p)
+	case "draft":
+		switch kind, _, why := m.draftOf([]model.PR{p}); {
+		case why != "":
+			return why, true
+		case kind == runner.Ready:
+			return "mark it ready, asking its reviewers to review it", false
+		}
+		return "turn it back into a draft", false
 	case "close":
 		if p.State != model.StateOpen {
 			return stateWords(p.State), true
@@ -181,12 +187,15 @@ func (m *Model) aboutMany(a keymap.Action, prs []model.PR) (string, bool) {
 			return "none of them can be merged", true
 		}
 		return of("merge", n), false
-	case "ready_for_review":
-		n := count(func(p model.PR) bool { _, off := m.aboutReady(p); return !off })
-		if n == 0 {
-			return "none of them is a draft", true
+	case "draft":
+		kind, n, why := m.draftOf(prs)
+		switch {
+		case why != "":
+			return why, true
+		case kind == runner.Ready:
+			return of("mark ready", n), false
 		}
-		return of("mark ready", n), false
+		return of("convert to draft", n), false
 	case "close":
 		n := count(func(p model.PR) bool { return p.State == model.StateOpen })
 		if n == 0 {
@@ -233,16 +242,56 @@ func (m *Model) cannotApprove(p model.PR) (string, bool) {
 	return "", false
 }
 
-// aboutReady says what marking p ready for review would do, or why it
-// cannot, as the list tells; the popup reads it again before it acts.
-func (m *Model) aboutReady(p model.PR) (string, bool) {
-	switch {
-	case p.State != model.StateOpen:
-		return stateWords(p.State), true
-	case !p.Draft:
-		return "not a draft", true
+// draftOf decides which way the key of draft turns prs, as the list
+// tells; the popup reads them again before it acts. Only a pull request of
+// the viewer's or of a bot counts, and n is how many; another person's is
+// skipped. When those that count are not all drafts or all ready, which
+// way is not known, and why says so (ADR-108).
+func (m *Model) draftOf(prs []model.PR) (kind runner.Kind, n int, why string) {
+	open, drafts := 0, 0
+	for _, p := range prs {
+		if p.State != model.StateOpen {
+			continue
+		}
+		open++
+		if !plan.OwnOrBot(p, m.viewer) {
+			continue
+		}
+		n++
+		if p.Draft {
+			drafts++
+		}
 	}
-	return "ask its reviewers to review it", false
+	switch {
+	case open == 0 && len(prs) == 1:
+		return 0, 0, stateWords(prs[0].State)
+	case open == 0:
+		return 0, 0, "none of them is open"
+	case n == 0 && len(prs) == 1:
+		return 0, 0, "someone else's pull request"
+	case n == 0:
+		return 0, 0, "none of them is yours or a bot's"
+	case drafts == n:
+		return runner.Ready, n, ""
+	case drafts == 0:
+		return runner.ToDraft, n, ""
+	}
+	return 0, 0, "some are drafts and some are not"
+}
+
+// startDraft opens the popup that marks the drafts ready, or turns the
+// pull requests back into drafts, as draftOf decides.
+func (m *Model) startDraft() tea.Cmd {
+	prs := m.menuTargets()
+	if len(prs) == 0 {
+		return nil
+	}
+	kind, _, why := m.draftOf(prs)
+	if why != "" {
+		m.refuse(m.keys.Help("draft") + ": " + why)
+		return nil
+	}
+	return m.startBulkFor(kind, runner.ReviewText{}, prs)
 }
 
 func stateWords(s model.PRState) string {
@@ -301,8 +350,8 @@ func (m *Model) runMenu(it menuItem) tea.Cmd {
 		return m.startApprove()
 	case "merge":
 		return m.startBulk(runner.Merge)
-	case "ready_for_review":
-		return m.startBulk(runner.Ready)
+	case "draft":
+		return m.startDraft()
 	case "close":
 		return m.startClose()
 	case "comment":

@@ -12,7 +12,7 @@ The popup reads each pull request again and lists what will be done to it, and w
 
 Each write is for the commit shown when you confirmed. If someone pushes in between, the pull request stops with "head changed · confirm again" rather than merging code you have not looked at. The only new head gh-desk takes is one it made itself by updating the branch.
 
-Marking a draft ready is the one write GitHub takes no commit for: gh-desk reads the pull request just before and stops if the head moved, but a push in the moment between is not caught.
+Marking a draft ready and turning a pull request back into a draft are the writes GitHub takes no commit for: gh-desk reads the pull request just before and stops if the head moved, but a push in the moment between is not caught.
 
 ## How each is merged
 
@@ -28,6 +28,10 @@ For each pull request, gh-desk decides the steps from what is true when it acts.
 Commit statuses, such as a policy bot's, are not jobs: gh-desk waits for them only where GitHub blocks the merge on them.
 
 The method is the first of `merge.methods` the repository allows, and the popup shows it. A draft of yours or of a bot is marked ready for review first. Your own pull request that GitHub lets you merge as an admin is merged as one, after its required checks pass, and the popup says so first.
+
+## Drafts
+
+`D` marks a draft ready for review, or turns a pull request that is ready back into a draft, through the same confirm popup. It acts only on your own pull requests and those of bots: another person's is theirs to mark, and is skipped. On a selection, the rest must all be drafts or all be ready; a selection of both is refused, since which way to turn it is not known.
 
 ## Approving once the checks pass
 

@@ -400,7 +400,9 @@ func (m *Model) decideBulk() {
 				it.noWait = it.d.Step == plan.StepWait && !m.set.CanWait
 			}
 		case runner.Ready:
-			it.d = plan.ForReady(it.mi)
+			it.d = plan.ForReady(it.mi, it.pr, m.viewer)
+		case runner.ToDraft:
+			it.d = plan.ForDraft(it.mi, it.pr, m.viewer)
 		case runner.Comment:
 			it.d = plan.ForComment(it.mi)
 		case runner.Close:
@@ -596,7 +598,7 @@ func (m *Model) renderBulk() []string {
 		case it.goes():
 			mark, title = st.mauve.Render("✓"), st.sub1.Render(shownTitle(it.pr.Title))
 			switch b.kind {
-			case runner.Review, runner.Ready, runner.Comment:
+			case runner.Review, runner.Ready, runner.ToDraft, runner.Comment:
 				style := st.green
 				if it.d.Step == plan.StepWait {
 					style = m.stepStyle(it.d.Step)
@@ -703,6 +705,8 @@ func (m *Model) renderBulk() []string {
 	case b.loading:
 	case b.kind == runner.Ready:
 		prose(st.dim, "Its reviewers are asked for a review once it is ready. Each acts only on the head shown when it was read.")
+	case b.kind == runner.ToDraft:
+		prose(st.dim, "A draft cannot be merged until it is marked ready again. Each acts only on the head shown when it was read.")
 	case b.close != nil:
 		prose(st.dim, m.closeProse())
 	case b.kind == runner.Comment:
@@ -915,7 +919,7 @@ func (m *Model) bulkName(pr model.PR, w int) string {
 func bulkNumber(pr model.PR) string { return fmt.Sprintf("#%d", pr.Key.Number) }
 
 // bulkVerbs name what a popup of each kind does, in its title and question.
-var bulkVerbs = map[runner.Kind]string{runner.Merge: "merge", runner.Ready: "mark ready", runner.Close: "close", runner.Comment: "comment"}
+var bulkVerbs = map[runner.Kind]string{runner.Merge: "merge", runner.Ready: "mark ready", runner.ToDraft: "convert to draft", runner.Close: "close", runner.Comment: "comment"}
 
 func (m *Model) stepStyle(s plan.Step) styleFn {
 	switch s {

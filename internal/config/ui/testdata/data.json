@@ -84,7 +84,7 @@
     "doc": "The actions the menu of enter offers, in the order given. One left out is not in the menu; its key still runs it from the list.",
     "kind": {
      "type": "config.listKind",
-     "name": "list of `ask_claude`, `browse`, `review`, `comment`, `approve`, `merge`, `ready_for_review`, `close`, `hide`",
+     "name": "list of `ask_claude`, `browse`, `review`, `comment`, `approve`, `merge`, `draft`, `close`, `hide`",
      "values": [
       "ask_claude",
       "browse",
@@ -92,7 +92,7 @@
       "comment",
       "approve",
       "merge",
-      "ready_for_review",
+      "draft",
       "close",
       "hide"
      ],
@@ -105,7 +105,7 @@
      "comment",
      "approve",
      "merge",
-     "ready_for_review",
+     "draft",
      "close",
      "hide"
     ]
@@ -1756,7 +1756,7 @@
    "scopeWords": "The list and its preview pane"
   },
   {
-   "action": "ready_for_review",
+   "action": "draft",
    "keys": [
     "D"
    ],

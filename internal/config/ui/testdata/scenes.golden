@@ -8,7 +8,7 @@
 │   comment               c      comment on its conversation                       │
 │   approve               A      send an approving review                          │
 │   merge                 M      merge it, as the next popup decides               │
-│   ready for review      D      not a draft                                       │
+│   draft / ready         D      someone else's pull request                       │
 │   close                        close it, as the next popup says                  │
 │   hide / done           d      hide it from this tab                             │
 │                                                                                  │

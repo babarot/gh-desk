@@ -253,6 +253,14 @@ func (g *GitHub) MarkReady(ctx context.Context, k model.PRKey, id, head string) 
 	return nil
 }
 
+func (g *GitHub) ConvertToDraft(ctx context.Context, k model.PRKey, id, head string) error {
+	if err := g.wait(ctx, 500); err != nil {
+		return err
+	}
+	g.find(k, id, func(p *pr) { p.Draft = true })
+	return nil
+}
+
 // BasedOn finds no pull request based on another: the recording has no
 // stacks.
 func (g *GitHub) BasedOn(ctx context.Context, bs []model.Branch) (map[model.Branch][]int, error) {

@@ -623,6 +623,22 @@ func (r Runner) MarkReady(_ context.Context, key model.PRKey, _, head string) er
 	return nil
 }
 
+func (r Runner) ConvertToDraft(_ context.Context, key model.PRKey, _, head string) error {
+	r.w.pause(500 * time.Millisecond)
+	r.w.mu.Lock()
+	defer r.w.mu.Unlock()
+	p := r.w.find(key)
+	if p == nil {
+		return fmt.Errorf("%s is not in the demo", key)
+	}
+	if p.HeadOID != head {
+		return errHeadMoved
+	}
+	p.Draft = true
+	p.Updated = r.w.now()
+	return nil
+}
+
 func (r Runner) PostComment(ctx context.Context, pr model.PR, body string) error {
 	return Source(r).PostComment(ctx, pr, body)
 }
