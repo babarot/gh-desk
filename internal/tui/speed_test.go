@@ -193,7 +193,7 @@ func TestFailedReadingKeepsTheRows(t *testing.T) {
 	m := newModel(f, cachedReview())
 	run(m, m.Init())
 	s := screen(m)
-	if !strings.Contains(s, "Since merged") || !strings.Contains(s, "as of") || !strings.Contains(s, "could not update") {
+	if !strings.Contains(s, "Since merged") || !strings.Contains(s, "as of") || !strings.Contains(s, "could not read the") {
 		t.Errorf("the rows or the reason are gone:\n%s", s)
 	}
 }
