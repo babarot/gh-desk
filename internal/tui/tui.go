@@ -442,24 +442,37 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.line.KeyPressed()
 			m.armed = nil
 		}
+		shown := m.tab()
+		sels := map[*tab]int{}
+		for _, t := range m.tabs {
+			sels[t] = t.sel
+		}
 		_, cmd := m.update(msg)
+		// A key that moved the cursor put it on its row. One that did not,
+		// acting on a row or switching tabs, leaves it on its pull request;
+		// what went from a tab not shown went while the user was away. A
+		// line changed on switching tabs is only the line kept in range.
+		t := m.tab()
+		switch {
+		case t != shown:
+			m.settle(t, true)
+		case sels[t] == t.sel:
+			m.settle(t, false)
+		default:
+			m.moved(t)
+		}
+		t.seen = t.at != nil
 		m.followCursor(before.Key, had)
 		m.endTabReading()
 		m.endRefresh()
 		return m, tea.Batch(cmd, m.spin(), m.statusTick(), m.takeNoted())
 	}
-	// What is read may make rows come and go under an exclusion rule;
-	// the cursor stays on its pull request, so that the next key does not
-	// act on another one it was moved onto unseen.
-	var back func()
-	switch msg.(type) {
-	case heavyMsg, checksMsg, infoMsg, infoAgainMsg, bodiesMsg, notifsMsg, inboxFirstMsg, inboxPRsMsg:
-		back = m.holdCursor(m.tab())
-	}
+	// What is read may make rows come and go, by a reading again or an
+	// exclusion rule; the cursor stays on its pull request, so that the
+	// next key does not act on another one it was moved onto unseen
+	// (ADR-115).
 	_, cmd := m.update(msg)
-	if back != nil {
-		back()
-	}
+	m.settle(m.tab(), true)
 	m.endTabReading()
 	m.endRefresh()
 	return m, tea.Batch(cmd, m.spin(), m.statusTick(), m.takeNoted())

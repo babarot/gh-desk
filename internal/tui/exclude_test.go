@@ -376,7 +376,7 @@ func TestPaneReadKeepsTheCursor(t *testing.T) {
 	m := startSource(t, f, set)
 	// As if its read were still on the way: it is not known to wait only
 	// for an approval, so it is shown, above the cursor. Moving the cursor
-	// past it would read it, so the cursor is put on b.
+	// past it would read it, so the cursor is put on b, as the user would.
 	delete(m.cache.info, waiting.Key)
 	b := f.searches["review"][0].Key
 	for i, r := range m.rows(m.tab()) {
@@ -384,6 +384,8 @@ func TestPaneReadKeepsTheCursor(t *testing.T) {
 			m.tab().sel = i
 		}
 	}
+	m.moved(m.tab())
+	m.tab().seen = true
 	if !strings.Contains(screen(m), "Deploy the client") {
 		t.Fatalf("not shown before the read:\n%s", screen(m))
 	}

@@ -122,9 +122,7 @@ func (m *Model) listKey(k string) tea.Cmd {
 			t.folded[plan.GroupBots] = !t.folded[plan.GroupBots]
 		}
 	case is("show_excluded"):
-		back := m.holdCursor(t)
 		t.showExcluded = !t.showExcluded
-		back()
 	case is("log"):
 		return m.openLog()
 	case is("preview"):
@@ -240,15 +238,13 @@ func (m *Model) openRow(r row) tea.Cmd {
 
 func (m *Model) switchTab(i int) tea.Cmd {
 	m.cur = (i + len(m.tabs)) % len(m.tabs)
+	// What changed in the tab while it was not shown changed unseen.
+	m.settle(m.tab(), true)
 	m.tabFrom, _ = m.shownTabs()
 	m.pane.scroll = 0
 	// A tab not read for longer than the refresh interval is read again
 	// when it is opened.
 	if at, ok := m.refreshed[m.cur]; ok && m.set.Refresh > 0 && m.set.Now().Sub(at) > m.set.Refresh && !m.tab().loading {
-		m.tab().keep = model.PRKey{}
-		if r, ok := m.current(); ok && r.kind == rowPR {
-			m.tab().keep = r.pr.Key
-		}
 		return tea.Batch(m.ensure(), m.loadTab(m.cur))
 	}
 	return m.ensure()
@@ -711,9 +707,9 @@ func (m *Model) renderRow(r row, cols []column, sel bool, n int) string {
 			continue
 		}
 		s := m.cell(c.id, r, sel, n)
-		if r.ex.excluded() && c.id != "pr" {
-			// A row the exclusion leaves out, shown with a, is drawn dim
-			// past its cursor and mark.
+		if (r.ex.excluded() || r.gone) && c.id != "pr" {
+			// A row the exclusion leaves out, shown with a, or one kept for
+			// the cursor, is drawn dim past its cursor and mark.
 			s = m.st.dim.Render(ansi.Strip(s))
 		}
 		width := c.width
@@ -828,6 +824,9 @@ func (m *Model) rowStart(r row, sel bool) string {
 		cursor = st.blue.Render("▎")
 	}
 	switch {
+	case r.gone:
+		// Kept for the cursor after its pull request left the list.
+		mark = st.dim.Render("−")
 	case m.selected[p.Key] == byHand:
 		mark = st.mauve.Render("✓")
 	case m.selected[p.Key] == byClaude:
@@ -855,7 +854,7 @@ func (m *Model) cell(id string, r row, sel bool, n int) string {
 	case "pr":
 		repo := m.repoName(p)
 		name, num := st.sub1, st.muted
-		if p.Draft || r.ex.excluded() {
+		if p.Draft || r.ex.excluded() || r.gone {
 			name, num = st.dim, st.dim
 		}
 		number := fmt.Sprintf("#%d", p.Key.Number)
