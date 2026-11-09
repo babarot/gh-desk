@@ -31,6 +31,25 @@ func (g *readsGH) MergeInfo(ctx context.Context, ids []string, full bool) (map[s
 	return g.fakeGH.MergeInfo(ctx, ids, full)
 }
 
+// full is how many reads asked for all three pull requests.
+func (g *readsGH) full() int {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	n := 0
+	for _, ids := range g.reads {
+		if len(ids) == 3 {
+			n++
+		}
+	}
+	return n
+}
+
+func (g *readsGH) snapshot() [][]string {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	return slices.Clone(g.reads)
+}
+
 func (g *readsGH) count() int {
 	g.mu.Lock()
 	defer g.mu.Unlock()
@@ -84,7 +103,13 @@ func TestTheWaitsOfARepositoryShareARead(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	ca, cb, cc := await(t, r, ctx, wa), await(t, r, ctx, wb), await(t, r, ctx, wc)
-	for g.count() < 6 {
+	// The waits start one by one, and the first reads can come before the
+	// last of them: once all three are there, every read has them all.
+	deadline := time.Now().Add(3 * time.Second)
+	for g.full() < 5 {
+		if time.Now().After(deadline) {
+			t.Fatalf("reads were not shared: %v", g.snapshot())
+		}
 		time.Sleep(time.Millisecond)
 	}
 	select {
@@ -96,16 +121,13 @@ func TestTheWaitsOfARepositoryShareARead(t *testing.T) {
 		t.Fatal("woken while its jobs are at work")
 	default:
 	}
-	g.mu.Lock()
-	full := 0
-	for _, ids := range g.reads {
-		if len(ids) == 3 {
-			full++
+	reads := g.snapshot()
+	first := slices.IndexFunc(reads, func(ids []string) bool { return len(ids) == 3 })
+	for _, ids := range reads[first:] {
+		if len(ids) != 3 {
+			t.Errorf("a read after all three waited was not shared: %v", reads)
+			break
 		}
-	}
-	g.mu.Unlock()
-	if full < 5 {
-		t.Errorf("reads were not shared: %v", g.reads)
 	}
 
 	g.fakeGH.mu.Lock()
