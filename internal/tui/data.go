@@ -873,8 +873,8 @@ func (m *Model) tabRead(msg tabMsg) tea.Cmd {
 			t.pend = nil
 			t.asOf = t.readAt
 			if t == m.tab() {
-				m.fail(fmt.Sprintf("could not update: %s · showing the list as of %s · %s to try again",
-					short80(msg.err), t.readAt.Local().Format("15:04"), m.firstKey("refresh")))
+				m.fail(fmt.Sprintf("could not read the %q tab: %s · showing the list as of %s · %s to try again",
+					t.name, short80(msg.err), t.readAt.Local().Format("15:04"), m.firstKey("refresh")))
 			}
 			// Kept once, not at every reading the clock starts while the
 			// network stays down.
@@ -882,7 +882,7 @@ func (m *Model) tabRead(msg tabMsg) tea.Cmd {
 				return nil
 			}
 			t.failing = true
-			return m.pushNote("✗", fmt.Sprintf("could not update %s: %s", t.name, short80(msg.err)), nil)
+			return m.pushNote("✗", fmt.Sprintf("could not read the %q tab: %s", t.name, short80(msg.err)), nil)
 		}
 		t.loaded, t.err = true, msg.err
 		return nil

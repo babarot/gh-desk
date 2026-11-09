@@ -86,7 +86,7 @@ func TestFailedReadingNotedOnce(t *testing.T) {
 	noted := func() int {
 		n := 0
 		for _, x := range m.notes {
-			if strings.Contains(x.title, "could not update review") {
+			if strings.Contains(x.title, `could not read the "review" tab`) {
 				n++
 			}
 		}
