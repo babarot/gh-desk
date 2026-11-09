@@ -551,6 +551,10 @@ func (m *Model) renderBulk() []string {
 	}
 	inner := w - 4
 	var lines []string
+	if m.set.Offline && b.kind == runner.Merge {
+		lines = append(lines, wrapped(st.dim, previewAssumes, inner)...)
+		lines = append(lines, "")
+	}
 	if b.tookOver {
 		lines = append(lines, wrapped(st.teal, "↻ The other gh-desk quit; this one runs the merges that wait now.", inner)...)
 		lines = append(lines, "")
