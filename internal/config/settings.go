@@ -578,7 +578,7 @@ var conditionElems = []elem{
 	{Key: "repos", Kind: listKind{NonEmpty: true}, Doc: "owner/repo globs the repository must match one of; * matches any part of the owner or the name."},
 	{Key: "authors", Kind: listKind{NonEmpty: true}, Doc: "The logins the author must be one of; bots without app/."},
 	{Key: "packages", Kind: listKind{}, Doc: "The dependencies a renovate or dependabot pull request updates, read from its body; every one it updates must be listed."},
-	{Key: "title", Kind: stringKind{}, Doc: "A regular expression the title must match, as written: a shortcode such as `:arrow_up:` is matched as itself, not as its emoji."},
+	{Key: "title", Kind: stringKind{}, Doc: "A regular expression the title must match, as written: a shortcode such as `:arrow_up:` is matched as itself, not as its emoji. An empty one sets no condition."},
 	{Key: "max_files", Kind: intKind{Min: 1}, Doc: "The most files it may change."},
 	{Key: "max_lines", Kind: intKind{Min: 1}, Doc: "The most lines it may add and delete together: the sum of the two numbers SIZE shows."},
 	{Key: "min_files", Kind: intKind{Min: 1}, Doc: "The least files it may change."},

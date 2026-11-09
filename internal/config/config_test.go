@@ -521,11 +521,20 @@ name = "everything"
 labels = ["wip"]
 
 [[exclude]]
+
+[[exclude]]
+title = ""
 `,
 		`exclude[0]: "everything" matches every pull request`,
 		`exclude[1].name "everything" is used twice`,
 		`exclude[2]: the rule matches every pull request`,
+		`exclude[3]: the rule matches every pull request`,
 	)
+	// A title left empty sets no condition, rather than match every title.
+	cfg, _, err = Load(write(t, "[[exclude]]\nlabels = [\"wip\"]\ntitle = \"\"\n"))
+	if err != nil || len(cfg.Exclude) != 1 || cfg.Exclude[0].Title != nil {
+		t.Fatalf("an empty title: %+v, %v", cfg.Exclude, err)
+	}
 	// A rule needs no name, nor do two of them differ by one.
 	cfg, _, err = Load(write(t, "[[exclude]]\nlabels = [\"wip\"]\n\n[[exclude]]\nname = \"  \"\nmine = true\n"))
 	if err != nil || len(cfg.Exclude) != 2 || cfg.Exclude[0].Name != "" || cfg.Exclude[1].Name != "" || cfg.Exclude[1].Mine == nil || !*cfg.Exclude[1].Mine {

@@ -53,6 +53,19 @@ for (const s of DATA.settings) if (app.split(`'${s.key}'`).length < 3) fail(`${s
 for (const a of DATA.arrays) if (!app.includes(`['${a.name}',`)) fail(`[[${a.name}]] has no page in web/app.js`);
 for (const e of Object.values(DATA.elems).flat()) if (e.key !== 'name' && !new RegExp(`\\b${e.key}:\\[`).test(app) && !['kind', 'groups', 'folded', 'sort', 'limit', 'show_settled'].includes(e.key)) fail(`the condition ${e.key} has no words in web/app.js`);
 
+// A rule whose conditions are all left empty matches every pull request,
+// as gh-desk reads it: the page stops it before gh-desk takes it.
+for (const r of [{}, { title: '' }, { authors: [] }, { name: 'x', title: '', repos: [] }]) {
+  const e = mod.load({});
+  e.arr.exclude = [r];
+  if (!mod.problems(e).some(p => p.at === 'exclude/0')) fail(`the rule ${JSON.stringify(r)} is not told to match every pull request`);
+}
+for (const r of [{ title: 'Renovate' }, { authors: ['renovate'], title: '' }, { bot: false }]) {
+  const e = mod.load({});
+  e.arr.exclude = [r];
+  if (mod.problems(e).length) fail(`the rule ${JSON.stringify(r)} is told: ${JSON.stringify(mod.problems(e))}`);
+}
+
 // What it writes, from a file that uses every shape of value. A Go test
 // reads it back and compares it with input.json.
 const file = JSON.parse(read('testdata/input.json'));

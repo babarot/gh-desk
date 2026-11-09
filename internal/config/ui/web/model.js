@@ -49,7 +49,7 @@ function problems(d){const ps=[];
     if(r.name){if(seen[r.name])ps.push({at,msg:`The name “${r.name}” is used twice.`});seen[r.name]=1}
     for(const k of ['repos','authors'])for(const v of r[k]||[]){const c=checkItem(itemType(k),v);if(c&&!c.warn)ps.push({at:`${at}/${k}`,msg:c.msg})}
     if(r.title!==undefined){try{goRe(r.title)}catch(e){ps.push({at,msg:'The title pattern is not a valid regular expression.'})}}
-    if(!Object.keys(r).some(k=>!['name','query','dry_run'].includes(k))&&!(n==='auto_approve'&&r.query))ps.push({at,msg:'Add a condition, or this rule matches every pull request.'})})};
+    if(!Object.keys(r).some(k=>!['name','query','dry_run'].includes(k)&&r[k]!==''&&!(Array.isArray(r[k])&&!r[k].length))&&!(n==='auto_approve'&&r.query))ps.push({at,msg:'Add a condition, or this rule matches every pull request.'})})};
   rules('select',true);rules('exclude',false);rules('auto_approve',false);
   if(d.arr.tabs){const t=d.arr.tabs;if(t.filter(x=>x.kind==='inbox').length!==1)ps.push({at:'tabs',msg:'Keep one inbox tab.'});if(t.length>9)ps.push({at:'tabs',msg:'Keep nine tabs or fewer.'});t.forEach((x,i)=>{if(x.kind!=='inbox'&&!x.query)ps.push({at:`tabs/${i}`,msg:'A tab needs a search.'})})}
   const seen={};for(const k of KEYS){const v=d.keys[k.action];if(!v)continue;for(const key of[].concat(v)){const id=k.scope+'/'+key;if(seen[id])ps.push({at:'key/'+k.action,msg:`${key} is also set for ${seen[id].replace(/_/g,' ')}.`});seen[id]=k.action}}

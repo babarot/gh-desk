@@ -85,7 +85,7 @@ title = "(?i)lock file maintenance"
 | `repos` | list of strings | owner/repo globs the repository must match one of; * matches any part of the owner or the name. |
 | `authors` | list of strings | The logins the author must be one of; bots without app/. |
 | `packages` | list of strings | The dependencies a renovate or dependabot pull request updates, read from its body; every one it updates must be listed. |
-| `title` | string | A regular expression the title must match, as written: a shortcode such as `:arrow_up:` is matched as itself, not as its emoji. |
+| `title` | string | A regular expression the title must match, as written: a shortcode such as `:arrow_up:` is matched as itself, not as its emoji. An empty one sets no condition. |
 | `max_files` | integer, 1 or more | The most files it may change. |
 | `max_lines` | integer, 1 or more | The most lines it may add and delete together: the sum of the two numbers SIZE shows. |
 | `min_files` | integer, 1 or more | The least files it may change. |
@@ -115,7 +115,7 @@ Rules that leave pull requests out of every tab, until a shows them. A pull requ
 | `name` | string | The rule's name, which a row it leaves out says; without one, the row says the rule's conditions. |
 | `repos` | list of strings | owner/repo globs the repository must match one of; * matches any part of the owner or the name. |
 | `authors` | list of strings | The logins the author must be one of; bots without app/. |
-| `title` | string | A regular expression the title must match, as written: a shortcode such as `:arrow_up:` is matched as itself, not as its emoji. |
+| `title` | string | A regular expression the title must match, as written: a shortcode such as `:arrow_up:` is matched as itself, not as its emoji. An empty one sets no condition. |
 | `max_files` | integer, 1 or more | The most files it may change. |
 | `max_lines` | integer, 1 or more | The most lines it may add and delete together: the sum of the two numbers SIZE shows. |
 | `min_files` | integer, 1 or more | The least files it may change. |
@@ -148,7 +148,7 @@ Rules that approve, without a confirm, the pull requests they match while gh-des
 | `repos` | list of strings | owner/repo globs the repository must match one of; * matches any part of the owner or the name. |
 | `authors` | list of strings | The logins the author must be one of; bots without app/. |
 | `packages` | list of strings | The dependencies a renovate or dependabot pull request updates, read from its body; every one it updates must be listed. |
-| `title` | string | A regular expression the title must match, as written: a shortcode such as `:arrow_up:` is matched as itself, not as its emoji. |
+| `title` | string | A regular expression the title must match, as written: a shortcode such as `:arrow_up:` is matched as itself, not as its emoji. An empty one sets no condition. |
 | `max_files` | integer, 1 or more | The most files it may change. |
 | `max_lines` | integer, 1 or more | The most lines it may add and delete together: the sum of the two numbers SIZE shows. |
 | `min_files` | integer, 1 or more | The least files it may change. |
