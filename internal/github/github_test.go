@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
@@ -231,5 +232,26 @@ func TestPullRequestsSplitsQueries(t *testing.T) {
 		if n := strings.Count(s.body, "repository(owner:"); n > prsPerQuery {
 			t.Errorf("a query read %d pull requests, more than %d", n, prsPerQuery)
 		}
+	}
+}
+
+// Heavy reads every heavy field, whether the pull request can be merged
+// among them.
+func TestHeavyReadsEveryHeavyField(t *testing.T) {
+	body := `{"data": {"rateLimit": {"cost": 1, "remaining": 4999}, "nodes": [
+  {"id": "PR_1", "headRefOid": "abc123", "additions": 3, "deletions": 1, "changedFiles": 1,
+   "reviewDecision": "APPROVED", "mergeStateStatus": "DIRTY",
+   "labels": {"nodes": [{"name": "bug"}]}, "comments": {"totalCount": 2},
+   "commits": {"nodes": [{"commit": {"statusCheckRollup": {"state": "SUCCESS"}}}]}},
+  null]}}`
+	f := &fake{rules: []rule{{gqlHas("...heavy"), body}}}
+	got, err := newClient(t, f, logging.Discard()).Heavy(context.Background(), []string{"PR_1", "PR_2"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := model.Heavy{HeadOID: "abc123", Additions: 3, Deletions: 1, ChangedFiles: 1, Comments: 2,
+		Decision: model.DecisionApproved, Checks: model.CheckSuccess, Merge: model.MergeDirty, Labels: []string{"bug"}}
+	if h := got["PR_1"]; fmt.Sprintf("%+v", h) != fmt.Sprintf("%+v", want) || len(got) != 1 {
+		t.Errorf("heavy = %+v, want %+v", got, want)
 	}
 }

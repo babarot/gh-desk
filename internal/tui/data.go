@@ -469,6 +469,9 @@ type cache struct {
 	// for, kept after a failed read so it is not asked again until r.
 	info     map[model.PRKey]model.MergeInfo
 	infoRead map[model.PRKey]bool
+	// unknown counts the reads of each pull request's merge information
+	// that found GitHub still working out whether it can be merged.
+	unknown  map[model.PRKey]int
 	bodies   map[model.PRKey]string
 	diffs    map[string]*entry[[]diff.File]
 	details  map[model.PRKey]*entry[model.Detail]
@@ -476,7 +479,7 @@ type cache struct {
 }
 
 func newCache() cache {
-	return cache{info: map[model.PRKey]model.MergeInfo{}, infoRead: map[model.PRKey]bool{}, bodies: map[model.PRKey]string{}, diffs: map[string]*entry[[]diff.File]{}, details: map[model.PRKey]*entry[model.Detail]{},
+	return cache{info: map[model.PRKey]model.MergeInfo{}, infoRead: map[model.PRKey]bool{}, unknown: map[model.PRKey]int{}, bodies: map[model.PRKey]string{}, diffs: map[string]*entry[[]diff.File]{}, details: map[model.PRKey]*entry[model.Detail]{},
 		comments: map[string]*entry[model.Comment]{}}
 }
 
@@ -712,9 +715,12 @@ func (m *Model) handleData(msg tea.Msg) tea.Cmd {
 	case checksMsg:
 		maps.Copy(m.cache.info, msg.got)
 	case infoMsg:
-		if msg.ok {
-			m.cache.info[msg.key] = msg.mi
-			delete(m.cache.infoRead, msg.key)
+		return m.infoRead(msg)
+	case infoAgainMsg:
+		// Still unknown: read it again, if the pane still shows it.
+		if mi, ok := m.cache.info[msg.key]; ok && mi.MergeState == model.MergeUnknown {
+			delete(m.cache.info, msg.key)
+			return m.ensure()
 		}
 	}
 	return nil
@@ -819,6 +825,31 @@ func (m *Model) ensureInfo(p model.PR) tea.Cmd {
 		mi, ok := got[p.ID]
 		return infoMsg{key: p.Key, mi: mi, ok: ok}
 	}
+}
+
+// infoAgainMsg asks for a pull request's merge information again, read
+// while GitHub was still working out whether it can be merged.
+type infoAgainMsg struct{ key model.PRKey }
+
+// GitHub works out whether a pull request can be merged when it is first
+// asked, and says it does not know yet meanwhile: such a read is tried
+// again after unknownWait, up to unknownTries times.
+const (
+	unknownWait  = 3 * time.Second
+	unknownTries = 3
+)
+
+func (m *Model) infoRead(msg infoMsg) tea.Cmd {
+	if !msg.ok {
+		return nil
+	}
+	m.cache.info[msg.key] = msg.mi
+	delete(m.cache.infoRead, msg.key)
+	if msg.mi.MergeState != model.MergeUnknown || m.cache.unknown[msg.key] >= unknownTries {
+		return nil
+	}
+	m.cache.unknown[msg.key]++
+	return m.after(unknownWait, infoAgainMsg{msg.key})
 }
 
 func (m *Model) ensureComment(url string) tea.Cmd {
@@ -931,6 +962,7 @@ func (m *Model) tabRead(msg tabMsg) tea.Cmd {
 		if mi, ok := m.cache.info[p.Key]; ok && mi.HeadOID != p.HeadOID {
 			delete(m.cache.info, p.Key)
 			delete(m.cache.infoRead, p.Key)
+			delete(m.cache.unknown, p.Key)
 		}
 	}
 	t.want = min(msg.total, t.limit)

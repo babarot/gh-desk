@@ -357,8 +357,11 @@ func (c *Client) Heavy(ctx context.Context, ids []string) (map[string]model.Heav
 		if n == nil || n.ID == "" {
 			continue
 		}
-		p, _ := prNode{HeadRefOid: n.HeadRefOid, Additions: n.Additions, Deletions: n.Deletions, ChangedFiles: n.ChangedFiles,
-			ReviewDecision: n.ReviewDecision, Labels: n.Labels, Comments: n.Comments, Commits: n.Commits, Number: 1}.toModel(true)
+		// The node has only the heavy fields; a number makes it a pull
+		// request to toModel, and Heavy takes only those fields.
+		hn := *n
+		hn.Number = 1
+		p, _ := hn.toModel(true)
 		out[n.ID] = p.Heavy()
 	}
 	return out, nil

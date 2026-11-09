@@ -73,6 +73,7 @@ func (m *Model) refresh() tea.Cmd {
 	// request.
 	clear(m.cache.info)
 	clear(m.cache.infoRead)
+	clear(m.cache.unknown)
 	clear(m.cache.details)
 	clear(m.cache.comments)
 	n := m.clearResults()

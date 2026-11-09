@@ -16,7 +16,7 @@ GitHub may also say that a draft conflicts, rather than that it is a draft. Deci
 
 - `mergeStateStatus` is a heavy field (ADR-011), read with the review decision and the checks after a list's search. Heavy fields are read again at every reading of a tab, so a pull request that came to conflict because its base moved is shown so at the next reading, by the clock or by r.
 - The list has a MERGE column. It says only what CI and REVIEW do not: that a pull request conflicts, is behind its base, or that GitHub is still working it out. One that would merge, or is held only by its reviews or checks, shows nothing, and so does one that is not open.
-- The pane reads the merge information of the open pull request it shows, in the background, so its merge line says what a merge would do. It is read once a pull request, and again after r or when the pull request's head changes. A read that fails is not tried again until r, so moving the cursor does not repeat it.
+- The pane reads the merge information of the open pull request it shows, in the background, so its merge line says what a merge would do. It is read once a pull request, and again after r or when the pull request's head changes. A read that fails is not tried again until r, so moving the cursor does not repeat it. A read that finds GitHub still working out whether the pull request can be merged, which it does when first asked, is tried again shortly after, a fixed number of times, so the pane does not keep "unknown" until r.
 - A draft that conflicts is skipped by a merge before it is marked ready ([`internal/plan/merge.go`](../../internal/plan/merge.go)).
 
 ## Consequences

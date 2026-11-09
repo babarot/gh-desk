@@ -132,3 +132,29 @@ func TestPaneReadsWhatAMergeWouldDo(t *testing.T) {
 		t.Errorf("the pane kept what it read before r:\n%s", s)
 	}
 }
+
+// A read that finds GitHub still working out whether the pull request can
+// be merged is read again, so the pane does not keep "unknown" until r.
+func TestPaneReadsAgainWhileUnknown(t *testing.T) {
+	f := fixture()
+	k := f.searches["review"][0].Key
+	state := model.MergeUnknown
+	f.info = map[model.PRKey]func(*model.MergeInfo){k: func(mi *model.MergeInfo) { mi.MergeState = state }}
+	m := start(t, f, keymap.Default())
+	if s := screen(m); strings.Contains(s, "merge     conflicts") {
+		t.Fatalf("conflicts before GitHub said so:\n%s", s)
+	}
+	state = model.MergeDirty
+	_, cmd := m.Update(infoAgainMsg{k})
+	run(m, cmd)
+	if s := screen(m); !strings.Contains(s, "merge     conflicts") {
+		t.Errorf("the pane was not read again:\n%s", s)
+	}
+	// Once known, it is not read again.
+	reads := len(f.infoReads)
+	_, cmd = m.Update(infoAgainMsg{k})
+	run(m, cmd)
+	if len(f.infoReads) != reads {
+		t.Error("read again once known")
+	}
+}
