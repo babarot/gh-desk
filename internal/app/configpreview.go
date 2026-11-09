@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/babarot/gh-desk/internal/config"
@@ -146,10 +147,96 @@ func pagePR(i int, pr model.PR, viewer, reason string, now time.Time) ui.PR {
 		Updated: int(now.Sub(pr.Updated).Hours() / 24), At: float64(pr.Updated.Unix())}
 }
 
-// verdicts are the rows a rule says yes of, and those it cannot tell yet.
+// verdicts are the rows a rule says yes of, and those it cannot tell yet,
+// with what each condition makes of those rows, by row.
 type verdicts struct {
-	Yes     []int `json:"yes"`
-	Unknown []int `json:"unknown"`
+	Yes     []int          `json:"yes"`
+	Unknown []int          `json:"unknown"`
+	Why     map[int][]cond `json:"why"`
+}
+
+// cond is what one condition of a rule makes of a row, in the words of
+// the config file.
+type cond struct {
+	Key string `json:"key"`
+	// State is yes, no or unknown; Need what an unknown one waits for:
+	// heavy, body or approval.
+	State   string     `json:"state"`
+	Need    string     `json:"need,omitempty"`
+	Values  []string   `json:"values,omitempty"`
+	Matched []string   `json:"matched,omitempty"`
+	Title   *[3]string `json:"title,omitempty"`
+}
+
+// condKey is the key of the config file for the condition c.
+func condKey(c plan.Cond) string {
+	switch c {
+	case plan.CondStates:
+		return "state"
+	case plan.CondDecisions:
+		return "decision"
+	}
+	return string(c)
+}
+
+// explained is what the conditions of rule make of pr, in the words of the
+// config file.
+func explained(es []plan.Explained) []cond {
+	out := make([]cond, 0, len(es))
+	for _, e := range es {
+		c := cond{Key: condKey(e.Cond), Values: e.Values, Matched: e.Matched, Need: string(e.Need)}
+		switch e.Verdict {
+		case plan.Yes:
+			c.State = "yes"
+		case plan.No:
+			c.State = "no"
+		default:
+			c.State = "unknown"
+		}
+		switch e.Cond {
+		case plan.CondStates, plan.CondDecisions:
+			c.Values, c.Matched = lower(e.Values), lower(e.Matched)
+		case plan.CondChecks:
+			c.Values = checkWords(e.Values)
+		case plan.CondTitle:
+			if e.Verdict == plan.Yes {
+				t := e.Title
+				c.Title = &t
+			}
+		}
+		out = append(out, c)
+	}
+	return out
+}
+
+func lower(ss []string) []string {
+	var out []string
+	for _, s := range ss {
+		out = append(out, strings.ToLower(s))
+	}
+	return out
+}
+
+// checkWords are the states of checks as the config file says them; a
+// pull request with no checks has none, which passes.
+func checkWords(ss []string) []string {
+	var out []string
+	for _, s := range ss {
+		switch model.CheckState(s) {
+		case model.CheckSuccess:
+			s = "passing"
+		case model.CheckFailure, model.CheckError:
+			s = "failing"
+		case model.CheckPending, model.CheckExpected:
+			s = "pending"
+		case "":
+			s = "none"
+		default:
+			s = strings.ToLower(s)
+		}
+		out = append(out, s)
+	}
+	return out
 }
 
 // judgement is what the rules of a file make of the rows, each rule the way
@@ -173,7 +260,7 @@ func (p *preview) judge(src []byte, now time.Time) ([]byte, error) {
 		return plan.Facts{Now: now, Reason: r.reason, ApprovalKnown: len(cfg.Checks.Approval) == 0}
 	}
 	each := func(rule plan.Rule, gate func(model.PR) bool) verdicts {
-		v := verdicts{Yes: []int{}, Unknown: []int{}}
+		v := verdicts{Yes: []int{}, Unknown: []int{}, Why: map[int][]cond{}}
 		for i, r := range p.rows {
 			if gate != nil && !gate(r.pr) {
 				continue
@@ -183,7 +270,10 @@ func (p *preview) judge(src []byte, now time.Time) ([]byte, error) {
 				v.Yes = append(v.Yes, i)
 			case plan.Pending:
 				v.Unknown = append(v.Unknown, i)
+			default:
+				continue
 			}
+			v.Why[i] = explained(rule.Explain(r.pr, p.viewer, facts(r)))
 		}
 		return v
 	}

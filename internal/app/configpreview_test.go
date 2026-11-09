@@ -138,3 +138,53 @@ func TestPreviewOfAFileThatDoesNotRead(t *testing.T) {
 		t.Error("no error")
 	}
 }
+
+// Each row a rule says yes of, or cannot tell, comes with what each of its
+// conditions makes of it, in the words of the config file; the rows it says
+// no of come with none. The same pull request in the inbox and in a tab is
+// judged per row: only the inbox's has the reason.
+func TestPreviewSaysWhereARuleMatched(t *testing.T) {
+	cfg := model.PR{Key: previewKey(1), Author: "app/renovate", Title: "Configure Renovate", State: model.StateOpen,
+		Labels: []string{"deps"}, HeadOID: "h", HeavyHead: "h"}
+	fix := model.PR{Key: previewKey(2), Author: "alice", Title: "Fix the cache", State: model.StateMerged, HeadOID: "h"}
+	in := &listcache.Inbox{Read: previewNow, PRs: []model.PR{cfg}, Notifs: []model.Notification{{Key: cfg.Key, Reason: "subscribed"}}}
+	p := cachedPreview(t, []model.PR{cfg, fix}, in)
+	j := judged(t, p, `
+[[exclude]]
+title = "Con"
+reasons = ["subscribed"]
+
+[[exclude]]
+state = ["merged"]
+labels = ["deps"]
+checks = ["passing"]
+decision = ["none"]
+`)
+	e := j.Exclude[0]
+	if !slices.Equal(e.Yes, []int{2}) || len(e.Unknown) != 0 || len(e.Why) != 1 {
+		t.Fatalf("the title and the reason: %+v", e)
+	}
+	got := e.Why[2]
+	if len(got) != 2 || got[0].Key != "title" || got[0].State != "yes" || got[0].Title == nil || *got[0].Title != [3]string{"", "Con", "figure Renovate"} ||
+		got[1].Key != "reasons" || got[1].State != "yes" || !slices.Equal(got[1].Values, []string{"subscribed"}) {
+		t.Errorf("why %+v", got)
+	}
+	e = j.Exclude[1]
+	if len(e.Yes) != 0 || !slices.Equal(e.Unknown, []int{1}) {
+		t.Fatalf("heavy fields not read: %+v", e)
+	}
+	got = e.Why[1]
+	if len(got) != 4 || got[0].Key != "state" || got[0].State != "yes" || !slices.Equal(got[0].Values, []string{"merged"}) ||
+		got[1].Key != "decision" || got[1].State != "unknown" || got[1].Need != "heavy" {
+		t.Errorf("why %+v", got)
+	}
+	// The heavy fields read: a pull request with no checks passes, and says
+	// it has none.
+	fix.HeavyHead, fix.Labels = "h", []string{"Deps"}
+	j = judged(t, cachedPreview(t, []model.PR{fix}, nil), "[[exclude]]\nlabels = [\"deps\"]\nchecks = [\"passing\"]\n")
+	got = j.Exclude[0].Why[0]
+	if len(got) != 2 || !slices.Equal(got[0].Values, []string{"Deps"}) || !slices.Equal(got[0].Matched, []string{"deps"}) ||
+		got[1].Key != "checks" || !slices.Equal(got[1].Values, []string{"none"}) {
+		t.Errorf("why %+v", got)
+	}
+}
