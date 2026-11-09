@@ -163,10 +163,7 @@ func (r Rule) Judge(pr model.PR, viewer string, f Facts) Verdict {
 	if r.NeedsHeavy() && !pr.HeavyRead() || r.NeedsBody() && !f.BodyKnown {
 		return Pending
 	}
-	// Whether pending checks only wait for an approval changes passing and
-	// pending, not failing.
-	if (slices.Contains(r.Checks, ChecksPassing) || slices.Contains(r.Checks, ChecksPending)) &&
-		(pr.Checks == model.CheckPending || pr.Checks == model.CheckExpected) && !f.ApprovalKnown {
+	if r.approvalUnknown(pr, f) {
 		return Pending
 	}
 	if !r.heavy(pr, f) || !r.packages(f) {
@@ -179,14 +176,9 @@ func (r Rule) Judge(pr model.PR, viewer string, f Facts) Verdict {
 // hold.
 func (r Rule) light(pr model.PR, viewer string, f Facts) bool {
 	switch {
-	case len(r.Repos) > 0 && !slices.ContainsFunc(r.Repos, func(g string) bool {
-		ok, _ := path.Match(strings.ToLower(g), strings.ToLower(pr.Key.Repository()))
-		return ok
-	}):
+	case len(r.Repos) > 0 && !slices.ContainsFunc(r.Repos, func(g string) bool { return repoMatches(g, pr) }):
 		return false
-	case len(r.Authors) > 0 && !slices.ContainsFunc(r.Authors, func(a string) bool {
-		return strings.EqualFold(strings.TrimPrefix(pr.Author, "app/"), strings.TrimPrefix(a, "app/"))
-	}):
+	case len(r.Authors) > 0 && !slices.ContainsFunc(r.Authors, func(a string) bool { return authorIs(a, pr) }):
 		return false
 	case !holds(r.Bot, pr.AuthorIsBot):
 		return false
@@ -210,13 +202,21 @@ func (r Rule) light(pr model.PR, viewer string, f Facts) bool {
 		return false
 	case r.CreatedBeforeDays > 0 && !before(pr.Created, f.Now, r.CreatedBeforeDays):
 		return false
-	case len(r.Reasons) > 0 && !slices.ContainsFunc(r.Reasons, func(s string) bool { return f.Reason != "" && strings.EqualFold(s, f.Reason) }):
+	case len(r.Reasons) > 0 && !slices.ContainsFunc(r.Reasons, func(s string) bool { return reasonIs(s, f) }):
 		return false
 	case len(r.Requested) > 0 && !slices.ContainsFunc(r.Requested, func(s string) bool { return requested(pr, viewer, s) }):
 		return false
 	}
 	rv, reviewed := pr.ReviewBy(viewer)
 	return holds(r.ApprovedByMe, reviewed && rv.State == model.ReviewApproved) && holds(r.ReviewedByMe, reviewed)
+}
+
+// approvalUnknown reports whether the checks condition waits to know if
+// pr's pending checks only wait for an approval: that changes passing and
+// pending, not failing.
+func (r Rule) approvalUnknown(pr model.PR, f Facts) bool {
+	return (slices.Contains(r.Checks, ChecksPassing) || slices.Contains(r.Checks, ChecksPending)) &&
+		(pr.Checks == model.CheckPending || pr.Checks == model.CheckExpected) && !f.ApprovalKnown
 }
 
 // holds reports whether a flag asking for want holds of a pull request
@@ -227,23 +227,31 @@ func holds(want *bool, is bool) bool { return want == nil || *want == is }
 // read for the head shown.
 func (r Rule) heavy(pr model.PR, f Facts) bool {
 	switch {
-	case r.MaxFiles > 0 && pr.ChangedFiles > r.MaxFiles:
+	case r.MaxFiles > 0 && !atMost(pr.ChangedFiles, r.MaxFiles):
 		return false
-	case r.MaxLines > 0 && pr.Additions+pr.Deletions > r.MaxLines:
+	case r.MaxLines > 0 && !atMost(linesOf(pr), r.MaxLines):
 		return false
-	case r.MinFiles > 0 && pr.ChangedFiles < r.MinFiles:
+	case r.MinFiles > 0 && !atLeast(pr.ChangedFiles, r.MinFiles):
 		return false
-	case r.MinLines > 0 && pr.Additions+pr.Deletions < r.MinLines:
+	case r.MinLines > 0 && !atLeast(linesOf(pr), r.MinLines):
 		return false
-	case len(r.Decisions) > 0 && !slices.Contains(r.Decisions, decisionOf(pr)):
+	case len(r.Decisions) > 0 && !r.decisionHolds(pr):
 		return false
-	case len(r.Labels) > 0 && !slices.ContainsFunc(r.Labels, func(l string) bool {
-		return slices.ContainsFunc(pr.Labels, func(have string) bool { return strings.EqualFold(have, l) })
-	}):
+	case len(r.Labels) > 0 && !slices.ContainsFunc(r.Labels, func(l string) bool { return hasLabel(l, pr) }):
 		return false
 	}
 	return len(r.Checks) == 0 || slices.ContainsFunc(r.Checks, func(c Checks) bool { return checksAre(c, pr, f) })
 }
+
+// atMost and atLeast compare a count with a rule's cap and floor.
+func atMost(v, n int) bool  { return v <= n }
+func atLeast(v, n int) bool { return v >= n }
+
+// linesOf are the lines pr adds and deletes together.
+func linesOf(pr model.PR) int { return pr.Additions + pr.Deletions }
+
+// decisionHolds reports whether pr's review decision is one the rule asks.
+func (r Rule) decisionHolds(pr model.PR) bool { return slices.Contains(r.Decisions, decisionOf(pr)) }
 
 // checksAre reports whether pr's checks are in the state c.
 func checksAre(c Checks, pr model.PR, f Facts) bool {
@@ -282,6 +290,27 @@ func (r Rule) packages(f Facts) bool {
 		}
 	}
 	return true
+}
+
+// repoMatches reports whether pr's repository matches the owner/repo glob g,
+// ignoring case.
+func repoMatches(g string, pr model.PR) bool {
+	ok, _ := path.Match(strings.ToLower(g), strings.ToLower(pr.Key.Repository()))
+	return ok
+}
+
+// authorIs reports whether pr's author is a, ignoring case and app/.
+func authorIs(a string, pr model.PR) bool {
+	return strings.EqualFold(strings.TrimPrefix(pr.Author, "app/"), strings.TrimPrefix(a, "app/"))
+}
+
+// reasonIs reports whether the reason of the row's notification is s; a
+// row with no notification has none.
+func reasonIs(s string, f Facts) bool { return f.Reason != "" && strings.EqualFold(s, f.Reason) }
+
+// hasLabel reports whether pr has the label l, ignoring case.
+func hasLabel(l string, pr model.PR) bool {
+	return slices.ContainsFunc(pr.Labels, func(have string) bool { return strings.EqualFold(have, l) })
 }
 
 // stateOf is pr's state, open when it is not read.
