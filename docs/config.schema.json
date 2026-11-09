@@ -176,7 +176,7 @@
             "type": "array"
           },
           "title": {
-            "description": "A regular expression the title must match, as written: a shortcode such as `:arrow_up:` is matched as itself, not as its emoji.",
+            "description": "A regular expression the title must match, as written: a shortcode such as `:arrow_up:` is matched as itself, not as its emoji. An empty one sets no condition.",
             "type": "string"
           },
           "updated_before_days": {
@@ -507,7 +507,7 @@
             "type": "array"
           },
           "title": {
-            "description": "A regular expression the title must match, as written: a shortcode such as `:arrow_up:` is matched as itself, not as its emoji.",
+            "description": "A regular expression the title must match, as written: a shortcode such as `:arrow_up:` is matched as itself, not as its emoji. An empty one sets no condition.",
             "type": "string"
           },
           "updated_before_days": {
@@ -884,7 +884,7 @@
             "type": "array"
           },
           "title": {
-            "description": "A regular expression the title must match, as written: a shortcode such as `:arrow_up:` is matched as itself, not as its emoji.",
+            "description": "A regular expression the title must match, as written: a shortcode such as `:arrow_up:` is matched as itself, not as its emoji. An empty one sets no condition.",
             "type": "string"
           },
           "updated_before_days": {
