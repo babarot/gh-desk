@@ -80,6 +80,8 @@ func kindName(k kind) string {
 		return "string"
 	case enumKind:
 		return "one of " + codeList(k.Values)
+	case optEnumKind:
+		return "one of " + codeList(k.Values) + ", or left out"
 	case listKind:
 		if len(k.Values) > 0 {
 			return "list of " + codeList(k.Values)
@@ -143,6 +145,8 @@ type (
 	stringKind struct{ NonEmpty bool }
 	// enumKind is one of Values.
 	enumKind struct{ Values []string }
+	// optEnumKind is one of Values, or left out, as "".
+	optEnumKind struct{ Values []string }
 	// listKind is a list of strings, each among Values when there are
 	// some, and at least one when NonEmpty. Renamed are values that were
 	// renamed, by their old name, with the new one: not read, but told.
@@ -249,6 +253,15 @@ func (enumKind) toml(v any) string                  { return fmt.Sprintf("%q", v
 func (k enumKind) schema() map[string]any {
 	return map[string]any{"type": "string", "enum": k.Values}
 }
+
+func (k optEnumKind) check(key string, v any) Problems {
+	if as[string](v) == "" {
+		return nil
+	}
+	return enumKind(k).check(key, v)
+}
+func (optEnumKind) toml(v any) string        { return fmt.Sprintf("%q", v) }
+func (k optEnumKind) schema() map[string]any { return enumKind(k).schema() }
 
 func (k listKind) check(key string, v any) Problems {
 	ss := as[[]string](v)
@@ -485,6 +498,8 @@ var settings = []setting{
 		Doc: "Owners whose name is left out of the PR column, such as your company."},
 	{Key: "list.columns", Display: true, Kind: listKind{Values: Columns, NonEmpty: true}, Value: func(f File) any { return f.List.Columns },
 		Doc: `The columns shown, in the order given; "pr" and "title" are needed. WHY shows when a row has something in it (whom a review is asked of, the reason of a notification), and AUTHOR not on a tab of your own pull requests. On a narrow terminal columns go before TITLE gets narrow: SIZE first, then AUTHOR, MERGE, WHY, AGE, REVIEW and CI.`},
+	{Key: "list.scope", Kind: optEnumKind{Scopes}, Value: func(f File) any { return f.List.Scope }, Example: `"owner"`,
+		Doc: `Narrow every tab to one owner, repository ("repo") or author at a time, chosen on the header with < and >, or from a list with O; left out, the tabs are not narrowed. The one chosen is kept for the next launch.`},
 	{Key: "list.bell", Display: true, Kind: boolKind{}, Value: func(f File) any { return f.List.Bell },
 		Doc: "Ring the terminal's bell when a reading of the inbox finds a notification newly unread: new, read before, or updated since. The first reading after start does not ring it, nor one of the excluded. The terminal rings, flashes or stays quiet as it is set to."},
 

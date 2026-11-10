@@ -143,6 +143,11 @@ func (m *Model) helpLines(w int) ([]string, []string) {
 	st := m.st
 	about := st.dim.Render(fmt.Sprintf("gh-desk %s · %s", cmp.Or(m.set.Version, "dev"), homepage))
 	lines := []string{strings.Repeat(" ", max(w-lipgloss.Width(about), 0)) + about}
+	// The header shows the scope switch in place of the viewer.
+	if m.set.Scope != "" && m.viewer != "" {
+		who := st.dim.Render("signed in as ") + st.muted.Render("@"+m.viewer)
+		lines = append(lines, strings.Repeat(" ", max(w-lipgloss.Width(who), 0))+who)
+	}
 	if v := m.newerRelease(); v != "" {
 		out := st.green.Render(v+" is out") + st.dim.Render(" · ") + st.key.Render(m.set.Release.How)
 		lines = append(lines, strings.Repeat(" ", max(w-lipgloss.Width(out), 0))+out)

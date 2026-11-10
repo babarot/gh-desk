@@ -96,6 +96,12 @@ func (m *Model) listKey(k string) tea.Cmd {
 		return m.tryAgain()
 	case is("select_rule"):
 		return m.openPick()
+	case is("next_scope"):
+		return m.stepScope(1)
+	case is("prev_scope"):
+		return m.stepScope(-1)
+	case is("choose_scope"):
+		return m.openChooser()
 	case is("triage"):
 		return m.openTriage()
 	case is("approve") && len(m.selected) > 0:
@@ -831,8 +837,15 @@ func progressOver(cols []column) (from, to, steal int) {
 }
 
 // repoName is a pull request's repository as the PR column shows it:
-// without the owner for the home owners.
+// without the owner for the home owners, or while an owner is chosen, and
+// none while a repository is, which the header says.
 func (m *Model) repoName(p model.PR) string {
+	switch {
+	case m.scoped() && m.set.Scope == ScopeRepo:
+		return ""
+	case m.scoped() && m.set.Scope == ScopeOwner:
+		return p.Key.Repo
+	}
 	if slices.Contains(m.set.HomeOwners, p.Key.Owner) {
 		return p.Key.Repo
 	}

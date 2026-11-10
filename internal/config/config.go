@@ -48,6 +48,8 @@ var (
 	MergeMethods      = []string{"merge", "squash", "rebase"}
 	// Columns are the list's columns, in their default order.
 	Columns = []string{"pr", "title", "author", "ci", "merge", "review", "why", "size", "age"}
+	// Scopes are what list.scope narrows every tab by.
+	Scopes = []string{"owner", "repo", "author"}
 	// MenuActions are the actions the menu of enter offers, in their
 	// default order; a test in internal/app keeps them the TUI's.
 	MenuActions        = []string{"ask_claude", "browse", "review", "comment", "approve", "merge", "draft", "close", "hide"}
@@ -141,6 +143,9 @@ type List struct {
 	// Bell rings the terminal's bell when a notification in the inbox is
 	// newly unread.
 	Bell bool
+	// Scope is what every tab is narrowed by, one at a time: one of
+	// Scopes, or "" for none.
+	Scope string
 }
 
 // Menu configures the menu of enter.
@@ -630,6 +635,7 @@ type (
 		HomeOwners *[]string `toml:"home_owners"`
 		Columns    *[]string `toml:"columns"`
 		Bell       *bool     `toml:"bell"`
+		Scope      *string   `toml:"scope"`
 	}
 	menuDoc struct {
 		Actions *[]string `toml:"actions"`
@@ -747,6 +753,7 @@ func Parse(path string, src []byte) (File, Problems, error) {
 	set(&cfg.List.HomeOwners, d.List.HomeOwners)
 	set(&cfg.List.Columns, d.List.Columns)
 	set(&cfg.List.Bell, d.List.Bell)
+	set(&cfg.List.Scope, d.List.Scope)
 	set(&cfg.Menu.Actions, d.Menu.Actions)
 	set(&cfg.Preview.Height, d.Preview.Height)
 	set(&cfg.Preview.Tab, d.Preview.Tab)

@@ -86,6 +86,8 @@ func uiKind(k kind) UIKind {
 		u.Min, u.Max = v.Min, v.Max
 	case enumKind:
 		u.Values = v.Values
+	case optEnumKind:
+		u.Values = v.Values
 	case listKind:
 		u.Values, u.NonEmpty = v.Values, v.NonEmpty
 	case durationKind:

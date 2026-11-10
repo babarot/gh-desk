@@ -56,6 +56,9 @@ type Source interface {
 // package passes the state package's Layout.
 type Layout interface {
 	SavePreviewHeight(h int) error
+	// SaveScope keeps value, "" for none, as the one chosen of the scope
+	// kind.
+	SaveScope(kind, value string) error
 }
 
 // Runner approves and merges batches of pull requests.
@@ -96,7 +99,11 @@ type Settings struct {
 	// for all of them in the default order.
 	Menu       []string
 	HomeOwners []string
-	StaleDays  int
+	// Scope is what every tab is narrowed by, one value at a time: one of
+	// ScopeOwner, ScopeRepo and ScopeAuthor, or "" for none. ScopeValue is
+	// the value chosen at start, kept from the last launch; "" for none.
+	Scope, ScopeValue string
+	StaleDays         int
 	// PreviewHeight is the preview pane's lines from the config file; 0
 	// hides it until it is toggled.
 	PreviewHeight int
@@ -274,7 +281,15 @@ type Model struct {
 	retry  *retry
 	bulk   *bulk
 	picker *pick
-	menu   *actionMenu
+	// scope is the value of Settings.Scope the tabs are narrowed to, ""
+	// for none; scopeChecked is set once the value kept from the last
+	// launch was looked for among the tabs read (checkScope), or one was
+	// chosen.
+	scope        string
+	scopeChecked bool
+	// chooser is the scope chooser, while it is open.
+	chooser *scopeChooser
+	menu    *actionMenu
 	// progress is each pull request's step or result in a batch, shown on
 	// its row until a refresh.
 	progress map[model.PRKey]progress
@@ -357,6 +372,9 @@ func New(src Source, run Runner, cl Claude, km keymap.Map, log *slog.Logger, set
 		merged: map[model.PRKey]bool{}, held: map[model.PRKey]model.PR{}, refreshed: map[int]time.Time{}, lastTheme: -1}
 	m.chats = map[model.PRKey]*chatScreen{}
 	m.chatState = chat.NewState(set.Chats, log, set.Now, chatStatus{m})
+	if set.Scope != "" {
+		m.scope = set.ScopeValue
+	}
 	m.st = newStyles(theme(set.ThemeDark))
 	m.spinStyle = spinner(set.Spinner)
 	for i, t := range set.Tabs {
@@ -565,6 +583,8 @@ func (m *Model) key(msg tea.KeyPressMsg) tea.Cmd {
 		return m.notesKey(k)
 	case m.picker != nil:
 		return m.pickKey(k)
+	case m.chooser != nil:
+		return m.chooserKey(msg)
 	case m.menu != nil:
 		return m.menuKey(k)
 	case m.triage != nil && m.triage.open:

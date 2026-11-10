@@ -51,11 +51,14 @@ browse = []
 | `8` | `tab_8` | tab 8 |
 | `9` | `tab_9` | tab 9 |
 | `enter` | `menu` | actions |
-| `l` `right` | `expand` | unfold group / next pane tab |
-| `h` `left` | `collapse` | fold group / previous pane tab |
+| `l` `right` | `expand` | unfold section / next pane tab |
+| `h` `left` | `collapse` | fold section / previous pane tab |
 | `space` | `select` | select |
 | `V` | `select_shown` | select shown |
 | `S` | `select_rule` | select by rule |
+| `>` | `next_scope` | next in the scope |
+| `<` | `prev_scope` | previous in the scope |
+| `O` | `choose_scope` | choose in the scope |
 | `u` | `clear_selection` | clear / restore selection |
 | `A` | `approve` | approve |
 | `M` | `merge` | merge |

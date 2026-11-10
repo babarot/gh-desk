@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -773,5 +774,12 @@ func TestConfigUILeftWithoutSaving(t *testing.T) {
 	code := uiConfig(ctx, filepath.Join(t.TempDir(), "config.toml"), false, noQuestion(t), open, &out, &errb)
 	if code != 1 || out.Len() != 0 || !strings.Contains(errb.String(), "nothing was saved") {
 		t.Errorf("code %d, out %q, err %q", code, out.String(), errb.String())
+	}
+}
+
+// Every scope the config file takes is one the TUI narrows by.
+func TestScopesAreTheTUIs(t *testing.T) {
+	if !slices.Equal(config.Scopes, []string{tui.ScopeOwner, tui.ScopeRepo, tui.ScopeAuthor}) {
+		t.Errorf("config.Scopes = %q", config.Scopes)
 	}
 }

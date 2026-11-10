@@ -155,6 +155,10 @@ func (m *Model) listClick(x, y int, prev *armed) tea.Cmd {
 			m.openNotes()
 			return nil
 		}
+		if cmd, ok := m.scopeClick(x); ok {
+			m.lastClick = click{}
+			return cmd
+		}
 		from, to := m.shownTabs()
 		var ws []int
 		for i := from; i < to; i++ {
@@ -279,7 +283,7 @@ func (m *Model) drawArmed(lines []string) []string {
 func (m *Model) linkUnder(x, y int) (spot, bool) {
 	if y == 0 {
 		lead := lipgloss.Width(m.st.app.Render("desk") + m.st.dim.Render(" // "))
-		if name := m.viewerName(); name != "" && spanAt([]int{lipgloss.Width(name)}, 0, x-lead) == 0 {
+		if name := m.viewerName(); name != "" && m.set.Scope == "" && spanAt([]int{lipgloss.Width(name)}, 0, x-lead) == 0 {
 			return spot{url: m.webURL(m.viewer), x: lead, y: y, w: lipgloss.Width(name), row: -1}, true
 		}
 		return spot{}, false
@@ -500,6 +504,13 @@ func (m *Model) popupMouse(msg tea.MouseMsg) (cmd tea.Cmd, ok bool) {
 		} else if run {
 			return m.chooseRules(false), true
 		}
+	case m.chooser != nil:
+		c := m.chooser
+		if run, closed := m.listMouse(msg, &c.pointer, &c.sel, len(m.chooserValues())); closed {
+			m.chooser = nil
+		} else if run {
+			return m.chooseScope(), true
+		}
 	case m.menu != nil:
 		return m.menuMouse(msg), true
 	case m.triage != nil && m.triage.open:
@@ -592,4 +603,23 @@ func (m *Model) scrollMouse(msg tea.MouseMsg, top *int) (closed bool) {
 		return msg.Button == tea.MouseLeft && !m.popupAt.has(msg.X, msg.Y)
 	}
 	return false
+}
+
+// scopeClick is a click at x on the header's scope switch: its marks step
+// to the value before and after, as < and > do, and its name opens the
+// scope chooser, as O does. ok is false off the switch.
+func (m *Model) scopeClick(x int) (tea.Cmd, bool) {
+	if m.set.Scope == "" {
+		return nil, false
+	}
+	lead := lipgloss.Width(m.st.app.Render("desk") + m.st.dim.Render(" // "))
+	switch spanAt([]int{1, m.scopeNameWidth(), 1}, 1, x-lead) {
+	case 0:
+		return m.stepScope(-1), true
+	case 1:
+		return m.openChooser(), true
+	case 2:
+		return m.stepScope(1), true
+	}
+	return nil, false
 }

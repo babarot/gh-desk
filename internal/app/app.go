@@ -192,6 +192,13 @@ func assemble(cfg config.File, warns []string, e env, log *slog.Logger) parts {
 	} else {
 		set.PaneHeight = h
 	}
+	if set.Scope != "" {
+		if v, err := layout.Scope(set.Scope); err != nil {
+			log.Warn("could not read the scope last chosen", "err", err.Error())
+		} else {
+			set.ScopeValue = v
+		}
+	}
 	// One gh-desk at a time keeps the record of merges it waits for;
 	// another one runs without waiting merges.
 	store, err := state.Open(e.stateDir)
@@ -528,7 +535,7 @@ func (g runnerGitHub) CommitInfo(ctx context.Context, key model.PRKey, oid strin
 // Settings are the config values the TUI uses. The demo takes them too.
 func Settings(cfg config.File) tui.Settings {
 	set := tui.Settings{
-		MarkDone: cfg.Review.MarkDone, HomeOwners: cfg.List.HomeOwners, Columns: cfg.List.Columns, Menu: cfg.Menu.Actions, PreviewHeight: cfg.Preview.Height,
+		MarkDone: cfg.Review.MarkDone, HomeOwners: cfg.List.HomeOwners, Scope: cfg.List.Scope, Columns: cfg.List.Columns, Menu: cfg.Menu.Actions, PreviewHeight: cfg.Preview.Height,
 		DefaultPaneHeight: config.DefaultPreviewHeight,
 		Collapse:          config.Patterns(cfg.Diff.Collapse), ThemeDark: cfg.Theme.Dark, ThemeLight: cfg.Theme.Light, Spinner: cfg.Theme.Spinner, Shimmer: cfg.Theme.Shimmer, Editor: editor(cfg.Review.Editor, os.Getenv),
 		Refresh: cfg.RefreshInterval(), Bell: cfg.List.Bell, ReleaseNotes: cfg.Claude.ReleaseNotesCheck, Language: cfg.Claude.Language,

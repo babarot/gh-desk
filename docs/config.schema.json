@@ -619,6 +619,15 @@
           ],
           "description": "Refresh the shown tab this often, as a Go duration such as \"3m\" or \"90s\"; \"off\" refreshes only when r is pressed."
         },
+        "scope": {
+          "description": "Narrow every tab to one owner, repository (\"repo\") or author at a time, chosen on the header with < and >, or from a list with O; left out, the tabs are not narrowed. The one chosen is kept for the next launch.",
+          "enum": [
+            "owner",
+            "repo",
+            "author"
+          ],
+          "type": "string"
+        },
         "stale_days": {
           "anyOf": [
             {
