@@ -1,11 +1,11 @@
 -- screen --
-desk // @me    1 review (3)   2 mine (1)   3 involved (0)   4 inbox (1)                           1 to you · 1 to a team · 1 bots
+desk // @me    1 review (3)   2 mine (1)   3 involved (0)   4 inbox (1)
     PR                        TITLE                           AUTHOR          CI  MERGE  REVIEW   WHY         SIZE          AGE
   ▾ reques╭ claude · review ─────────────────────────────────────────────────────────────────────────────── plan only ─╮
 ▎ ● api#12│                                                                                                            │     3h
   ▸ reques│    ▐▛███▛█    review  3 pull requests                                                                      │
-  ▸ bots 1│   ▝▜██████▀   1 to you · 1 to a team · 1 bots                                                              │
-          │    ▝▝   ▝▝    filter none · selected 0 · cursor api#12                                                     │
+  ▸ bots 1│   ▝▜██████▀   filter none · selected 0 · cursor api#12                                                     │
+          │    ▝▝   ▝▝                                                                                                 │
           │                                                                                                            │
           │   try                                                                                                      │
           │     bots with passing checks                                                                               │
@@ -34,7 +34,7 @@ desk // @me    1 review (3)   2 mine (1)   3 involved (0)   4 inbox (1)         
 
 enter accept · tab complete · esc back
 -- styles --
-L1 0-129 fg=#706f87
+L1 0-71 fg=#706f87
 L2 4-127 fg=#706f87
 L3 2-10 fg=#706f87
 L3 10-11 fg=#96bfff
@@ -55,16 +55,15 @@ L5 119-120 fg=#96bfff
 L6 2-10 fg=#706f87
 L6 10-11 fg=#96bfff
 L6 14-23 fg=#d97757
-L6 26-57 fg=#706f87
+L6 26-32 fg=#706f87
+L6 33-37 fg=#8888a4
+L6 38-48 fg=#706f87
+L6 49-50 fg=#8888a4
+L6 51-59 fg=#706f87
+L6 60-66 fg=#8888a4
 L6 119-120 fg=#96bfff
 L7 10-11 fg=#96bfff
 L7 15-22 fg=#d97757
-L7 26-32 fg=#706f87
-L7 33-37 fg=#8888a4
-L7 38-48 fg=#706f87
-L7 49-50 fg=#8888a4
-L7 51-59 fg=#706f87
-L7 60-66 fg=#8888a4
 L7 119-120 fg=#96bfff
 L8 10-120 fg=#96bfff
 L9 10-11 fg=#96bfff

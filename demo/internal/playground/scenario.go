@@ -107,7 +107,6 @@ func Scenarios() []Scenario {
 		// those of the config file a first launch writes: "dependency bots"
 		// is the third.
 		{Name: "merge", Title: "The dependency updates selected by a rule, approved and merged", Steps: []Step{
-			{Action: "fold_bots", Hold: time.Second},
 			{Action: "select_rule", Hold: time.Second},
 			{Action: "down"},
 			{Action: "down", Wait: -scroll, Hold: time.Second},

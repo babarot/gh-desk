@@ -365,10 +365,10 @@ func (t *tab) sectionNamed(name string) int {
 	return slices.IndexFunc(t.sections, func(s plan.Section) bool { return s.Name == name })
 }
 
-// sectionOfGroup is the section of t that shows the group g, -1 when none
-// does.
-func (t *tab) sectionOfGroup(g plan.Group) int {
-	return slices.IndexFunc(t.sections, func(s plan.Section) bool { return s.Group == g })
+// hasRowsIn reports whether the section i of t holds a row, filtered or
+// not: what Claude is told of the tab.
+func (m *Model) hasRowsIn(t *tab, i int) bool {
+	return slices.ContainsFunc(m.listed(t), func(r row) bool { return r.ex.at == i })
 }
 
 // sectionName is what a section is called where it is shown: its name, or

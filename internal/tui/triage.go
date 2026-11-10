@@ -303,7 +303,7 @@ func (m *Model) triageAnswered(msg triageMsg) tea.Cmd {
 // it cannot name. A pull request any tab has read in full is given as that.
 func (m *Model) snapshot() (claude.Snapshot, map[model.PRKey]model.PR) {
 	t := m.tab()
-	s := claude.Snapshot{Now: m.set.Now(), Tab: t.name, Grouped: t.grouped, Filter: m.filter, Pane: "off"}
+	s := claude.Snapshot{Now: m.set.Now(), Tab: t.name, Filter: m.filter, Pane: "off"}
 	if t.ruleFilter != nil {
 		s.RuleFilter = ruleNames(t.ruleFilter)
 	}
@@ -314,6 +314,10 @@ func (m *Model) snapshot() (claude.Snapshot, map[model.PRKey]model.PR) {
 		s.Cursor = p.Key
 	}
 	for i, sc := range t.sections {
+		if sc.Name == "" || !m.hasRowsIn(t, i) {
+			continue
+		}
+		s.Sections = append(s.Sections, sc.Name)
 		if t.foldedAt(i) {
 			s.Folded = append(s.Folded, sc.Name)
 		}
@@ -330,7 +334,7 @@ func (m *Model) snapshot() (claude.Snapshot, map[model.PRKey]model.PR) {
 		row := claude.SnapshotRow{PR: p, Why: m.why(r), Selected: m.isSelected(p.Key),
 			Narrowed: t.ruleFilter != nil && !m.passes(own, "", t.ruleFilter, s.Now), Excluded: r.ex.excluded()}
 		if r.ex.at >= 0 {
-			row.Group = t.sections[r.ex.at].Name
+			row.Section = t.sections[r.ex.at].Name
 		}
 		if rv, ok := p.ReviewBy(m.viewer); ok && m.viewer != "" {
 			row.Mine = rv.State
@@ -391,12 +395,12 @@ func (m *Model) checkPlan() []step {
 		case claude.DoFilter:
 			filter = a.Text
 		case claude.DoFold, claude.DoUnfold:
-			s.section = t.sectionNamed(a.Group)
+			s.section = t.sectionNamed(a.Section)
 			switch {
 			case !t.grouped:
-				s.skip = "the tab has no groups"
-			case s.section < 0:
-				s.skip = "no such group"
+				s.skip = "the tab has no sections"
+			case a.Section == "" || s.section < 0:
+				s.skip = "no such section"
 			}
 		case claude.DoSelect, claude.DoApprove, claude.DoMerge:
 			s.prs, s.gone = m.resolve(a.Keys, now, a.Do)
@@ -695,8 +699,8 @@ func (m *Model) triageWelcome(height int) []string {
 	}
 	right := []string{
 		st.title.Render(t.name) + "  " + st.dim.Render(pullRequests(len(prs))),
-		st.dim.Render(strings.Join(m.groupCounts(t, prs), " · ")),
 		where,
+		"",
 	}
 	top, head := m.clawdBeside(stand(pDefault), clawdW, right)
 	asks := m.tryLines(claude.TriageQuestions(), m.triage.input.Value())
@@ -774,7 +778,7 @@ func (m *Model) stepWords(s step) string {
 		}
 		return fmt.Sprintf("filter %q", safeLine(s.Text))
 	case claude.DoFold, claude.DoUnfold:
-		return string(s.Do) + " " + safeLine(s.Group)
+		return string(s.Do) + " " + safeLine(s.Section)
 	case claude.DoClearSelection:
 		return "clear the selection"
 	case claude.DoCursor:

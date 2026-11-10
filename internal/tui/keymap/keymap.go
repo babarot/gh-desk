@@ -104,7 +104,6 @@ var Defaults = []Def{
 	{"browse", ScopeList, []string{"o"}, "browser"},
 	{"copy_url", ScopeList, []string{"y"}, "copy url"},
 	{"hide", ScopeList, []string{"d"}, "hide / done"},
-	{"fold_bots", ScopeList, []string{"b"}, "fold bots"},
 	// Shows the rows the exclusion leaves out, the inbox's merged or
 	// closed ones among them, and hides them again.
 	{"show_excluded", ScopeList, []string{"a"}, "excluded"},
@@ -173,7 +172,6 @@ var renamed = map[string]Action{
 	"claude":           "triage",
 	"pr_claude":        "ask_claude",
 	"unfold":           "fold",
-	"toggle_bots":      "fold_bots",
 	"toggle_pane":      "preview",
 	"show_settled":     "show_excluded",
 	"pane_tab":         "preview_tab",
@@ -182,6 +180,13 @@ var renamed = map[string]Action{
 	"pane_down":        "preview_down",
 	"pane_up":          "preview_up",
 	"notifications":    "events",
+}
+
+// removed are the actions that are gone, with nothing in their place, by
+// name, with why. A [keys] entry for one is a mistake that says so.
+var removed = map[string]string{
+	"fold_bots":   "a tab's sections are folded by their heads, and bots is no longer a part of every tab",
+	"toggle_bots": "a tab's sections are folded by their heads, and bots is no longer a part of every tab",
 }
 
 // The fixed keys are read before any action and cannot be bound.
@@ -270,6 +275,10 @@ func Apply(base Map, set map[string][]string) (Map, []Problem) {
 		a := Action(n)
 		if to, ok := renamed[n]; ok {
 			ps = append(ps, Problem{Action: n, Index: -1, AtKey: true, Message: fmt.Sprintf("keys.%s: %q was renamed to %q", n, n, to)})
+			continue
+		}
+		if why, ok := removed[n]; ok {
+			ps = append(ps, Problem{Action: n, Index: -1, AtKey: true, Message: fmt.Sprintf("keys.%s: %q is no longer an action: %s", n, n, why)})
 			continue
 		}
 		if _, ok := m.defs[a]; !ok {

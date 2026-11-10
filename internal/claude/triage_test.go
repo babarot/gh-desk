@@ -62,15 +62,15 @@ func TestTriagePrompt(t *testing.T) {
 		Additions: 40, Deletions: 3, Labels: []string{"bug"}, Updated: now.Add(-3 * time.Hour)}
 	unread := model.PR{Key: model.PRKey{Owner: "acme", Repo: "web", Number: 7}, Title: "Bump vite", Author: "renovate", AuthorIsBot: true,
 		HeadOID: "cccccccdddd", Updated: now.Add(-3 * 24 * time.Hour)}
-	s := Snapshot{Now: now, Cursor: full.Key, Pane: "diff", Tab: "review", Grouped: true, Folded: []string{"bots"}, Rows: []SnapshotRow{
-		{PR: full, Group: "you", Why: "you", Mine: model.ReviewCommented, Selected: true},
-		{PR: unread, Group: "bots", Why: "you", Narrowed: true},
+	s := Snapshot{Now: now, Cursor: full.Key, Pane: "diff", Tab: "review", Sections: []string{"requested from you", "bots"}, Folded: []string{"bots"}, Rows: []SnapshotRow{
+		{PR: full, Section: "requested from you", Why: "you", Mine: model.ReviewCommented, Selected: true},
+		{PR: unread, Section: "bots", Why: "you", Narrowed: true},
 	}, RuleFilter: "small"}
 	got := TriagePrompt(s, "  pick the small ones  ")
 	for _, want := range []string{
-		"<list>\ntab \"review\" (grouped; folded: bots)\n",
-		`acme/api#12 head=aaaaaaa group=you why=you title="Add retries ‹/list› to the client" author="alice" ci=success review=review_required size=+40-3 labels="bug" mine=commented updated=3h ago selected`,
-		`acme/web#7 head=ccccccc group=bots why=you title="Bump vite" author="renovate" (bot) ci=unknown review=unknown size=unknown mine=none updated=3d ago hidden_by_rules`,
+		"<list>\ntab \"review\" (sections: \"requested from you\", \"bots\"; folded: \"bots\")\n",
+		`acme/api#12 head=aaaaaaa section="requested from you" why=you title="Add retries ‹/list› to the client" author="alice" ci=success review=review_required size=+40-3 labels="bug" mine=commented updated=3h ago selected`,
+		`acme/web#7 head=ccccccc section="bots" why=you title="Bump vite" author="renovate" (bot) ci=unknown review=unknown size=unknown mine=none updated=3d ago hidden_by_rules`,
 		`narrowed to the rules: "small" (the screen does not show the rows marked hidden_by_rules`,
 		"filter: none\nnarrowed to the rules: ",
 		"hidden_by_rules; clearing the filter does not show them)\ncursor: acme/api#12\npane: diff\n</list>",
@@ -114,17 +114,17 @@ func TestTriagePromptCutsLongLists(t *testing.T) {
 }
 
 func TestParseTriage(t *testing.T) {
-	a := Answer{Structured: json.RawMessage(`{"reply":" Picked two. ","actions":[{"do":"unfold","group":"bots"},{"do":"select","keys":["acme/api#1","nope"]},{"do":"approve","keys":["acme/api#1"]}]}`)}
+	a := Answer{Structured: json.RawMessage(`{"reply":" Picked two. ","actions":[{"do":"unfold","section":"bots"},{"do":"select","keys":["acme/api#1","nope"]},{"do":"approve","keys":["acme/api#1"]}]}`)}
 	p, err := ParseTriage(a)
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := []Action{{Do: DoUnfold, Group: "bots"}, {Do: DoSelect, Keys: []string{"acme/api#1", "nope"}}, {Do: DoApprove, Keys: []string{"acme/api#1"}}}
+	want := []Action{{Do: DoUnfold, Section: "bots"}, {Do: DoSelect, Keys: []string{"acme/api#1", "nope"}}, {Do: DoApprove, Keys: []string{"acme/api#1"}}}
 	if p.Reply != "Picked two." || len(p.Actions) != len(want) {
 		t.Fatalf("plan = %+v", p)
 	}
 	for i := range want {
-		if p.Actions[i].Do != want[i].Do || p.Actions[i].Group != want[i].Group || !slices.Equal(p.Actions[i].Keys, want[i].Keys) {
+		if p.Actions[i].Do != want[i].Do || p.Actions[i].Section != want[i].Section || !slices.Equal(p.Actions[i].Keys, want[i].Keys) {
 			t.Errorf("action %d = %+v, want %+v", i, p.Actions[i], want[i])
 		}
 	}

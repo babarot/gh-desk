@@ -68,7 +68,6 @@ browse = []
 | `o` | `browse` | browser |
 | `y` | `copy_url` | copy url |
 | `d` | `hide` | hide / done |
-| `b` | `fold_bots` | fold bots |
 | `a` | `show_excluded` | excluded |
 | `/` | `filter` | filter |
 | `J` | `preview_down` | scroll pane down |

@@ -65,7 +65,8 @@ func TestGroupsInTheOrderGiven(t *testing.T) {
 	if strings.Contains(s, "requested from a team") || strings.Contains(s, "Rework the settings page") {
 		t.Errorf("a group left out of groups is shown:\n%s", s)
 	}
-	if h := headerLine(m); !strings.Contains(h, "1 bots · 1 to you") || strings.Contains(h, "to a team") {
+	// The header counts no section: its heads do.
+	if h := headerLine(m); strings.Contains(h, "to you") || strings.Contains(h, "bots") {
 		t.Errorf("header = %q", h)
 	}
 }

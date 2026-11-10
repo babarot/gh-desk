@@ -158,6 +158,24 @@ func TestRenamed(t *testing.T) {
 	}
 }
 
+// An action that is gone is told with why, and is neither an action nor an
+// old name.
+func TestRemoved(t *testing.T) {
+	_, ps := Apply(Default(), map[string][]string{"fold_bots": {"b"}})
+	if len(ps) != 1 || !ps[0].AtKey || !strings.HasPrefix(ps[0].Message, `keys.fold_bots: "fold_bots" is no longer an action: `) {
+		t.Errorf("problems = %+v", ps)
+	}
+	m := Default()
+	for name := range removed {
+		if _, ok := m.defs[Action(name)]; ok {
+			t.Errorf("%q is both an action and removed", name)
+		}
+		if _, ok := renamed[name]; ok {
+			t.Errorf("%q is both renamed and removed", name)
+		}
+	}
+}
+
 // The ? list also reads the list's fold, so a key both are set to is a
 // mistake, and fold set to the key of the release notes takes it from
 // them.

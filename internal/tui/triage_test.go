@@ -78,10 +78,10 @@ func TestTriageAnswerDrawnAsAChat(t *testing.T) {
 
 func TestTriagePlanApplied(t *testing.T) {
 	m, fc := startTriage(t, `{"reply":"Picked the bot update; api#99 is not in this tab.","actions":[`+
-		`{"do":"unfold","group":"bots"},{"do":"select","keys":["acme/api#30","acme/api#99"]},`+
+		`{"do":"unfold","section":"bots"},{"do":"select","keys":["acme/api#30","acme/api#99"]},`+
 		`{"do":"cursor","key":"acme/api#30"},{"do":"approve","keys":["acme/api#30"]}]}`)
 	r := fc.triaged[0]
-	if !r.First || !strings.Contains(r.Prompt, "<request>\nbots\n</request>") || !strings.Contains(r.Prompt, "acme/api#30 head=ccccccc group=bots") {
+	if !r.First || !strings.Contains(r.Prompt, "<request>\nbots\n</request>") || !strings.Contains(r.Prompt, "acme/api#30 head=ccccccc section=\"bots\"") {
 		t.Errorf("request %+v", r)
 	}
 	golden(t, "triage-plan", m)
@@ -719,7 +719,7 @@ func TestAskGhost(t *testing.T) {
 	}
 }
 
-// The welcome counts what a triage is given, by group as a whole.
+// The welcome counts what a triage is given.
 func TestTriageWelcomeCountsTheSameRows(t *testing.T) {
 	m, _ := startWith(t, fixture(), keymap.Default())
 	fakeClaudeOf(t, m)
@@ -735,7 +735,7 @@ func TestTriageWelcomeCountsTheSameRows(t *testing.T) {
 		prs = append(prs, r.pr)
 	}
 	s := screen(m)
-	if !strings.Contains(s, pullRequests(len(prs))) || !strings.Contains(s, strings.Join(m.groupCounts(tab, prs), " · ")) {
+	if !strings.Contains(s, pullRequests(len(prs))) {
 		t.Errorf("counts differ:\n%s", s)
 	}
 }

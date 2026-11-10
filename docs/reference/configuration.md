@@ -196,7 +196,7 @@ Owners whose name is left out of the PR column, such as your company.
 
 list of `pr`, `title`, `author`, `ci`, `merge`, `review`, `why`, `size`, `age` · Default: `["pr", "title", "author", "ci", "merge", "review", "why", "size", "age"]`
 
-The columns shown, in the order given; "pr" and "title" are needed. WHY shows on grouped tabs and the inbox only, and AUTHOR not on a tab of your own pull requests. On a narrow terminal columns go before TITLE gets narrow: SIZE first, then AUTHOR, MERGE, WHY, AGE, REVIEW and CI.
+The columns shown, in the order given; "pr" and "title" are needed. WHY shows when a row has something in it (whom a review is asked of, the reason of a notification), and AUTHOR not on a tab of your own pull requests. On a narrow terminal columns go before TITLE gets narrow: SIZE first, then AUTHOR, MERGE, WHY, AGE, REVIEW and CI.
 
 ### list.bell
 

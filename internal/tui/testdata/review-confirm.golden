@@ -1,5 +1,5 @@
 -- screen --
-desk // @me    1 review (3)   2 mine (1)   3 involved (0)   4 inbox (1)                           1 to you · 1 to a team · 1 bots
+desk // @me    1 review (3)   2 mine (1)   3 involved (0)   4 inbox (1)
     PR                        TITLE                           AUTHOR          CI  MERGE  REVIEW   WHY         SIZE          AGE
   ▾╭ review comment ──────────────────────────────────────────────────────────────────────────────────────────────────────────╮
 ▎ ●│   Looks good, one question.                                                                                              │
@@ -34,7 +34,7 @@ desk // @me    1 review (3)   2 mine (1)   3 involved (0)   4 inbox (1)         
 
 y yes · esc back
 -- styles --
-L1 0-129 fg=#706f87
+L1 0-71 fg=#706f87
 L2 4-127 fg=#706f87
 L3 2-3 fg=#706f87
 L3 3-4 fg=#96bfff

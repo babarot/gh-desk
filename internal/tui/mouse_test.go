@@ -256,7 +256,7 @@ func TestClickOpensInTheBrowser(t *testing.T) {
 		clickTwice(m, x+1, y)
 	}
 	click("@me")
-	press(m, "b") // unfold the bots
+	unfoldBots(m)
 	click("api#30")
 	click("renovate")
 	click("alice")
