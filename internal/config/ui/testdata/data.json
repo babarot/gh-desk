@@ -39,7 +39,7 @@
     "key": "list.columns",
     "table": "list",
     "name": "columns",
-    "doc": "The columns shown, in the order given; \"pr\" and \"title\" are needed. WHY shows on grouped tabs and the inbox only, and AUTHOR not on a tab of your own pull requests. On a narrow terminal SIZE goes first, then AUTHOR.",
+    "doc": "The columns shown, in the order given; \"pr\" and \"title\" are needed. WHY shows on grouped tabs and the inbox only, and AUTHOR not on a tab of your own pull requests. On a narrow terminal columns go before TITLE gets narrow: SIZE first, then AUTHOR, MERGE, WHY, AGE, REVIEW and CI.",
     "kind": {
      "type": "config.listKind",
      "name": "list of `pr`, `title`, `author`, `ci`, `merge`, `review`, `why`, `size`, `age`",

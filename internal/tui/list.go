@@ -482,10 +482,11 @@ var columnDefs = []column{
 const rowLead = 4
 
 // dropFirst are the columns left out on a narrow terminal, first to last,
-// while TITLE would be narrower than minTitle; the others are never left
-// out (ADR-017). minTitle keeps SIZE down to 127 columns with all the
-// columns on a grouped tab.
-var dropFirst = []string{"size", "author"}
+// while TITLE would be narrower than minTitle; PR and TITLE are never left
+// out (ADR-017). The ones that tell the least go first: MERGE is empty on
+// most rows, and WHY repeats the group a row is in. With all the columns on
+// a grouped tab, minTitle keeps SIZE down to 127 columns and CI down to 64.
+var dropFirst = []string{"size", "author", "merge", "why", "age", "review", "ci"}
 
 const minTitle = 27
 
@@ -730,15 +731,20 @@ func (m *Model) renderRow(r row, cols []column, sel bool, n int) string {
 			i = to - 1
 			continue
 		}
-		s := m.cell(c.id, r, sel, n)
+		width := c.width
+		if running && c.id == "title" {
+			width -= steal
+		}
+		var s string
+		if c.id == "pr" {
+			s = m.prCell(r, width)
+		} else {
+			s = m.cell(c.id, r, sel, n)
+		}
 		if (r.ex.excluded() || r.gone) && c.id != "pr" {
 			// A row the exclusion leaves out, shown with a, or one kept for
 			// the cursor, is drawn dim past its cursor and mark.
 			s = m.st.dim.Render(ansi.Strip(s))
-		}
-		width := c.width
-		if running && c.id == "title" {
-			width -= steal
 		}
 		if c.right {
 			s = spaces(width-lipgloss.Width(s)) + s
@@ -872,22 +878,31 @@ func (m *Model) rowStart(r row, sel bool) string {
 	return cursor + " " + mark + " "
 }
 
+// prCell is the PR cell of a row, w cells wide: the repository and the
+// number. When they do not fit, the repository is cut and the number kept,
+// since the number is what tells two pull requests of a repository apart.
+func (m *Model) prCell(r row, w int) string {
+	p, st := r.pr, m.st
+	repo := m.repoName(p)
+	name, num := st.sub1, st.muted
+	if p.Draft || r.ex.excluded() || r.gone {
+		name, num = st.dim, st.dim
+	}
+	number := fmt.Sprintf("#%d", p.Key.Number)
+	if room := w - lipgloss.Width(number); lipgloss.Width(repo) > room && room >= 2 {
+		repo = ansi.Truncate(repo, room, "…")
+	}
+	// A row an exclusion rule cannot tell yet may leave once what the
+	// rule waits for is read.
+	if (m.answering(p.Key) || r.ex.pending) && m.set.Shimmer {
+		return m.shimmerParts(styled{repo, name}, styled{number, num})
+	}
+	return name.Render(repo) + num.Render(number)
+}
+
 func (m *Model) cell(id string, r row, sel bool, n int) string {
 	p, st := r.pr, m.st
 	switch id {
-	case "pr":
-		repo := m.repoName(p)
-		name, num := st.sub1, st.muted
-		if p.Draft || r.ex.excluded() || r.gone {
-			name, num = st.dim, st.dim
-		}
-		number := fmt.Sprintf("#%d", p.Key.Number)
-		// A row an exclusion rule cannot tell yet may leave once what the
-		// rule waits for is read.
-		if (m.answering(p.Key) || r.ex.pending) && m.set.Shimmer {
-			return m.shimmerParts(styled{repo, name}, styled{number, num})
-		}
-		return name.Render(repo) + num.Render(number)
 	case "title":
 		if m.merged[p.Key] {
 			return st.dim.Render(shownTitle(p.Title))
