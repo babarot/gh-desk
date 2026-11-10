@@ -7,6 +7,7 @@ import (
 
 	"charm.land/bubbles/v2/textarea"
 	tea "charm.land/bubbletea/v2"
+	"github.com/charmbracelet/x/ansi"
 
 	"github.com/babarot/gh-desk/internal/tui/keymap"
 )
@@ -44,11 +45,7 @@ func (m *Model) chooserValues() []string {
 	}
 	var out []string
 	for _, v := range m.scopeChoices() {
-		name := v
-		if v == "" {
-			name = allScope
-		}
-		if strings.Contains(strings.ToLower(name), q) {
+		if strings.Contains(strings.ToLower(scopeName(v)), q) {
 			out = append(out, v)
 		}
 	}
@@ -138,14 +135,21 @@ func (m *Model) scopeTitle() string {
 // lines.
 func (m *Model) renderChooser() ([]string, int) {
 	st, c := m.st, m.chooser
-	w := min(max(m.width-8, 40), 110)
+	vs := m.chooserValues()
+	cols := m.scopeColumns(vs, min(max(m.width-8, 40), 110, m.width)-4)
+	w := min(max(scopeLead+cols.name+cols.sum+4, 60), max(m.width-8, 40), 110, m.width)
 	inner := w - 4
 	c.input.SetWidth(inner)
-	vs := m.chooserValues()
 	c.sel = min(c.sel, max(len(vs)-1, 0))
 	counts := m.scopeCounts()
 
-	lines := []string{c.input.View(), ""}
+	// The tabs' names head the columns of their counts, once.
+	var head strings.Builder
+	head.WriteString(spaces(scopeLead + cols.name))
+	for j, t := range m.tabs {
+		head.WriteString("  " + st.dim.Render(fitLeft(safeLine(t.name), cols.tabs[j])))
+	}
+	lines := []string{c.input.View(), "", head.String()}
 	items := noItems(len(lines) + 1)
 	room := max(min(16, m.popupHeight()-6), 1)
 	c.top = min(max(c.top, c.sel-room+1, 0), c.sel)
@@ -153,13 +157,8 @@ func (m *Model) renderChooser() ([]string, int) {
 		lines = append(lines, st.dim.Render("  no "+m.set.Scope+" holds that"))
 		items = append(items, -1)
 	}
-	nameW := 34
 	for i := c.top; i < min(c.top+room, len(vs)); i++ {
 		v := vs[i]
-		name := v
-		if v == "" {
-			name = allScope
-		}
 		cursor, mark := "  ", "  "
 		if i == c.sel {
 			cursor = st.blue.Render("▎") + " "
@@ -176,17 +175,17 @@ func (m *Model) renderChooser() ([]string, int) {
 		if total == 0 {
 			nameStyle = st.dim
 		}
-		line := cursor + mark + fit(nameStyle.Render(safeLine(name)), nameW)
-		for j, t := range m.tabs {
+		line := cursor + mark + fit(nameStyle.Render(safeLine(scopeName(v))), cols.name)
+		for j := range m.tabs {
 			x := 0
 			if n != nil {
 				x = n[j]
 			}
-			cnt := st.dim.Render(fmt.Sprintf("%3d", x))
+			cnt := st.dim
 			if x > 0 {
-				cnt = st.mauve.Render(fmt.Sprintf("%3d", x))
+				cnt = st.mauve
 			}
-			line += st.dim.Render(fit(safeLine(t.name), 9)) + " " + cnt + "  "
+			line += "  " + cnt.Render(fmt.Sprintf("%*d", cols.tabs[j], x))
 		}
 		if i == c.sel {
 			line = onBackground(line, st.sel, inner)
@@ -221,4 +220,76 @@ func (m *Model) tabCount(t *tab) int {
 		return m.unreadShown(t)
 	}
 	return m.searchCount(t)
+}
+
+// scopeName is a value as the chooser names it: all for none.
+func scopeName(v string) string {
+	if v == "" {
+		return allScope
+	}
+	return v
+}
+
+// scopeLead is the cells before a value's name in the chooser: the cursor
+// and the mark of the value chosen.
+const scopeLead = 4
+
+// scopeWidths are the cells the chooser gives a value's name and each tab's
+// count, the tab's name heading it; sum is those of the counts with the
+// gaps before them.
+type scopeWidths struct {
+	name int
+	tabs []int
+	sum  int
+}
+
+// minScopeName is the fewest cells a value's name is cut to before the
+// tabs' names are.
+const minScopeName = 12
+
+// scopeColumns fit the chooser's columns in inner cells: a name as wide as
+// the longest, at most 34, and each count as wide as its tab's name. When
+// they do not fit, the names are cut, then the tabs' names, down to the
+// counts.
+func (m *Model) scopeColumns(vs []string, inner int) scopeWidths {
+	var c scopeWidths
+	for _, v := range vs {
+		c.name = max(c.name, ansi.StringWidth(safeLine(scopeName(v))))
+	}
+	c.name = min(c.name, 34)
+	c.tabs = make([]int, len(m.tabs))
+	sum := func() int {
+		n := 0
+		for _, w := range c.tabs {
+			n += 2 + w
+		}
+		return n
+	}
+	for j, t := range m.tabs {
+		c.tabs[j] = max(ansi.StringWidth(safeLine(t.name)), 3)
+	}
+	if over := scopeLead + c.name + sum() - inner; over > 0 {
+		c.name = max(c.name-over, min(c.name, minScopeName))
+	}
+	for over := scopeLead + c.name + sum() - inner; over > 0; over = scopeLead + c.name + sum() - inner {
+		j := 0
+		for k, w := range c.tabs {
+			if w > c.tabs[j] {
+				j = k
+			}
+		}
+		if c.tabs[j] <= 3 {
+			break
+		}
+		c.tabs[j]--
+	}
+	c.sum = sum()
+	return c
+}
+
+// fitLeft is s cut to w cells and padded on the left, as a count's head is
+// over its column.
+func fitLeft(s string, w int) string {
+	s = ansi.Truncate(s, w, "…")
+	return spaces(w-ansi.StringWidth(s)) + s
 }

@@ -226,3 +226,26 @@ func TestScopeGolden(t *testing.T) {
 	press(m, "O")
 	golden(t, "scope-chooser", m)
 }
+
+// On a narrow terminal the chooser fits: its frame is whole, and every
+// tab's count is in it.
+func TestScopeChooserFitsANarrowTerminal(t *testing.T) {
+	for _, width := range []int{50, 60} {
+		set, _ := scopedBy(ScopeRepo, "")
+		m := startSet(t, set, width)
+		press(m, "O")
+		var box []string
+		for l := range strings.SplitSeq(screen(m), "\n") {
+			if strings.Contains(l, "│") || strings.Contains(l, "╭") || strings.Contains(l, "╰") {
+				box = append(box, l)
+			}
+			if ansi.StringWidth(l) > width {
+				t.Errorf("width %d: a line is %d wide: %q", width, ansi.StringWidth(l), l)
+			}
+		}
+		s := strings.Join(box, "\n")
+		if !strings.Contains(s, "╮") || !strings.Contains(s, "╯") || !strings.Contains(s, "acme/api") {
+			t.Errorf("width %d: chooser cut:\n%s", width, screen(m))
+		}
+	}
+}
