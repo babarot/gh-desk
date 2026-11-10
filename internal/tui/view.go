@@ -12,7 +12,6 @@ import (
 
 	"github.com/babarot/gh-desk/internal/claude"
 	"github.com/babarot/gh-desk/internal/model"
-	"github.com/babarot/gh-desk/internal/plan"
 	"github.com/babarot/gh-desk/internal/tui/keymap"
 )
 
@@ -398,14 +397,14 @@ func (m *Model) groupCounts(t *tab, prs []model.PR) []string {
 	if !t.grouped || !t.loaded {
 		return nil
 	}
-	n := map[plan.Group]int{}
+	n := map[int]int{}
 	for _, p := range prs {
-		n[plan.GroupOf(p, m.viewer)]++
+		n[m.sectionOf(t, p)]++
 	}
 	var parts []string
-	for _, g := range t.groups {
-		if n[g] > 0 {
-			parts = append(parts, fmt.Sprintf("%d %s", n[g], groupCount[g]))
+	for i, s := range t.sections {
+		if n[i] > 0 {
+			parts = append(parts, fmt.Sprintf("%d %s", n[i], groupCount[s.Group]))
 		}
 	}
 	return parts

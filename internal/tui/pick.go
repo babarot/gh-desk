@@ -280,9 +280,7 @@ func (m *Model) applyRules(rs []plan.Rule, add bool) tea.Cmd {
 			added++
 			m.selected[p.Key] = byHand
 		}
-		if t.grouped {
-			t.folded[plan.GroupOf(p, m.viewer)] = false
-		}
+		m.unfoldFor(t, p)
 	}
 	if len(hits) == 0 {
 		m.say(name + ": nothing matches in this tab")
@@ -308,10 +306,8 @@ func (m *Model) applyRules(rs []plan.Rule, add bool) tea.Cmd {
 func (m *Model) filterByRules(rs []plan.Rule) tea.Cmd {
 	t := m.tab()
 	t.ruleFilter = rs
-	if t.grouped {
-		for _, p := range m.ruleMatches(rs...) {
-			t.folded[plan.GroupOf(p, m.viewer)] = false
-		}
+	for _, p := range m.ruleMatches(rs...) {
+		m.unfoldFor(t, p)
 	}
 	t.sel, t.offset = 0, 0
 	return m.ensure()

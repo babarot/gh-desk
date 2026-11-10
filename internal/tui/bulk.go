@@ -245,17 +245,18 @@ func containsKey(prs []model.PR, k model.PRKey) bool {
 }
 
 // allOf is every pull request a tab holds, filtered or not, leaving out
-// the groups the tab does not show.
+// those no section of the tab takes.
 func (m *Model) allOf(t *tab) []model.PR {
 	if !t.inbox && !t.grouped {
 		return t.prs
 	}
 	if !t.inbox {
-		// A group left out of the tab's groups is never shown, so nothing
-		// in it is selected or acted on from this tab.
+		// A pull request no section takes is never shown, so it is not
+		// selected or acted on from this tab.
 		var out []model.PR
+		now := m.set.Now()
 		for _, p := range t.prs {
-			if slices.Contains(t.groups, plan.GroupOf(p, m.viewer)) {
+			if at, _ := t.place(p, m.viewer, m.ruleFacts(p, now)); at >= 0 {
 				out = append(out, p)
 			}
 		}

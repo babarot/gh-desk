@@ -596,7 +596,7 @@ func (m *Model) jumpTo(k model.PRKey) tea.Cmd {
 		if t.grouped {
 			for _, p := range t.prs {
 				if p.Key == k {
-					t.folded[plan.GroupOf(p, m.viewer)] = false
+					m.unfoldFor(t, p)
 				}
 			}
 		}

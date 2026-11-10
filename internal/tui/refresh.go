@@ -9,7 +9,6 @@ import (
 
 	"github.com/babarot/gh-desk/internal/logging"
 	"github.com/babarot/gh-desk/internal/model"
-	"github.com/babarot/gh-desk/internal/plan"
 )
 
 type tickMsg struct{}
@@ -205,7 +204,7 @@ func (m *Model) moved(t *tab) {
 		if r.kind == rowPR {
 			t.sel = slices.IndexFunc(m.rows(t), isPR(r.pr.Key))
 		} else {
-			t.sel = slices.IndexFunc(m.rows(t), func(o row) bool { return o.kind == rowGroup && o.group == r.group })
+			t.sel = slices.IndexFunc(m.rows(t), func(o row) bool { return o.kind == rowGroup && o.section == r.section })
 		}
 	}
 	if r.kind == rowPR {
@@ -222,7 +221,7 @@ func (m *Model) stays(t *tab) bool {
 	if t.hidden[p.Key] || !matches(p, m.filter) {
 		return false
 	}
-	return !t.grouped || !t.folded[plan.GroupOf(p, m.viewer)]
+	return !t.foldedAt(m.sectionOf(t, p))
 }
 
 // firstRows puts the cursor of a tab just read on its first pull request,

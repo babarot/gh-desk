@@ -364,7 +364,7 @@ func startWith(t *testing.T, f *fakeSource, km keymap.Map) (*Model, *fakeRunner)
 func testSettings() Settings {
 	return Settings{
 		Tabs: []Tab{
-			{Name: "review", Query: "review", Groups: plan.Groups, Folded: []plan.Group{plan.GroupTeam, plan.GroupBots}, Limit: 100},
+			{Name: "review", Query: "review", Sections: plan.GroupSections(plan.Groups, []plan.Group{plan.GroupTeam, plan.GroupBots}), Limit: 100},
 			{Name: "mine", Query: "mine", DraftsLast: true, Limit: 100},
 			{Name: "involved", Query: "involved", Limit: 100},
 			{Name: "inbox", Inbox: true, Limit: 100},
@@ -482,7 +482,7 @@ func groupHeads(m *Model) []plan.Group {
 	var gs []plan.Group
 	for _, r := range m.rows(m.tab()) {
 		if r.kind == rowGroup {
-			gs = append(gs, r.group)
+			gs = append(gs, m.tab().sections[r.section].Group)
 		}
 	}
 	return gs
@@ -572,7 +572,7 @@ func TestGroupedTabWithoutRequests(t *testing.T) {
 	// A grouped tab of one's own pull requests has no requests to the
 	// viewer or a team: its rows are all under other.
 	set := testSettings()
-	set.Tabs[1].Groups = plan.Groups
+	set.Tabs[1].Sections = plan.GroupSections(plan.Groups, nil)
 	m := New(fixture(), &fakeRunner{results: map[model.PRKey]runner.Event{}}, &fakeClaude{}, keymap.Default(), nil, set)
 	m.Update(tea.WindowSizeMsg{Width: 130, Height: 34})
 	run(m, m.Init())
@@ -1159,7 +1159,7 @@ func TestMarkReady(t *testing.T) {
 	f.searches["review"][1].Author = "me"
 	f.info = map[model.PRKey]func(*model.MergeInfo){draft: func(mi *model.MergeInfo) { mi.Draft = true }}
 	m, r := startWith(t, f, keymap.Default())
-	m.tab().folded[plan.GroupTeam] = false
+	m.tab().folded[string(plan.GroupTeam)] = false
 	for range 10 {
 		if row, ok := m.current(); ok && row.pr.Key == draft {
 			break
@@ -1279,14 +1279,14 @@ func TestRunningIsNotStartedAgain(t *testing.T) {
 
 func TestFoldGroupByKey(t *testing.T) {
 	m := start(t, fixture(), keymap.Default())
-	if !m.tab().folded[plan.GroupBots] {
+	if !m.tab().folded[string(plan.GroupBots)] {
 		t.Fatal("the bots group is not folded at start")
 	}
-	for r, _ := m.current(); r.kind != rowGroup || r.group != plan.GroupBots; r, _ = m.current() {
+	for r, _ := m.current(); r.kind != rowGroup || m.tab().sections[r.section].Group != plan.GroupBots; r, _ = m.current() {
 		press(m, "j")
 	}
 	press(m, "l")
-	if m.tab().folded[plan.GroupBots] {
+	if m.tab().folded[string(plan.GroupBots)] {
 		t.Fatal("l did not unfold the group")
 	}
 	press(m, "j")
@@ -1294,15 +1294,15 @@ func TestFoldGroupByKey(t *testing.T) {
 		t.Fatalf("row = %+v, want a pull request in the group", r)
 	}
 	press(m, "h")
-	if m.tab().folded[plan.GroupBots] {
+	if m.tab().folded[string(plan.GroupBots)] {
 		t.Fatal("h on a pull request folded its group")
 	}
 	press(m, "k", "h")
-	if !m.tab().folded[plan.GroupBots] {
+	if !m.tab().folded[string(plan.GroupBots)] {
 		t.Fatal("h did not fold the group")
 	}
 	press(m, "right", "left")
-	if !m.tab().folded[plan.GroupBots] {
+	if !m.tab().folded[string(plan.GroupBots)] {
 		t.Fatal("left did not fold the group")
 	}
 }
@@ -1315,7 +1315,7 @@ func TestSelectByRule(t *testing.T) {
 	if len(m.selected) != 1 || m.selected[key("acme", "api", 30)] != byHand {
 		t.Fatalf("selected = %v", m.selected)
 	}
-	if m.tab().folded[plan.GroupBots] {
+	if m.tab().folded[string(plan.GroupBots)] {
 		t.Error("the bots group stayed folded")
 	}
 	if r, ok := m.current(); !ok || r.pr.Key != key("acme", "api", 30) {
@@ -1422,7 +1422,7 @@ func TestFilterByRule(t *testing.T) {
 	// pull request the rules hide.
 	press(m, "esc", "S", "j", "space", "f")
 	for range 10 {
-		if r, _ := m.current(); r.kind == rowGroup && r.group == plan.GroupBots {
+		if r, _ := m.current(); r.kind == rowGroup && m.tab().sections[r.section].Group == plan.GroupBots {
 			break
 		}
 		press(m, "j")
@@ -1508,7 +1508,7 @@ func TestFilterByRuleOnDays(t *testing.T) {
 
 func TestResumeAtStart(t *testing.T) {
 	f := fixture()
-	set := Settings{Tabs: []Tab{{Name: "review", Query: "review", Groups: plan.Groups, Limit: 100}, {Name: "inbox", Inbox: true, Limit: 100}},
+	set := Settings{Tabs: []Tab{{Name: "review", Query: "review", Sections: plan.GroupSections(plan.Groups, nil), Limit: 100}, {Name: "inbox", Inbox: true, Limit: 100}},
 		ThemeDark: "default", ThemeLight: "default", Now: func() time.Time { return now }, CanWait: true, Tick: func(time.Duration, tea.Msg) tea.Cmd { return nil },
 		Resume: []model.Pending{{Key: key("acme", "api", 12), ID: "1", Head: "aaaaaaa1", Author: "alice"}}}
 	r := &fakeRunner{results: map[model.PRKey]runner.Event{}}
@@ -1922,7 +1922,7 @@ func TestClaudeAnsweringElsewhere(t *testing.T) {
 		t.Errorf("the row does not tell Claude is answering, or the status line does too:\n%s", s)
 	}
 	// Folded, the head of its group tells.
-	m.tab().folded[plan.GroupYou] = true
+	m.tab().folded[string(plan.GroupYou)] = true
 	if s := screen(m); !strings.Contains(s, "requested from you 1 "+frame) || strings.Contains(s, "Claude is answering") {
 		t.Errorf("the folded group does not tell:\n%s", s)
 	}
@@ -1936,7 +1936,7 @@ func TestClaudeAnsweringElsewhere(t *testing.T) {
 	if s := screen(m); !c.unseen || !strings.Contains(s, "requested from you 1 ✦") {
 		t.Errorf("the answer that came elsewhere is not marked on the folded group:\n%s", s)
 	}
-	m.tab().folded[plan.GroupYou] = false
+	m.tab().folded[string(plan.GroupYou)] = false
 	if strings.Count(screen(m), "✦ api#12") != 1 {
 		t.Errorf("the answer that came elsewhere is not marked:\n%s", screen(m))
 	}
