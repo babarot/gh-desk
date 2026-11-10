@@ -448,7 +448,7 @@ var settings = []setting{
 	{Key: "list.home_owners", Kind: listKind{}, Value: func(f File) any { return f.List.HomeOwners },
 		Doc: "Owners whose name is left out of the PR column, such as your company."},
 	{Key: "list.columns", Display: true, Kind: listKind{Values: Columns, NonEmpty: true}, Value: func(f File) any { return f.List.Columns },
-		Doc: `The columns shown, in the order given; "pr" and "title" are needed. WHY shows on grouped tabs and the inbox only, and AUTHOR not on a tab of your own pull requests. On a narrow terminal SIZE goes first, then AUTHOR.`},
+		Doc: `The columns shown, in the order given; "pr" and "title" are needed. WHY shows on grouped tabs and the inbox only, and AUTHOR not on a tab of your own pull requests. On a narrow terminal columns go before TITLE gets narrow: SIZE first, then AUTHOR, MERGE, WHY, AGE, REVIEW and CI.`},
 	{Key: "list.bell", Display: true, Kind: boolKind{}, Value: func(f File) any { return f.List.Bell },
 		Doc: "Ring the terminal's bell when a reading of the inbox finds a notification newly unread: new, read before, or updated since. The first reading after start does not ring it, nor one of the excluded. The terminal rings, flashes or stays quiet as it is set to."},
 

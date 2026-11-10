@@ -37,7 +37,7 @@ func TestColumnsInTheOrderGiven(t *testing.T) {
 	}
 }
 
-func TestNarrowTerminalLeavesOutSizeThenAuthor(t *testing.T) {
+func TestNarrowTerminalLeavesOutColumnsInOrder(t *testing.T) {
 	// A grouped tab, all the columns: SIZE goes below 127 and AUTHOR below
 	// 114 (120 and 107 before MERGE, 110 for AUTHOR when the widths were
 	// fixed).
@@ -49,6 +49,24 @@ func TestNarrowTerminalLeavesOutSizeThenAuthor(t *testing.T) {
 		{126, "PR TITLE AUTHOR CI MERGE REVIEW WHY AGE"},
 		{114, "PR TITLE AUTHOR CI MERGE REVIEW WHY AGE"},
 		{113, "PR TITLE CI MERGE REVIEW WHY AGE"},
+	} {
+		m := startSet(t, testSettings(), tt.width)
+		if got := columnsLine(t, m); got != tt.want {
+			t.Errorf("width %d: columns = %q, want %q", tt.width, got, tt.want)
+		}
+	}
+	// Past AUTHOR, the columns go in the order of dropFirst, each while
+	// TITLE would be narrower than minTitle.
+	for _, tt := range []struct {
+		width int
+		want  string
+	}{
+		{98, "PR TITLE CI MERGE REVIEW WHY AGE"},
+		{97, "PR TITLE CI REVIEW WHY AGE"},
+		{90, "PR TITLE CI REVIEW AGE"},
+		{78, "PR TITLE CI REVIEW"},
+		{72, "PR TITLE CI"},
+		{63, "PR TITLE"},
 	} {
 		m := startSet(t, testSettings(), tt.width)
 		if got := columnsLine(t, m); got != tt.want {
@@ -156,5 +174,18 @@ func TestPaneReadsAgainWhileUnknown(t *testing.T) {
 	run(m, cmd)
 	if len(f.infoReads) != reads {
 		t.Error("read again once known")
+	}
+}
+
+func TestPRCellKeepsTheNumber(t *testing.T) {
+	m := startSet(t, testSettings(), 130)
+	long := row{pr: model.PR{Key: key("octo", "a-repository-with-a-long-name", 1373)}}
+	got := ansi.Strip(m.prCell(long, 24))
+	if want := "octo/a-repository-…#1373"; got != want {
+		t.Errorf("long repository: PR = %q, want %q", got, want)
+	}
+	short := row{pr: model.PR{Key: key("octo", "cli", 7)}}
+	if got, want := ansi.Strip(m.prCell(short, 24)), "octo/cli#7"; got != want {
+		t.Errorf("short repository: PR = %q, want %q", got, want)
 	}
 }
