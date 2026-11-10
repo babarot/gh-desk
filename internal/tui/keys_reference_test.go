@@ -39,7 +39,7 @@ func keysReference() string {
 		fmt.Fprintf(&b, "\n## %s\n\n", capitalized(sc.title))
 		b.WriteString("| Key | Action | Does |\n|---|---|---|\n")
 		for _, a := range km.Actions(sc.s) {
-			if !ready[a] {
+			if toldInPlace[a] {
 				continue
 			}
 			fmt.Fprintf(&b, "| %s | `%s` | %s |\n", keyCells(km.Keys(a)), a, km.Help(a))

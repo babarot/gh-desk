@@ -411,20 +411,11 @@ func (m *Model) groupCounts(t *tab, prs []model.PR) []string {
 	return parts
 }
 
-// ready are the actions this version does; the hints and the ? list show
-// only these.
-var ready = map[keymap.Action]bool{
-	"quit": true, "help": true, "refresh": true,
-	"up": true, "down": true, "top": true, "bottom": true, "page_up": true, "page_down": true,
-	"next_tab": true, "prev_tab": true, "tab_1": true, "tab_2": true, "tab_3": true, "tab_4": true, "tab_5": true, "tab_6": true, "tab_7": true, "tab_8": true, "tab_9": true,
-	"menu": true, "expand": true, "collapse": true, "approve": true, "comment": true, "review": true, "browse": true, "copy_url": true, "hide": true,
-	"events": true, "select": true, "select_shown": true, "clear_selection": true, "merge": true, "draft": true,
-	"include_failing": true, "wait_for_checks": true, "close": true, "delete_branch": true, "write_comment": true, "choose": true, "select_rule": true, "toggle_rule": true, "add_to_selection": true, "filter_by_rule": true,
-	"fold_bots": true, "show_excluded": true, "filter": true,
-	"preview_down": true, "preview_up": true, "preview_grow": true, "preview_shrink": true, "next_file": true, "prev_file": true, "preview_tab": true, "fold": true, "preview": true,
-	"confirm": true, "next_kind": true, "post": true, "editor": true, "accept": true, "complete": true, "erase": true, "erase_word": true,
-	"log": true, "log_this_pr": true,
-	"triage": true, "triage_apply": true, "triage_more": true, "ask_claude": true, "history_prev": true, "history_next": true, "history_search": true, "draft_review": true, "open_claude": true, "chat_close": true,
+// toldInPlace are the actions whose key is told where it works, in the
+// status line or at the foot of a popup, and not in the hints or the ? list.
+// Every other action is listed.
+var toldInPlace = map[keymap.Action]bool{
+	"retry": true, "chat_restart": true, "release_notes": true,
 }
 
 // hints is the key line of what has the focus. It holds the ways in (the
