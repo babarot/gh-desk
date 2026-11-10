@@ -11,7 +11,6 @@ import (
 	"github.com/charmbracelet/x/ansi"
 
 	"github.com/babarot/gh-desk/internal/claude"
-	"github.com/babarot/gh-desk/internal/model"
 	"github.com/babarot/gh-desk/internal/tui/keymap"
 )
 
@@ -381,31 +380,11 @@ func (m *Model) headerParts() []string {
 	if len(m.progress) > 0 {
 		return parts
 	}
-	parts = append(parts, m.groupCounts(t, t.prs)...)
 	if t.loaded && t.total > len(t.prs) && !t.inbox {
 		parts = append(parts, fmt.Sprintf("showing %d of %d", len(t.prs), t.total))
 	}
 	if len(t.warnings) > 0 {
 		parts = append(parts, st.yellow.Render("⚠ read in part"))
-	}
-	return parts
-}
-
-// groupCounts count prs of t by group, a group with none left out as in the
-// list; none when t has no groups or is not read yet.
-func (m *Model) groupCounts(t *tab, prs []model.PR) []string {
-	if !t.grouped || !t.loaded {
-		return nil
-	}
-	n := map[int]int{}
-	for _, p := range prs {
-		n[m.sectionOf(t, p)]++
-	}
-	var parts []string
-	for i, s := range t.sections {
-		if n[i] > 0 {
-			parts = append(parts, fmt.Sprintf("%d %s", n[i], groupCount[s.Group]))
-		}
 	}
 	return parts
 }

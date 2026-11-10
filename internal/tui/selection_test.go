@@ -20,7 +20,8 @@ import (
 // sight.
 func TestHideSelection(t *testing.T) {
 	m := start(t, fixture(), keymap.Default())
-	press(m, "b", "V")
+	unfoldBots(m)
+	press(m, "V")
 	n := len(m.selected)
 	if n < 2 {
 		t.Fatalf("selected = %v", m.selected)
@@ -60,7 +61,8 @@ func TestDoneSelection(t *testing.T) {
 func TestHideSelectionKeepsOtherTabs(t *testing.T) {
 	f := fixture()
 	m := start(t, f, keymap.Default())
-	press(m, "b", "V")
+	unfoldBots(m)
+	press(m, "V")
 	n := len(m.selected)
 	if !m.isSelected(key("acme", "api", 12)) {
 		t.Fatalf("selected = %v", m.selected)
@@ -83,7 +85,8 @@ func TestBrowseSelection(t *testing.T) {
 		}
 	}
 	m := start(t, f, keymap.Default())
-	press(m, "b", "V")
+	unfoldBots(m)
+	press(m, "V")
 	var want []string
 	for _, p := range m.menuTargets() {
 		if p.URL != "" {
@@ -109,7 +112,7 @@ func TestCopyURL(t *testing.T) {
 		}
 	}
 	m := start(t, f, keymap.Default())
-	press(m, "b")
+	unfoldBots(m)
 	p, _, ok := m.currentPR()
 	if !ok {
 		t.Fatal("no pull request under the cursor")
@@ -332,3 +335,6 @@ func TestSkippedIsNotTriedAgain(t *testing.T) {
 		t.Errorf("status = %q", status(m))
 	}
 }
+
+// unfoldBots unfolds the bots section of the tab shown.
+func unfoldBots(m *Model) { m.tab().folded[string(plan.GroupBots)] = false }

@@ -33,7 +33,7 @@ A search tab can be split into groups with `groups`. A group states a fact of th
 3. `team`: a review is requested from a team
 4. `other`: none of the above
 
-The groups are shown in the order you write them. A group left out is not shown, and nothing in it is selected or acted on from that tab. `folded` names the groups folded at start; `h` and `l` fold and unfold the one under the cursor, and `b` folds the bots.
+The groups are shown in the order you write them. A group left out is not shown, and nothing in it is selected or acted on from that tab. `folded` names the groups folded at start; `h` and `l` fold and unfold the one under the cursor.
 
 ## The inbox
 

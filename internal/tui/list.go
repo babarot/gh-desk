@@ -119,10 +119,6 @@ func (m *Model) listKey(k string) tea.Cmd {
 		return m.browseAll(m.menuTargets())
 	case is("copy_url"):
 		return m.copyURLs(m.menuTargets())
-	case is("fold_bots"):
-		if i := t.sectionOfGroup(plan.GroupBots); i >= 0 {
-			t.setFolded(i, !t.foldedAt(i))
-		}
 	case is("show_excluded"):
 		t.showExcluded = !t.showExcluded
 	case is("log"):
@@ -503,7 +499,7 @@ func (m *Model) columns(t *tab) []column {
 	for _, id := range ids {
 		switch {
 		case id == "author" && m.allMine(t):
-		case id == "why" && !t.grouped && !t.inbox:
+		case id == "why" && !m.anyWhy(t):
 		default:
 			if i := slices.IndexFunc(columnDefs, func(c column) bool { return c.id == id }); i >= 0 {
 				cols = append(cols, columnDefs[i])
@@ -535,6 +531,16 @@ func (m *Model) columns(t *tab) []column {
 
 // allMine reports whether every pull request of t is the viewer's, so the
 // author column says nothing.
+// anyWhy reports whether a pull request of t has something to show in
+// WHY: the reason of a notification in the inbox, or whom a review is
+// asked of. A tab where none has leaves the column out.
+func (m *Model) anyWhy(t *tab) bool {
+	if t.inbox {
+		return len(t.notifs) > 0
+	}
+	return slices.ContainsFunc(t.prs, func(p model.PR) bool { return searchWhy(p, m.viewer) != "" })
+}
+
 func (m *Model) allMine(t *tab) bool {
 	if m.viewer == "" || t.inbox || len(t.prs) == 0 {
 		return false
@@ -836,14 +842,6 @@ func sectionLabel(s plan.Section) string {
 var groupLabel = map[plan.Group]string{
 	plan.GroupYou:   "requested from you",
 	plan.GroupTeam:  "requested from a team",
-	plan.GroupOther: "other",
-	plan.GroupBots:  "bots",
-}
-
-// groupCount is how the header counts each group.
-var groupCount = map[plan.Group]string{
-	plan.GroupYou:   "to you",
-	plan.GroupTeam:  "to a team",
 	plan.GroupOther: "other",
 	plan.GroupBots:  "bots",
 }

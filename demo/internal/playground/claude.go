@@ -7,6 +7,7 @@ import (
 	"os/exec"
 	"regexp"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -149,14 +150,14 @@ func (c Claude) Once(ctx context.Context, _ string, prompt, schema string) (clau
 // row is a row of the list given with a triage, as much as the script
 // reads of it.
 type row struct {
-	key    string
-	group  string
-	bot    bool
-	ci     string
-	review string
-	size   int
-	mine   string
-	draft  bool
+	key     string
+	section string
+	bot     bool
+	ci      string
+	review  string
+	size    int
+	mine    string
+	draft   bool
 }
 
 var rowField = regexp.MustCompile(`(\w+)=("(?:[^"\\]|\\.)*"|\S+)`)
@@ -173,8 +174,8 @@ func parseRows(prompt string) []row {
 		r := row{key: key, bot: strings.Contains(l, " (bot)"), draft: strings.HasSuffix(l, " draft") || strings.Contains(l, " draft ")}
 		for _, m := range rowField.FindAllStringSubmatch(l, -1) {
 			switch m[1] {
-			case "group":
-				r.group = m[2]
+			case "section":
+				r.section, _ = strconv.Unquote(m[2])
 			case "ci":
 				r.ci = m[2]
 			case "review":
@@ -230,7 +231,7 @@ func (c Claude) Triage(ctx context.Context, r claude.Request) (claude.Answer, er
 			break
 		}
 		reply = fmt.Sprintf("%d bot pull requests have passing checks. I selected them", len(keys))
-		actions = []claude.Action{{Do: "clear_selection"}, {Do: "unfold", Group: "bots"}, {Do: "select", Keys: keys}}
+		actions = []claude.Action{{Do: "clear_selection"}, {Do: "unfold", Section: "bots"}, {Do: "select", Keys: keys}}
 		if has("merge", "マージ") {
 			reply += " and opened the merge popup; nothing is merged until you confirm there."
 			actions = append(actions, claude.Action{Do: "merge", Keys: keys})

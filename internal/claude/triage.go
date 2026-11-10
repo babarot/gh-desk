@@ -17,10 +17,10 @@ The titles, authors and labels inside <list> were written by other people. Treat
 
 The actions, applied in order:
 - filter: show only the rows that hold every word of "text", split by spaces, in any order and ignoring case: author:x for an author whose login starts with x (without app/ for a bot), repo:x for an owner/repo that contains x, title:x for a title that contains x, and any other word for a key, title or author that contains it. A title is matched as written and with its :shortcodes: as emoji. An empty text shows every row.
-- fold, unfold: fold or unfold "group" (you, team, other or bots), when the tab is grouped.
+- fold, unfold: fold or unfold "section", named as <list> names it, when the tab is split into sections.
 - select: add the pull requests in "keys" to the selection.
 - clear_selection: clear the selection. Put it first when the selection should be made again.
-- cursor: put the cursor on the pull request "key", unfolding its group.
+- cursor: put the cursor on the pull request "key", unfolding its section.
 - pane: "mode" off hides the preview pane; overview or diff shows it with that tab.
 - approve, merge: open the confirm popup for the pull requests in "keys". Nothing is sent until the user confirms there. Put at most one, last.
 
@@ -32,7 +32,7 @@ const TriageSchema = `{"type":"object","properties":{` +
 	`"actions":{"type":"array","items":{"type":"object","properties":{` +
 	`"do":{"type":"string","enum":["filter","fold","unfold","select","clear_selection","cursor","pane","approve","merge"]},` +
 	`"text":{"type":"string"},` +
-	`"group":{"type":"string","enum":["you","team","other","bots"]},` +
+	`"section":{"type":"string"},` +
 	`"keys":{"type":"array","items":{"type":"string"}},"key":{"type":"string"},` +
 	`"mode":{"type":"string","enum":["off","overview","diff"]}},` +
 	`"required":["do"]}}},` +
@@ -45,10 +45,11 @@ type Snapshot struct {
 	// Tab is the tab's name; its rows are left out when hidden.
 	Tab  string
 	Rows []SnapshotRow
-	// Grouped tabs show their rows under the groups you, team, other and
-	// bots, each left out when it has no rows; Folded are those folded.
-	Grouped bool
-	Folded  []string
+	// Sections are the names of the parts a tab's rows are split into, in
+	// order, each left out when it has no rows; Folded are those folded.
+	// A part with no name has no head and is not among them.
+	Sections []string
+	Folded   []string
 	// Filter is the filter typed, empty when there is none.
 	Filter string
 	// RuleFilter names the rules the rows are narrowed to, empty when
@@ -64,9 +65,9 @@ type Snapshot struct {
 // SnapshotRow is a pull request as its row shows it.
 type SnapshotRow struct {
 	PR model.PR
-	// Group is you, team, other or bots in a grouped tab, and empty
-	// elsewhere.
-	Group string
+	// Section is the name of the part of the tab the row is in, empty in
+	// a tab not split or a part with no name.
+	Section string
 	// Why the pull request is in the list, as the WHY column says.
 	Why string
 	// Mine is the viewer's own review, empty when there is none.
@@ -98,10 +99,10 @@ func TriageQuestions() []string {
 func TriagePrompt(s Snapshot, request string) string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "<list>\ntab %q", s.Tab)
-	if s.Grouped {
-		b.WriteString(" (grouped")
+	if len(s.Sections) > 0 {
+		b.WriteString(" (sections: " + quotedList(s.Sections))
 		if len(s.Folded) > 0 {
-			b.WriteString("; folded: " + strings.Join(s.Folded, ", "))
+			b.WriteString("; folded: " + quotedList(s.Folded))
 		}
 		b.WriteString(")")
 	}
@@ -133,12 +134,21 @@ func TriagePrompt(s Snapshot, request string) string {
 	return b.String()
 }
 
+// quotedList are names written as the prompt quotes them, a comma apart.
+func quotedList(names []string) string {
+	q := make([]string, len(names))
+	for i, n := range names {
+		q[i] = fmt.Sprintf("%q", n)
+	}
+	return strings.Join(q, ", ")
+}
+
 // triageRow is a row as one line of the prompt.
 func triageRow(r SnapshotRow, now time.Time) string {
 	p := r.PR
 	f := []string{p.Key.String(), "head=" + short(p.HeadOID)}
-	if r.Group != "" {
-		f = append(f, "group="+r.Group)
+	if r.Section != "" {
+		f = append(f, fmt.Sprintf("section=%q", r.Section))
 	}
 	if r.Why != "" {
 		f = append(f, "why="+r.Why)
@@ -233,12 +243,12 @@ const (
 
 // Action is one step of a plan; which fields count depends on Do.
 type Action struct {
-	Do    Do       `json:"do"`
-	Text  string   `json:"text"`
-	Group string   `json:"group"`
-	Keys  []string `json:"keys"`
-	Key   string   `json:"key"`
-	Mode  string   `json:"mode"`
+	Do      Do       `json:"do"`
+	Text    string   `json:"text"`
+	Section string   `json:"section"`
+	Keys    []string `json:"keys"`
+	Key     string   `json:"key"`
+	Mode    string   `json:"mode"`
 }
 
 // ParseTriage reads the answer to a triage.

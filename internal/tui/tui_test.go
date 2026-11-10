@@ -473,7 +473,8 @@ func golden(t *testing.T, name string, m *Model) {
 func TestReviewTab(t *testing.T) {
 	m := start(t, fixture(), keymap.Default())
 	golden(t, "review", m)
-	press(m, "b", "G")
+	unfoldBots(m)
+	press(m, "G")
 	golden(t, "review-bots", m)
 }
 
@@ -581,13 +582,13 @@ func TestGroupedTabWithoutRequests(t *testing.T) {
 		t.Fatalf("groups = %v, want other only\n%s", got, screen(m))
 	}
 	s := screen(m)
-	for _, want := range []string{"▾ other 1", "1 other"} {
-		if !strings.Contains(s, want) {
-			t.Errorf("screen does not show %q:\n%s", want, s)
-		}
+	if !strings.Contains(s, "▾ other 1") {
+		t.Errorf("screen does not show the other head:\n%s", s)
 	}
-	if strings.Contains(s, "to a team") || strings.Contains(s, "to you") {
-		t.Errorf("screen counts groups with no rows:\n%s", s)
+	// None of one's own pull requests is asked of anyone: WHY has nothing
+	// to show, and is left out.
+	if strings.Contains(s, "WHY") {
+		t.Errorf("WHY is shown with nothing in it:\n%s", s)
 	}
 }
 
@@ -1106,7 +1107,8 @@ func TestBulkMerge(t *testing.T) {
 		key("acme", "api", 30): func(mi *model.MergeInfo) { mi.MergeState = model.MergeDirty },
 	}
 	m, r := startWith(t, f, keymap.Default())
-	press(m, "b", "space", "j", "j", "space")
+	unfoldBots(m)
+	press(m, "space", "j", "j", "space")
 	if len(m.selected) != 2 {
 		t.Fatalf("selected = %v", m.selected)
 	}
@@ -1809,7 +1811,7 @@ func TestClaudeWaitingTakesTheKeys(t *testing.T) {
 // drawn: not scrolled out, nor filtered out.
 func TestOnScreen(t *testing.T) {
 	m, _ := startWith(t, fixture(), keymap.Default())
-	press(m, "b")
+	unfoldBots(m)
 	m.pane.on = false
 	// Three lines of rows: the head of the first group, api#12, the head
 	// of the second.
@@ -1997,7 +1999,8 @@ func TestReleaseNotesMarkBotPullRequests(t *testing.T) {
 	m, r := startWith(t, f, keymap.Default())
 	m.set.ReleaseNotes = true
 	fc := fakeClaudeOf(t, m)
-	press(m, "b", "space", "j", "j", "space", "M")
+	unfoldBots(m)
+	press(m, "space", "j", "j", "space", "M")
 	if len(fc.notes) != 1 || !strings.Contains(fc.notes[0], "acme/api#30") || strings.Contains(fc.notes[0], "acme/api#12") {
 		t.Fatalf("asked about %q", fc.notes)
 	}
@@ -2425,7 +2428,8 @@ func TestCloseKeepsBranches(t *testing.T) {
 		key("acme", "api", 30): func(mi *model.MergeInfo) { mi.HeadInFork = true },
 	}
 	m := start(t, f, keymap.Default())
-	press(m, "b", "space", "j", "j", "space")
+	unfoldBots(m)
+	press(m, "space", "j", "j", "space")
 	press(m, "enter")
 	for i, it := range m.menuItems() {
 		if it.action == "close" {
