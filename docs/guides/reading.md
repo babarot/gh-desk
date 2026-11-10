@@ -24,4 +24,4 @@ The CI column sums up the checks. Checks that pass only after an approval, such 
 
 ## Conflicts
 
-The MERGE column marks a pull request that conflicts with its base with ✗, and one behind its base with ↓; · is GitHub still working it out. It is read again with each reading of the list, so a pull request that comes to conflict when its base moves is marked at the next one. The pane's merge line says what a merge would do to the pull request it shows, such as "conflicts" or "wait for checks → merge".
+The MERGE column marks a pull request that conflicts with its base with ✗, and one behind its base with ↓; · is GitHub still working it out. It is read again with each reading of the list, so a pull request that comes to conflict when its base moves is marked at the next one. The pane's merge line says what a merge would do to the pull request it shows, such as "conflicts" or "wait for checks → merge". A rule's `merge` condition reads the same state ([Selecting by rules](selecting.md)).

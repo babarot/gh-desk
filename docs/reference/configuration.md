@@ -100,10 +100,11 @@ title = "(?i)lock file maintenance"
 | `state` | list of `open`, `merged`, `closed` | The states it must be in one of: "open", "merged" or "closed"; S selects open ones only, so [[select]] takes "open" alone. |
 | `checks` | list of `passing`, `failing`, `pending` | The states its checks must be in one of: "passing" (passed, none at all, or only checks.approval pending), "failing" or "pending" (still running). |
 | `decision` | list of `approved`, `changes_requested`, `review_required`, `none` | The review decisions REVIEW shows, one of which it must have; "none" is none, as in a repository that requires no review. |
+| `merge` | list of `ready`, `behind`, `conflict`, `blocked`, `unknown` | Whether GitHub would let it be merged now, one of: "ready" (the merge button can be pressed), "behind" (its branch must be brought up to date), "conflict" (it conflicts with its base), "blocked" (its reviews or required checks hold it, or it is a draft) or "unknown" (GitHub is still working it out). |
 | `labels` | list of strings | Labels one of which it must have. |
 | `approved_by_me` | boolean | true: your latest review must approve it, a person's pull request too, unlike the built-in "approved by me"; false: none of yours does. |
 | `reviewed_by_me` | boolean | true: you must have reviewed it, whatever the review said; false: you have not. |
-| `requested` | list of strings | Whom a review must be asked of, one of them: "me", or a team as "@slug". |
+| `requested` | list of strings | Whom a review must be asked of, one of them: "me", a team as "@slug", or "@*" for any team. |
 | `reasons` | list of `approval_requested`, `assign`, `author`, `ci_activity`, `comment`, `invitation`, `manual`, `member_feature_requested`, `mention`, `review_requested`, `security_advisory_credit`, `security_alert`, `state_change`, `subscribed`, `team_mention` | Reasons of a notification, one of which the row's must have; S and a rule that approves judge a pull request without one, so [[select]] and [[auto_approve]] do not take it. |
 
 ## [[exclude]]
@@ -130,10 +131,11 @@ Rules that leave pull requests out of every tab, until a shows them. A pull requ
 | `state` | list of `open`, `merged`, `closed` | The states it must be in one of: "open", "merged" or "closed"; S selects open ones only, so [[select]] takes "open" alone. |
 | `checks` | list of `passing`, `failing`, `pending` | The states its checks must be in one of: "passing" (passed, none at all, or only checks.approval pending), "failing" or "pending" (still running). |
 | `decision` | list of `approved`, `changes_requested`, `review_required`, `none` | The review decisions REVIEW shows, one of which it must have; "none" is none, as in a repository that requires no review. |
+| `merge` | list of `ready`, `behind`, `conflict`, `blocked`, `unknown` | Whether GitHub would let it be merged now, one of: "ready" (the merge button can be pressed), "behind" (its branch must be brought up to date), "conflict" (it conflicts with its base), "blocked" (its reviews or required checks hold it, or it is a draft) or "unknown" (GitHub is still working it out). |
 | `labels` | list of strings | Labels one of which it must have. |
 | `approved_by_me` | boolean | true: your latest review must approve it, a person's pull request too, unlike the built-in "approved by me"; false: none of yours does. |
 | `reviewed_by_me` | boolean | true: you must have reviewed it, whatever the review said; false: you have not. |
-| `requested` | list of strings | Whom a review must be asked of, one of them: "me", or a team as "@slug". |
+| `requested` | list of strings | Whom a review must be asked of, one of them: "me", a team as "@slug", or "@*" for any team. |
 | `reasons` | list of `approval_requested`, `assign`, `author`, `ci_activity`, `comment`, `invitation`, `manual`, `member_feature_requested`, `mention`, `review_requested`, `security_advisory_credit`, `security_alert`, `state_change`, `subscribed`, `team_mention` | Reasons of a notification, one of which the row's must have; S and a rule that approves judge a pull request without one, so [[select]] and [[auto_approve]] do not take it. |
 
 ## [[auto_approve]]
@@ -163,10 +165,11 @@ Rules that approve, without a confirm, the pull requests they match while gh-des
 | `state` | list of `open`, `merged`, `closed` | The states it must be in one of: "open", "merged" or "closed"; S selects open ones only, so [[select]] takes "open" alone. |
 | `checks` | list of `passing`, `failing`, `pending` | The states its checks must be in one of: "passing" (passed, none at all, or only checks.approval pending), "failing" or "pending" (still running). |
 | `decision` | list of `approved`, `changes_requested`, `review_required`, `none` | The review decisions REVIEW shows, one of which it must have; "none" is none, as in a repository that requires no review. |
+| `merge` | list of `ready`, `behind`, `conflict`, `blocked`, `unknown` | Whether GitHub would let it be merged now, one of: "ready" (the merge button can be pressed), "behind" (its branch must be brought up to date), "conflict" (it conflicts with its base), "blocked" (its reviews or required checks hold it, or it is a draft) or "unknown" (GitHub is still working it out). |
 | `labels` | list of strings | Labels one of which it must have. |
 | `approved_by_me` | boolean | true: your latest review must approve it, a person's pull request too, unlike the built-in "approved by me"; false: none of yours does. |
 | `reviewed_by_me` | boolean | true: you must have reviewed it, whatever the review said; false: you have not. |
-| `requested` | list of strings | Whom a review must be asked of, one of them: "me", or a team as "@slug". |
+| `requested` | list of strings | Whom a review must be asked of, one of them: "me", a team as "@slug", or "@*" for any team. |
 | `reasons` | list of `approval_requested`, `assign`, `author`, `ci_activity`, `comment`, `invitation`, `manual`, `member_feature_requested`, `mention`, `review_requested`, `security_advisory_credit`, `security_alert`, `state_change`, `subscribed`, `team_mention` | Reasons of a notification, one of which the row's must have; S and a rule that approves judge a pull request without one, so [[select]] and [[auto_approve]] do not take it. |
 
 ## [list]

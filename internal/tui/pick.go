@@ -472,6 +472,13 @@ func ruleWords(r plan.Rule) string {
 		}
 		parts = append(parts, "review "+strings.Join(ss, " or "))
 	}
+	if len(r.Merges) > 0 {
+		var ss []string
+		for _, m := range r.Merges {
+			ss = append(ss, string(m))
+		}
+		parts = append(parts, "merge "+strings.Join(ss, " or "))
+	}
 	if len(r.Labels) > 0 {
 		parts = append(parts, "labels "+strings.Join(r.Labels, ", "))
 	}

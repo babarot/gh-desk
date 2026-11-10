@@ -248,3 +248,11 @@ func TestBulkShowsEveryNote(t *testing.T) {
 		t.Errorf("what marking it ready means is said more than once:\n%s", text)
 	}
 }
+
+// S's list says what a rule asks of merging in the words of the file.
+func TestRuleWordsSayMerge(t *testing.T) {
+	r := plan.Rule{Merges: []plan.Merges{plan.MergeReady, plan.MergeBehind}, Requested: []string{plan.AnyTeam}}
+	if got, want := ruleWords(r), "asked of @* · merge ready or behind"; got != want {
+		t.Errorf("ruleWords = %q, want %q", got, want)
+	}
+}

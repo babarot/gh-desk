@@ -600,10 +600,11 @@ var conditionElems = []elem{
 	{Key: "state", Kind: listKind{Values: States, NonEmpty: true}, Doc: `The states it must be in one of: "open", "merged" or "closed"; S selects open ones only, so [[select]] takes "open" alone.`},
 	{Key: "checks", Kind: listKind{Values: CheckStates, NonEmpty: true}, Doc: `The states its checks must be in one of: "passing" (passed, none at all, or only checks.approval pending), "failing" or "pending" (still running).`},
 	{Key: "decision", Kind: listKind{Values: Decisions, NonEmpty: true}, Doc: `The review decisions REVIEW shows, one of which it must have; "none" is none, as in a repository that requires no review.`},
+	{Key: "merge", Kind: listKind{Values: MergeStates, NonEmpty: true}, Doc: `Whether GitHub would let it be merged now, one of: "ready" (the merge button can be pressed), "behind" (its branch must be brought up to date), "conflict" (it conflicts with its base), "blocked" (its reviews or required checks hold it, or it is a draft) or "unknown" (GitHub is still working it out).`},
 	{Key: "labels", Kind: listKind{NonEmpty: true}, Doc: "Labels one of which it must have."},
 	{Key: "approved_by_me", Kind: boolKind{}, Doc: "true: your latest review must approve it, a person's pull request too, unlike the built-in \"approved by me\"; false: none of yours does."},
 	{Key: "reviewed_by_me", Kind: boolKind{}, Doc: "true: you must have reviewed it, whatever the review said; false: you have not."},
-	{Key: "requested", Kind: listKind{NonEmpty: true}, Doc: `Whom a review must be asked of, one of them: "me", or a team as "@slug".`},
+	{Key: "requested", Kind: listKind{NonEmpty: true}, Doc: `Whom a review must be asked of, one of them: "me", a team as "@slug", or "@*" for any team.`},
 	{Key: "reasons", Kind: listKind{Values: Reasons, NonEmpty: true}, Doc: "Reasons of a notification, one of which the row's must have; S and a rule that approves judge a pull request without one, so [[select]] and [[auto_approve]] do not take it."},
 }
 
@@ -667,10 +668,12 @@ const selectWords = `# Rules S offers to select pull requests, besides "approved
 # it too, and the inbox's AGE is its notification's time, not this),
 # updated_before_days and created_before_days (the least days), min_files and
 # min_lines (the least), repos (owner/repo globs), labels (one of them),
-# requested ("me" or a team as "@slug"), state ("open", "merged" or
-# "closed"), checks ("passing": passed, or only checks.approval pending;
-# "failing"; "pending"), and decision ("approved", "changes_requested",
-# "review_required", or "none" in a repository that requires no review).
+# requested ("me", a team as "@slug", or "@*" for any team), state ("open",
+# "merged" or "closed"), checks ("passing": passed, or only checks.approval
+# pending; "failing"; "pending"), decision ("approved", "changes_requested",
+# "review_required", or "none" in a repository that requires no review), and
+# merge ("ready" when the merge button can be pressed, "behind", "conflict",
+# "blocked" or "unknown").
 # The keys that take a list match one of its values, which is how to say
 # "not": the states of checks but "passing" are ["failing", "pending"].
 # The keys bot, mine (your own), draft, approved_by_me (a review of yours
@@ -1191,7 +1194,7 @@ func writeConditions(b *strings.Builder, c Conditions) {
 	for _, l := range []struct {
 		key string
 		v   []string
-	}{{"checks", c.Checks}, {"decision", c.Decision}} {
+	}{{"checks", c.Checks}, {"decision", c.Decision}, {"merge", c.Merge}} {
 		if len(l.v) > 0 {
 			b.WriteString(l.key + " = " + tomlList(l.v) + "\n")
 		}

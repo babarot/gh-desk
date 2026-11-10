@@ -83,6 +83,10 @@ func TestRuleJudge(t *testing.T) {
 	mine.Author = "me"
 	passing := read
 	passing.Checks, passing.Decision = model.CheckSuccess, ""
+	behind := read
+	behind.Merge = model.MergeBehind
+	onlyMe := read
+	onlyMe.Requested = []model.Reviewer{{Login: "me"}}
 	now := Facts{Now: day0, ApprovalKnown: true}
 	tests := []struct {
 		name string
@@ -111,6 +115,8 @@ func TestRuleJudge(t *testing.T) {
 		{"requested from me", Rule{Requested: []string{"me"}}, read, now, Yes},
 		{"requested from the team", Rule{Requested: []string{"@Platform"}}, read, now, Yes},
 		{"requested from another team", Rule{Requested: []string{"@core"}}, read, now, No},
+		{"requested from any team", Rule{Requested: []string{AnyTeam}}, read, now, Yes},
+		{"requested from no team", Rule{Requested: []string{AnyTeam}}, onlyMe, now, No},
 		{"reason", Rule{Reasons: []string{"mention", "subscribed"}}, read, Facts{Now: day0, Reason: "subscribed"}, Yes},
 		{"no notification", Rule{Reasons: []string{"subscribed"}}, read, now, No},
 		{"labels", Rule{Labels: []string{"do-not-merge", "wip"}}, read, now, Yes},
@@ -142,6 +148,10 @@ func TestRuleJudge(t *testing.T) {
 		{"not approved", Rule{Decisions: []model.ReviewDecision{model.DecisionChangesRequested, model.DecisionReviewRequired, NoDecision}}, read, now, Yes},
 		{"no review decision", Rule{Decisions: []model.ReviewDecision{NoDecision}}, passing, now, Yes},
 		{"no review decision, but one", Rule{Decisions: []model.ReviewDecision{NoDecision}}, read, now, No},
+		{"behind", Rule{Merges: []Merges{MergeBehind}}, behind, now, Yes},
+		{"not ready", Rule{Merges: []Merges{MergeReady}}, behind, now, No},
+		{"merging not said", Rule{Merges: []Merges{MergeUnknown}}, read, now, Yes},
+		{"merging not read", Rule{Merges: []Merges{MergeReady}}, unread, now, Pending},
 	}
 	for _, tt := range tests {
 		if got := tt.rule.Judge(tt.pr, "me", tt.f); got != tt.want {
@@ -154,5 +164,20 @@ func TestRuleJudge(t *testing.T) {
 	}
 	if got := (Rule{Mine: new(false)}).Judge(read, "", now); got != No {
 		t.Errorf("someone else's, viewer unknown: Judge = %v, want No", got)
+	}
+}
+
+// A state of merging is what a person sees on the merge button: the three
+// GitHub lets merge are ready, and a draft is held as a blocked one is.
+func TestMergesOf(t *testing.T) {
+	for s, want := range map[model.MergeState]Merges{
+		model.MergeClean: MergeReady, model.MergeUnstable: MergeReady, model.MergeHasHooks: MergeReady,
+		model.MergeBehind: MergeBehind, model.MergeDirty: MergeConflict,
+		model.MergeBlocked: MergeBlocked, model.MergeDraft: MergeBlocked,
+		model.MergeUnknown: MergeUnknown, "": MergeUnknown,
+	} {
+		if got := MergesOf(s); got != want {
+			t.Errorf("MergesOf(%q) = %q, want %q", s, got, want)
+		}
 	}
 }

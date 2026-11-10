@@ -34,6 +34,7 @@ const (
 	CondMinFiles          Cond = "min_files"
 	CondMinLines          Cond = "min_lines"
 	CondDecisions         Cond = "decisions"
+	CondMerges            Cond = "merge"
 	CondLabels            Cond = "labels"
 	CondChecks            Cond = "checks"
 	CondPackages          Cond = "packages"
@@ -179,6 +180,14 @@ func (r Rule) Explain(pr model.PR, viewer string, f Facts) []Explained {
 		func() []string {
 			if r.decisionHolds(pr) {
 				return []string{string(decisionOf(pr))}
+			}
+			return nil
+		})
+	heavy(CondMerges, len(r.Merges) > 0, func() bool { return r.mergeHolds(pr) },
+		func() []string { return []string{string(MergesOf(pr.Merge))} },
+		func() []string {
+			if r.mergeHolds(pr) {
+				return []string{string(MergesOf(pr.Merge))}
 			}
 			return nil
 		})

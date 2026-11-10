@@ -56,6 +56,9 @@ type Rule struct {
 	// Decisions are the review decisions it must have one of; NoDecision
 	// for none.
 	Decisions []model.ReviewDecision
+	// Merges are the states of merging it must be in one of, as GitHub's
+	// mergeStateStatus says them (MergesOf).
+	Merges []Merges
 	// Labels are labels one of which it must have.
 	Labels []string
 	// ApprovedByMe asks for the viewer's latest review to approve it, or
@@ -65,7 +68,7 @@ type Rule struct {
 	// or with false for none.
 	ReviewedByMe *bool
 	// Requested are whom a review must be asked of, one of them: "me" for
-	// the viewer, or a team as "@slug".
+	// the viewer, a team as "@slug", or "@*" for any team.
 	Requested []string
 	// Reasons are the reasons of the row's notification, one of which it
 	// must have (Facts.Reason); a row with no notification has none.
@@ -89,6 +92,43 @@ const (
 	// approval.
 	ChecksPending Checks = "pending"
 )
+
+// Merges is a state of merging a rule asks for: whether GitHub would let
+// the pull request be merged now, and if not, why. Several of GitHub's
+// mergeStateStatus values fall in one, so that a rule can say what a person
+// sees on the merge button.
+type Merges string
+
+const (
+	// MergeReady: the merge button can be pressed, as for CLEAN, UNSTABLE
+	// (checks that are not required failed) and HAS_HOOKS.
+	MergeReady Merges = "ready"
+	// MergeBehind: the base moved on, and the base branch's rules ask for
+	// the branch to be brought up to date first.
+	MergeBehind Merges = "behind"
+	// MergeConflict: it conflicts with its base (DIRTY).
+	MergeConflict Merges = "conflict"
+	// MergeBlocked: something else holds it, such as its reviews or its
+	// required checks (BLOCKED), or being a draft (DRAFT).
+	MergeBlocked Merges = "blocked"
+	// MergeUnknown: GitHub is still working it out, or did not say.
+	MergeUnknown Merges = "unknown"
+)
+
+// MergesOf is the state of merging GitHub's mergeStateStatus s falls in.
+func MergesOf(s model.MergeState) Merges {
+	switch s {
+	case model.MergeClean, model.MergeUnstable, model.MergeHasHooks:
+		return MergeReady
+	case model.MergeBehind:
+		return MergeBehind
+	case model.MergeDirty:
+		return MergeConflict
+	case model.MergeBlocked, model.MergeDraft:
+		return MergeBlocked
+	}
+	return MergeUnknown
+}
 
 // ApprovedByMe is the rule S always offers first: bot pull requests the
 // viewer has approved and that are still open. A person's pull request is
@@ -131,12 +171,13 @@ const (
 func (r Rule) NeedsBody() bool { return len(r.Packages) > 0 }
 
 // NeedsHeavy reports whether matching the rule reads the heavy fields (the
-// size, the checks, the review decision and the labels). Unread, they look
-// like an empty pull request with no checks and no labels, which would
-// pass, so a pull request whose heavy fields are not read for its head is
-// never judged on them.
+// size, the checks, the review decision, the state of merging and the
+// labels). Unread, they look like an empty pull request with no checks and
+// no labels, which would pass, so a pull request whose heavy fields are not
+// read for its head is never judged on them.
 func (r Rule) NeedsHeavy() bool {
-	return r.MaxFiles > 0 || r.MaxLines > 0 || r.MinFiles > 0 || r.MinLines > 0 || len(r.Checks) > 0 || len(r.Decisions) > 0 || len(r.Labels) > 0
+	return r.MaxFiles > 0 || r.MaxLines > 0 || r.MinFiles > 0 || r.MinLines > 0 || len(r.Checks) > 0 || len(r.Decisions) > 0 ||
+		len(r.Merges) > 0 || len(r.Labels) > 0
 }
 
 // Match reports whether S selects pr by the rule for viewer: an open pull
@@ -237,6 +278,8 @@ func (r Rule) heavy(pr model.PR, f Facts) bool {
 		return false
 	case len(r.Decisions) > 0 && !r.decisionHolds(pr):
 		return false
+	case len(r.Merges) > 0 && !r.mergeHolds(pr):
+		return false
 	case len(r.Labels) > 0 && !slices.ContainsFunc(r.Labels, func(l string) bool { return hasLabel(l, pr) }):
 		return false
 	}
@@ -252,6 +295,9 @@ func linesOf(pr model.PR) int { return pr.Additions + pr.Deletions }
 
 // decisionHolds reports whether pr's review decision is one the rule asks.
 func (r Rule) decisionHolds(pr model.PR) bool { return slices.Contains(r.Decisions, decisionOf(pr)) }
+
+// mergeHolds reports whether pr's state of merging is one the rule asks.
+func (r Rule) mergeHolds(pr model.PR) bool { return slices.Contains(r.Merges, MergesOf(pr.Merge)) }
 
 // checksAre reports whether pr's checks are in the state c.
 func checksAre(c Checks, pr model.PR, f Facts) bool {
@@ -321,9 +367,15 @@ func stateOf(pr model.PR) model.PRState {
 	return pr.State
 }
 
+// AnyTeam is who a rule asks a review of to mean any team.
+const AnyTeam = "@*"
+
 // requested reports whether a review of pr is asked of who: "me" for the
-// viewer, or "@slug" for a team.
+// viewer, "@slug" for a team, or "@*" for any team.
 func requested(pr model.PR, viewer, who string) bool {
+	if who == AnyTeam {
+		return pr.RequestedFromTeam()
+	}
 	if team, ok := strings.CutPrefix(who, "@"); ok {
 		return slices.ContainsFunc(pr.Requested, func(rv model.Reviewer) bool { return rv.Team && strings.EqualFold(rv.Login, team) })
 	}

@@ -719,7 +719,7 @@ func rule(name string, c config.Conditions) plan.Rule {
 		UpdatedWithinDays: c.UpdatedWithinDays, CreatedWithinDays: c.CreatedWithinDays,
 		UpdatedBeforeDays: c.UpdatedBeforeDays, CreatedBeforeDays: c.CreatedBeforeDays,
 		Bot: c.Bot, Mine: c.Mine, Draft: c.Draft, Checks: checks(c.Checks), Decisions: decisions(c.Decision),
-		Labels: c.Labels, States: states(c.States), ApprovedByMe: c.ApprovedByMe, ReviewedByMe: c.ReviewedByMe, Requested: c.Requested, Reasons: c.Reasons}
+		Merges: merges(c.Merge), Labels: c.Labels, States: states(c.States), ApprovedByMe: c.ApprovedByMe, ReviewedByMe: c.ReviewedByMe, Requested: c.Requested, Reasons: c.Reasons}
 }
 
 // states are the states the config file names, as the model has them.
@@ -736,6 +736,15 @@ func checks(ss []string) []plan.Checks {
 	var out []plan.Checks
 	for _, s := range ss {
 		out = append(out, plan.Checks(s))
+	}
+	return out
+}
+
+// merges are the states of merging the config file names.
+func merges(ss []string) []plan.Merges {
+	var out []plan.Merges
+	for _, s := range ss {
+		out = append(out, plan.Merges(s))
 	}
 	return out
 }

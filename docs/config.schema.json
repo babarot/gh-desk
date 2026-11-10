@@ -87,6 +87,21 @@
             "minimum": 1,
             "type": "integer"
           },
+          "merge": {
+            "description": "Whether GitHub would let it be merged now, one of: \"ready\" (the merge button can be pressed), \"behind\" (its branch must be brought up to date), \"conflict\" (it conflicts with its base), \"blocked\" (its reviews or required checks hold it, or it is a draft) or \"unknown\" (GitHub is still working it out).",
+            "items": {
+              "enum": [
+                "ready",
+                "behind",
+                "conflict",
+                "blocked",
+                "unknown"
+              ],
+              "type": "string"
+            },
+            "minItems": 1,
+            "type": "array"
+          },
           "min_files": {
             "description": "The least files it may change.",
             "minimum": 1,
@@ -151,7 +166,7 @@
             "type": "array"
           },
           "requested": {
-            "description": "Whom a review must be asked of, one of them: \"me\", or a team as \"@slug\".",
+            "description": "Whom a review must be asked of, one of them: \"me\", a team as \"@slug\", or \"@*\" for any team.",
             "items": {
               "type": "string"
             },
@@ -430,6 +445,21 @@
             "minimum": 1,
             "type": "integer"
           },
+          "merge": {
+            "description": "Whether GitHub would let it be merged now, one of: \"ready\" (the merge button can be pressed), \"behind\" (its branch must be brought up to date), \"conflict\" (it conflicts with its base), \"blocked\" (its reviews or required checks hold it, or it is a draft) or \"unknown\" (GitHub is still working it out).",
+            "items": {
+              "enum": [
+                "ready",
+                "behind",
+                "conflict",
+                "blocked",
+                "unknown"
+              ],
+              "type": "string"
+            },
+            "minItems": 1,
+            "type": "array"
+          },
           "min_files": {
             "description": "The least files it may change.",
             "minimum": 1,
@@ -482,7 +512,7 @@
             "type": "array"
           },
           "requested": {
-            "description": "Whom a review must be asked of, one of them: \"me\", or a team as \"@slug\".",
+            "description": "Whom a review must be asked of, one of them: \"me\", a team as \"@slug\", or \"@*\" for any team.",
             "items": {
               "type": "string"
             },
@@ -800,6 +830,21 @@
             "minimum": 1,
             "type": "integer"
           },
+          "merge": {
+            "description": "Whether GitHub would let it be merged now, one of: \"ready\" (the merge button can be pressed), \"behind\" (its branch must be brought up to date), \"conflict\" (it conflicts with its base), \"blocked\" (its reviews or required checks hold it, or it is a draft) or \"unknown\" (GitHub is still working it out).",
+            "items": {
+              "enum": [
+                "ready",
+                "behind",
+                "conflict",
+                "blocked",
+                "unknown"
+              ],
+              "type": "string"
+            },
+            "minItems": 1,
+            "type": "array"
+          },
           "min_files": {
             "description": "The least files it may change.",
             "minimum": 1,
@@ -860,7 +905,7 @@
             "type": "array"
           },
           "requested": {
-            "description": "Whom a review must be asked of, one of them: \"me\", or a team as \"@slug\".",
+            "description": "Whom a review must be asked of, one of them: \"me\", a team as \"@slug\", or \"@*\" for any team.",
             "items": {
               "type": "string"
             },
