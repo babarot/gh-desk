@@ -208,7 +208,7 @@ func TestExcludeByReason(t *testing.T) {
 // would exclude is not counted.
 func TestExcludedOfAGroupNotShownAreNotCounted(t *testing.T) {
 	set := excluding(plan.Rule{Name: "bots", Bot: new(true)})
-	set.Tabs[0].Groups = []plan.Group{plan.GroupYou, plan.GroupTeam}
+	set.Tabs[0].Sections = plan.GroupSections([]plan.Group{plan.GroupYou, plan.GroupTeam}, []plan.Group{plan.GroupTeam, plan.GroupBots})
 	m := startSource(t, fixture(), set)
 	if strings.Contains(screen(m), "excluded") {
 		t.Errorf("the tab counts a pull request of a group it does not show:\n%s", screen(m))
@@ -300,7 +300,7 @@ func TestInboxReadAgainKeepsTheCursor(t *testing.T) {
 // the list, and the rows scroll above it.
 func TestExcludedLineStaysUnderAFullList(t *testing.T) {
 	set := excluding(plan.Rule{Name: "carol's", Authors: []string{"carol"}})
-	set.Tabs[0].Folded = nil
+	set.Tabs[0].Sections = plan.GroupSections(plan.Groups, nil)
 	m := startSource(t, withCarol(), set)
 	m.Update(tea.WindowSizeMsg{Width: 130, Height: 18})
 	if got := len(m.rows(m.tab())); got <= m.layout().list-1 {

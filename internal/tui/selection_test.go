@@ -215,11 +215,11 @@ func TestHideFoldedGroup(t *testing.T) {
 	rs := m.rows(m.tab())
 	at := -1
 	for i, r := range rs {
-		if r.kind == rowGroup && r.group == plan.GroupBots {
+		if r.kind == rowGroup && m.tab().sections[r.section].Group == plan.GroupBots {
 			at = i
 		}
 	}
-	if at < 0 || !m.tab().folded[plan.GroupBots] {
+	if at < 0 || !m.tab().folded[string(plan.GroupBots)] {
 		t.Fatalf("no folded bots group in %+v", rs)
 	}
 	m.tab().sel = at

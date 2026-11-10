@@ -15,7 +15,6 @@ import (
 	"github.com/babarot/gh-desk/internal/claude"
 	"github.com/babarot/gh-desk/internal/logging"
 	"github.com/babarot/gh-desk/internal/model"
-	"github.com/babarot/gh-desk/internal/plan"
 	"github.com/babarot/gh-desk/internal/runner"
 	"github.com/babarot/gh-desk/internal/tui/askbox"
 	"github.com/babarot/gh-desk/internal/tui/chat"
@@ -314,9 +313,9 @@ func (m *Model) snapshot() (claude.Snapshot, map[model.PRKey]model.PR) {
 	if p, _, ok := m.currentPR(); ok {
 		s.Cursor = p.Key
 	}
-	for _, g := range t.groups {
-		if t.folded[g] {
-			s.Folded = append(s.Folded, string(g))
+	for i, sc := range t.sections {
+		if t.foldedAt(i) {
+			s.Folded = append(s.Folded, sc.Name)
 		}
 	}
 	seen := map[model.PRKey]model.PR{}
@@ -330,8 +329,8 @@ func (m *Model) snapshot() (claude.Snapshot, map[model.PRKey]model.PR) {
 		}
 		row := claude.SnapshotRow{PR: p, Why: m.why(r), Selected: m.isSelected(p.Key),
 			Narrowed: t.ruleFilter != nil && !m.passes(own, "", t.ruleFilter, s.Now), Excluded: r.ex.excluded()}
-		if t.grouped {
-			row.Group = string(plan.GroupOf(p, m.viewer))
+		if r.ex.at >= 0 {
+			row.Group = t.sections[r.ex.at].Name
 		}
 		if rv, ok := p.ReviewBy(m.viewer); ok && m.viewer != "" {
 			row.Mine = rv.State
@@ -359,8 +358,9 @@ var paneWords = map[paneMode]string{paneOverview: "overview", paneDiff: "diff"}
 // on, or why it is left out.
 type step struct {
 	claude.Action
-	group plan.Group
-	prs   []model.PR
+	// section is the tab's section a fold or an unfold is of.
+	section int
+	prs     []model.PR
 	// gone are the keys of the action left out, and why.
 	gone []gone
 	// skip is why the whole action is left out; empty when it applies.
@@ -391,11 +391,11 @@ func (m *Model) checkPlan() []step {
 		case claude.DoFilter:
 			filter = a.Text
 		case claude.DoFold, claude.DoUnfold:
-			s.group = plan.Group(a.Group)
+			s.section = t.sectionNamed(a.Group)
 			switch {
 			case !t.grouped:
 				s.skip = "the tab has no groups"
-			case !slices.Contains(t.groups, s.group):
+			case s.section < 0:
 				s.skip = "no such group"
 			}
 		case claude.DoSelect, claude.DoApprove, claude.DoMerge:
@@ -495,7 +495,7 @@ func (m *Model) applyTriage() tea.Cmd {
 			m.filter = s.Text
 			m.tab().sel, m.tab().offset = 0, 0
 		case claude.DoFold, claude.DoUnfold:
-			m.tab().folded[s.group] = s.Do == claude.DoFold
+			m.tab().setFolded(s.section, s.Do == claude.DoFold)
 		case claude.DoSelect:
 			for _, p := range s.prs {
 				if !m.isSelected(p.Key) {
@@ -532,9 +532,7 @@ func (m *Model) applyTriage() tea.Cmd {
 // cursorTo puts the cursor on p in the tab shown, unfolding its group.
 func (m *Model) cursorTo(p model.PR) tea.Cmd {
 	t := m.tab()
-	if t.grouped {
-		t.folded[plan.GroupOf(p, m.viewer)] = false
-	}
+	m.unfoldFor(t, p)
 	for i, r := range m.rows(t) {
 		if r.kind == rowPR && r.pr.Key == p.Key {
 			return m.moveTo(i)

@@ -557,12 +557,14 @@ func Settings(cfg config.File) tui.Settings {
 	}
 	for _, t := range cfg.Tabs {
 		tt := tui.Tab{Name: t.Name, Inbox: t.Inbox(), Query: t.Query, DraftsLast: t.Sort == "drafts_last", Limit: t.Limit, ShowSettled: t.ShowSettled}
+		var groups, folded []plan.Group
 		for _, g := range t.Groups {
-			tt.Groups = append(tt.Groups, plan.Group(g))
+			groups = append(groups, plan.Group(g))
 		}
 		for _, g := range t.Folded {
-			tt.Folded = append(tt.Folded, plan.Group(g))
+			folded = append(folded, plan.Group(g))
 		}
+		tt.Sections = plan.GroupSections(groups, folded)
 		set.Tabs = append(set.Tabs, tt)
 	}
 	return set

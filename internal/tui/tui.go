@@ -72,10 +72,9 @@ type Tab struct {
 	Name  string
 	Inbox bool
 	Query string
-	// Groups are the groups a search's rows are split into, in the order
-	// shown; none leaves them unsplit.
-	Groups []plan.Group
-	Folded []plan.Group
+	// Sections are the parts a search's rows are split into, in the order
+	// shown, each with a head; none leaves them unsplit.
+	Sections []plan.Section
 	// DraftsLast sorts drafts after the rest.
 	DraftsLast bool
 	// Limit is how many pull requests, or notifications, to read.

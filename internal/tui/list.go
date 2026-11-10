@@ -120,8 +120,8 @@ func (m *Model) listKey(k string) tea.Cmd {
 	case is("copy_url"):
 		return m.copyURLs(m.menuTargets())
 	case is("fold_bots"):
-		if t.grouped {
-			t.folded[plan.GroupBots] = !t.folded[plan.GroupBots]
+		if i := t.sectionOfGroup(plan.GroupBots); i >= 0 {
+			t.setFolded(i, !t.foldedAt(i))
 		}
 	case is("show_excluded"):
 		t.showExcluded = !t.showExcluded
@@ -158,16 +158,16 @@ func (m *Model) listKey(k string) tea.Cmd {
 	if r.kind == rowGroup {
 		switch {
 		case is("expand"):
-			t.folded[r.group] = false
+			t.setFolded(r.section, false)
 		case is("collapse"):
-			t.folded[r.group] = true
+			t.setFolded(r.section, true)
 		case is("select"):
-			// A group's header selects every pull request in it, or clears
+			// A section's head selects every pull request in it, or clears
 			// them when all are selected.
 			var in []model.PRKey
 			now := m.set.Now()
 			for _, p := range t.prs {
-				if _, ok := m.shows(t, p, nil, m.filter, t.ruleFilter, now); ok && plan.GroupOf(p, m.viewer) == r.group {
+				if x, ok := m.shows(t, p, nil, m.filter, t.ruleFilter, now); ok && x.at == r.section {
 					in = append(in, p.Key)
 				}
 			}
@@ -229,10 +229,11 @@ func (m *Model) moveTo(to int) tea.Cmd {
 }
 
 // openRow opens the action menu of a pull request, or folds or unfolds a
-// group.
+// section.
 func (m *Model) openRow(r row) tea.Cmd {
 	if r.kind == rowGroup {
-		m.tab().folded[r.group] = !m.tab().folded[r.group]
+		t := m.tab()
+		t.setFolded(r.section, !t.foldedAt(r.section))
 		return nil
 	}
 	return m.openMenu()
@@ -641,14 +642,14 @@ func excludedLine(c excludedCount) string {
 }
 
 // claudeIn reports whether Claude is answering about a pull request in
-// group g of the tab shown, and whether an answer came in it unseen.
-func (m *Model) claudeIn(g plan.Group) (answering, unseen bool) {
+// the section i of the tab shown, and whether an answer came in it unseen.
+func (m *Model) claudeIn(i int) (answering, unseen bool) {
 	t := m.tab()
 	for k, c := range m.chats {
 		if !c.Running() && !c.unseen {
 			continue
 		}
-		if p, ok := m.shownPR(t, k); ok && plan.GroupOf(p, m.viewer) == g {
+		if p, ok := m.shownPR(t, k); ok && m.sectionOf(t, p) == i {
 			answering = answering || c.Running()
 			unseen = unseen || !c.Running() && c.unseen
 		}
@@ -658,7 +659,7 @@ func (m *Model) claudeIn(g plan.Group) (answering, unseen bool) {
 
 // onScreen reports whether the pull request k is on the screen: its row
 // in the part of the list renderList draws, or the head of its folded
-// group there.
+// section there.
 func (m *Model) onScreen(k model.PRKey) bool {
 	t := m.tab()
 	if !t.loaded && t.loading {
@@ -674,8 +675,8 @@ func (m *Model) onScreen(k model.PRKey) bool {
 		switch r := rs[i]; {
 		case r.kind == rowPR && r.pr.Key == k:
 			return true
-		case r.kind == rowGroup && t.folded[r.group]:
-			if p, ok := m.shownPR(t, k); ok && plan.GroupOf(p, m.viewer) == r.group {
+		case r.kind == rowGroup && t.foldedAt(r.section):
+			if p, ok := m.shownPR(t, k); ok && m.sectionOf(t, p) == r.section {
 				return true
 			}
 		}
@@ -690,18 +691,20 @@ func (m *Model) renderRow(r row, cols []column, sel bool, n int) string {
 		if sel {
 			cursor = m.st.blue.Render("▎")
 		}
+		t := m.tab()
 		arrow := "▾"
-		if m.tab().folded[r.group] {
+		if t.foldedAt(r.section) {
 			arrow = "▸"
 		}
-		label := m.st.group.Render(groupLabel[r.group])
+		name := sectionLabel(t.sections[r.section])
+		label := m.st.group.Render(name)
 		var tail string
-		if m.tab().folded[r.group] {
-			// A folded group tells what its rows would.
-			switch answering, unseen := m.claudeIn(r.group); {
+		if t.foldedAt(r.section) {
+			// A folded section tells what its rows would.
+			switch answering, unseen := m.claudeIn(r.section); {
 			case answering:
 				if m.set.Shimmer {
-					label = m.shimmer(m.st.group, groupLabel[r.group])
+					label = m.shimmer(m.st.group, name)
 				}
 				tail = " " + m.st.mauve.Render(m.claudeFrame())
 			case unseen:
@@ -819,6 +822,15 @@ func progressOver(cols []column) (from, to, steal int) {
 		steal = min(progressWidth-room, cols[from-1].width-1)
 	}
 	return from, to, steal
+}
+
+// sectionLabel is the head of the section s: what its group was called,
+// for a tab split into groups, or its name.
+func sectionLabel(s plan.Section) string {
+	if l, ok := groupLabel[s.Group]; ok {
+		return l
+	}
+	return sectionName(s)
 }
 
 var groupLabel = map[plan.Group]string{

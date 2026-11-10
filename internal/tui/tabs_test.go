@@ -55,8 +55,7 @@ func TestInboxAnywhere(t *testing.T) {
 
 func TestGroupsInTheOrderGiven(t *testing.T) {
 	set := testSettings()
-	set.Tabs[0].Groups = []plan.Group{plan.GroupBots, plan.GroupYou}
-	set.Tabs[0].Folded = nil
+	set.Tabs[0].Sections = plan.GroupSections([]plan.Group{plan.GroupBots, plan.GroupYou}, nil)
 	m := startSet(t, set, 130)
 	s := screen(m)
 	bots, you := strings.Index(s, "▾ bots"), strings.Index(s, "▾ requested from you")
@@ -120,14 +119,14 @@ func TestGroupLeftOutIsNotSelected(t *testing.T) {
 	// tab's groups, renovate's is neither shown nor picked.
 	set := testSettings()
 	set.Rules = []plan.Rule{{Name: "bots", Bot: new(true)}}
-	set.Tabs[0].Groups = []plan.Group{plan.GroupYou, plan.GroupTeam}
+	set.Tabs[0].Sections = plan.GroupSections([]plan.Group{plan.GroupYou, plan.GroupTeam}, []plan.Group{plan.GroupTeam, plan.GroupBots})
 	m := startSet(t, set, 130)
 	for _, r := range m.rules() {
 		if hits := m.ruleMatches(r); len(hits) > 0 {
 			t.Errorf("rule %q picked %v from groups not shown", r.Name, hits[0].Key)
 		}
 	}
-	set.Tabs[0].Groups = plan.Groups
+	set.Tabs[0].Sections = plan.GroupSections(plan.Groups, []plan.Group{plan.GroupTeam, plan.GroupBots})
 	m = startSet(t, set, 130)
 	picked := false
 	for _, r := range m.rules() {
