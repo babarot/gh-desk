@@ -253,3 +253,25 @@ func TestScopeChooserFitsANarrowTerminal(t *testing.T) {
 		}
 	}
 }
+
+// When the tabs' names do not fit, the counts are headed by the keys that
+// go to the tabs, which a cut name would not tell apart.
+func TestScopeChooserHeadsByKeyWhenNamesDoNotFit(t *testing.T) {
+	set, _ := scopedBy(ScopeOwner, "")
+	inbox := set.Tabs[3]
+	set.Tabs = set.Tabs[:3]
+	for _, name := range []string{"team-4", "team-5", "team-6", "team-7", "team-8"} {
+		set.Tabs = append(set.Tabs, Tab{Name: name, Query: "involved", Limit: 100})
+	}
+	set.Tabs = append(set.Tabs, inbox)
+	m := startSet(t, set, 80)
+	press(m, "O")
+	if s := screen(m); !strings.Contains(s, " 1    2    3    4    5    6    7    8    9 │") || strings.Contains(s, "team…") {
+		t.Errorf("heads:\n%s", s)
+	}
+	m = startSet(t, set, 130)
+	press(m, "O")
+	if s := screen(m); !strings.Contains(s, "involved  team-4  team-5") {
+		t.Errorf("heads with room:\n%s", s)
+	}
+}

@@ -151,8 +151,8 @@ func (m *Model) renderChooser() ([]string, int) {
 	// The tabs' names head the columns of their counts, once.
 	var head strings.Builder
 	head.WriteString(spaces(scopeLead + cols.name))
-	for j, t := range m.tabs {
-		head.WriteString("  " + st.dim.Render(fitLeft(safeLine(t.name), cols.tabs[j])))
+	for j := range m.tabs {
+		head.WriteString("  " + st.dim.Render(fitLeft(m.tabHead(j, cols.byKey), cols.tabs[j])))
 	}
 	lines := []string{c.input.View(), "", head.String()}
 	items := noItems(len(lines) + 1)
@@ -240,22 +240,25 @@ func scopeName(v string) string {
 const scopeLead = 4
 
 // scopeWidths are the cells the chooser gives a value's name and each tab's
-// count, the tab's name heading it; sum is those of the counts with the
-// gaps before them.
+// count, the tab's head heading it; sum is those of the counts with the
+// gaps before them. byKey is set when the tabs are headed by their keys,
+// as their names do not fit.
 type scopeWidths struct {
-	name int
-	tabs []int
-	sum  int
+	name  int
+	tabs  []int
+	sum   int
+	byKey bool
 }
 
 // minScopeName is the fewest cells a value's name is cut to before the
-// tabs' names are.
+// tabs are headed by their keys.
 const minScopeName = 12
 
 // scopeColumns fit the chooser's columns in inner cells: a name as wide as
 // the longest, at most 34, and each count as wide as its tab's name. When
-// they do not fit, the names are cut, then the tabs' names, down to the
-// counts.
+// they do not fit, the names are cut, then the tabs are headed by their
+// keys, which tell them apart where cut names would not; what does not fit
+// even then is cut at the frame.
 func (m *Model) scopeColumns(vs []string, inner int) scopeWidths {
 	var c scopeWidths
 	for _, v := range vs {
@@ -276,20 +279,26 @@ func (m *Model) scopeColumns(vs []string, inner int) scopeWidths {
 	if over := scopeLead + c.name + sum() - inner; over > 0 {
 		c.name = max(c.name-over, min(c.name, minScopeName))
 	}
-	for over := scopeLead + c.name + sum() - inner; over > 0; over = scopeLead + c.name + sum() - inner {
-		j := 0
-		for k, w := range c.tabs {
-			if w > c.tabs[j] {
-				j = k
-			}
+	if scopeLead+c.name+sum() > inner {
+		c.byKey = true
+		for j := range c.tabs {
+			c.tabs[j] = max(ansi.StringWidth(m.tabHead(j, true)), 3)
 		}
-		if c.tabs[j] <= 3 {
-			break
-		}
-		c.tabs[j]--
 	}
 	c.sum = sum()
 	return c
+}
+
+// tabHead is what heads the counts of tab i in the chooser: its name, or
+// byKey the key that goes to it.
+func (m *Model) tabHead(i int, byKey bool) string {
+	if !byKey {
+		return safeLine(m.tabs[i].name)
+	}
+	if ks := m.keys.Keys(keymap.Action(fmt.Sprintf("tab_%d", i+1))); len(ks) > 0 {
+		return ks[0]
+	}
+	return fmt.Sprint(i + 1)
 }
 
 // fitLeft is s cut to w cells and padded on the left, as a count's head is
