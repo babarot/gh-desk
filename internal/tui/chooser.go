@@ -139,6 +139,8 @@ func (m *Model) renderChooser() ([]string, int) {
 	cols := m.scopeColumns(vs, min(max(m.width-8, 40), 110, m.width)-4)
 	w := min(max(scopeLead+cols.name+cols.sum+4, 60), max(m.width-8, 40), 110, m.width)
 	inner := w - 4
+	// The counts go to the right edge: the names take what is left.
+	cols.name = max(cols.name, inner-scopeLead-cols.sum)
 	c.input.SetWidth(inner)
 	c.sel = min(c.sel, max(len(vs)-1, 0))
 	counts := m.scopeCounts()
