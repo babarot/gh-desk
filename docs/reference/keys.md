@@ -66,6 +66,7 @@ browse = []
 | `C` | `triage` | triage with claude |
 | `i` | `ask_claude` | ask claude about it |
 | `o` | `browse` | browser |
+| `y` | `copy_url` | copy url |
 | `d` | `hide` | hide / done |
 | `b` | `fold_bots` | fold bots |
 | `a` | `show_excluded` | excluded |

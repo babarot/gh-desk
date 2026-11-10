@@ -60,7 +60,7 @@ func (m *Model) helpRows(s keymap.Scope) [][2]string {
 	tabsAt := -1
 	for _, a := range m.keys.Actions(s) {
 		ks := m.keys.Keys(a)
-		if !ready[a] || len(ks) == 0 || !m.hasTabFor(a) {
+		if toldInPlace[a] || len(ks) == 0 || !m.hasTabFor(a) {
 			continue
 		}
 		if strings.HasPrefix(string(a), "tab_") && len(ks) == 1 {
