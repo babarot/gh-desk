@@ -1812,6 +1812,14 @@
    "scopeWords": "The list and its preview pane"
   },
   {
+   "action": "copy_url",
+   "keys": [
+    "y"
+   ],
+   "scope": "list",
+   "scopeWords": "The list and its preview pane"
+  },
+  {
    "action": "hide",
    "keys": [
     "d"

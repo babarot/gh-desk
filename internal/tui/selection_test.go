@@ -1,10 +1,13 @@
 package tui
 
 import (
+	"fmt"
 	"slices"
 	"strconv"
 	"strings"
 	"testing"
+
+	tea "charm.land/bubbletea/v2"
 
 	"github.com/babarot/gh-desk/internal/model"
 	"github.com/babarot/gh-desk/internal/plan"
@@ -94,6 +97,73 @@ func TestBrowseSelection(t *testing.T) {
 	if !slices.Equal(f.browsed, want) {
 		t.Errorf("browsed %v, want %v", f.browsed, want)
 	}
+}
+
+// y copies the URL of the pull request under the cursor or, with a
+// selection, of each selected one, a line each; the selection stays.
+func TestCopyURL(t *testing.T) {
+	f := fixture()
+	for _, prs := range f.searches {
+		for i := range prs {
+			prs[i].URL = "https://github.com/" + prs[i].Key.Owner + "/" + prs[i].Key.Repo + "/pull/" + strconv.Itoa(prs[i].Key.Number)
+		}
+	}
+	m := start(t, f, keymap.Default())
+	press(m, "b")
+	p, _, ok := m.currentPR()
+	if !ok {
+		t.Fatal("no pull request under the cursor")
+	}
+	if got := clipboard(t, m, "y"); got != p.URL {
+		t.Errorf("copied %q, want %q", got, p.URL)
+	}
+	if status(m) != "copied "+p.URL {
+		t.Errorf("status = %q", status(m))
+	}
+
+	press(m, "V")
+	n := len(m.selected)
+	var want []string
+	for _, p := range m.menuTargets() {
+		want = append(want, p.URL)
+	}
+	if len(want) < 2 {
+		t.Fatalf("selected = %v", m.selected)
+	}
+	if got := clipboard(t, m, "y"); got != strings.Join(want, "\n") {
+		t.Errorf("copied %q, want %q", got, strings.Join(want, "\n"))
+	}
+	if status(m) != fmt.Sprintf("copied %d URLs", len(want)) {
+		t.Errorf("status = %q", status(m))
+	}
+	if len(m.selected) != n {
+		t.Errorf("selection = %v, want it kept", m.selected)
+	}
+}
+
+// clipboard presses k and returns what it sets the clipboard to.
+func clipboard(t *testing.T, m *Model, k string) string {
+	t.Helper()
+	_, cmd := m.Update(keyMsg(k))
+	queue := []tea.Cmd{cmd}
+	for len(queue) > 0 {
+		c := queue[0]
+		queue = queue[1:]
+		if c == nil {
+			continue
+		}
+		switch msg := c().(type) {
+		case tea.BatchMsg:
+			queue = append(queue, msg...)
+		default:
+			// Bubble Tea does not export the message that sets the clipboard.
+			if fmt.Sprintf("%T", msg) == "tea.setClipboardMsg" {
+				return fmt.Sprint(msg)
+			}
+		}
+	}
+	t.Fatalf("%s set no clipboard", k)
+	return ""
 }
 
 // i talks about one pull request; with a selection it is refused.

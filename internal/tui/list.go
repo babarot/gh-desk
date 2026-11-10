@@ -117,6 +117,8 @@ func (m *Model) listKey(k string) tea.Cmd {
 		return m.hideSelected()
 	case is("browse") && len(m.selected) > 0:
 		return m.browseAll(m.menuTargets())
+	case is("copy_url"):
+		return m.copyURLs(m.menuTargets())
 	case is("fold_bots"):
 		if t.grouped {
 			t.folded[plan.GroupBots] = !t.folded[plan.GroupBots]
@@ -380,6 +382,28 @@ func (m *Model) browseAll(prs []model.PR) tea.Cmd {
 		cmds = append(cmds, m.browse(p))
 	}
 	return tea.Batch(cmds...)
+}
+
+// copyURLs copies the URLs of prs to the clipboard, a line each, in the
+// order of the list. It goes through the terminal (OSC 52), so nothing is
+// run. The selection stays: nothing was changed, so the next key can act on
+// it too.
+func (m *Model) copyURLs(prs []model.PR) tea.Cmd {
+	var urls []string
+	for _, p := range prs {
+		if p.URL != "" {
+			urls = append(urls, p.URL)
+		}
+	}
+	switch len(urls) {
+	case 0:
+		return nil
+	case 1:
+		m.say("copied " + urls[0])
+	default:
+		m.say(fmt.Sprintf("copied %d URLs", len(urls)))
+	}
+	return tea.SetClipboard(strings.Join(urls, "\n"))
 }
 
 func (m *Model) browse(p model.PR) tea.Cmd { return m.browseURL(p.URL) }

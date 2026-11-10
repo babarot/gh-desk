@@ -417,7 +417,7 @@ var ready = map[keymap.Action]bool{
 	"quit": true, "help": true, "refresh": true,
 	"up": true, "down": true, "top": true, "bottom": true, "page_up": true, "page_down": true,
 	"next_tab": true, "prev_tab": true, "tab_1": true, "tab_2": true, "tab_3": true, "tab_4": true, "tab_5": true, "tab_6": true, "tab_7": true, "tab_8": true, "tab_9": true,
-	"menu": true, "expand": true, "collapse": true, "approve": true, "comment": true, "review": true, "browse": true, "hide": true,
+	"menu": true, "expand": true, "collapse": true, "approve": true, "comment": true, "review": true, "browse": true, "copy_url": true, "hide": true,
 	"events": true, "select": true, "select_shown": true, "clear_selection": true, "merge": true, "draft": true,
 	"include_failing": true, "wait_for_checks": true, "close": true, "delete_branch": true, "write_comment": true, "choose": true, "select_rule": true, "toggle_rule": true, "add_to_selection": true, "filter_by_rule": true,
 	"fold_bots": true, "show_excluded": true, "filter": true,

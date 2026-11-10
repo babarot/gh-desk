@@ -102,6 +102,7 @@ var Defaults = []Def{
 	{"triage", ScopeList, []string{"C"}, "triage with claude"},
 	{"ask_claude", ScopeList, []string{"i"}, "ask claude about it"},
 	{"browse", ScopeList, []string{"o"}, "browser"},
+	{"copy_url", ScopeList, []string{"y"}, "copy url"},
 	{"hide", ScopeList, []string{"d"}, "hide / done"},
 	{"fold_bots", ScopeList, []string{"b"}, "fold bots"},
 	// Shows the rows the exclusion leaves out, the inbox's merged or
