@@ -280,6 +280,9 @@ type Conditions struct {
 	// Decision are "approved", "changes_requested", "review_required" or
 	// "none", one of which its review decision must be.
 	Decision []string
+	// Merge are the states of merging, among MergeStates, one of which it
+	// must be in.
+	Merge []string
 	// Labels are labels one of which it must have.
 	Labels []string
 	// ApprovedByMe requires the viewer's latest review to approve it, a
@@ -287,8 +290,8 @@ type Conditions struct {
 	// any state.
 	ApprovedByMe *bool
 	ReviewedByMe *bool
-	// Requested are whom a review must be asked of: "me", or a team as
-	// "@slug".
+	// Requested are whom a review must be asked of: "me", a team as
+	// "@slug", or "@*" for any team.
 	Requested []string
 	// Reasons are reasons of a notification, one of which the row's must
 	// have.
@@ -304,6 +307,10 @@ var CheckStates = []string{"passing", "failing", "pending"}
 // Decisions are the values of decision; "none" is no review decision, as
 // in a repository that requires no review.
 var Decisions = []string{"approved", "changes_requested", "review_required", "none"}
+
+// MergeStates are the values of merge: whether GitHub would let a pull
+// request be merged now, and if not, why.
+var MergeStates = []string{"ready", "behind", "conflict", "blocked", "unknown"}
 
 // Reasons are the reasons GitHub gives a notification, the values of
 // reasons.
@@ -645,6 +652,7 @@ type (
 		States        []string `toml:"state"`
 		Checks        []string `toml:"checks"`
 		Decision      []string `toml:"decision"`
+		Merge         []string `toml:"merge"`
 		Labels        []string `toml:"labels"`
 		ApprovedByMe  *bool    `toml:"approved_by_me"`
 		ReviewedByMe  *bool    `toml:"reviewed_by_me"`
@@ -1045,14 +1053,14 @@ func (r elemReporter) item(key string, j int, format string, args ...any) {
 // is wrong at at.
 func conditionsFrom(d conditionDoc, packages []string, name string, r elemReporter) Conditions {
 	at := r.at
-	c := Conditions{Repos: d.Repos, Authors: d.Authors, Packages: packages, Labels: d.Labels, Requested: d.Requested, Reasons: d.Reasons, States: d.States, Checks: d.Checks, Decision: d.Decision,
+	c := Conditions{Repos: d.Repos, Authors: d.Authors, Packages: packages, Labels: d.Labels, Requested: d.Requested, Reasons: d.Reasons, States: d.States, Checks: d.Checks, Decision: d.Decision, Merge: d.Merge,
 		Bot: d.Bot, Mine: d.Mine, Draft: d.Draft, ApprovedByMe: d.ApprovedByMe, ReviewedByMe: d.ReviewedByMe}
 	for _, l := range []struct {
 		key  string
 		v    []string
 		noun string
 	}{{"repos", d.Repos, "repository"}, {"authors", d.Authors, "login"}, {"labels", d.Labels, "label"}, {"requested", d.Requested, "reviewer"}, {"reasons", d.Reasons, "reason"}, {"state", d.States, "state"},
-		{"checks", d.Checks, "state of checks"}, {"decision", d.Decision, "review decision"}} {
+		{"checks", d.Checks, "state of checks"}, {"decision", d.Decision, "review decision"}, {"merge", d.Merge, "state of merging"}} {
 		if l.v != nil && len(l.v) == 0 {
 			at(l.key, "must name at least one %s", l.noun)
 		}
@@ -1065,7 +1073,7 @@ func conditionsFrom(d conditionDoc, packages []string, name string, r elemReport
 	}
 	for j, who := range d.Requested {
 		if who != "me" && (!strings.HasPrefix(who, "@") || len(who) == 1) {
-			r.item("requested", j, `%q must be "me" or a team as "@slug"`, who)
+			r.item("requested", j, `%q must be "me", a team as "@slug", or "@*" for any team`, who)
 		}
 	}
 	for j, st := range d.States {
@@ -1112,7 +1120,7 @@ func conditionsFrom(d conditionDoc, packages []string, name string, r elemReport
 		key    string
 		v      []string
 		values []string
-	}{{"checks", d.Checks, CheckStates}, {"decision", d.Decision, Decisions}} {
+	}{{"checks", d.Checks, CheckStates}, {"decision", d.Decision, Decisions}, {"merge", d.Merge, MergeStates}} {
 		for j, v := range e.v {
 			if !slices.Contains(e.values, v) {
 				r.item(e.key, j, "must be one of %s, got %q", quoted(e.values), v)
@@ -1128,7 +1136,7 @@ func reportNoCondition(d conditionDoc, packages []string, name string, r elemRep
 	// A list or a title left empty sets no condition: the rule reads it as
 	// none.
 	if len(d.Repos) == 0 && len(d.Authors) == 0 && len(packages) == 0 && len(d.Labels) == 0 && len(d.Requested) == 0 && len(d.Reasons) == 0 && len(d.States) == 0 &&
-		len(d.Checks) == 0 && len(d.Decision) == 0 && (d.Title == nil || d.Title.raw == "") &&
+		len(d.Checks) == 0 && len(d.Decision) == 0 && len(d.Merge) == 0 && (d.Title == nil || d.Title.raw == "") &&
 		d.MaxFiles == nil && d.MaxLines == nil && d.MinFiles == nil && d.MinLines == nil &&
 		d.UpdatedIn == nil && d.CreatedIn == nil && d.UpdatedBefore == nil && d.CreatedBefore == nil &&
 		d.Bot == nil && d.Mine == nil && d.Draft == nil && d.ApprovedByMe == nil && d.ReviewedByMe == nil {

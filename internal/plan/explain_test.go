@@ -13,7 +13,7 @@ import (
 // heavyConds are the conditions Judge looks at after the others, once the
 // heavy fields and the body are read.
 var heavyConds = map[Cond]bool{CondMaxFiles: true, CondMaxLines: true, CondMinFiles: true, CondMinLines: true,
-	CondDecisions: true, CondLabels: true, CondChecks: true, CondPackages: true}
+	CondDecisions: true, CondMerges: true, CondLabels: true, CondChecks: true, CondPackages: true}
 
 // Explain never says other than Judge, over every rule of one condition
 // and of two, every pull request and every set of facts here: Yes when
@@ -31,7 +31,7 @@ func TestExplainTellsWhatJudgeDecides(t *testing.T) {
 	pending := read
 	pending.Checks = model.CheckPending
 	passing := read
-	passing.Checks, passing.Decision, passing.Labels = model.CheckSuccess, "", nil
+	passing.Checks, passing.Decision, passing.Labels, passing.Merge = model.CheckSuccess, "", nil, model.MergeClean
 	person := read
 	person.Author, person.AuthorIsBot, person.Draft, person.State, person.Reviews = "me", false, true, model.StateMerged, nil
 	prs := map[string]model.PR{"read": read, "unread": unread, "pending": pending, "passing": passing, "person": person, "empty": {}}
@@ -52,11 +52,12 @@ func TestExplainTellsWhatJudgeDecides(t *testing.T) {
 		{States: []model.PRState{model.StateOpen}}, {States: []model.PRState{model.StateMerged, model.StateClosed}},
 		{Title: regexp.MustCompile(`checkout`)}, {Title: regexp.MustCompile(`^Fix`)},
 		{UpdatedWithinDays: 50}, {UpdatedWithinDays: 7}, {CreatedWithinDays: 90}, {UpdatedBeforeDays: 30}, {CreatedBeforeDays: 90},
-		{Reasons: []string{"review_requested"}}, {Requested: []string{"me"}}, {Requested: []string{"@core"}},
+		{Reasons: []string{"review_requested"}}, {Requested: []string{"me"}}, {Requested: []string{"@core"}}, {Requested: []string{AnyTeam}},
 		{ApprovedByMe: new(true)}, {ApprovedByMe: new(false)}, {ReviewedByMe: new(true)}, {ReviewedByMe: new(false)},
 		{MaxFiles: 20}, {MaxFiles: 12}, {MaxFiles: 11}, {MaxLines: 600}, {MaxLines: 599}, {MinFiles: 12}, {MinFiles: 13}, {MinLines: 600}, {MinLines: 601},
 		{UpdatedWithinDays: 40}, {UpdatedBeforeDays: 40}, {UpdatedBeforeDays: 41}, {CreatedWithinDays: 60},
 		{Decisions: []model.ReviewDecision{model.DecisionChangesRequested}}, {Decisions: []model.ReviewDecision{NoDecision}},
+		{Merges: []Merges{MergeReady}}, {Merges: []Merges{MergeConflict, MergeUnknown}},
 		{Labels: []string{"wip"}}, {Labels: []string{"do-not-merge"}},
 		{Checks: []Checks{ChecksPassing}}, {Checks: []Checks{ChecksFailing}}, {Checks: []Checks{ChecksPending}},
 		{Packages: []string{"actions/checkout"}}, {Packages: []string{"x"}},

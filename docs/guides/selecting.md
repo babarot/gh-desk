@@ -8,7 +8,7 @@ Confirming an action takes its pull requests out of the selection, however it en
 
 ## Rules
 
-A rule picks pull requests by facts gh-desk reads: who opened them and in which repository, what a dependency update bumps, their size, age and labels, how they are reviewed, and how their checks are. Rules are written in `[[select]]` of the config file, and a pull request matches a rule when it meets every key the rule gives:
+A rule picks pull requests by facts gh-desk reads: who opened them and in which repository, what a dependency update bumps, their size, age and labels, how they are reviewed, how their checks are, and whether GitHub would let them be merged now. Rules are written in `[[select]]` of the config file, and a pull request matches a rule when it meets every key the rule gives:
 
 ```toml
 [[select]]
@@ -18,6 +18,8 @@ packages  = ["golang.org/x/net", "actions/checkout"]
 checks    = ["passing"]
 max_lines = 50
 ```
+
+`merge` asks what the merge button would say: `"ready"` when it can be pressed, `"behind"` when the branch must be brought up to date first, `"conflict"`, `"blocked"` when reviews or required checks hold it, and `"unknown"` while GitHub works it out. `merge = ["ready"]` in `[[exclude]]` leaves out what is ready to merge; `requested = ["@*"]` asks for a review requested from any team.
 
 Five rules are there by default: `small`, `dependency bots`, `approved`, `recent` and `lock files`. Rules you write replace all five, as tabs do; copy the ones you want to keep from `gh desk config reference select`, or write `select = []` at the top of the file to have none. Besides them, the built-in "approved by me" picks the bots' pull requests you approved that are still open.
 

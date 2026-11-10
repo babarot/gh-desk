@@ -799,6 +799,22 @@
      }
     },
     {
+     "key": "merge",
+     "doc": "Whether GitHub would let it be merged now, one of: \"ready\" (the merge button can be pressed), \"behind\" (its branch must be brought up to date), \"conflict\" (it conflicts with its base), \"blocked\" (its reviews or required checks hold it, or it is a draft) or \"unknown\" (GitHub is still working it out).",
+     "kind": {
+      "type": "config.listKind",
+      "name": "list of `ready`, `behind`, `conflict`, `blocked`, `unknown`",
+      "values": [
+       "ready",
+       "behind",
+       "conflict",
+       "blocked",
+       "unknown"
+      ],
+      "nonEmpty": true
+     }
+    },
+    {
      "key": "labels",
      "doc": "Labels one of which it must have.",
      "kind": {
@@ -825,7 +841,7 @@
     },
     {
      "key": "requested",
-     "doc": "Whom a review must be asked of, one of them: \"me\", or a team as \"@slug\".",
+     "doc": "Whom a review must be asked of, one of them: \"me\", a team as \"@slug\", or \"@*\" for any team.",
      "kind": {
       "type": "config.listKind",
       "name": "list of strings",
@@ -1038,6 +1054,22 @@
      }
     },
     {
+     "key": "merge",
+     "doc": "Whether GitHub would let it be merged now, one of: \"ready\" (the merge button can be pressed), \"behind\" (its branch must be brought up to date), \"conflict\" (it conflicts with its base), \"blocked\" (its reviews or required checks hold it, or it is a draft) or \"unknown\" (GitHub is still working it out).",
+     "kind": {
+      "type": "config.listKind",
+      "name": "list of `ready`, `behind`, `conflict`, `blocked`, `unknown`",
+      "values": [
+       "ready",
+       "behind",
+       "conflict",
+       "blocked",
+       "unknown"
+      ],
+      "nonEmpty": true
+     }
+    },
+    {
      "key": "labels",
      "doc": "Labels one of which it must have.",
      "kind": {
@@ -1064,7 +1096,7 @@
     },
     {
      "key": "requested",
-     "doc": "Whom a review must be asked of, one of them: \"me\", or a team as \"@slug\".",
+     "doc": "Whom a review must be asked of, one of them: \"me\", a team as \"@slug\", or \"@*\" for any team.",
      "kind": {
       "type": "config.listKind",
       "name": "list of strings",
@@ -1286,6 +1318,22 @@
      }
     },
     {
+     "key": "merge",
+     "doc": "Whether GitHub would let it be merged now, one of: \"ready\" (the merge button can be pressed), \"behind\" (its branch must be brought up to date), \"conflict\" (it conflicts with its base), \"blocked\" (its reviews or required checks hold it, or it is a draft) or \"unknown\" (GitHub is still working it out).",
+     "kind": {
+      "type": "config.listKind",
+      "name": "list of `ready`, `behind`, `conflict`, `blocked`, `unknown`",
+      "values": [
+       "ready",
+       "behind",
+       "conflict",
+       "blocked",
+       "unknown"
+      ],
+      "nonEmpty": true
+     }
+    },
+    {
      "key": "labels",
      "doc": "Labels one of which it must have.",
      "kind": {
@@ -1312,7 +1360,7 @@
     },
     {
      "key": "requested",
-     "doc": "Whom a review must be asked of, one of them: \"me\", or a team as \"@slug\".",
+     "doc": "Whom a review must be asked of, one of them: \"me\", a team as \"@slug\", or \"@*\" for any team.",
      "kind": {
       "type": "config.listKind",
       "name": "list of strings",

@@ -419,8 +419,9 @@ func TestSelectConditions(t *testing.T) {
 name = "old team upgrades"
 repos = ["acme/*", "babarot/gh-desk"]
 labels = ["dependencies"]
-requested = ["me", "@platform"]
+requested = ["me", "@platform", "@*"]
 decision = ["changes_requested", "none"]
+merge = ["ready", "behind"]
 checks = ["failing", "pending"]
 min_files = 2
 min_lines = 10
@@ -433,8 +434,8 @@ bot = false
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := Conditions{Repos: []string{"acme/*", "babarot/gh-desk"}, Labels: []string{"dependencies"}, Requested: []string{"me", "@platform"},
-		Decision: []string{"changes_requested", "none"}, Checks: []string{"failing", "pending"}, MinFiles: 2, MinLines: 10, UpdatedBeforeDays: 30, CreatedBeforeDays: 60,
+	want := Conditions{Repos: []string{"acme/*", "babarot/gh-desk"}, Labels: []string{"dependencies"}, Requested: []string{"me", "@platform", "@*"},
+		Decision: []string{"changes_requested", "none"}, Merge: []string{"ready", "behind"}, Checks: []string{"failing", "pending"}, MinFiles: 2, MinLines: 10, UpdatedBeforeDays: 30, CreatedBeforeDays: 60,
 		Mine: new(true), ReviewedByMe: new(true), Bot: new(false)}
 	if len(cfg.Select) != 1 || !reflect.DeepEqual(cfg.Select[0].Conditions, want) {
 		t.Fatalf("cfg.Select = %+v", cfg.Select)
@@ -450,6 +451,7 @@ name = "bad"
 repos = ["acme", "a/b/c"]
 requested = ["alice", "@"]
 decision = ["lgtm"]
+merge = ["clean"]
 min_lines = 0
 updated_before_days = 36501
 labels = []
@@ -469,12 +471,18 @@ packages = []
 [[select]]
 name = "merged"
 state = ["open", "merged", "shipped"]
+
+[[select]]
+name = "no merge"
+bot = true
+merge = []
 `,
 		`config.toml:4:10: select[0].repos[0] "acme" must be owner/repo`,
 		`config.toml:4:18: select[0].repos[1] "a/b/c" must be owner/repo`,
-		`select[0].requested[0] "alice" must be "me" or a team`,
-		`select[0].requested[1] "@" must be "me" or a team`,
+		`select[0].requested[0] "alice" must be "me", a team as "@slug", or "@*" for any team`,
+		`select[0].requested[1] "@" must be "me", a team as "@slug", or "@*" for any team`,
 		`select[0].decision[0] must be one of "approved", "changes_requested", "review_required", "none", got "lgtm"`,
+		`select[0].merge[0] must be one of "ready", "behind", "conflict", "blocked", "unknown", got "clean"`,
 		`select[0].min_lines must be 1 or more, got 0`,
 		`select[0].updated_before_days must be between 1 and 36500, got 36501`,
 		`select[0].labels must name at least one label`,
@@ -483,6 +491,7 @@ state = ["open", "merged", "shipped"]
 		`select[3]: "no packages" matches every pull request`,
 		`select[4].state[1] "merged": S selects open pull requests only`,
 		`select[4].state[2] must be one of "open", "merged", "closed", got "shipped"`,
+		`select[5].merge must name at least one state of merging`,
 	)
 }
 
