@@ -352,7 +352,7 @@ sort = "drafts_last"
 [[tabs]]
 kind = "inbox"
 `,
-		"config.toml:5:1: tabs[0].groups groups was replaced by sections, which say what each group was; write\n"+
+		"config.toml:5:1: tabs[0].groups was replaced by sections, which say what each group was; write\n"+
 			"    sections = [\n"+
 			`      { name = "requested from you", bot = false, requested = ["me"], show = "folded" },`+"\n"+
 			`      { name = "requested from a team", bot = false, requested = ["@*"], show = "excluded" },`+"\n"+

@@ -932,7 +932,7 @@ func tabsFrom(ds []tabDoc) ([]Tab, Problems) {
 				folded = *d.Folded
 			}
 			ss := groupSections(*d.Groups, folded, false)
-			msg := "groups was replaced by sections, which say what each group was; write" + sectionsWords(ss)
+			msg := "was replaced by sections, which say what each group was; write" + sectionsWords(ss)
 			if note := groupsNote(*d.Groups); note != "" {
 				msg += "\n" + note
 			}
