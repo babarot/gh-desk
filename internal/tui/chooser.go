@@ -52,8 +52,9 @@ func (m *Model) chooserValues() []string {
 	return out
 }
 
-// chooserKey handles a key while the chooser is open: the arrows move, enter
-// chooses, esc closes, and the rest is typed. j and k are typed, as a name
+// chooserKey handles a key while the chooser is open: the arrows and the
+// keys of history_next and history_prev move, enter chooses, esc closes,
+// and the rest is typed. j and k are typed, as a name
 // may hold them.
 func (m *Model) chooserKey(msg tea.KeyPressMsg) tea.Cmd {
 	c, k := m.chooser, msg.String()
@@ -64,9 +65,11 @@ func (m *Model) chooserKey(msg tea.KeyPressMsg) tea.Cmd {
 		m.chooser = nil
 	case is("choose"):
 		return m.chooseScope()
-	case is("down") && msg.Text == "":
+	// ctrl+n and ctrl+p move too, as in the triage's lists, since they
+	// type nothing.
+	case is("down") && msg.Text == "", is("history_next"):
 		c.sel = min(c.sel+1, max(len(vs)-1, 0))
-	case is("up") && msg.Text == "":
+	case is("up") && msg.Text == "", is("history_prev"):
 		c.sel = max(c.sel-1, 0)
 	default:
 		before := c.input.Value()

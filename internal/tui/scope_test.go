@@ -158,6 +158,10 @@ func TestScopeChooser(t *testing.T) {
 	if cur == nil || cur.Y >= len(lines) || !strings.HasSuffix(ansi.Truncate(lines[cur.Y], cur.X, ""), "me") {
 		t.Errorf("cursor = %+v", cur)
 	}
+	press(m, "ctrl+n", "ctrl+n", "ctrl+p")
+	if m.chooser.sel != 0 {
+		t.Errorf("ctrl+n twice and ctrl+p: sel = %d, want 0", m.chooser.sel)
+	}
 	press(m, "down", "enter")
 	if m.chooser != nil || m.scope != "me" {
 		t.Errorf("chooser open = %v, scope = %q", m.chooser != nil, m.scope)
