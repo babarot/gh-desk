@@ -1,5 +1,16 @@
 #:schema https://raw.githubusercontent.com/babarot/gh-desk/main/docs/config.schema.json
 
+[[tabs]]
+name = "bots"
+query = "is:open is:pr author:app/renovate"
+sections = [
+  { name = "can merge", merge = ["ready"] },
+  { draft = true, show = "excluded" },
+]
+
+[[tabs]]
+kind = "inbox"
+
 [[select]]
 name = "a \"quoted\" rule"
 title = '(?i)^fix\(deps\)'

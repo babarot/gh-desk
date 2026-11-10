@@ -75,8 +75,6 @@ type Tab struct {
 	// Sections are the parts a search's rows are split into, in the order
 	// shown, each with a head; none leaves them unsplit.
 	Sections []plan.Section
-	// DraftsLast sorts drafts after the rest.
-	DraftsLast bool
 	// Limit is how many pull requests, or notifications, to read.
 	Limit int
 	// ShowSettled has the inbox show the notifications whose pull request
@@ -293,7 +291,7 @@ type Model struct {
 	noted  []tea.Cmd
 	merged map[model.PRKey]bool
 	// held is where each row showing a result sorts while it shows it.
-	held map[model.PRKey]heldSort
+	held map[model.PRKey]model.PR
 	// refreshed is when each tab was last read.
 	refreshed map[int]time.Time
 	// refreshing is the reading r started, while it lasts.
@@ -356,7 +354,7 @@ func New(src Source, run Runner, cl Claude, km keymap.Map, log *slog.Logger, set
 	}
 	m := &Model{src: src, run: run, claude: cl, cautions: map[string]string{}, fresh: map[model.PRKey]time.Time{}, keys: km, log: log, set: set, ctx: context.Background(), unread: map[model.PRKey]model.Notification{},
 		selected: map[model.PRKey]selection{}, progress: map[model.PRKey]progress{}, batches: map[string]*batchState{},
-		merged: map[model.PRKey]bool{}, held: map[model.PRKey]heldSort{}, refreshed: map[int]time.Time{}, lastTheme: -1}
+		merged: map[model.PRKey]bool{}, held: map[model.PRKey]model.PR{}, refreshed: map[int]time.Time{}, lastTheme: -1}
 	m.chats = map[model.PRKey]*chatScreen{}
 	m.chatState = chat.NewState(set.Chats, log, set.Now, chatStatus{m})
 	m.st = newStyles(theme(set.ThemeDark))

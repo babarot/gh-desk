@@ -28,8 +28,11 @@ let bump=()=>{};
 dark.addEventListener('change',()=>{if(S.pref==='auto'){S.mode=resolved('auto');bump()}});
 const set=f=>{f(S);bump();judgeSoon()};
 // What the rules say of the rows comes from gh-desk: a rule is judged by the code that uses it.
-let judged=null,judging=0,judgeTimer=0,lastJudged=null;
-const verdictSets=v=>({yes:new Set(v.yes),unknown:new Set(v.unknown),why:v.why||{}}),judgedOf=j=>({approved:[verdictSets(j.approved)],select:j.select.map(verdictSets),exclude:j.exclude.map(verdictSets),auto_approve:j.auto_approve.map(verdictSets)});
+const verdictSets=v=>({yes:new Set(v.yes),unknown:new Set(v.unknown),why:v.why||{}}),judgedOf=j=>({approved:[verdictSets(j.approved)],select:j.select.map(verdictSets),exclude:j.exclude.map(verdictSets),auto_approve:j.auto_approve.map(verdictSets),tabs:(j.tabs||[]).map(placeOf)});
+// The sections of a tab, as gh-desk lays its rows out in them (placement in configpreview.go).
+const placeOf=t=>({names:t.names,show:t.show,at:t.at,pending:new Set(t.pending)});
+// What the file read makes of the rows comes with the page, and gh-desk is asked again as the file changes.
+let judged=JUDGED?judgedOf(JUDGED):null,judging=0,judgeTimer=0,lastJudged=null;
 const verdict=(k,i,x)=>{const v=judged?.[k]?.[i];return !v?'n':v.yes.has(x.i)?'y':v.unknown.has(x.i)?'?':'n'};
 function judgeSoon(){if(PLAYGROUND)return;clearTimeout(judgeTimer);judgeTimer=setTimeout(async()=>{if(!S.d||problems(S.d).length)return;const src=genToml(S.d);if(src===lastJudged)return;lastJudged=src;if(LIVE)liveApply(src);const n=++judging;try{const r=await fetch('judge',{method:'POST',body:src});if(!r.ok)return;const j=await r.json();if(n===judging){judged=judgedOf(j);bump()}}catch(e){}},200)}
 // The tab the preview shows, and its rows.
@@ -84,7 +87,7 @@ function PageKeys(){const h=PAGE_KEYS[S.page];if(!LIVE||S.q||!h)return null;if(t
 // The spinner ticks here alone: redrawing the title bar with it would touch the options of its select, and an open one flickers.
 function Cells(){const[f,setF]=useState(0),name=val('theme.spinner'),sp=SPIN[name]||SPIN.dots;useEffect(()=>{if(sp.f.length<2||matchMedia('(prefers-reduced-motion: reduce)').matches)return;const t=setInterval(()=>setF(x=>x+1),sp.t);return()=>clearInterval(t)},[name]);
   const kv=a=>{const v=S.d.keys[a];return[].concat(v===undefined?keyDefault(a)||[]:v)[0]},hints=[['enter','menu'],[kv('select')||'space','select'],[kv('approve')||'A','approve'],[kv('merge')||'M','merge'],[kv('select_rule')||'S','rules'],['?','keys']];const scene=sceneOf(),rules=S.page==='select'?(S.d.arr.select||defaultRules()):S.d.arr[S.page]||[],o=S.open[S.page]??0,cur=['select','exclude','auto_approve'].includes(S.page)?rules[o]:null,p=pal();
-  const{ts,at}=shownTab(),l=shownList(),grid=drawTui({p,prs:l?.prs,v:verdict,at,viewer:LISTS.viewer,count:t=>listOf(t)?.prs.length??'?',ruleKind:S.page==='select'?'select':S.page,cols:val('list.columns'),tabs:ts,exclude:S.d.arr.exclude||[],owners:val('list.home_owners')||[],stale:val('list.stale_days'),mark:(S.page==='select'||S.page==='auto_approve')&&cur?{kind:S.page,i:o}:null,hide:S.page==='exclude'?{kind:'exclude',i:cur?o:-1}:null,spin:sp.f[f%sp.f.length],scene,key:a=>kv(a),keysOf,custom:a=>a in S.d.keys});
+  const{ts,at}=shownTab(),l=shownList(),grid=drawTui({p,prs:l?.prs,v:verdict,at,layout:judged?.tabs?.[at],viewer:LISTS.viewer,count:t=>listOf(t)?.prs.length??'?',ruleKind:S.page==='select'?'select':S.page,cols:val('list.columns'),tabs:ts,exclude:S.d.arr.exclude||[],owners:val('list.home_owners')||[],stale:val('list.stale_days'),mark:(S.page==='select'||S.page==='auto_approve')&&cur?{kind:S.page,i:o}:null,hide:S.page==='exclude'?{kind:'exclude',i:cur?o:-1}:null,spin:sp.f[f%sp.f.length],scene,key:a=>kv(a),keysOf,custom:a=>a in S.d.keys});
   return html`<div class="tview"><div class="tbody" aria-label="Preview of gh-desk" dangerouslySetInnerHTML=${{__html:grid.html()}}/>${grid.tabs.length>1&&grid.tabs.map(t=>html`<button class="tabhit" key=${t.i} style=${{'--x':t.x,'--w':t.w}} aria-label=${`Show the tab ${t.name}`} aria-current=${t.i===at?'true':undefined} onClick=${()=>set(()=>{S.ptab=t.i})}/>`)}</div>`}
 // gh-desk itself, which the command runs on the lists last read and streams here (ADR-109). What is typed in it goes to gh-desk one request after another, so that text typed into a box keeps its order.
 let liveSend=()=>{},liveApply=()=>{};

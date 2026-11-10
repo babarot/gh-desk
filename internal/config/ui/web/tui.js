@@ -5,7 +5,6 @@
 const COLS=132,LINES=18;
 // As columnDefs in internal/tui/list.go.
 const LEAD=4,CW={pr:24,author:14,ci:2,merge:5,review:7,why:10,size:11,age:4};
-const GROUPS={you:'requested from you',team:'requested from a team',other:'other',bots:'bots'};
 const BOXES={'─':'h','│':'v','╵':'tv','╭':'rdr','╮':'rdl','╰':'rur','╯':'rul','▎':'rail','┃':'thick','└':'ur'};
 function cw(ch){const c=ch.codePointAt(0);return c>=0x1100&&(c<=0x115f||(c>=0x2e80&&c<=0xa4cf)||(c>=0xac00&&c<=0xd7a3)||(c>=0xf900&&c<=0xfaff)||(c>=0xfe30&&c<=0xfe4f)||(c>=0xff00&&c<=0xff60)||(c>=0xffe0&&c<=0xffe6)||(c>=0x1f300&&c<=0x1faff))?2:1}
 const sw=s=>{let w=0;for(const ch of s)w+=cw(ch);return w};
@@ -35,7 +34,7 @@ const SCENES={
   keys(g,o){const p=o.p,rows=[['next_tab','next tab'],['prev_tab','previous tab'],['menu','actions'],['select','select'],['select_shown','select shown'],['select_rule','select by rule'],['approve','approve'],['merge','merge'],['review','review'],['ask_claude','ask claude about it'],['hide','hide / done']],b=[[['▾ ',p.subtext0],['the list and its preview ',p.subtext1,null,1],['· works here ',p.overlay],['─'.repeat(20),p.surface1]]];for(const[a,w]of rows)b.push([['  '],[fit(o.keysOf(a).join(' ')||'',16),o.custom(a)?p.mauve:p.blue,null,1],[w,p.subtext0]]);box(g,p,34,1,64,'keys · z fold · ? esc close',b,'↓ j k wheel')},
 };
 // o: p palette, cols, tabs, exclude, owners, stale, mark rule, hide rule, spin, keys for the status line, scene (merge or keys, the scenes the settings playground shows), all
-function drawTui(o){const p=o.p,prs=o.prs||[],v=o.v||(()=>'n'),at=o.at||0,hidden=x=>o.exclude.some((r,i)=>v('exclude',i,x)==='y'),shown=prs.filter(x=>!hidden(x)),listed=o.hide?prs:shown,tab=o.tabs[at]||{},inbox=tab.kind==='inbox',grouped=!!(tab.groups&&tab.groups.length),hit=(r,x)=>r?v(r.kind,r.i,x):'n',g=new Grid(COLS,o.all?40:LINES);
+function drawTui(o){const p=o.p,prs=o.prs||[],v=o.v||(()=>'n'),at=o.at||0,lay=o.layout&&o.layout.names.length?o.layout:null,placed=x=>lay?lay.at[x.i]:-1,hidden=x=>o.exclude.some((r,i)=>v('exclude',i,x)==='y')||(lay&&lay.show[placed(x)]==='excluded'&&!lay.pending.has(x.i)),shown=prs.filter(x=>!hidden(x)),listed=o.hide?prs:shown,tab=o.tabs[at]||{},inbox=tab.kind==='inbox',hit=(r,x)=>r?v(r.kind,r.i,x):'n',g=new Grid(COLS,o.all?40:LINES);
   const cols=o.cols.filter(c=>c!=='why'||prs.some(z=>z.why)),W={...CW,title:Math.max(10,COLS-1-LEAD-cols.filter(c=>c!=='title').reduce((n,c)=>n+CW[c]+2,0)-2)},tabBg=mix(p.base,p.blue,p.dark?.35:.25),pick=mix(p.base,p.mauve,p.dark?.2:.14);
   let x=g.put(0,0,[['desk',p.blue,p.surface0,1],[' // ',p.dim],[`@${o.viewer||'octocat'}`,p.overlay],['   ']]);
   g.tabs=[];o.tabs.forEach((t,i)=>{const n=i===at?shown.length:o.count?o.count(t):'?',from=x;x=g.put(x,0,i===at?[[` ${i+1} `,p.subtext0,tabBg],[`${t.name||'inbox'} (${n}) `,p.text,tabBg,1]]:[[`${i+1} `,p.dim],[t.name||'inbox',p.subtext0],[` (${n})`,p.dim]]);g.tabs.push({i,name:t.name||'inbox',x:from,w:x-from});x=g.put(x,0,[[i===at?'  ':'   ']])});
@@ -53,9 +52,10 @@ function drawTui(o){const p=o.p,prs=o.prs||[],v=o.v||(()=>'n'),at=o.at||0,hidden
     case'age':return[[z.age.padStart(W.age),o.stale!=='off'&&z.updated>=o.stale?p.yellow:d(p.dim)]]}};
   let y=2,first=true,cur=null;const room=g.h-1;
   const row=z=>{if(y>=room)return;const mv=hit(o.mark,z),hv=hit(o.hide,z),m=mv==='y',h=o.hide&&(hv==='y'||hidden(z)),on=first;if(on)cur=z;first=false;const mk=m?['✓',p.mauve]:h?['⊘',p.dim]:mv==='?'||hv==='?'?['?',p.yellow]:null;g.put(0,y,[[on?'▎':' ',p.blue],[' '],[mk?mk[0]:' ',mk?mk[1]:null]]);let cx=LEAD;for(const q of cols){g.put(cx,y,cell(q,z,h));cx+=W[q]+2}if(on||m)g.band(y,m?pick:p.surface0);y++};
-  const newest=(a,b)=>tab.sort==='drafts_last'&&!!a.draft!==!!b.draft?(a.draft?1:-1):b.at-a.at;
+  const newest=(a,b)=>b.at-a.at;
   if(!o.prs){g.put(LEAD,3,[['Not read yet. gh-desk reads this tab the next time it runs.',p.overlay]])}
-  if(grouped)for(const k of tab.groups){const rs=listed.filter(z=>z.group===k).sort(newest);if(!rs.length||y>=room)continue;g.put(0,y++,[['  ▾ ',p.subtext0],[GROUPS[k],p.subtext0,null,1],[' '],[String(rs.length),p.dim]]);rs.forEach(row)}
+  // The rows under the heads of the sections they go in, as gh-desk lays them out; a section with no name has no head, and an excluded one shows only with the excluded.
+  if(lay)lay.names.forEach((name,k)=>{if(lay.show[k]==='excluded'&&!o.hide)return;const rs=listed.filter(z=>placed(z)===k).sort(newest);if(!rs.length||y>=room)return;if(name)g.put(0,y++,[['  ▾ ',p.subtext0],[name,p.subtext0,null,1],[' '],[String(rs.length),p.dim]]);rs.forEach(row)})
   else listed.slice().sort(newest).forEach(row);
   if(o.all)return g;
   const k=o.key||(()=>'');status(g,g.h-1,p,[[k('menu')||'enter','actions'],[k('select')||'space','select'],[k('select_rule')||'S','select by rule'],[k('triage')||'C','triage with claude'],[k('log')||'L','log'],[k('filter')||'/','filter'],[k('help')||'?','keys']]);

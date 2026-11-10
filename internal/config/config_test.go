@@ -258,7 +258,7 @@ func TestLoadReportsWhereTheMistakeIs(t *testing.T) {
 		{"moved setting", "[claude]\nmodel = \"opus\"\ncache_dir = \"~/cache\"\n", `config.toml:3:1: "claude.cache_dir" moved to "cache.dir"`},
 		{"moved setting, dotted", "claude.cache_dir = \"~/cache\"\n", `config.toml:1:8: "claude.cache_dir" moved to "cache.dir"`},
 		{"moved table", "[ui]\ntheme = \"auto\"\n", `config.toml:1:2: "ui" moved: theme is theme.dark and theme.light`},
-		{"moved array of tables", "[[sections]]\nname = \"a\"\n", `config.toml:1:3: "sections" moved to "tabs"`},
+		{"moved array of tables", "[[sections]]\nname = \"a\"\n", `config.toml:1:3: "sections" moved: each [[tabs]] element has its own sections`},
 		{"moved inbox", "[inbox]\nhide_closed = true\n", `"inbox" moved: the inbox is a [[tabs]] element`},
 		{"watch timeout", "[merge]\nwatch_timeout = \"1h\"\n", `"merge.watch_timeout" is no longer a setting`},
 		{"empty cache dir", "[cache]\ndir = \" \"\n", `config.toml:2:7: cache.dir must not be empty`},
@@ -296,23 +296,105 @@ func TestTabs(t *testing.T) {
 kind = "inbox"
 name = "通知"
 show_settled = true
+sections = [
+  { name = "review requests", reasons = ["review_requested"] },
+]
 
 [[tabs]]
 name = "bots"
 query = "is:open is:pr author:app/renovate"
-groups = ["bots", "you"]
-folded = ["you"]
+sections = [
+  { name = "can merge", merge = ["ready"], show = "excluded" },
+  { name = "people", bot = false, show = "folded" },
+  { draft = false },
+  {},
+]
 `))
 	if err != nil {
 		t.Fatal(err)
 	}
 	want := []Tab{
-		{Kind: "inbox", Name: "通知", Limit: 100, ShowSettled: true},
-		{Kind: "search", Name: "bots", Query: "is:open is:pr author:app/renovate", Groups: []string{"bots", "you"}, Folded: []string{"you"}, Sort: "updated", Limit: 100},
+		{Kind: "inbox", Name: "通知", Limit: 100, ShowSettled: true, Sections: []Section{
+			{Name: "review requests", Show: "open", Conditions: Conditions{Reasons: []string{"review_requested"}}}}},
+		{Kind: "search", Name: "bots", Query: "is:open is:pr author:app/renovate", Sort: "updated", Limit: 100, Sections: []Section{
+			{Name: "can merge", Show: "excluded", Conditions: Conditions{Merge: []string{"ready"}}},
+			{Name: "people", Show: "folded", Conditions: Conditions{Bot: new(false)}},
+			{Show: "open", Conditions: Conditions{Draft: new(false)}},
+			{Show: "open"},
+		}},
 	}
 	if !reflect.DeepEqual(cfg.Tabs, want) {
 		t.Errorf("tabs = %+v\nwant %+v", cfg.Tabs, want)
 	}
+	// Show writes them back as the file takes them.
+	again, _, err := Load(write(t, Show(cfg, true)))
+	if err != nil || !reflect.DeepEqual(again.Tabs, cfg.Tabs) {
+		t.Fatalf("Show then Load = %+v, %v\n%s", again.Tabs, err, Show(cfg, true))
+	}
+}
+
+// A file of the groups, as it was written before sections, is told how to
+// write them, at each key that changed.
+func TestTabsFromGroups(t *testing.T) {
+	wantErrs(t, `
+[[tabs]]
+name = "review"
+query = "is:pr"
+groups = ["other", "you"]
+folded = ["you"]
+sort = "drafts_last"
+
+[[tabs]]
+name = "mine"
+query = "is:pr"
+sort = "drafts_last"
+
+[[tabs]]
+kind = "inbox"
+`,
+		"config.toml:5:1: tabs[0].groups was replaced by sections, which say what each group was; write\n"+
+			"    sections = [\n"+
+			`      { name = "requested from you", bot = false, requested = ["me"], show = "folded" },`+"\n"+
+			`      { name = "requested from a team", bot = false, requested = ["@*"], show = "excluded" },`+"\n"+
+			`      { name = "other", bot = false },`+"\n"+
+			`      { name = "bots", bot = true, show = "excluded" },`+"\n"+
+			"    ]\n"+
+			"you, team and other come in that order: other is what neither of the others takes; a group not written is excluded",
+		`config.toml:6:1: tabs[0].folded was replaced by show = "folded" on a section; see groups`,
+		`config.toml:7:8: tabs[0].sort "drafts_last" was replaced by sections, which cannot also put the drafts last in each of them; see groups`,
+		"config.toml:12:8: tabs[1].sort \"drafts_last\" was replaced by sections; write the drafts as a section after the rest:\n"+
+			"    sections = [\n      { draft = false },\n      { draft = true },\n    ]",
+	)
+}
+
+// The bots stay where they were written; other written alone takes the rest
+// of the persons' pull requests, with the groups before it excluded.
+func TestTabsFromGroupsInOtherOrders(t *testing.T) {
+	for _, c := range []struct{ groups, want string }{
+		{`["bots", "you"]`, "    sections = [\n" +
+			`      { name = "bots", bot = true },` + "\n" +
+			`      { name = "requested from you", bot = false, requested = ["me"] },` + "\n" +
+			`      { name = "requested from a team", bot = false, requested = ["@*"], show = "excluded" },` + "\n" +
+			`      { name = "other", bot = false, show = "excluded" },` + "\n    ]"},
+		{`["you", "bots", "team"]`, "    sections = [\n" +
+			`      { name = "requested from you", bot = false, requested = ["me"] },` + "\n" +
+			`      { name = "bots", bot = true },` + "\n" +
+			`      { name = "requested from a team", bot = false, requested = ["@*"] },` + "\n" +
+			`      { name = "other", bot = false, show = "excluded" },` + "\n    ]"},
+		{`["other"]`, "    sections = [\n" +
+			`      { name = "requested from you", bot = false, requested = ["me"], show = "excluded" },` + "\n" +
+			`      { name = "requested from a team", bot = false, requested = ["@*"], show = "excluded" },` + "\n" +
+			`      { name = "other", bot = false },` + "\n" +
+			`      { name = "bots", bot = true, show = "excluded" },` + "\n    ]"},
+	} {
+		wantErrs(t, "[[tabs]]\nname = \"r\"\nquery = \"is:pr\"\ngroups = "+c.groups+"\n[[tabs]]\nkind = \"inbox\"\n", c.want)
+	}
+}
+
+// packages, not a condition of a section, is told at the section.
+func TestSectionPackages(t *testing.T) {
+	wantErrs(t, "[[tabs]]\nname = \"r\"\nquery = \"is:pr\"\nsections = [ { name = \"p\", packages = [\"x\"] } ]\n[[tabs]]\nkind = \"inbox\"\n",
+		"config.toml:4:28: tabs[0].sections[0].packages is not a condition of a section")
 }
 
 func TestTabMistakes(t *testing.T) {
@@ -326,9 +408,14 @@ name = "a"
 query = " "
 sort = "newest"
 limit = 0
-groups = ["robots", "you", "you"]
-folded = ["team"]
 show_settled = true
+sections = [
+  { name = "x", show = "hidden" },
+  { name = "x", merge = ["clean"] },
+  { show = "folded", bot = true },
+  { show = "excluded" },
+  { name = "y", reasons = ["mention"] },
+]
 
 [[tabs]]
 kind = "inbox"
@@ -336,18 +423,20 @@ query = "is:pr"
 `,
 		`config.toml:7:8: tabs[1].name "a" is used twice`,
 		`config.toml:8:9: tabs[1].query must not be empty`,
-		`config.toml:9:8: tabs[1].sort must be one of "updated", "drafts_last", got "newest"`,
+		`config.toml:9:8: tabs[1].sort must be one of "updated", got "newest"`,
 		`config.toml:10:9: tabs[1].limit must be between 1 and 1000, got 0`,
-		`config.toml:11:11: tabs[1].groups must name groups among`,
-		`config.toml:11:28: tabs[1].groups names "you" twice`,
-		`config.toml:12:11: tabs[1].folded must name groups among its groups, got "team"`,
-		`config.toml:13:16: tabs[1].show_settled is read only by the inbox`,
-		`config.toml:17:9: tabs[2].query is not read by the inbox`,
+		`config.toml:11:16: tabs[1].show_settled is read only by the inbox`,
+		`config.toml:13:24: tabs[1].sections[0].show must be one of "open", "folded", "excluded", got "hidden"`,
+		`config.toml:14:12: tabs[1].sections[1].name "x" is used twice in the tab`,
+		`config.toml:14:26: tabs[1].sections[1].merge[0] must be one of "ready", "behind"`,
+		`config.toml:15:12: tabs[1].sections[2].show a section with no name has no head to unfold it by`,
+		`config.toml:16:3: tabs[1].sections[3]: excludes every pull request left, with no name to say so by`,
+		`config.toml:17:17: tabs[1].sections[4].reasons is read only in the inbox`,
+		`config.toml:22:9: tabs[2].query is not read by the inbox`,
 	)
 	wantErrs(t, "[[tabs]]\nname = \"a\"\n", `config.toml:1:3: tabs[0]: needs a query`, "exactly one tab must be the inbox")
 	wantErrs(t, "[[tabs]]\nkind = \"inbx\"\n", `tabs[0].kind must be one of "search", "inbox", got "inbx"`)
 	wantErrs(t, "[[tabs]]\nkind = \"inbox\"\n[[tabs]]\nkind = \"inbox\"\nname = \"other\"\n", `exactly one tab must be the inbox (kind = "inbox"), got 2`)
-	wantErrs(t, "[[tabs]]\nname = \"x\"\nquery = \"q\"\ngroups = []\n[[tabs]]\nkind = \"inbox\"\n", "tabs[0].groups must name at least one group")
 	var b strings.Builder
 	for i := range 10 {
 		fmt.Fprintf(&b, "[[tabs]]\nname = \"t%d\"\nquery = \"q\"\n", i)
@@ -594,7 +683,7 @@ func TestDidYouMean(t *testing.T) {
 		{"key in a tab", "[[tabs]]\nkind = \"inbox\"\nshow_setled = true\n", `"tabs.show_setled" is not a setting; did you mean "tabs.show_settled"?`},
 		{"value", "[theme]\nlight = \"lattte\"\n", `got "lattte"; did you mean "latte"?`},
 		{"kind", "[[tabs]]\nkind = \"inbx\"\n", `got "inbx"; did you mean "inbox"?`},
-		{"group", "[[tabs]]\nname = \"r\"\nquery = \"is:pr\"\ngroups = [\"bot\"]\n[[tabs]]\nkind = \"inbox\"\n", `got "bot"; did you mean "bots"?`},
+		{"show", "[[tabs]]\nname = \"r\"\nquery = \"is:pr\"\nsections = [ { name = \"x\", show = \"foldd\" } ]\n[[tabs]]\nkind = \"inbox\"\n", `got "foldd"; did you mean "folded"?`},
 		{"moved wins", "[ui]\ntheme = \"auto\"\n", `"ui" moved:`},
 	}
 	for _, tt := range tests {

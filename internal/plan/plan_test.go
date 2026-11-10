@@ -7,24 +7,33 @@ import (
 	"github.com/babarot/gh-desk/internal/model"
 )
 
-func TestGroupOf(t *testing.T) {
+// The sections a tab of review requests is split into by default put each
+// pull request where the four groups did: a bot's under bots, whatever is
+// asked of whom, and other is what neither you nor a team is asked of.
+func TestSectionsOfTheGroups(t *testing.T) {
 	me := []model.Reviewer{{Login: "me"}}
 	team := []model.Reviewer{{Login: "core", Team: true}}
+	ss := []Section{
+		{Name: "requested from you", Rule: Rule{Requested: []string{"me"}, Bot: new(false)}},
+		{Name: "requested from a team", Rule: Rule{Requested: []string{AnyTeam}, Bot: new(false)}},
+		{Name: "other", Rule: Rule{Bot: new(false)}},
+		{Name: "bots", Rule: Rule{Bot: new(true)}},
+	}
 	tests := []struct {
 		pr   model.PR
-		want Group
+		want int
 	}{
-		{model.PR{Requested: me}, GroupYou},
-		{model.PR{Requested: team}, GroupTeam},
-		{model.PR{Requested: append(team, me...)}, GroupYou},
-		{model.PR{Requested: me, AuthorIsBot: true}, GroupBots},
-		{model.PR{Requested: team, AuthorIsBot: true}, GroupBots},
-		{model.PR{Requested: []model.Reviewer{{Login: "someone"}}}, GroupOther},
-		{model.PR{}, GroupOther},
+		{model.PR{Requested: me}, 0},
+		{model.PR{Requested: team}, 1},
+		{model.PR{Requested: append(team, me...)}, 0},
+		{model.PR{Requested: me, AuthorIsBot: true}, 3},
+		{model.PR{Requested: team, AuthorIsBot: true}, 3},
+		{model.PR{Requested: []model.Reviewer{{Login: "someone"}}}, 2},
+		{model.PR{}, 2},
 	}
 	for _, tt := range tests {
-		if got := GroupOf(tt.pr, "me"); got != tt.want {
-			t.Errorf("GroupOf(%+v) = %s; want %s", tt.pr.Requested, got, tt.want)
+		if got, _ := Place(ss, tt.pr, "me", Facts{}); got != tt.want {
+			t.Errorf("Place(%+v) = %d; want %d", tt.pr.Requested, got, tt.want)
 		}
 	}
 }

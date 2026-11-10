@@ -36,7 +36,7 @@ Across the top are the tabs. By default they are four:
 
 | Tab | What it lists |
 |---|---|
-| review | pull requests whose review is requested from you or a team of yours, split into groups |
+| review | pull requests whose review is requested from you or a team of yours, split into sections |
 | mine | your own pull requests, drafts last |
 | involved | pull requests you are involved in, that are neither yours nor asked of you |
 | inbox | the pull requests in your notifications, with why each is there |
@@ -76,6 +76,6 @@ Installed as a gh extension or with Nix, gh-desk reads its releases on GitHub on
 
 ## Next
 
-- [Tabs and groups](guides/tabs.md), to make the tabs your own
+- [Tabs and sections](guides/tabs.md), to make the tabs your own
 - [Approving and merging](guides/approve-and-merge.md), to know what the popup will do
 - [Concepts](concepts/README.md), for what gh-desk aims for and why it works the way it does

@@ -204,14 +204,14 @@ func TestExcludeByReason(t *testing.T) {
 	}
 }
 
-// A group the tab does not show has no rows to show with a, so what it
-// would exclude is not counted.
-func TestExcludedOfAGroupNotShownAreNotCounted(t *testing.T) {
+// A row that both an exclusion rule and an excluded section leave out is
+// counted once.
+func TestExcludedTwiceIsCountedOnce(t *testing.T) {
 	set := excluding(plan.Rule{Name: "bots", Bot: new(true)})
-	set.Tabs[0].Sections = plan.GroupSections([]plan.Group{plan.GroupYou, plan.GroupTeam}, []plan.Group{plan.GroupTeam, plan.GroupBots})
+	set.Tabs[0].Sections = pickSections([]string{secYou, secTeam}, secTeam)
 	m := startSource(t, fixture(), set)
-	if strings.Contains(screen(m), "excluded") {
-		t.Errorf("the tab counts a pull request of a group it does not show:\n%s", screen(m))
+	if !strings.Contains(screen(m), "1 pull request excluded") {
+		t.Errorf("the bot's pull request is not counted once:\n%s", screen(m))
 	}
 }
 
@@ -300,7 +300,7 @@ func TestInboxReadAgainKeepsTheCursor(t *testing.T) {
 // the list, and the rows scroll above it.
 func TestExcludedLineStaysUnderAFullList(t *testing.T) {
 	set := excluding(plan.Rule{Name: "carol's", Authors: []string{"carol"}})
-	set.Tabs[0].Sections = plan.GroupSections(plan.Groups, nil)
+	set.Tabs[0].Sections = reviewSections()
 	m := startSource(t, withCarol(), set)
 	m.Update(tea.WindowSizeMsg{Width: 130, Height: 18})
 	if got := len(m.rows(m.tab())); got <= m.layout().list-1 {

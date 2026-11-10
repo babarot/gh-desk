@@ -24,7 +24,7 @@ Each of these is a page on the left of the settings.
 
 | To | Open | Read more |
 |---|---|---|
-| Add a tab for your repository | Tabs | [Tabs and groups](tabs.md) |
+| Add a tab for your repository | Tabs | [Tabs and sections](tabs.md) |
 | Choose what is safe to merge together | Selection rules | [Selecting by rules](selecting.md) |
 | Decide how to merge | Merging | [Approving and merging](approve-and-merge.md) |
 | Change a key | Keys | [Keys](../reference/keys.md) |

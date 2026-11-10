@@ -46,3 +46,16 @@ func TestARowShowingAResultKeepsItsPlace(t *testing.T) {
 		t.Errorf("after the results are put away: %v, want it first, as the newest ready one", got)
 	}
 }
+
+// A row kept before its heavy fields were read is placed by them once they
+// are, with what the batch changes still as it was.
+func TestAHeldRowTakesTheHeavyFieldsReadSince(t *testing.T) {
+	m := start(t, fixture(), keymap.Default())
+	k := key("me", "tool", 9)
+	m.held[k] = model.PR{Key: k, Draft: true, Updated: now.Add(-time.Hour), HeadOID: "a"}
+	read := model.PR{Key: k, Draft: false, Updated: now, HeadOID: "a", HeavyHead: "a", Checks: model.CheckSuccess}
+	got := m.asHeld(read)
+	if !got.Draft || !got.Updated.Equal(now.Add(-time.Hour)) || got.Checks != model.CheckSuccess || !got.HeavyRead() {
+		t.Errorf("asHeld = %+v", got)
+	}
+}

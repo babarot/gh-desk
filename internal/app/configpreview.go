@@ -86,7 +86,11 @@ func SettingsPlayground() ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	return ui.Page(ui.Input{File: ui.File{Path: "config.toml"}, Keys: uiKeys(), Themes: tui.Palettes(), Spinners: tui.Spinners(), Lists: shown.lists, Playground: true})
+	judged, err := shown.judge(nil, ui.SampleTime)
+	if err != nil {
+		return nil, err
+	}
+	return ui.Page(ui.Input{File: ui.File{Path: "config.toml"}, Keys: uiKeys(), Themes: tui.Palettes(), Spinners: tui.Spinners(), Lists: shown.lists, Judged: judged, Playground: true})
 }
 
 func samplePreview(now time.Time) (*preview, error) {
@@ -152,7 +156,7 @@ func pagePR(i int, pr model.PR, viewer, reason string, now time.Time) ui.PR {
 	}
 	return ui.PR{Index: i, Repo: pr.Key.Repository(), N: pr.Key.Number, Author: pr.Author, Bot: pr.AuthorIsBot, Title: t.Title,
 		Add: pr.Additions, Del: pr.Deletions, Files: pr.ChangedFiles, Draft: pr.Draft, State: state, Checks: checks, Merge: merge, Decision: decision,
-		Heavy: pr.HeavyRead(), Group: string(plan.GroupOf(pr, viewer)), Why: t.Why, Review: t.Review, Age: t.Age,
+		Heavy: pr.HeavyRead(), Why: t.Why, Review: t.Review, Age: t.Age,
 		Updated: int(now.Sub(pr.Updated).Hours() / 24), At: float64(pr.Updated.Unix())}
 }
 
@@ -255,6 +259,18 @@ type judgement struct {
 	Select      []verdicts `json:"select"`
 	Exclude     []verdicts `json:"exclude"`
 	AutoApprove []verdicts `json:"auto_approve"`
+	// Tabs are what each tab's sections make of the rows, tab by tab.
+	Tabs []placement `json:"tabs"`
+}
+
+// placement is the sections of a tab as its rows are laid out, other
+// included (plan.Layout), and the section each row goes in, by row; Pending
+// are the rows a section passed over could not tell of yet.
+type placement struct {
+	Names   []string `json:"names"`
+	Show    []string `json:"show"`
+	At      []int    `json:"at"`
+	Pending []int    `json:"pending"`
 }
 
 // judge reads src as a config file and judges its rules.
@@ -295,6 +311,22 @@ func (p *preview) judge(src []byte, now time.Time) ([]byte, error) {
 	}
 	for _, a := range cfg.AutoApprove {
 		out.AutoApprove = append(out.AutoApprove, each(rule(a.Name, a.Conditions), nil))
+	}
+	out.Tabs = []placement{}
+	for _, t := range cfg.Tabs {
+		ss, other := plan.Layout(sections(t.Sections))
+		pl := placement{Names: []string{}, Show: []string{}, At: make([]int, len(p.rows)), Pending: []int{}}
+		for _, s := range ss {
+			pl.Names, pl.Show = append(pl.Names, s.Name), append(pl.Show, string(s.Show))
+		}
+		for i, r := range p.rows {
+			at, pending := plan.PlaceIn(ss, other, r.pr, p.viewer, facts(r))
+			pl.At[i] = at
+			if pending {
+				pl.Pending = append(pl.Pending, i)
+			}
+		}
+		out.Tabs = append(out.Tabs, pl)
 	}
 	b, err := json.Marshal(out)
 	if err != nil {

@@ -1,6 +1,10 @@
 package plan
 
-import "github.com/babarot/gh-desk/internal/model"
+import (
+	"slices"
+
+	"github.com/babarot/gh-desk/internal/model"
+)
 
 // Show is how a tab shows the pull requests of one of its sections.
 type Show string
@@ -23,22 +27,10 @@ type Section struct {
 	Name string
 	Show Show
 	Rule Rule
-	// Group, when set, has the section take the pull requests GroupOf puts
-	// in it, and its Rule is not read. A tab split into groups is read as
-	// sections this way, so that it keeps what the groups showed, which a
-	// rule cannot say of the other group (a review asked of neither the
-	// viewer nor a team).
-	Group Group
 }
 
 // Judge is what the section says of p for viewer: Yes when it takes p.
 func (s Section) Judge(p model.PR, viewer string, f Facts) Verdict {
-	if s.Group != "" {
-		if GroupOf(p, viewer) == s.Group {
-			return Yes
-		}
-		return No
-	}
 	return s.Rule.Judge(p, viewer, f)
 }
 
@@ -58,20 +50,33 @@ func Place(sections []Section, p model.PR, viewer string, f Facts) (i int, pendi
 	return -1, pending
 }
 
-// GroupSections are the sections of a tab split into groups, in the order
-// given, each named after its group; those in folded are folded. A pull
-// request of a group not given goes in none, so it is not shown, as the
-// group was not.
-func GroupSections(groups, folded []Group) []Section {
-	out := make([]Section, 0, len(groups))
-	for _, g := range groups {
-		s := Section{Name: string(g), Show: ShowOpen, Group: g}
-		for _, f := range folded {
-			if f == g {
-				s.Show = ShowFolded
-			}
-		}
-		out = append(out, s)
+// OtherName is the section that takes what no other section of a tab
+// does.
+const OtherName = "other"
+
+// Layout are the sections of a tab as its rows are laid out, and which of
+// them takes what no other does: the one called other, or one made for it
+// after the rest, so that no row is lost, neither one no rule takes nor
+// one a rule cannot tell yet. other is -1 when there are no sections.
+func Layout(ss []Section) (out []Section, other int) {
+	if len(ss) == 0 {
+		return nil, -1
 	}
-	return out
+	for i, s := range ss {
+		if s.Name == OtherName {
+			return ss, i
+		}
+	}
+	out = append(slices.Clone(ss), Section{Name: OtherName, Show: ShowOpen})
+	return out, len(out) - 1
+}
+
+// PlaceIn is Place among sections laid out with Layout: what no section
+// takes goes in other.
+func PlaceIn(sections []Section, other int, p model.PR, viewer string, f Facts) (int, bool) {
+	at, pending := Place(sections, p, viewer, f)
+	if at < 0 {
+		at = other
+	}
+	return at, pending
 }

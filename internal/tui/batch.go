@@ -34,22 +34,36 @@ type progress struct {
 	ended time.Time
 }
 
-// heldSort is where a row sorts while it shows a result: by what it was
-// when its batch started, so that what the batch changes on it, such as a
-// draft made ready, does not move it away from where it was being watched.
-type heldSort struct {
-	draft   bool
-	updated time.Time
-}
-
-// hold keeps where the row of k sorts now, unless it is kept already.
+// hold keeps the pull request of k as it is now, unless it is kept
+// already: while its row shows a result, it sorts and is placed in its
+// tab's sections by what it was when its batch started, so that what the
+// batch changes on it, such as a draft made ready, does not move it away
+// from where it was being watched.
 func (m *Model) hold(k model.PRKey) {
 	if _, ok := m.held[k]; ok {
 		return
 	}
 	if p, ok := m.knownPR(k); ok {
-		m.held[k] = heldSort{draft: p.Draft, updated: p.Updated}
+		m.held[k] = p
 	}
+}
+
+// asHeld is p as its row is sorted and placed: as it was kept by hold
+// while the row shows a result.
+// A pull request whose heavy fields were not read when it was kept is
+// taken as it is, but for whether it is a draft and when it was updated,
+// which is what a batch changes: kept unread, a section on a heavy field
+// would wait for it until the result is put away.
+func (m *Model) asHeld(p model.PR) model.PR {
+	h, ok := m.held[p.Key]
+	switch {
+	case !ok:
+		return p
+	case !h.HeavyRead() && p.HeavyRead():
+		p.Draft, p.Updated = h.Draft, h.Updated
+		return p
+	}
+	return h
 }
 
 // batchState follows a batch until every pull request it acts on has a

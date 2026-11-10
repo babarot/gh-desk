@@ -77,7 +77,10 @@ kind = "inbox"
 [[tabs]]
 name = "bots"
 query = "is:open is:pr author:app/renovate"
-groups = ["bots"]
+sections = [
+  { name = "can merge", merge = ["ready"] },
+  { draft = true, show = "excluded" },
+]
 
 [[select]]
 name = "lock files"
@@ -96,7 +99,7 @@ quit = ["q", "Q"]
 	if code != 0 {
 		t.Fatalf("show --diff: code %d", code)
 	}
-	for _, want := range []string{"[[tabs]]\nkind = \"inbox\"", "groups = [\"bots\"]", "[[select]]\nname = \"lock files\"",
+	for _, want := range []string{"[[tabs]]\nkind = \"inbox\"", "sections = [\n  { name = \"can merge\", merge = [\"ready\"] },\n  { draft = true, show = \"excluded\" },\n]", "[[select]]\nname = \"lock files\"",
 		"title = \"(?i)lock file\"", "[list]\nrefresh = \"off\"", "editor = \"code --wait\"", "[keys]\nquit = [\"q\", \"Q\"]"} {
 		if !strings.Contains(diff, want) {
 			t.Errorf("show --diff =\n%s\nwant one containing %q", diff, want)
@@ -392,7 +395,11 @@ func TestConfigUIData(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want, err := json.MarshalIndent(map[string]any{"DATA": config.UI(), "KEYS": uiKeys(), "LISTS": shown.lists}, "", " ")
+	judged, err := shown.judge(nil, ui.SampleTime)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want, err := json.MarshalIndent(map[string]any{"DATA": config.UI(), "KEYS": uiKeys(), "LISTS": shown.lists, "JUDGED": json.RawMessage(judged)}, "", " ")
 	if err != nil {
 		t.Fatal(err)
 	}

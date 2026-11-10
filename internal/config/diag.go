@@ -30,6 +30,10 @@ type Problem struct {
 	// Index is which element of a list the mistake is in, or -1 for the
 	// whole value.
 	Index int
+	// Inline is which inline table of an array Key goes through, counted
+	// from 1, as for a section of a tab, tabs[i].sections[j]: Key is then
+	// tabs, sections and the key in that table. 0 when it goes through none.
+	Inline int
 	// AtKey marks the key rather than its value, as for a key that is not
 	// a setting.
 	AtKey bool
@@ -197,6 +201,30 @@ func locate(src []byte, p Problem) (line, col, width int, ok bool) {
 			}
 		case unstable.KeyValue:
 			parts, keyNode := keyOf(e)
+			full := append(slices.Clone(table), parts...)
+			// A mistake in a whole inline table, with no key in it, is
+			// placed at that table too.
+			if e.Value().Kind == unstable.Array && len(full) <= len(p.Key) && slices.Equal(full, p.Key[:len(full)]) &&
+				(len(full) < len(p.Key) || p.Index < 0) {
+				// An array of inline tables: exclude = [ {...} ] at the top,
+				// where Element counts its tables, or a key such as
+				// sections in an element of an array of tables, where
+				// Inline does.
+				n := 0
+				switch {
+				case len(table) == 0 && p.Element > 0:
+					n = p.Element
+				case p.Inline > 0 && (p.Element == 0 || elem == p.Element):
+					n = p.Inline
+				}
+				if n > 0 {
+					if node, ok := nthChild(e.Value(), n-1); ok && node.Kind == unstable.InlineTable {
+						if l, c, w, ok := within(&parser, node, p.Key[len(full):], p); ok {
+							return l, c, w, ok
+						}
+					}
+				}
+			}
 			if p.Element != 0 && elem != p.Element {
 				continue
 			}
@@ -223,6 +251,58 @@ func locate(src []byte, p Problem) (line, col, width int, ok bool) {
 	}
 	if header.line > 0 {
 		return header.line, header.col, header.width, true
+	}
+	return 0, 0, 0, false
+}
+
+// nthChild is the i-th value of the array v.
+func nthChild(v *unstable.Node, i int) (*unstable.Node, bool) {
+	n := 0
+	for it := v.Children(); it.Next(); n++ {
+		if n == i {
+			return it.Node(), true
+		}
+	}
+	return nil, false
+}
+
+// within places the mistake p at key in the inline table t: the key, its
+// value or one of the values of its list, or the table itself when key is
+// none or not in it.
+func within(parser *unstable.Parser, t *unstable.Node, key []string, p Problem) (line, col, width int, ok bool) {
+	at := func(n *unstable.Node) (int, int, int, bool) {
+		s := parser.Shape(n.Raw)
+		return s.Start.Line, s.Start.Column, max(1, s.End.Column-s.Start.Column), true
+	}
+	if len(key) > 0 {
+		for it := t.Children(); it.Next(); {
+			kv := it.Node()
+			var parts []string
+			var last *unstable.Node
+			for k := kv.Key(); k.Next(); {
+				last = k.Node()
+				parts = append(parts, string(last.Data))
+			}
+			if !slices.Equal(parts, key) {
+				continue
+			}
+			if p.AtKey {
+				return at(last)
+			}
+			v := kv.Value()
+			if v.Kind == unstable.Array && p.Index >= 0 {
+				if item, ok := nthChild(v, p.Index); ok && item.Raw.Length > 0 {
+					return at(item)
+				}
+			}
+			if v.Raw.Length > 0 {
+				return at(v)
+			}
+			return at(last)
+		}
+	}
+	if t.Raw.Length > 0 {
+		return at(t)
 	}
 	return 0, 0, 0, false
 }

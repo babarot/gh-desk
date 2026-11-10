@@ -12,7 +12,6 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/babarot/gh-desk/internal/model"
-	"github.com/babarot/gh-desk/internal/plan"
 )
 
 // the settings page draws the list again in JavaScript. This writes
@@ -43,7 +42,7 @@ func configuiModel(t *testing.T) *Model {
 	set := testSettings()
 	set.Tabs = set.Tabs[:1]
 	set.Tabs = append(set.Tabs, Tab{Name: "inbox", Inbox: true, Limit: 100})
-	set.Tabs[0].Sections, set.HomeOwners = plan.GroupSections(plan.Groups, nil), nil
+	set.Tabs[0].Sections, set.HomeOwners = reviewSections(), nil
 	m := startSource(t, configuiFixture(t), set)
 	m.Update(tea.WindowSizeMsg{Width: 132, Height: 34})
 	return m

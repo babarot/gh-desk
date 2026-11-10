@@ -1,4 +1,4 @@
-# Tabs and groups
+# Tabs and sections
 
 ## A tab is a search
 
@@ -6,10 +6,14 @@ Each tab is a GitHub search, written in `[[tabs]]` of the config file, in the or
 
 ```toml
 [[tabs]]
-name   = "review"
-query  = "is:open is:pr review-requested:@me archived:false"
-groups = ["you", "team", "bots"]
-folded = ["bots"]
+name  = "review"
+query = "is:open is:pr review-requested:@me archived:false"
+sections = [
+  { name = "requested from you", requested = ["me"], bot = false },
+  { name = "requested from a team", requested = ["@*"], bot = false, show = "folded" },
+  { name = "other", bot = false },
+  { name = "bots", bot = true, show = "folded" },
+]
 
 [[tabs]]
 name  = "infra"
@@ -24,16 +28,32 @@ A tab is read in pages: a small first page so it appears in a few seconds, then 
 
 Once you move the cursor or press a key, it stays on its pull request while the list changes under it: rows read again, rows a rule leaves out or lets back, rows sorting again. If that pull request leaves the list, its row stays where it is, dimmed and marked −, until you move off it, and `r` puts it away.
 
-## Groups
+## Sections
 
-A search tab can be split into groups with `groups`. A group states a fact of the pull request, whatever the query is, and the first that holds wins:
+A tab can be split into sections with `sections`, a list of tables in the order shown. A section takes the keys of `[[select]]` but `packages`, and a pull request goes in the first section whose keys it meets; a section with no key takes the rest. `name` is the head the section is shown under. A section with no name has no head: its rows follow the section above, and it cannot be folded. `show` is how the section is shown:
 
-1. `bots`: the author is a bot
-2. `you`: a review is requested from you in person
-3. `team`: a review is requested from a team
-4. `other`: none of the above
+| `show` | The section |
+|---|---|
+| `"open"` (default) | is shown with its rows |
+| `"folded"` | is folded at start; `h` and `l` fold and unfold the one under the cursor |
+| `"excluded"` | leaves its rows out of this tab, as `[[exclude]]` does, until `a` shows them |
 
-The groups are shown in the order you write them. A group left out is not shown, and nothing in it is selected or acted on from that tab. `folded` names the groups folded at start; `h` and `l` fold and unfold the one under the cursor.
+What no section takes goes in a section called `other` at the end, or in the section you name `other`, where it is. A section with no rows is not shown. In the inbox, `reasons` asks for the reason of the notification, such as `["review_requested"]`.
+
+A section whose keys need what is not read yet, such as `merge` or `checks`, is passed over until it is read: the row goes in a section below meanwhile, its PR column shimmering, and is never left out by it. With `merge`, the tab of your own pull requests can show first those GitHub would let you merge now:
+
+```toml
+[[tabs]]
+name  = "mine"
+query = "is:open is:pr author:@me archived:false"
+sections = [
+  { name = "can merge", merge = ["ready"] },
+  { draft = false },
+  { name = "drafts", draft = true, show = "folded" },
+]
+```
+
+The review tab can leave them out with a first section such as `{ name = "can merge", merge = ["ready"], show = "excluded" }`.
 
 ## The inbox
 
@@ -55,7 +75,9 @@ updated_before_days = 30
 labels = ["wip", "do-not-merge"]
 ```
 
-A tab says how many it leaves out on the last line of its list, and its count in the tab's title leaves them out. While `/` filters the rows, that line counts only those the filter matches, still out of sight. `a` shows them, dimmed and marked ⊘, and hides them again; the status line and the pane say which rule leaves out the row under the cursor. What is left out is never selected, by a group's header or by `S`, nor put away by `d`. A rule is matched again at every draw, so a pull request leaves or comes back as it changes. One whose CI, size, review or labels are not read yet stays until they are, its PR column shimmering, or marked `?` with `theme.shimmer = false`, and the cursor stays on its pull request when rows above it leave.
+To leave pull requests out of one tab only, give the tab a section with `show = "excluded"`.
+
+A tab says how many it leaves out on the last line of its list, and its count in the tab's title leaves them out. While `/` filters the rows, that line counts only those the filter matches, still out of sight. `a` shows them, dimmed and marked ⊘, and hides them again; the status line and the pane say which rule leaves out the row under the cursor. What is left out is never selected, by a section's head or by `S`, nor put away by `d`. A rule is matched again at every draw, so a pull request leaves or comes back as it changes. One whose CI, size, review or labels are not read yet stays until they are, its PR column shimmering, or marked `?` with `theme.shimmer = false`, and the cursor stays on its pull request when rows above it leave.
 
 ## Narrowing a tab
 

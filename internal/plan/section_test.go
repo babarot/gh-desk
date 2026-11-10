@@ -1,7 +1,6 @@
 package plan
 
 import (
-	"reflect"
 	"testing"
 
 	"github.com/babarot/gh-desk/internal/model"
@@ -29,8 +28,6 @@ func TestPlace(t *testing.T) {
 		{"none takes it", []Section{bots}, read, -1, false},
 		{"one that cannot tell is passed over", []Section{passing, rest}, unread, 1, true},
 		{"nothing after it", []Section{passing}, unread, -1, true},
-		{"a group takes what GroupOf puts in it", GroupSections([]Group{GroupTeam, GroupYou}, nil), read, 1, false},
-		{"a group not given takes none", GroupSections([]Group{GroupBots}, nil), read, -1, false},
 	}
 	for _, tt := range tests {
 		at, pending := Place(tt.sections, tt.pr, "me", Facts{ApprovalKnown: true})
@@ -40,10 +37,22 @@ func TestPlace(t *testing.T) {
 	}
 }
 
-func TestGroupSections(t *testing.T) {
-	got := GroupSections([]Group{GroupYou, GroupBots}, []Group{GroupBots})
-	want := []Section{{Name: "you", Show: ShowOpen, Group: GroupYou}, {Name: "bots", Show: ShowFolded, Group: GroupBots}}
-	if !reflect.DeepEqual(got, want) {
-		t.Errorf("GroupSections = %+v, want %+v", got, want)
+// What no section takes goes in the one called other, or in one made for
+// it after the rest; a tab with no sections has none.
+func TestLayout(t *testing.T) {
+	bots := Section{Name: "bots", Rule: Rule{Bot: new(true)}}
+	got, other := Layout([]Section{bots})
+	if len(got) != 2 || got[1].Name != OtherName || other != 1 {
+		t.Errorf("Layout = %+v, %d; want other made after the rest", got, other)
+	}
+	mine := Section{Name: OtherName, Rule: Rule{Draft: new(true)}}
+	if got, other := Layout([]Section{mine, bots}); len(got) != 2 || other != 0 {
+		t.Errorf("Layout = %+v, %d; want the user's other", got, other)
+	}
+	if got, other := Layout(nil); got != nil || other != -1 {
+		t.Errorf("Layout(nil) = %+v, %d", got, other)
+	}
+	if at, _ := PlaceIn(got, other, model.PR{}, "me", Facts{}); at != 1 {
+		t.Errorf("PlaceIn = %d; want what bots does not take in other", at)
 	}
 }

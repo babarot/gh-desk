@@ -702,7 +702,7 @@ func (m *Model) renderRow(r row, cols []column, sel bool, n int) string {
 		if t.foldedAt(r.section) {
 			arrow = "▸"
 		}
-		name := sectionLabel(t.sections[r.section])
+		name := sectionName(t.sections[r.section])
 		label := m.st.group.Render(name)
 		var tail string
 		if t.foldedAt(r.section) {
@@ -828,22 +828,6 @@ func progressOver(cols []column) (from, to, steal int) {
 		steal = min(progressWidth-room, cols[from-1].width-1)
 	}
 	return from, to, steal
-}
-
-// sectionLabel is the head of the section s: what its group was called,
-// for a tab split into groups, or its name.
-func sectionLabel(s plan.Section) string {
-	if l, ok := groupLabel[s.Group]; ok {
-		return l
-	}
-	return sectionName(s)
-}
-
-var groupLabel = map[plan.Group]string{
-	plan.GroupYou:   "requested from you",
-	plan.GroupTeam:  "requested from a team",
-	plan.GroupOther: "other",
-	plan.GroupBots:  "bots",
 }
 
 // repoName is a pull request's repository as the PR column shows it:
