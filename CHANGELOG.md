@@ -1,5 +1,14 @@
 # Changelog
 
+## [v0.17.0](https://github.com/babarot/gh-desk/compare/v0.16.0...v0.17.0) - 2026-11-10
+### New Features
+- Turn a pull request either way between draft and ready with D by @babarot in https://github.com/babarot/gh-desk/pull/121
+- Show in the list and the pane that a pull request conflicts by @babarot in https://github.com/babarot/gh-desk/pull/127
+- Copy the URLs of the pull request or the selection with y by @babarot in https://github.com/babarot/gh-desk/pull/130
+### Improvements
+- Name the tab that could not be read in its error by @babarot in https://github.com/babarot/gh-desk/pull/128
+- Keep the cursor on the pull request the user put it on by @babarot in https://github.com/babarot/gh-desk/pull/129
+
 ## [v0.16.0](https://github.com/babarot/gh-desk/compare/v0.15.0...v0.16.0) - 2026-11-09
 ### New Features
 - Let the TUI run offline, take new settings, and draw on a given terminal by @babarot in https://github.com/babarot/gh-desk/pull/117
