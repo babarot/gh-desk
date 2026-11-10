@@ -96,6 +96,8 @@ func kindName(k kind) string {
 		return "list of glob patterns"
 	case mcpServersKind:
 		return "table of MCP servers"
+	case sectionsKind:
+		return "list of sections"
 	}
 	panic(fmt.Sprintf("config: no name for %T", k))
 }
@@ -207,6 +209,40 @@ func (k stringKind) schema() map[string]any {
 	}
 	return s
 }
+
+// sectionsKind is a tab's sections: a list of inline tables, each a name,
+// how it is shown and the conditions of a rule. They are read by hand, as
+// the rest of a tab is.
+type sectionsKind struct{}
+
+func (sectionsKind) check(string, any) Problems { return nil }
+func (sectionsKind) toml(v any) string {
+	ss := as[[]Section](v)
+	if len(ss) == 0 {
+		return "[]"
+	}
+	var b strings.Builder
+	b.WriteString("[\n")
+	for _, s := range ss {
+		b.WriteString("  " + sectionTOML(s) + ",\n")
+	}
+	b.WriteString("]")
+	return b.String()
+}
+func (sectionsKind) schema() map[string]any {
+	props := map[string]any{
+		"name": map[string]any{"type": "string", "pattern": `\S`, "description": "The head the section's rows are shown under; left out, the section has no head and cannot be folded."},
+		"show": map[string]any{"type": "string", "enum": Shows, "description": `"open" (default), "folded" (its head alone, until unfolded) or "excluded" (left out as an exclusion rule leaves them, until a shows them).`},
+	}
+	for _, e := range sectionElems {
+		props[e.Key] = described(e.Kind.schema(), e.Doc)
+	}
+	return map[string]any{"type": "array", "items": map[string]any{"type": "object", "additionalProperties": false, "properties": props}}
+}
+
+// sectionElems are the conditions a section takes: those of [[exclude]],
+// which does not read the description either.
+var sectionElems = slices.DeleteFunc(slices.Clone(conditionElems), func(e elem) bool { return e.Key == "packages" })
 
 func (k enumKind) check(key string, v any) Problems { return oneOf(key, as[string](v), k.Values) }
 func (enumKind) toml(v any) string                  { return fmt.Sprintf("%q", v) }
@@ -561,9 +597,8 @@ var elems = map[string][]elem{
 		{Key: "kind", Kind: enumKind{TabKinds}, Doc: `"search" (default), a GitHub search, or "inbox", the pull requests in your notifications.`},
 		{Key: "name", Kind: stringKind{NonEmpty: true}, Doc: `The tab's name; "inbox" for the inbox by default.`},
 		{Key: "query", Kind: stringKind{NonEmpty: true}, Doc: "A search's GitHub search query."},
-		{Key: "groups", Kind: listKind{Values: GroupNames, NonEmpty: true}, Doc: "The groups a search is split into, in the order shown."},
-		{Key: "folded", Kind: listKind{Values: GroupNames}, Doc: "The groups folded at start, among groups."},
-		{Key: "sort", Kind: enumKind{TabSorts}, Doc: `"updated" (default) or "drafts_last".`},
+		{Key: "sections", Kind: sectionsKind{}, Doc: `The parts a tab's rows are split into, in the order shown, each an inline table: a name (its head; without one, no head), show ("open", "folded" or "excluded") and the conditions of a rule. A row goes in the first section whose conditions it meets; one with no condition takes the rest, and what none takes goes in other. A section whose conditions wait for what is not read yet is passed over, and never leaves a row out.`},
+		{Key: "sort", Kind: enumKind{TabSorts}, Doc: `"updated" (default): the most recently updated first.`},
 		{Key: "limit", Kind: intKind{Min: 1}, Doc: "How many pull requests, or notifications, to read (at most 1000; 100 by default)."},
 		{Key: "show_settled", Kind: boolKind{}, Doc: "The inbox shows the notifications whose pull request is merged or closed, rather than leave them out with the excluded until a shows them."},
 	},
@@ -625,26 +660,36 @@ const templateHead = `# gh-desk settings. Only what you change goes here: a sett
 const tabsWords = `# The tabs, in the order shown; the keys 1 to 9 go to them. Tabs given here
 # replace all four below, and one of them must be the inbox. A tab is a
 # GitHub search, or with kind = "inbox", the pull requests in your
-# notifications. groups splits a search tab by whom a review is requested
-# from: "you", a "team", or neither ("other"), with pull requests opened by
-# "bots" apart; the groups are shown in the order given, a group left out is
-# not shown, and one with no rows is not shown either. folded are the groups
-# folded at start. sort is "updated" (default) or "drafts_last". limit is
-# how many pull requests, or notifications, to read (at most 1000; 100 by
-# default). The inbox hides notifications whose pull request is merged or
-# closed until they are shown with a key; show_settled = true shows them
+# notifications. sections split a tab into parts by rules: each takes the
+# keys of [[select]] but packages, a pull request goes in the first section
+# it meets, and one with no condition takes the rest. name is the head the
+# section is shown under; a section with no name has no head. show is "open"
+# (default), "folded" (folded at start) or "excluded" (counted as excluded
+# until a shows them). What no section takes goes in "other" at the end, or
+# in the section named "other" where it is; a section with no rows is not
+# shown. reasons is read only by the inbox. sort is "updated" (default).
+# limit is how many pull requests, or notifications, to read (at most 1000;
+# 100 by default). The inbox hides notifications whose pull request is merged
+# or closed until they are shown with a key; show_settled = true shows them
 # from the start.
 #
 # [[tabs]]
 # name = "review"
 # query = "is:open is:pr review-requested:@me archived:false"
-# groups = ["you", "team", "other", "bots"]
-# folded = ["team", "bots"]
+# sections = [
+#   { name = "requested from you", requested = ["me"], bot = false },
+#   { name = "requested from a team", requested = ["@*"], bot = false, show = "folded" },
+#   { name = "other", bot = false },
+#   { name = "bots", bot = true, show = "folded" },
+# ]
 #
 # [[tabs]]
 # name = "mine"
 # query = "is:open is:pr author:@me archived:false"
-# sort = "drafts_last"
+# sections = [
+#   { draft = false },
+#   { draft = true },
+# ]
 #
 # [[tabs]]
 # name = "involved"
@@ -716,9 +761,10 @@ const selectExample = `# A rule on the packages a bot's pull request updates:
 
 const excludeWords = `# Rules that leave pull requests out of every tab, until a shows them. They
 # take the keys of [[select]] but packages, and name may be left out; a pull
-# request is left out when it meets every key of one of them. The inbox
-# leaves out its notifications on merged or closed pull requests too, unless
-# its show_settled is true.
+# request is left out when it meets every key of one of them. To leave them
+# out of one tab only, give that tab a section with show = "excluded". The
+# inbox leaves out its notifications on merged or closed pull requests too,
+# unless its show_settled is true.
 #
 # [[exclude]]
 # name = "old upgrades"
@@ -1078,13 +1124,10 @@ func Show(f File, onlyDiff bool) string {
 			fmt.Fprintf(&b, "name = %q\n", t.Name)
 			if !t.Inbox() {
 				fmt.Fprintf(&b, "query = %q\n", t.Query)
-				if len(t.Groups) > 0 {
-					b.WriteString("groups = " + tomlList(t.Groups) + "\n")
-				}
-				if len(t.Folded) > 0 {
-					b.WriteString("folded = " + tomlList(t.Folded) + "\n")
-				}
 				fmt.Fprintf(&b, "sort = %q\n", t.Sort)
+			}
+			if len(t.Sections) > 0 {
+				b.WriteString("sections = " + sectionsKind{}.toml(t.Sections) + "\n")
 			}
 			fmt.Fprintf(&b, "limit = %d\n", t.Limit)
 			if t.Inbox() {
@@ -1151,8 +1194,30 @@ func rulesText(rules []Select) string {
 }
 
 func sameTab(a, b Tab) bool {
-	return a.Kind == b.Kind && a.Name == b.Name && a.Query == b.Query && slices.Equal(a.Groups, b.Groups) &&
-		slices.Equal(a.Folded, b.Folded) && a.Sort == b.Sort && a.Limit == b.Limit && a.ShowSettled == b.ShowSettled
+	return a.Kind == b.Kind && a.Name == b.Name && a.Query == b.Query &&
+		slices.EqualFunc(a.Sections, b.Sections, func(x, y Section) bool { return sectionTOML(x) == sectionTOML(y) }) &&
+		a.Sort == b.Sort && a.Limit == b.Limit && a.ShowSettled == b.ShowSettled
+}
+
+// sectionTOML is s as an inline table on one line, as a tab's sections are
+// written: its name, its conditions, and how it is shown unless it is open.
+func sectionTOML(s Section) string {
+	var parts []string
+	if s.Name != "" {
+		parts = append(parts, fmt.Sprintf("name = %q", s.Name))
+	}
+	var b strings.Builder
+	writeConditions(&b, s.Conditions)
+	for l := range strings.Lines(b.String()) {
+		parts = append(parts, strings.TrimSuffix(l, "\n"))
+	}
+	if s.Show != "" && s.Show != "open" {
+		parts = append(parts, fmt.Sprintf("show = %q", s.Show))
+	}
+	if len(parts) == 0 {
+		return "{}"
+	}
+	return "{ " + strings.Join(parts, ", ") + " }"
 }
 
 // writeConditions writes the conditions c sets, as the file takes them.

@@ -22,13 +22,20 @@ The tabs, in the order shown; the keys 1 to 9 go to them. Tabs given replace the
 [[tabs]]
 name = "review"
 query = "is:open is:pr review-requested:@me archived:false"
-groups = ["you", "team", "other", "bots"]
-folded = ["team", "bots"]
+sections = [
+  { name = "requested from you", requested = ["me"], bot = false },
+  { name = "requested from a team", requested = ["@*"], bot = false, show = "folded" },
+  { name = "other", bot = false },
+  { name = "bots", bot = true, show = "folded" },
+]
 
 [[tabs]]
 name = "mine"
 query = "is:open is:pr author:@me archived:false"
-sort = "drafts_last"
+sections = [
+  { draft = false },
+  { draft = true },
+]
 
 [[tabs]]
 name = "involved"
@@ -45,9 +52,8 @@ show_settled = false
 | `kind` | one of `search`, `inbox` | "search" (default), a GitHub search, or "inbox", the pull requests in your notifications. |
 | `name` | string | The tab's name; "inbox" for the inbox by default. |
 | `query` | string | A search's GitHub search query. |
-| `groups` | list of `you`, `team`, `other`, `bots` | The groups a search is split into, in the order shown. |
-| `folded` | list of `you`, `team`, `other`, `bots` | The groups folded at start, among groups. |
-| `sort` | one of `updated`, `drafts_last` | "updated" (default) or "drafts_last". |
+| `sections` | list of sections | The parts a tab's rows are split into, in the order shown, each an inline table: a name (its head; without one, no head), show ("open", "folded" or "excluded") and the conditions of a rule. A row goes in the first section whose conditions it meets; one with no condition takes the rest, and what none takes goes in other. A section whose conditions wait for what is not read yet is passed over, and never leaves a row out. |
+| `sort` | one of `updated` | "updated" (default): the most recently updated first. |
 | `limit` | integer, 1 or more | How many pull requests, or notifications, to read (at most 1000; 100 by default). |
 | `show_settled` | boolean | The inbox shows the notifications whose pull request is merged or closed, rather than leave them out with the excluded until a shows them. |
 

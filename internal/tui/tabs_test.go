@@ -53,9 +53,10 @@ func TestInboxAnywhere(t *testing.T) {
 	}
 }
 
-func TestGroupsInTheOrderGiven(t *testing.T) {
+// The sections are shown in the order written.
+func TestSectionsInTheOrderGiven(t *testing.T) {
 	set := testSettings()
-	set.Tabs[0].Sections = plan.GroupSections([]plan.Group{plan.GroupBots, plan.GroupYou}, nil)
+	set.Tabs[0].Sections = pickSections([]string{secBots, secYou})
 	m := startSet(t, set, 130)
 	s := screen(m)
 	bots, you := strings.Index(s, "▾ bots"), strings.Index(s, "▾ requested from you")
@@ -63,7 +64,7 @@ func TestGroupsInTheOrderGiven(t *testing.T) {
 		t.Fatalf("want bots, then you:\n%s", s)
 	}
 	if strings.Contains(s, "requested from a team") || strings.Contains(s, "Rework the settings page") {
-		t.Errorf("a group left out of groups is shown:\n%s", s)
+		t.Errorf("an excluded section is shown:\n%s", s)
 	}
 	// The header counts no section: its heads do.
 	if h := headerLine(m); strings.Contains(h, "to you") || strings.Contains(h, "bots") {
@@ -115,19 +116,19 @@ func TestTabsThatDoNotFit(t *testing.T) {
 	}
 }
 
-func TestGroupLeftOutIsNotSelected(t *testing.T) {
-	// A rule that picks bots' pull requests: with bots left out of the
-	// tab's groups, renovate's is neither shown nor picked.
+func TestExcludedSectionIsNotSelected(t *testing.T) {
+	// A rule that picks bots' pull requests: with the bots' section
+	// excluded, renovate's is neither shown nor picked.
 	set := testSettings()
 	set.Rules = []plan.Rule{{Name: "bots", Bot: new(true)}}
-	set.Tabs[0].Sections = plan.GroupSections([]plan.Group{plan.GroupYou, plan.GroupTeam}, []plan.Group{plan.GroupTeam, plan.GroupBots})
+	set.Tabs[0].Sections = pickSections([]string{secYou, secTeam}, secTeam, secBots)
 	m := startSet(t, set, 130)
 	for _, r := range m.rules() {
 		if hits := m.ruleMatches(r); len(hits) > 0 {
-			t.Errorf("rule %q picked %v from groups not shown", r.Name, hits[0].Key)
+			t.Errorf("rule %q picked %v from a section excluded", r.Name, hits[0].Key)
 		}
 	}
-	set.Tabs[0].Sections = plan.GroupSections(plan.Groups, []plan.Group{plan.GroupTeam, plan.GroupBots})
+	set.Tabs[0].Sections = reviewSections(secTeam, secBots)
 	m = startSet(t, set, 130)
 	picked := false
 	for _, r := range m.rules() {

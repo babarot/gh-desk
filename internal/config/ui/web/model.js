@@ -15,7 +15,9 @@ function load(t){const d={vals:{},arr:{},keys:{},comments:t.__comments||0};
   for(const a of ARR)if(a in t)d.arr[a]=t[a];Object.assign(d.keys,t.keys||{});return d}
 function keyDefault(a){const k=KEYS.find(x=>x.action===a);if(!k||!k.keys)return undefined;return k.keys.length===1?k.keys[0]:k.keys}
 function genToml(d){const out=['#:schema '+DATA.schema,''];
-  const wr=(n,rows)=>{for(const r of rows){out.push(`[[${n}]]`);for(const[k,v]of Object.entries(r))out.push(`${k} = ${tomlVal(v)}`);out.push('')}};
+  // A list of tables, such as a tab's sections, is one table a line, as config show writes it.
+  const line=(k,v)=>Array.isArray(v)&&v.length&&v.every(x=>x&&typeof x==='object'&&!Array.isArray(x))?`${k} = [\n${v.map(x=>'  '+tomlVal(x)+',').join('\n')}\n]`:`${k} = ${tomlVal(v)}`;
+  const wr=(n,rows)=>{for(const r of rows){out.push(`[[${n}]]`);for(const[k,v]of Object.entries(r))out.push(line(k,v));out.push('')}};
   if(d.arr.select&&!d.arr.select.length)out.push('select = []','');
   for(const n of ARR)if(d.arr[n]&&d.arr[n].length)wr(n,d.arr[n]);
   for(const t of DATA.tables){const ls=DATA.settings.filter(s=>s.table===t.name&&s.key in d.vals).map(s=>`${s.name} = ${tomlVal(d.vals[s.key])}`);if(ls.length)out.push(`[${t.name}]`,...ls,'')}

@@ -8,6 +8,61 @@ import (
 	"github.com/babarot/gh-desk/internal/plan"
 )
 
+// The names of the sections of the default review tab.
+const (
+	secYou   = "requested from you"
+	secTeam  = "requested from a team"
+	secOther = "other"
+	secBots  = "bots"
+)
+
+// reviewSections are the sections of the default review tab, with those
+// named in folded folded at start.
+func reviewSections(folded ...string) []plan.Section {
+	person, bot := false, true
+	ss := []plan.Section{
+		{Name: secYou, Rule: plan.Rule{Name: secYou, Requested: []string{"me"}, Bot: &person}},
+		{Name: secTeam, Rule: plan.Rule{Name: secTeam, Requested: []string{"@*"}, Bot: &person}},
+		{Name: secOther, Rule: plan.Rule{Name: secOther, Bot: &person}},
+		{Name: secBots, Rule: plan.Rule{Name: secBots, Bot: &bot}},
+	}
+	for i := range ss {
+		ss[i].Show = plan.ShowOpen
+		if slices.Contains(folded, ss[i].Name) {
+			ss[i].Show = plan.ShowFolded
+		}
+	}
+	return ss
+}
+
+// pickSections are the sections of the default review tab named in names,
+// in that order, then the others excluded, as a file of groups that left
+// them out is rewritten.
+func pickSections(names []string, folded ...string) []plan.Section {
+	all := reviewSections(folded...)
+	var out []plan.Section
+	for _, n := range names {
+		out = append(out, all[slices.IndexFunc(all, func(s plan.Section) bool { return s.Name == n })])
+	}
+	for _, s := range all {
+		if !slices.Contains(names, s.Name) {
+			s.Show = plan.ShowExcluded
+			out = append(out, s)
+		}
+	}
+	return out
+}
+
+// mineSections are the sections of the default tab of one's own pull
+// requests: the drafts after the rest, with no heads.
+func mineSections() []plan.Section {
+	ready, draft := false, true
+	return []plan.Section{
+		{Show: plan.ShowOpen, Rule: plan.Rule{Draft: &ready}},
+		{Show: plan.ShowOpen, Rule: plan.Rule{Draft: &draft}},
+	}
+}
+
 // withSections are the test settings with the review tab split into the
 // sections ss.
 func withSections(ss ...plan.Section) Settings {
@@ -148,5 +203,21 @@ func TestASectionWithNoNameIsNotFolded(t *testing.T) {
 	tb.setFolded(0, true)
 	if tb.foldedAt(0) || tb.folded[""] {
 		t.Errorf("a section with no name was folded: %v", tb.folded)
+	}
+}
+
+// The inbox is split by its sections too, which may ask for the reason of
+// the notification.
+func TestInboxSectionsByReason(t *testing.T) {
+	set := testSettings()
+	set.Tabs[3].Sections = []plan.Section{{Name: "asked", Show: plan.ShowOpen, Rule: plan.Rule{Reasons: []string{"review_requested"}}}}
+	m := startSource(t, fixture(), set)
+	press(m, "4")
+	s := screen(m)
+	if got := heads(m); len(got) == 0 || got[0] != "asked" {
+		t.Fatalf("heads = %v, want asked first\n%s", got, s)
+	}
+	if asked, row := strings.Index(s, "▾ asked"), strings.Index(s, "api#12"); asked < 0 || row < asked {
+		t.Errorf("the notification asking for a review is not under its section:\n%s", s)
 	}
 }

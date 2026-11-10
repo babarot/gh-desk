@@ -556,15 +556,7 @@ func Settings(cfg config.File) tui.Settings {
 		set.Plan.Methods = append(set.Plan.Methods, model.MergeMethod(strings.ToUpper(m)))
 	}
 	for _, t := range cfg.Tabs {
-		tt := tui.Tab{Name: t.Name, Inbox: t.Inbox(), Query: t.Query, DraftsLast: t.Sort == "drafts_last", Limit: t.Limit, ShowSettled: t.ShowSettled}
-		var groups, folded []plan.Group
-		for _, g := range t.Groups {
-			groups = append(groups, plan.Group(g))
-		}
-		for _, g := range t.Folded {
-			folded = append(folded, plan.Group(g))
-		}
-		tt.Sections = plan.GroupSections(groups, folded)
+		tt := tui.Tab{Name: t.Name, Inbox: t.Inbox(), Query: t.Query, Limit: t.Limit, ShowSettled: t.ShowSettled, Sections: sections(t.Sections)}
 		set.Tabs = append(set.Tabs, tt)
 	}
 	return set
@@ -738,6 +730,16 @@ func checks(ss []string) []plan.Checks {
 	var out []plan.Checks
 	for _, s := range ss {
 		out = append(out, plan.Checks(s))
+	}
+	return out
+}
+
+// sections are a tab's sections as the file gives them, each a rule named
+// after it.
+func sections(ss []config.Section) []plan.Section {
+	var out []plan.Section
+	for _, s := range ss {
+		out = append(out, plan.Section{Name: s.Name, Show: plan.Show(s.Show), Rule: rule(s.Name, s.Conditions)})
 	}
 	return out
 }

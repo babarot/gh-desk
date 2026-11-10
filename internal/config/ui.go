@@ -58,7 +58,7 @@ type UIData struct {
 // UI is the table of settings as the settings page takes it.
 func UI() UIData {
 	def := Default()
-	d := UIData{Elems: map[string][]UIElem{}, Schema: SchemaURL, DefaultRules: tomlTables(defaultSelect, "select"), DefaultTabs: tomlTables(uncommented(tabsWords), "tabs")}
+	d := UIData{Elems: map[string][]UIElem{}, Schema: SchemaURL, DefaultRules: tomlTables(defaultSelect, "select"), DefaultTabs: tomlTables(Show(def, false), "tabs")}
 	for _, s := range settings {
 		table, name := splitKey(s.Key)
 		u := UISetting{Key: s.Key, Table: table, Name: name, Doc: s.Doc, Kind: uiKind(s.Kind), Example: strings.Trim(s.Example, `"`)}
@@ -114,23 +114,6 @@ func tomlTables(src, name string) any {
 		panic(fmt.Sprintf("config: %s: %v", name, err))
 	}
 	return t[name]
-}
-
-// uncommented are the commented-out example lines of words.
-func uncommented(words string) string {
-	var b strings.Builder
-	for line := range strings.Lines(words) {
-		l, ok := strings.CutPrefix(line, "# ")
-		if ok && (strings.HasPrefix(l, "[[") || isKeyLine(l)) {
-			b.WriteString(l)
-		}
-	}
-	return b.String()
-}
-
-func isKeyLine(l string) bool {
-	k, _, ok := strings.Cut(l, " = ")
-	return ok && k != "" && strings.Trim(k, "abcdefghijklmnopqrstuvwxyz_") == ""
 }
 
 // Raw is the file as written: the keys in it and nothing else, which a

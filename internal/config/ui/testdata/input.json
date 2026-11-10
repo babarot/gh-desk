@@ -1,4 +1,25 @@
 {
+ "tabs": [
+  {
+   "name": "bots",
+   "query": "is:open is:pr author:app/renovate",
+   "sections": [
+    {
+     "name": "can merge",
+     "merge": [
+      "ready"
+     ]
+    },
+    {
+     "draft": true,
+     "show": "excluded"
+    }
+   ]
+  },
+  {
+   "kind": "inbox"
+  }
+ ],
  "list": {
   "refresh": "90s",
   "bell": true,

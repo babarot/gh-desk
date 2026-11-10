@@ -305,8 +305,14 @@ func uiConfig(ctx context.Context, path string, debug bool, ask confirmer, open 
 		fmt.Fprintf(stderr, "gh-desk: %v\n", err)
 		return 1
 	}
+	// What the rules and the sections make of the rows when the page opens;
+	// the page asks again as the file is changed.
+	judged, err := shown.judge(src, time.Now())
+	if err != nil {
+		judged = nil
+	}
 	page, err := ui.Page(ui.Input{File: ui.File{Path: config.TildePath(path), Src: src}, Keys: uiKeys(),
-		Themes: tui.Palettes(), Spinners: tui.Spinners(), Lists: shown.lists, Live: true})
+		Themes: tui.Palettes(), Spinners: tui.Spinners(), Lists: shown.lists, Judged: judged, Live: true})
 	if err != nil {
 		fmt.Fprintf(stderr, "gh-desk: %v\n", err)
 		return 1

@@ -1,6 +1,6 @@
 // Package plan decides things about pull requests without asking anyone:
-// which group a review request falls in, whether its checks pass, and what
-// a dependency bot's pull request updates. Everything here is a function of
+// which section of a tab one goes in, whether its checks pass, and what a
+// dependency bot's pull request updates. Everything here is a function of
 // its arguments, so it is tested without GitHub.
 package plan
 
@@ -11,43 +11,6 @@ import (
 
 	"github.com/babarot/gh-desk/internal/model"
 )
-
-// Group is where a pull request is listed in a grouped tab. A group says
-// only what holds of the pull request itself, never what the tab's query
-// implies, so it is true whatever the query is. See ADR-015.
-type Group string
-
-const (
-	// GroupYou is a pull request whose review is requested from the viewer
-	// in person.
-	GroupYou Group = "you"
-	// GroupTeam is a pull request whose review is requested from a team,
-	// whether or not the viewer is on it.
-	GroupTeam Group = "team"
-	// GroupOther is a pull request with neither request.
-	GroupOther Group = "other"
-	// GroupBots is a pull request opened by a bot.
-	GroupBots Group = "bots"
-)
-
-// Groups are the groups in the order a grouped tab lists them.
-var Groups = []Group{GroupYou, GroupTeam, GroupOther, GroupBots}
-
-// GroupOf is the group p falls in for viewer: the first of bots, you, team
-// and other that holds. Groups do not overlap, so a bot's pull request is
-// in bots even when it is requested from the viewer.
-func GroupOf(p model.PR, viewer string) Group {
-	switch {
-	case p.AuthorIsBot:
-		return GroupBots
-	case p.RequestedFrom(viewer):
-		return GroupYou
-	case p.RequestedFromTeam():
-		return GroupTeam
-	default:
-		return GroupOther
-	}
-}
 
 // ChecksPass reports whether p's checks have passed: every check succeeded,
 // there are none, or only checks that wait for an approval are pending.

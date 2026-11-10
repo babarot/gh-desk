@@ -38,10 +38,11 @@ var (
 	Themes = []string{"default", "latte", "github-dark", "github-light", "tokyonight", "tokyonight-day", "gruvbox-dark", "gruvbox-light", "nord"}
 	// Spinners are the spinners internal/tui draws; a test in
 	// internal/app keeps the two in step.
-	Spinners          = []string{"dots", "dense", "bounce", "snake", "jump", "fill", "sand", "line", "arc", "quarter", "block", "star", "off"}
-	TabKinds          = []string{"search", "inbox"}
-	TabSorts          = []string{"updated", "drafts_last"}
-	GroupNames        = []string{"you", "team", "other", "bots"}
+	Spinners = []string{"dots", "dense", "bounce", "snake", "jump", "fill", "sand", "line", "arc", "quarter", "block", "star", "off"}
+	TabKinds = []string{"search", "inbox"}
+	TabSorts = []string{"updated"}
+	// Shows are how a tab shows the pull requests of a section.
+	Shows             = []string{"open", "folded", "excluded"}
 	PaneTabs          = []string{"overview", "diff"}
 	DescriptionStyles = []string{"rendered", "plain"}
 	MergeMethods      = []string{"merge", "squash", "rebase"}
@@ -97,18 +98,29 @@ type Tab struct {
 	Kind  string
 	Name  string
 	Query string
-	// Groups are the groups a search tab is split into, in the order
-	// shown; none leaves it unsplit.
-	Groups []string
-	// Folded are the groups folded at start.
-	Folded []string
-	// Sort is "updated" or "drafts_last".
+	// Sections are the parts the tab's rows are split into, in the order
+	// shown; a row goes in the first whose conditions it meets. None
+	// leaves it unsplit.
+	Sections []Section
+	// Sort is "updated".
 	Sort string
 	// Limit is how many pull requests, or notifications, to read.
 	Limit int
 	// ShowSettled has the inbox show the notifications whose pull request
 	// is merged or closed, rather than leave them out with the excluded.
 	ShowSettled bool
+}
+
+// Section is a part of a tab: the pull requests its conditions match that
+// no section above it took. A section with no condition takes the rest.
+type Section struct {
+	// Name is the head the section's rows are shown under; empty for none,
+	// and then it has no head.
+	Name string
+	// Show is "open", "folded" (its head alone, until unfolded) or
+	// "excluded" (left out, as an exclusion rule leaves them).
+	Show string
+	Conditions
 }
 
 // Inbox reports whether t is the inbox.
@@ -484,13 +496,33 @@ func defaultRules() []Select {
 	return rules
 }
 
+// reviewSections are the sections of the default review tab: whom the
+// review is asked of, a bot's pull request last, as it is judged first.
+func reviewSections() []Section {
+	return []Section{
+		{Name: "requested from you", Show: "open", Conditions: Conditions{Requested: []string{"me"}, Bot: new(false)}},
+		{Name: "requested from a team", Show: "folded", Conditions: Conditions{Requested: []string{"@*"}, Bot: new(false)}},
+		{Name: "other", Show: "open", Conditions: Conditions{Bot: new(false)}},
+		{Name: "bots", Show: "folded", Conditions: Conditions{Bot: new(true)}},
+	}
+}
+
+// mineSections are the sections of the default tab of one's own pull
+// requests: the drafts after the rest, with no heads.
+func mineSections() []Section {
+	return []Section{
+		{Show: "open", Conditions: Conditions{Draft: new(false)}},
+		{Show: "open", Conditions: Conditions{Draft: new(true)}},
+	}
+}
+
 // Default is the config with every setting at its default.
 func Default() File {
 	return File{
 		Tabs: []Tab{
-			{Kind: "search", Name: "review", Query: "is:open is:pr review-requested:@me archived:false", Groups: slices.Clone(GroupNames),
-				Folded: []string{"team", "bots"}, Sort: "updated", Limit: 100},
-			{Kind: "search", Name: "mine", Query: "is:open is:pr author:@me archived:false", Sort: "drafts_last", Limit: 100},
+			{Kind: "search", Name: "review", Query: "is:open is:pr review-requested:@me archived:false", Sections: reviewSections(),
+				Sort: "updated", Limit: 100},
+			{Kind: "search", Name: "mine", Query: "is:open is:pr author:@me archived:false", Sections: mineSections(), Sort: "updated", Limit: 100},
 			{Kind: "search", Name: "involved", Query: "is:open is:pr involves:@me -author:@me -review-requested:@me archived:false", Sort: "updated", Limit: 100},
 			{Kind: "inbox", Name: "inbox", Limit: 100},
 		},
@@ -572,14 +604,25 @@ type (
 		Keys        map[string]any   `toml:"keys"`
 	}
 	tabDoc struct {
-		Kind        *string   `toml:"kind"`
-		Name        *string   `toml:"name"`
-		Query       *string   `toml:"query"`
-		Groups      *[]string `toml:"groups"`
-		Folded      *[]string `toml:"folded"`
+		Kind     *string       `toml:"kind"`
+		Name     *string       `toml:"name"`
+		Query    *string       `toml:"query"`
+		Sections *[]sectionDoc `toml:"sections"`
+		// Groups and Folded are read only to tell how to write them as
+		// sections; they are no setting.
+		Groups      *[]string `toml:"groups" removed:"true"`
+		Folded      *[]string `toml:"folded" removed:"true"`
 		Sort        *string   `toml:"sort"`
 		Limit       *int      `toml:"limit"`
 		ShowSettled *bool     `toml:"show_settled"`
+	}
+	sectionDoc struct {
+		Name *string `toml:"name"`
+		Show *string `toml:"show"`
+		// Packages is read only to tell it is not a condition of a section:
+		// the decoder would name a key it does not know in the tab.
+		Packages *[]string `toml:"packages" removed:"true"`
+		conditionDoc
 	}
 	listDoc struct {
 		Refresh    *Duration `toml:"refresh"`
@@ -847,7 +890,7 @@ func tabsFrom(ds []tabDoc) ([]Tab, Problems) {
 		if t.Inbox() {
 			inboxes++
 			t.Name, t.Sort = "inbox", ""
-			for key, given := range map[string]bool{"query": d.Query != nil, "groups": d.Groups != nil, "folded": d.Folded != nil, "sort": d.Sort != nil} {
+			for key, given := range map[string]bool{"query": d.Query != nil, "sort": d.Sort != nil} {
 				if given {
 					at(i, key, "is not read by the inbox")
 				}
@@ -857,8 +900,6 @@ func tabsFrom(ds []tabDoc) ([]Tab, Problems) {
 		}
 		set(&t.Name, d.Name)
 		set(&t.Query, d.Query)
-		set(&t.Groups, d.Groups)
-		set(&t.Folded, d.Folded)
 		set(&t.Sort, d.Sort)
 		set(&t.Limit, d.Limit)
 		set(&t.ShowSettled, d.ShowSettled)
@@ -875,28 +916,33 @@ func tabsFrom(ds []tabDoc) ([]Tab, Problems) {
 			} else if strings.TrimSpace(t.Query) == "" {
 				at(i, "query", "must not be empty")
 			}
-			if !slices.Contains(TabSorts, t.Sort) {
+			switch {
+			case t.Sort == "drafts_last" && d.Groups == nil:
+				at(i, "sort", `"drafts_last" was replaced by sections; write the drafts as a section after the rest:%s`, sectionsWords(groupSections(nil, nil, true)))
+			case t.Sort == "drafts_last":
+				at(i, "sort", `"drafts_last" was replaced by sections, which cannot also put the drafts last in each of them; see groups`)
+			case !slices.Contains(TabSorts, t.Sort):
 				at(i, "sort", "must be one of %s, got %q%s", quoted(TabSorts), t.Sort, didYouMean(t.Sort, TabSorts))
 			}
+			t.Sort = "updated"
 		}
-		if d.Groups != nil && len(t.Groups) == 0 {
-			at(i, "groups", "must name at least one group; leave it out to show the tab unsplit")
-		}
-		for j, g := range t.Groups {
-			switch {
-			case !slices.Contains(GroupNames, g):
-				ps = append(ps, Problem{Key: []string{"tabs", "groups"}, Element: i + 1, Index: j,
-					Message: fmt.Sprintf("tabs[%d].groups must name groups among %s, got %q%s", i, quoted(GroupNames), g, didYouMean(g, GroupNames))})
-			case slices.Contains(t.Groups[:j], g):
-				ps = append(ps, Problem{Key: []string{"tabs", "groups"}, Element: i + 1, Index: j,
-					Message: fmt.Sprintf("tabs[%d].groups names %q twice", i, g)})
+		if d.Groups != nil {
+			var folded []string
+			if d.Folded != nil {
+				folded = *d.Folded
 			}
-		}
-		for j, g := range t.Folded {
-			if !slices.Contains(t.Groups, g) {
-				ps = append(ps, Problem{Key: []string{"tabs", "folded"}, Element: i + 1, Index: j,
-					Message: fmt.Sprintf("tabs[%d].folded must name groups among its groups, got %q", i, g)})
+			ss := groupSections(*d.Groups, folded, false)
+			msg := "groups was replaced by sections, which say what each group was; write" + sectionsWords(ss)
+			if note := groupsNote(*d.Groups); note != "" {
+				msg += "\n" + note
 			}
+			at(i, "groups", "%s", msg)
+		}
+		if d.Folded != nil {
+			at(i, "folded", `was replaced by show = "folded" on a section; see groups`)
+		}
+		if d.Sections != nil {
+			t.Sections = sectionsFrom(&ps, i, t.Inbox(), *d.Sections)
 		}
 		if t.Limit < 1 || t.Limit > 1000 {
 			at(i, "limit", "must be between 1 and 1000, got %d", t.Limit)
@@ -910,6 +956,129 @@ func tabsFrom(ds []tabDoc) ([]Tab, Problems) {
 	return tabs, ps
 }
 
+// sectionsFrom reads the sections of the tab i and reports what is wrong
+// with them.
+func sectionsFrom(ps *Problems, i int, inbox bool, ds []sectionDoc) []Section {
+	var out []Section
+	names := map[string]bool{}
+	for j, d := range ds {
+		r := elemReporter{ps: ps, table: "tabs", i: i, sub: "sections", j: j}
+		s := Section{Show: "open"}
+		set(&s.Name, d.Name)
+		set(&s.Show, d.Show)
+		if !slices.Contains(Shows, s.Show) {
+			r.at("show", "must be one of %s, got %q%s", quoted(Shows), s.Show, didYouMean(s.Show, Shows))
+		}
+		// A section with no condition takes the rest, which is what one
+		// written last is for.
+		s.Conditions = conditionsFrom(d.conditionDoc, nil, s.Name, r)
+		switch {
+		case d.Name != nil && strings.TrimSpace(s.Name) == "":
+			r.at("name", "must not be empty; leave it out for a section with no head")
+		case names[s.Name]:
+			r.at("name", "%q is used twice in the tab", s.Name)
+		case s.Name == "" && s.Show == "folded":
+			r.at("show", "a section with no name has no head to unfold it by, so it cannot be folded")
+		case s.Name == "" && s.Show == "excluded" && noCondition(d.conditionDoc):
+			r.at("", "excludes every pull request left, with no name to say so by; give it a name or a condition")
+		}
+		if s.Name != "" {
+			names[s.Name] = true
+		}
+		if d.Packages != nil {
+			r.at("packages", "is not a condition of a section: it reads the body of every bot pull request in the tab")
+		}
+		if !inbox && d.Reasons != nil {
+			r.at("reasons", `is read only in the inbox (kind = "inbox"): the rows of a search have no notification`)
+		}
+		out = append(out, s)
+	}
+	return out
+}
+
+// groupNames are what each group's head said, which its section is named.
+var groupNames = map[string]string{"you": "requested from you", "team": "requested from a team", "other": "other", "bots": "bots"}
+
+// groupSections are the sections that show what the groups did: each group
+// a section, you, team and other in that order, since other was what a
+// review is asked of neither of, which a condition can say only by coming
+// after them; bots where it was written among them, since no other takes a
+// bot's pull request, and last when it was not written. A group not
+// written is excluded where it is, so that it is not shown as it was not.
+// draftsLast with no groups puts the drafts after the rest.
+func groupSections(groups, folded []string, draftsLast bool) []Section {
+	if groups == nil {
+		if !draftsLast {
+			return nil
+		}
+		return mineSections()
+	}
+	cond := map[string]Conditions{
+		"you":   {Requested: []string{"me"}, Bot: new(false)},
+		"team":  {Requested: []string{"@*"}, Bot: new(false)},
+		"other": {Bot: new(false)},
+		"bots":  {Bot: new(true)},
+	}
+	order := []string{"you", "team", "other"}
+	at := len(order)
+	if i := slices.Index(groups, "bots"); i >= 0 {
+		at = 0
+		for _, g := range groups[:i] {
+			if g != "bots" {
+				at++
+			}
+		}
+	}
+	order = slices.Insert(order, at, "bots")
+	var out []Section
+	for _, g := range order {
+		s := Section{Name: groupNames[g], Show: "open", Conditions: cond[g]}
+		switch {
+		case !slices.Contains(groups, g):
+			s.Show = "excluded"
+		case slices.Contains(folded, g):
+			s.Show = "folded"
+		}
+		out = append(out, s)
+	}
+	return out
+}
+
+// groupsNote says what the sections of groups do otherwise than the
+// groups did: the order of you, team and other, and the groups not shown.
+func groupsNote(groups []string) string {
+	var notes []string
+	var people []string
+	for _, g := range groups {
+		if g != "bots" {
+			people = append(people, g)
+		}
+	}
+	if !slices.IsSortedFunc(people, func(a, b string) int {
+		return slices.Index([]string{"you", "team", "other"}, a) - slices.Index([]string{"you", "team", "other"}, b)
+	}) {
+		notes = append(notes, "you, team and other come in that order: other is what neither of the others takes")
+	}
+	for _, g := range []string{"you", "team", "other", "bots"} {
+		if !slices.Contains(groups, g) {
+			notes = append(notes, `a group not written is excluded: its pull requests are counted as excluded, and a shows them`)
+			break
+		}
+	}
+	return strings.Join(notes, "; ")
+}
+
+// sectionsWords are ss as the file writes them, indented under a message.
+func sectionsWords(ss []Section) string {
+	var b strings.Builder
+	b.WriteString("\n    sections = [\n")
+	for _, s := range ss {
+		b.WriteString("      " + sectionTOML(s) + ",\n")
+	}
+	b.WriteString("    ]")
+	return b.String()
+}
+
 // selectFrom reads the rules S offers and reports what is wrong with
 // them.
 func selectFrom(ds []selectDoc) ([]Select, Problems) {
@@ -917,7 +1086,7 @@ func selectFrom(ds []selectDoc) ([]Select, Problems) {
 	var out []Select
 	seen := map[string]bool{"approved by me": true}
 	for i, d := range ds {
-		r := elemReporter{&ps, "select", i}
+		r := elemReporter{ps: &ps, table: "select", i: i, j: -1}
 		at := r.at
 		switch {
 		case strings.TrimSpace(d.Name) == "":
@@ -954,7 +1123,7 @@ func excludeFrom(ds []excludeDoc) ([]Exclude, Problems) {
 	var out []Exclude
 	seen := map[string]bool{}
 	for i, d := range ds {
-		r := elemReporter{&ps, "exclude", i}
+		r := elemReporter{ps: &ps, table: "exclude", i: i, j: -1}
 		// A rule with no name is named by its conditions where it is
 		// shown; many rules are easier to write without one. A name of
 		// spaces is none.
@@ -982,7 +1151,7 @@ func autoApproveFrom(ds []autoApproveDoc) ([]AutoApprove, Problems) {
 	var out []AutoApprove
 	seen := map[string]bool{}
 	for i, d := range ds {
-		r := elemReporter{&ps, "auto_approve", i}
+		r := elemReporter{ps: &ps, table: "auto_approve", i: i, j: -1}
 		at := r.at
 		d.Name = strings.TrimSpace(d.Name)
 		if d.Name != "" && seen[d.Name] {
@@ -1023,11 +1192,14 @@ func autoApproveFrom(ds []autoApproveDoc) ([]AutoApprove, Problems) {
 }
 
 // elemReporter reports problems in the i-th element of the array of
-// tables table.
+// tables table, or with sub, in the j-th inline table of its key sub, as
+// the sections of a tab are.
 type elemReporter struct {
 	ps    *Problems
 	table string
 	i     int
+	sub   string
+	j     int
 }
 
 // at reports a problem at key, or at the element when key is "".
@@ -1039,14 +1211,21 @@ func (r elemReporter) at(key, format string, args ...any) {
 // whole value when j is -1.
 func (r elemReporter) item(key string, j int, format string, args ...any) {
 	k := []string{r.table}
+	where := fmt.Sprintf("%s[%d]", r.table, r.i)
+	inline := 0
+	if r.sub != "" {
+		k = append(k, r.sub)
+		where += fmt.Sprintf(".%s[%d]", r.sub, r.j)
+		inline = r.j + 1
+	}
 	if key != "" {
 		k = append(k, key)
 	}
-	where := fmt.Sprintf("%s[%d]", r.table, r.i) + dotted(key)
+	where += dotted(key)
 	if j >= 0 {
 		where += fmt.Sprintf("[%d]", j)
 	}
-	*r.ps = append(*r.ps, Problem{Key: k, Element: r.i + 1, Index: j, Message: where + " " + fmt.Sprintf(format, args...)})
+	*r.ps = append(*r.ps, Problem{Key: k, Element: r.i + 1, Index: j, Inline: inline, Message: where + " " + fmt.Sprintf(format, args...)})
 }
 
 // conditionsFrom reads the conditions of a rule named name, reporting what
@@ -1130,16 +1309,20 @@ func conditionsFrom(d conditionDoc, packages []string, name string, r elemReport
 	return c
 }
 
-// reportNoCondition reports a rule named name that sets no condition, and
-// so matches every pull request.
-func reportNoCondition(d conditionDoc, packages []string, name string, r elemReporter) {
-	// A list or a title left empty sets no condition: the rule reads it as
-	// none.
-	if len(d.Repos) == 0 && len(d.Authors) == 0 && len(packages) == 0 && len(d.Labels) == 0 && len(d.Requested) == 0 && len(d.Reasons) == 0 && len(d.States) == 0 &&
+// noCondition reports whether d sets no condition. A list or a title left
+// empty sets none: the rule reads it as none.
+func noCondition(d conditionDoc) bool {
+	return len(d.Repos) == 0 && len(d.Authors) == 0 && len(d.Labels) == 0 && len(d.Requested) == 0 && len(d.Reasons) == 0 && len(d.States) == 0 &&
 		len(d.Checks) == 0 && len(d.Decision) == 0 && len(d.Merge) == 0 && (d.Title == nil || d.Title.raw == "") &&
 		d.MaxFiles == nil && d.MaxLines == nil && d.MinFiles == nil && d.MinLines == nil &&
 		d.UpdatedIn == nil && d.CreatedIn == nil && d.UpdatedBefore == nil && d.CreatedBefore == nil &&
-		d.Bot == nil && d.Mine == nil && d.Draft == nil && d.ApprovedByMe == nil && d.ReviewedByMe == nil {
+		d.Bot == nil && d.Mine == nil && d.Draft == nil && d.ApprovedByMe == nil && d.ReviewedByMe == nil
+}
+
+// reportNoCondition reports a rule named name that sets no condition, and
+// so matches every pull request.
+func reportNoCondition(d conditionDoc, packages []string, name string, r elemReporter) {
+	if len(packages) == 0 && noCondition(d) {
 		what := "the rule"
 		if name != "" {
 			what = fmt.Sprintf("%q", name)
@@ -1252,7 +1435,7 @@ func decodeProblems(err error) Problems {
 var moved = map[string]string{
 	"claude.cache_dir":     `moved to "cache.dir"`,
 	"theme.name":           `replaced by theme.dark and theme.light, the themes used on a dark terminal and on a light one; write the same theme in both to use it on any`,
-	"sections":             `moved to "tabs"; group = "requested" is groups = ["you", "team", "other", "bots"]`,
+	"sections":             `moved: each [[tabs]] element has its own sections = [...], which split it by rules, and [[exclude]] leaves pull requests out of every tab`,
 	"inbox":                `moved: the inbox is a [[tabs]] element with kind = "inbox", holding limit, and show_settled for hide_closed with the opposite value; done_after_review is review.mark_done`,
 	"ui":                   `moved: theme is theme.dark and theme.light; stale_days and home_owners are under [list]; editor is review.editor; approval_checks is checks.approval`,
 	"refresh":              `moved: refresh.interval is list.refresh, and "0" is "off"`,
@@ -1292,7 +1475,7 @@ func tagsOf(t reflect.Type) []string {
 			names = append(names, tagsOf(f.Type)...)
 			continue
 		}
-		if tag, _, _ := strings.Cut(f.Tag.Get("toml"), ","); tag != "" && tag != "-" {
+		if tag, _, _ := strings.Cut(f.Tag.Get("toml"), ","); tag != "" && tag != "-" && f.Tag.Get("removed") == "" {
 			names = append(names, tag)
 		}
 	}

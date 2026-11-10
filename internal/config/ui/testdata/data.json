@@ -1426,43 +1426,21 @@
      }
     },
     {
-     "key": "groups",
-     "doc": "The groups a search is split into, in the order shown.",
+     "key": "sections",
+     "doc": "The parts a tab's rows are split into, in the order shown, each an inline table: a name (its head; without one, no head), show (\"open\", \"folded\" or \"excluded\") and the conditions of a rule. A row goes in the first section whose conditions it meets; one with no condition takes the rest, and what none takes goes in other. A section whose conditions wait for what is not read yet is passed over, and never leaves a row out.",
      "kind": {
-      "type": "config.listKind",
-      "name": "list of `you`, `team`, `other`, `bots`",
-      "values": [
-       "you",
-       "team",
-       "other",
-       "bots"
-      ],
-      "nonEmpty": true
-     }
-    },
-    {
-     "key": "folded",
-     "doc": "The groups folded at start, among groups.",
-     "kind": {
-      "type": "config.listKind",
-      "name": "list of `you`, `team`, `other`, `bots`",
-      "values": [
-       "you",
-       "team",
-       "other",
-       "bots"
-      ]
+      "type": "config.sectionsKind",
+      "name": "list of sections"
      }
     },
     {
      "key": "sort",
-     "doc": "\"updated\" (default) or \"drafts_last\".",
+     "doc": "\"updated\" (default): the most recently updated first.",
      "kind": {
       "type": "config.enumKind",
-      "name": "one of `updated`, `drafts_last`",
+      "name": "one of `updated`",
       "values": [
-       "updated",
-       "drafts_last"
+       "updated"
       ]
      }
     },
@@ -1518,35 +1496,551 @@
   ],
   "defaultTabs": [
    {
-    "folded": [
-     "team",
-     "bots"
-    ],
-    "groups": [
-     "you",
-     "team",
-     "other",
-     "bots"
-    ],
+    "limit": 100,
     "name": "review",
-    "query": "is:open is:pr review-requested:@me archived:false"
+    "query": "is:open is:pr review-requested:@me archived:false",
+    "sections": [
+     {
+      "bot": false,
+      "name": "requested from you",
+      "requested": [
+       "me"
+      ]
+     },
+     {
+      "bot": false,
+      "name": "requested from a team",
+      "requested": [
+       "@*"
+      ],
+      "show": "folded"
+     },
+     {
+      "bot": false,
+      "name": "other"
+     },
+     {
+      "bot": true,
+      "name": "bots",
+      "show": "folded"
+     }
+    ],
+    "sort": "updated"
    },
    {
+    "limit": 100,
     "name": "mine",
     "query": "is:open is:pr author:@me archived:false",
-    "sort": "drafts_last"
+    "sections": [
+     {
+      "draft": false
+     },
+     {
+      "draft": true
+     }
+    ],
+    "sort": "updated"
    },
    {
+    "limit": 100,
     "name": "involved",
-    "query": "is:open is:pr involves:@me -author:@me -review-requested:@me archived:false"
+    "query": "is:open is:pr involves:@me -author:@me -review-requested:@me archived:false",
+    "sort": "updated"
    },
    {
     "kind": "inbox",
+    "limit": 100,
     "name": "inbox",
     "show_settled": false
    }
   ],
   "schema": "https://raw.githubusercontent.com/babarot/gh-desk/main/docs/config.schema.json"
+ },
+ "JUDGED": {
+  "approved": {
+   "yes": [
+    0,
+    5
+   ],
+   "unknown": [],
+   "why": {
+    "0": [
+     {
+      "key": "bot",
+      "state": "yes",
+      "values": [
+       "true"
+      ]
+     },
+     {
+      "key": "approved_by_me",
+      "state": "yes",
+      "values": [
+       "true"
+      ]
+     }
+    ],
+    "5": [
+     {
+      "key": "bot",
+      "state": "yes",
+      "values": [
+       "true"
+      ]
+     },
+     {
+      "key": "approved_by_me",
+      "state": "yes",
+      "values": [
+       "true"
+      ]
+     }
+    ]
+   }
+  },
+  "select": [
+   {
+    "yes": [
+     0,
+     2,
+     5,
+     6,
+     7,
+     8,
+     9,
+     10,
+     12
+    ],
+    "unknown": [],
+    "why": {
+     "0": [
+      {
+       "key": "max_lines",
+       "state": "yes",
+       "values": [
+        "12"
+       ]
+      }
+     ],
+     "10": [
+      {
+       "key": "max_lines",
+       "state": "yes",
+       "values": [
+        "4"
+       ]
+      }
+     ],
+     "12": [
+      {
+       "key": "max_lines",
+       "state": "yes",
+       "values": [
+        "4"
+       ]
+      }
+     ],
+     "2": [
+      {
+       "key": "max_lines",
+       "state": "yes",
+       "values": [
+        "30"
+       ]
+      }
+     ],
+     "5": [
+      {
+       "key": "max_lines",
+       "state": "yes",
+       "values": [
+        "4"
+       ]
+      }
+     ],
+     "6": [
+      {
+       "key": "max_lines",
+       "state": "yes",
+       "values": [
+        "210"
+       ]
+      }
+     ],
+     "7": [
+      {
+       "key": "max_lines",
+       "state": "yes",
+       "values": [
+        "90"
+       ]
+      }
+     ],
+     "8": [
+      {
+       "key": "max_lines",
+       "state": "yes",
+       "values": [
+        "4"
+       ]
+      }
+     ],
+     "9": [
+      {
+       "key": "max_lines",
+       "state": "yes",
+       "values": [
+        "4"
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "yes": [
+     0,
+     1,
+     5
+    ],
+    "unknown": [],
+    "why": {
+     "0": [
+      {
+       "key": "authors",
+       "state": "yes",
+       "values": [
+        "renovate"
+       ],
+       "matched": [
+        "renovate"
+       ]
+      },
+      {
+       "key": "checks",
+       "state": "yes",
+       "values": [
+        "passing"
+       ],
+       "matched": [
+        "passing"
+       ]
+      }
+     ],
+     "1": [
+      {
+       "key": "authors",
+       "state": "yes",
+       "values": [
+        "renovate"
+       ],
+       "matched": [
+        "renovate"
+       ]
+      },
+      {
+       "key": "checks",
+       "state": "yes",
+       "values": [
+        "passing"
+       ],
+       "matched": [
+        "passing"
+       ]
+      }
+     ],
+     "5": [
+      {
+       "key": "authors",
+       "state": "yes",
+       "values": [
+        "renovate"
+       ],
+       "matched": [
+        "renovate"
+       ]
+      },
+      {
+       "key": "checks",
+       "state": "yes",
+       "values": [
+        "passing"
+       ],
+       "matched": [
+        "passing"
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "yes": [
+     0,
+     5
+    ],
+    "unknown": [],
+    "why": {
+     "0": [
+      {
+       "key": "approved_by_me",
+       "state": "yes",
+       "values": [
+        "true"
+       ]
+      }
+     ],
+     "5": [
+      {
+       "key": "approved_by_me",
+       "state": "yes",
+       "values": [
+        "true"
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "yes": [
+     0,
+     1,
+     2,
+     3,
+     5,
+     7,
+     8,
+     9,
+     10,
+     12
+    ],
+    "unknown": [],
+    "why": {
+     "0": [
+      {
+       "key": "updated_within_days",
+       "state": "yes",
+       "values": [
+        "1"
+       ]
+      }
+     ],
+     "1": [
+      {
+       "key": "updated_within_days",
+       "state": "yes",
+       "values": [
+        "3"
+       ]
+      }
+     ],
+     "10": [
+      {
+       "key": "updated_within_days",
+       "state": "yes",
+       "values": [
+        "9"
+       ]
+      }
+     ],
+     "12": [
+      {
+       "key": "updated_within_days",
+       "state": "yes",
+       "values": [
+        "11"
+       ]
+      }
+     ],
+     "2": [
+      {
+       "key": "updated_within_days",
+       "state": "yes",
+       "values": [
+        "0"
+       ]
+      }
+     ],
+     "3": [
+      {
+       "key": "updated_within_days",
+       "state": "yes",
+       "values": [
+        "0"
+       ]
+      }
+     ],
+     "5": [
+      {
+       "key": "updated_within_days",
+       "state": "yes",
+       "values": [
+        "2"
+       ]
+      }
+     ],
+     "7": [
+      {
+       "key": "updated_within_days",
+       "state": "yes",
+       "values": [
+        "0"
+       ]
+      }
+     ],
+     "8": [
+      {
+       "key": "updated_within_days",
+       "state": "yes",
+       "values": [
+        "8"
+       ]
+      }
+     ],
+     "9": [
+      {
+       "key": "updated_within_days",
+       "state": "yes",
+       "values": [
+        "8"
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "yes": [
+     1
+    ],
+    "unknown": [],
+    "why": {
+     "1": [
+      {
+       "key": "authors",
+       "state": "yes",
+       "values": [
+        "renovate"
+       ],
+       "matched": [
+        "renovate"
+       ]
+      },
+      {
+       "key": "title",
+       "state": "yes",
+       "values": [
+        "Lock file maintenance"
+       ],
+       "title": [
+        "",
+        "Lock file maintenance",
+        ""
+       ]
+      }
+     ]
+    }
+   }
+  ],
+  "exclude": [],
+  "auto_approve": [],
+  "tabs": [
+   {
+    "names": [
+     "requested from you",
+     "requested from a team",
+     "other",
+     "bots"
+    ],
+    "show": [
+     "open",
+     "folded",
+     "open",
+     "folded"
+    ],
+    "at": [
+     3,
+     3,
+     3,
+     0,
+     2,
+     3,
+     0,
+     2,
+     2,
+     2,
+     2,
+     2,
+     2
+    ],
+    "pending": []
+   },
+   {
+    "names": [
+     "",
+     "",
+     "other"
+    ],
+    "show": [
+     "open",
+     "open",
+     "open"
+    ],
+    "at": [
+     0,
+     0,
+     0,
+     0,
+     1,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0
+    ],
+    "pending": []
+   },
+   {
+    "names": [],
+    "show": [],
+    "at": [
+     -1,
+     -1,
+     -1,
+     -1,
+     -1,
+     -1,
+     -1,
+     -1,
+     -1,
+     -1,
+     -1,
+     -1,
+     -1
+    ],
+    "pending": []
+   },
+   {
+    "names": [],
+    "show": [],
+    "at": [
+     -1,
+     -1,
+     -1,
+     -1,
+     -1,
+     -1,
+     -1,
+     -1,
+     -1,
+     -1,
+     -1,
+     -1,
+     -1
+    ],
+    "pending": []
+   }
+  ]
  },
  "KEYS": [
   {
@@ -2208,7 +2702,6 @@
     "checks": "passing",
     "decision": "none",
     "heavy": true,
-    "group": "bots",
     "why": "you",
     "review": "me✓",
     "age": "1d",
@@ -2229,7 +2722,6 @@
     "checks": "passing",
     "decision": "none",
     "heavy": true,
-    "group": "bots",
     "why": "you",
     "age": "3d",
     "updated": 3,
@@ -2249,7 +2741,6 @@
     "checks": "failing",
     "decision": "review_required",
     "heavy": true,
-    "group": "bots",
     "why": "@frontend",
     "age": "4h",
     "updated": 0,
@@ -2268,7 +2759,6 @@
     "checks": "pending",
     "decision": "review_required",
     "heavy": true,
-    "group": "you",
     "why": "you",
     "age": "2h",
     "updated": 0,
@@ -2289,7 +2779,6 @@
     "merge": "dirty",
     "decision": "none",
     "heavy": true,
-    "group": "other",
     "why": "",
     "age": "12d",
     "updated": 12,
@@ -2310,7 +2799,6 @@
     "merge": "behind",
     "decision": "approved",
     "heavy": true,
-    "group": "bots",
     "why": "",
     "review": "me✓",
     "age": "2d",
@@ -2330,7 +2818,6 @@
     "checks": "passing",
     "decision": "changes_requested",
     "heavy": true,
-    "group": "you",
     "why": "you",
     "age": "3mo",
     "updated": 95,
@@ -2349,7 +2836,6 @@
     "checks": "passing",
     "decision": "approved",
     "heavy": true,
-    "group": "other",
     "why": "",
     "age": "5h",
     "updated": 0,
@@ -2368,7 +2854,6 @@
     "checks": "passing",
     "decision": "none",
     "heavy": true,
-    "group": "other",
     "why": "",
     "age": "8d",
     "updated": 8,
@@ -2387,7 +2872,6 @@
     "checks": "passing",
     "decision": "none",
     "heavy": true,
-    "group": "other",
     "why": "",
     "age": "8d",
     "updated": 8,
@@ -2406,7 +2890,6 @@
     "checks": "passing",
     "decision": "none",
     "heavy": true,
-    "group": "other",
     "why": "",
     "age": "9d",
     "updated": 9,
@@ -2425,7 +2908,6 @@
     "checks": "passing",
     "decision": "none",
     "heavy": true,
-    "group": "other",
     "why": "",
     "age": "9d",
     "updated": 9,
@@ -2444,7 +2926,6 @@
     "checks": "passing",
     "decision": "changes_requested",
     "heavy": true,
-    "group": "other",
     "why": "",
     "review": "me±",
     "age": "11d",

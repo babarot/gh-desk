@@ -10,7 +10,6 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/babarot/gh-desk/internal/model"
-	"github.com/babarot/gh-desk/internal/plan"
 	"github.com/babarot/gh-desk/internal/runner"
 	"github.com/babarot/gh-desk/internal/tui/keymap"
 )
@@ -213,16 +212,16 @@ func TestDoneSkipsWhatIsNotShown(t *testing.T) {
 
 // A folded group is shown by its header: d on its selected pull requests
 // puts them away.
-func TestHideFoldedGroup(t *testing.T) {
+func TestHideFoldedSection(t *testing.T) {
 	m := start(t, fixture(), keymap.Default())
 	rs := m.rows(m.tab())
 	at := -1
 	for i, r := range rs {
-		if r.kind == rowGroup && m.tab().sections[r.section].Group == plan.GroupBots {
+		if r.kind == rowGroup && m.tab().sections[r.section].Name == secBots {
 			at = i
 		}
 	}
-	if at < 0 || !m.tab().folded[string(plan.GroupBots)] {
+	if at < 0 || !m.tab().folded[secBots] {
 		t.Fatalf("no folded bots group in %+v", rs)
 	}
 	m.tab().sel = at
@@ -337,4 +336,4 @@ func TestSkippedIsNotTriedAgain(t *testing.T) {
 }
 
 // unfoldBots unfolds the bots section of the tab shown.
-func unfoldBots(m *Model) { m.tab().folded[string(plan.GroupBots)] = false }
+func unfoldBots(m *Model) { m.tab().folded[secBots] = false }

@@ -74,7 +74,6 @@ type PR struct {
 	Decision string `json:"decision"`
 	// Heavy says the size, checks and review were read for the head shown.
 	Heavy   bool    `json:"heavy"`
-	Group   string  `json:"group"`
 	Why     string  `json:"why"`
 	Review  string  `json:"review,omitempty"`
 	Age     string  `json:"age"`
@@ -120,6 +119,10 @@ type Input struct {
 	Themes   any
 	Spinners any
 	Lists    Lists
+	// Judged is what the file's rules and sections make of the rows when
+	// the page opens, as gh-desk judges them; nil when the file does not
+	// read.
+	Judged json.RawMessage
 	// Playground makes the settings playground: no gh-desk answers it, so it shows
 	// only what needs none, and saves nothing.
 	Playground bool
@@ -168,7 +171,7 @@ func dataJS(in Input, file map[string]any) (string, error) {
 	for _, v := range []struct {
 		name string
 		v    any
-	}{{"DATA", config.UI()}, {"KEYS", in.Keys}, {"THEMES", in.Themes}, {"SPIN", in.Spinners}, {"BOOT", boot{in.File.Path, file}}, {"LISTS", in.Lists}, {"PLAYGROUND", in.Playground}, {"LIVE", in.Live && !in.Playground}} {
+	}{{"DATA", config.UI()}, {"KEYS", in.Keys}, {"THEMES", in.Themes}, {"SPIN", in.Spinners}, {"BOOT", boot{in.File.Path, file}}, {"LISTS", in.Lists}, {"JUDGED", in.Judged}, {"PLAYGROUND", in.Playground}, {"LIVE", in.Live && !in.Playground}} {
 		j, err := json.Marshal(v.v)
 		if err != nil {
 			return "", err

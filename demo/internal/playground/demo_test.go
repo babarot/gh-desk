@@ -132,9 +132,16 @@ func TestTriage(t *testing.T) {
 	var rows []claude.SnapshotRow
 	for _, p := range prs {
 		full, _ := w.Source().PullRequests(ctx, []model.PRKey{p.Key})
-		rows = append(rows, claude.SnapshotRow{PR: full[p.Key], Section: string(plan.GroupOf(full[p.Key], Viewer))})
+		// The page's tab is split as the default review tab is; the plan
+		// reads only the bots' section.
+		section := "requested from you"
+		if full[p.Key].AuthorIsBot {
+			section = "bots"
+		}
+		rows = append(rows, claude.SnapshotRow{PR: full[p.Key], Section: section})
 	}
-	prompt := claude.TriagePrompt(claude.Snapshot{Now: w.start, Tab: "review", Rows: rows, Sections: []string{"you", "team", "other", "bots"}, Pane: "off"}, "merge the bots with passing checks")
+	prompt := claude.TriagePrompt(claude.Snapshot{Now: w.start, Tab: "review", Rows: rows,
+		Sections: []string{"requested from you", "requested from a team", "other", "bots"}, Pane: "off"}, "merge the bots with passing checks")
 	a, err := w.Claude().Triage(ctx, claude.Request{Prompt: prompt, Schema: claude.TriageSchema})
 	if err != nil {
 		t.Fatal(err)

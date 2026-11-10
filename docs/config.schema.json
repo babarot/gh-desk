@@ -954,33 +954,6 @@
       "items": {
         "additionalProperties": false,
         "properties": {
-          "folded": {
-            "description": "The groups folded at start, among groups.",
-            "items": {
-              "enum": [
-                "you",
-                "team",
-                "other",
-                "bots"
-              ],
-              "type": "string"
-            },
-            "type": "array"
-          },
-          "groups": {
-            "description": "The groups a search is split into, in the order shown.",
-            "items": {
-              "enum": [
-                "you",
-                "team",
-                "other",
-                "bots"
-              ],
-              "type": "string"
-            },
-            "minItems": 1,
-            "type": "array"
-          },
           "kind": {
             "description": "\"search\" (default), a GitHub search, or \"inbox\", the pull requests in your notifications.",
             "enum": [
@@ -1004,15 +977,218 @@
             "pattern": "\\S",
             "type": "string"
           },
+          "sections": {
+            "description": "The parts a tab's rows are split into, in the order shown, each an inline table: a name (its head; without one, no head), show (\"open\", \"folded\" or \"excluded\") and the conditions of a rule. A row goes in the first section whose conditions it meets; one with no condition takes the rest, and what none takes goes in other. A section whose conditions wait for what is not read yet is passed over, and never leaves a row out.",
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "approved_by_me": {
+                  "description": "true: your latest review must approve it, a person's pull request too, unlike the built-in \"approved by me\"; false: none of yours does.",
+                  "type": "boolean"
+                },
+                "authors": {
+                  "description": "The logins the author must be one of; bots without app/.",
+                  "items": {
+                    "type": "string"
+                  },
+                  "minItems": 1,
+                  "type": "array"
+                },
+                "bot": {
+                  "description": "true: the author must be a bot; false: a person.",
+                  "type": "boolean"
+                },
+                "checks": {
+                  "description": "The states its checks must be in one of: \"passing\" (passed, none at all, or only checks.approval pending), \"failing\" or \"pending\" (still running).",
+                  "items": {
+                    "enum": [
+                      "passing",
+                      "failing",
+                      "pending"
+                    ],
+                    "type": "string"
+                  },
+                  "minItems": 1,
+                  "type": "array"
+                },
+                "created_before_days": {
+                  "description": "The least days, of 24 hours, since it was created.",
+                  "maximum": 36500,
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                "created_within_days": {
+                  "description": "The most days, of 24 hours, since it was created.",
+                  "maximum": 36500,
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                "decision": {
+                  "description": "The review decisions REVIEW shows, one of which it must have; \"none\" is none, as in a repository that requires no review.",
+                  "items": {
+                    "enum": [
+                      "approved",
+                      "changes_requested",
+                      "review_required",
+                      "none"
+                    ],
+                    "type": "string"
+                  },
+                  "minItems": 1,
+                  "type": "array"
+                },
+                "draft": {
+                  "description": "true: it must be a draft, which S never selects, so [[select]] does not take true; false: ready for review.",
+                  "type": "boolean"
+                },
+                "labels": {
+                  "description": "Labels one of which it must have.",
+                  "items": {
+                    "type": "string"
+                  },
+                  "minItems": 1,
+                  "type": "array"
+                },
+                "max_files": {
+                  "description": "The most files it may change.",
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                "max_lines": {
+                  "description": "The most lines it may add and delete together: the sum of the two numbers SIZE shows.",
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                "merge": {
+                  "description": "Whether GitHub would let it be merged now, one of: \"ready\" (the merge button can be pressed), \"behind\" (its branch must be brought up to date), \"conflict\" (it conflicts with its base), \"blocked\" (its reviews or required checks hold it, or it is a draft) or \"unknown\" (GitHub is still working it out).",
+                  "items": {
+                    "enum": [
+                      "ready",
+                      "behind",
+                      "conflict",
+                      "blocked",
+                      "unknown"
+                    ],
+                    "type": "string"
+                  },
+                  "minItems": 1,
+                  "type": "array"
+                },
+                "min_files": {
+                  "description": "The least files it may change.",
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                "min_lines": {
+                  "description": "The least lines it may add and delete together.",
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                "mine": {
+                  "description": "true: it must be your own pull request; false: someone else's.",
+                  "type": "boolean"
+                },
+                "name": {
+                  "description": "The head the section's rows are shown under; left out, the section has no head and cannot be folded.",
+                  "pattern": "\\S",
+                  "type": "string"
+                },
+                "reasons": {
+                  "description": "Reasons of a notification, one of which the row's must have; S and a rule that approves judge a pull request without one, so [[select]] and [[auto_approve]] do not take it.",
+                  "items": {
+                    "enum": [
+                      "approval_requested",
+                      "assign",
+                      "author",
+                      "ci_activity",
+                      "comment",
+                      "invitation",
+                      "manual",
+                      "member_feature_requested",
+                      "mention",
+                      "review_requested",
+                      "security_advisory_credit",
+                      "security_alert",
+                      "state_change",
+                      "subscribed",
+                      "team_mention"
+                    ],
+                    "type": "string"
+                  },
+                  "minItems": 1,
+                  "type": "array"
+                },
+                "repos": {
+                  "description": "owner/repo globs the repository must match one of; * matches any part of the owner or the name.",
+                  "items": {
+                    "type": "string"
+                  },
+                  "minItems": 1,
+                  "type": "array"
+                },
+                "requested": {
+                  "description": "Whom a review must be asked of, one of them: \"me\", a team as \"@slug\", or \"@*\" for any team.",
+                  "items": {
+                    "type": "string"
+                  },
+                  "minItems": 1,
+                  "type": "array"
+                },
+                "reviewed_by_me": {
+                  "description": "true: you must have reviewed it, whatever the review said; false: you have not.",
+                  "type": "boolean"
+                },
+                "show": {
+                  "description": "\"open\" (default), \"folded\" (its head alone, until unfolded) or \"excluded\" (left out as an exclusion rule leaves them, until a shows them).",
+                  "enum": [
+                    "open",
+                    "folded",
+                    "excluded"
+                  ],
+                  "type": "string"
+                },
+                "state": {
+                  "description": "The states it must be in one of: \"open\", \"merged\" or \"closed\"; S selects open ones only, so [[select]] takes \"open\" alone.",
+                  "items": {
+                    "enum": [
+                      "open",
+                      "merged",
+                      "closed"
+                    ],
+                    "type": "string"
+                  },
+                  "minItems": 1,
+                  "type": "array"
+                },
+                "title": {
+                  "description": "A regular expression the title must match, as written: a shortcode such as `:arrow_up:` is matched as itself, not as its emoji. An empty one sets no condition.",
+                  "type": "string"
+                },
+                "updated_before_days": {
+                  "description": "The least days, of 24 hours, since it was last updated, as AGE counts them in a search tab.",
+                  "maximum": 36500,
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                "updated_within_days": {
+                  "description": "The most days, of 24 hours, since it was last updated: a label or a bot's comment updates it too. An old pull request updated lately matches.",
+                  "maximum": 36500,
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              },
+              "type": "object"
+            },
+            "type": "array"
+          },
           "show_settled": {
             "description": "The inbox shows the notifications whose pull request is merged or closed, rather than leave them out with the excluded until a shows them.",
             "type": "boolean"
           },
           "sort": {
-            "description": "\"updated\" (default) or \"drafts_last\".",
+            "description": "\"updated\" (default): the most recently updated first.",
             "enum": [
-              "updated",
-              "drafts_last"
+              "updated"
             ],
             "type": "string"
           }

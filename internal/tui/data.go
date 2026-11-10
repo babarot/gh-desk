@@ -17,21 +17,18 @@ import (
 
 // tab is one tab: a section of pull requests, or the inbox.
 type tab struct {
-	name       string
-	query      string
-	grouped    bool
-	draftsLast bool
-	limit      int
+	name    string
+	query   string
+	grouped bool
+	limit   int
 
 	// sections are the parts the rows are split into, in the order shown;
 	// folded are those folded, by name. other is the section that takes
-	// what no section's rule does, and fromGroups is set when the
-	// sections are a tab's groups, which leave out what no group shows.
-	sections   []plan.Section
-	folded     map[string]bool
-	other      int
-	fromGroups bool
-	inbox      bool
+	// what no section's rule does (plan.Layout).
+	sections []plan.Section
+	folded   map[string]bool
+	other    int
+	inbox    bool
 	// keepSettled has the inbox show the notifications on merged or
 	// closed pull requests rather than exclude them (show_settled).
 	keepSettled bool
@@ -115,23 +112,12 @@ type pending struct {
 }
 
 func newTab(s Tab) *tab {
-	t := &tab{name: s.Name, query: s.Query, grouped: len(s.Sections) > 0, sections: s.Sections, draftsLast: s.DraftsLast, limit: s.Limit,
+	t := &tab{name: s.Name, query: s.Query, grouped: len(s.Sections) > 0, limit: s.Limit,
 		inbox: s.Inbox, keepSettled: s.ShowSettled, folded: map[string]bool{}, hidden: map[model.PRKey]bool{}}
-	for _, sc := range s.Sections {
+	t.sections, t.other = plan.Layout(s.Sections)
+	for _, sc := range t.sections {
 		if sc.Show == plan.ShowFolded && sc.Name != "" {
 			t.folded[sc.Name] = true
-		}
-		t.fromGroups = t.fromGroups || sc.Group != ""
-	}
-	t.other = -1
-	if t.grouped && !t.fromGroups {
-		// What no section takes goes in the one called other, or in one
-		// made for it after the rest, so that no row is lost: not one
-		// that no rule takes, nor one that a rule cannot tell yet.
-		t.other = slices.IndexFunc(t.sections, func(sc plan.Section) bool { return sc.Name == otherName })
-		if t.other < 0 {
-			t.sections = append(slices.Clone(t.sections), plan.Section{Name: otherName, Show: plan.ShowOpen})
-			t.other = len(t.sections) - 1
 		}
 	}
 	if s.Inbox {
@@ -197,7 +183,7 @@ func (m *Model) listed(t *tab) []row {
 // folded folded.
 func (m *Model) rowsOf(t *tab, filter string, rules []plan.Rule, folded map[string]bool) []row {
 	if t.inbox {
-		return m.inboxRows(t, filter, rules)
+		return m.inboxRows(t, filter, rules, folded)
 	}
 	var prs []model.PR
 	ex := map[model.PRKey]exclusion{}
@@ -209,35 +195,29 @@ func (m *Model) rowsOf(t *tab, filter string, rules []plan.Rule, folded map[stri
 		}
 	}
 	// A row showing a result sorts where it was when its batch started.
-	sortKey := func(p model.PR) heldSort {
-		if h, ok := m.held[p.Key]; ok {
-			return h
-		}
-		return heldSort{draft: p.Draft, updated: p.Updated}
-	}
 	slices.SortStableFunc(prs, func(a, b model.PR) int {
-		ka, kb := sortKey(a), sortKey(b)
-		if t.draftsLast && ka.draft != kb.draft {
-			if ka.draft {
-				return 1
-			}
-			return -1
-		}
-		return kb.updated.Compare(ka.updated)
+		return m.asHeld(b).Updated.Compare(m.asHeld(a).Updated)
 	})
+	rs := make([]row, len(prs))
+	for i, p := range prs {
+		rs[i] = row{kind: rowPR, pr: p, ex: ex[p.Key]}
+	}
+	return t.split(rs, folded)
+}
+
+// split lays the rows of t out in its sections, in their order, each under
+// its head, those in folded folded; a tab with no sections has them as
+// they are.
+func (t *tab) split(rs []row, folded map[string]bool) []row {
 	if !t.grouped {
-		out := make([]row, len(prs))
-		for i, p := range prs {
-			out[i] = row{kind: rowPR, pr: p, ex: ex[p.Key]}
-		}
-		return out
+		return rs
 	}
 	var out []row
 	for i, sc := range t.sections {
-		var in []model.PR
-		for _, p := range prs {
-			if ex[p.Key].at == i {
-				in = append(in, p)
+		var in []row
+		for _, r := range rs {
+			if r.ex.at == i {
+				in = append(in, r)
 			}
 		}
 		// A section with no rows, filtered or not, is left out with its
@@ -248,23 +228,20 @@ func (m *Model) rowsOf(t *tab, filter string, rules []plan.Rule, folded map[stri
 		// A section with no name has no head: its rows follow the section
 		// above, and it never folds.
 		if sc.Name == "" {
-			for _, p := range in {
-				out = append(out, row{kind: rowPR, pr: p, ex: ex[p.Key]})
-			}
+			out = append(out, in...)
 			continue
 		}
 		out = append(out, row{kind: rowGroup, section: i, count: len(in)})
 		if !folded[sc.Name] {
-			for _, p := range in {
-				out = append(out, row{kind: rowPR, pr: p, ex: ex[p.Key]})
-			}
+			out = append(out, in...)
 		}
 	}
 	return out
 }
 
-// inboxRows are the inbox's lines under filter and rules.
-func (m *Model) inboxRows(t *tab, filter string, rules []plan.Rule) []row {
+// inboxRows are the inbox's lines under filter and rules, with the
+// sections in folded folded.
+func (m *Model) inboxRows(t *tab, filter string, rules []plan.Rule, folded map[string]bool) []row {
 	now := m.set.Now()
 	var out []row
 	for i := range t.notifs {
@@ -279,7 +256,7 @@ func (m *Model) inboxRows(t *tab, filter string, rules []plan.Rule) []row {
 		p.Updated = n.Updated
 		out = append(out, row{kind: rowPR, pr: p, notif: n, ex: x})
 	}
-	return out
+	return t.split(out, folded)
 }
 
 // notifPR is the pull request of the notification n, as far as it is
@@ -316,19 +293,10 @@ type exclusion struct {
 
 func (x exclusion) excluded() bool { return len(x.by) > 0 }
 
-// otherName is the section that takes what no other section does.
-const otherName = "other"
-
 // place is the section of t that p goes in, and whether a section passed
-// over could not tell yet: what no section takes goes in other, but in a
-// tab of groups, where it is a group the tab does not show, it goes in
-// none (-1).
+// over could not tell yet: what no section takes goes in other.
 func (t *tab) place(p model.PR, viewer string, f plan.Facts) (int, bool) {
-	at, pending := plan.Place(t.sections, p, viewer, f)
-	if at < 0 && t.other >= 0 {
-		at = t.other
-	}
-	return at, pending
+	return plan.PlaceIn(t.sections, t.other, p, viewer, f)
 }
 
 // sectionOf is the section of t that p is in, -1 when no section takes
@@ -337,8 +305,23 @@ func (m *Model) sectionOf(t *tab, p model.PR) int {
 	if !t.grouped {
 		return -1
 	}
-	at, _ := t.place(p, m.viewer, m.ruleFacts(p, m.set.Now()))
+	at, _ := m.placeIn(t, p, m.notifOf(t, p.Key), m.set.Now())
 	return at
+}
+
+// placeIn is the section of t that p, the pull request of the notification
+// n in the inbox, is in, and whether a section was passed over as it cannot
+// tell yet. A row showing a result is placed as it was when its batch
+// started (hold).
+func (m *Model) placeIn(t *tab, p model.PR, n *model.Notification, now time.Time) (int, bool) {
+	p = m.asHeld(p)
+	f := m.ruleFacts(p, now)
+	if n != nil {
+		// In the inbox, a section may ask for the reason of the row's
+		// notification.
+		f.Reason = n.Reason
+	}
+	return t.place(p, m.viewer, f)
 }
 
 // unfoldFor unfolds the section of t that p is in.
@@ -408,7 +391,7 @@ func (m *Model) exclusionOf(t *tab, p model.PR, n *model.Notification, now time.
 	if t.grouped {
 		// A section that cannot tell yet is passed over, and the row is
 		// not left out on it: it is drawn as not judged (ADR-062).
-		at, pending := t.place(p, m.viewer, f)
+		at, pending := m.placeIn(t, p, n, now)
 		x.at, x.pending = at, pending
 		if at >= 0 && t.sections[at].Show == plan.ShowExcluded && !pending {
 			x.by = append(x.by, sectionName(t.sections[at]))
@@ -480,7 +463,6 @@ func (m *Model) excludedPassing(t *tab, filter string, rules []plan.Rule) exclud
 		}
 		return c
 	}
-	// A group the tab does not show has no rows, excluded or not.
 	for _, p := range m.allOf(t) {
 		add(p, nil)
 	}
