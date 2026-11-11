@@ -87,10 +87,18 @@ func TestClickPaneTab(t *testing.T) {
 	}
 }
 
-type fakeLayout struct{ saved []int }
+type fakeLayout struct {
+	saved  []int
+	scopes []string
+}
 
 func (f *fakeLayout) SavePreviewHeight(h int) error {
 	f.saved = append(f.saved, h)
+	return nil
+}
+
+func (f *fakeLayout) SaveScope(kind, value string) error {
+	f.scopes = append(f.scopes, kind+"="+value)
 	return nil
 }
 

@@ -45,7 +45,7 @@ func TestHelpUnfoldsTheScreenItWasOpenedFrom(t *testing.T) {
 	press(m, "esc", "i")
 	chat.NewState(nil, logging.Discard(), func() time.Time { return now }, noStatus{}).Begin(m.chat().Conversation, "And then?")
 	press(m, "?")
-	if s := helpText(m); !strings.HasPrefix(s, "▾ asking claude · works here") || !strings.Contains(s, "▸ the list and its preview (32) ─") {
+	if s := helpText(m); !strings.HasPrefix(s, "▾ asking claude · works here") || !strings.Contains(s, "▸ the list and its preview (35) ─") {
 		t.Errorf("the Claude screen's section is not first and unfolded:\n%s", s)
 	}
 }
@@ -56,7 +56,7 @@ func TestHelpFolds(t *testing.T) {
 	m := newModel(fixture(), cachedReview())
 	run(m, m.Init())
 	press(m, "?", "z")
-	if s := helpText(m); !strings.HasPrefix(s, "▸ the list and its preview (32) · works here") {
+	if s := helpText(m); !strings.HasPrefix(s, "▸ the list and its preview (35) · works here") {
 		t.Errorf("z did not fold the list's section:\n%s", s)
 	}
 	x, y := lineOf(t, m, "▸ moving")

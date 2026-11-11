@@ -69,6 +69,22 @@
     ]
    },
    {
+    "key": "list.scope",
+    "table": "list",
+    "name": "scope",
+    "doc": "Narrow every tab to one owner, repository (\"repo\") or author at a time, chosen on the header with \u003c and \u003e, or from a list with O; left out, the tabs are not narrowed. The one chosen is kept for the next launch.",
+    "kind": {
+     "type": "config.optEnumKind",
+     "name": "one of `owner`, `repo`, `author`, or left out",
+     "values": [
+      "owner",
+      "repo",
+      "author"
+     ]
+    },
+    "example": "owner"
+   },
+   {
     "key": "list.bell",
     "table": "list",
     "name": "bell",
@@ -2263,6 +2279,30 @@
    "action": "select_rule",
    "keys": [
     "S"
+   ],
+   "scope": "list",
+   "scopeWords": "The list and its preview pane"
+  },
+  {
+   "action": "next_scope",
+   "keys": [
+    "\u003e"
+   ],
+   "scope": "list",
+   "scopeWords": "The list and its preview pane"
+  },
+  {
+   "action": "prev_scope",
+   "keys": [
+    "\u003c"
+   ],
+   "scope": "list",
+   "scopeWords": "The list and its preview pane"
+  },
+  {
+   "action": "choose_scope",
+   "keys": [
+    "O"
    ],
    "scope": "list",
    "scopeWords": "The list and its preview pane"

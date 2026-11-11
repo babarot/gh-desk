@@ -204,6 +204,12 @@ list of `pr`, `title`, `author`, `ci`, `merge`, `review`, `why`, `size`, `age` �
 
 The columns shown, in the order given; "pr" and "title" are needed. WHY shows when a row has something in it (whom a review is asked of, the reason of a notification), and AUTHOR not on a tab of your own pull requests. On a narrow terminal columns go before TITLE gets narrow: SIZE first, then AUTHOR, MERGE, WHY, AGE, REVIEW and CI.
 
+### list.scope
+
+one of `owner`, `repo`, `author`, or left out · Example: `"owner"`
+
+Narrow every tab to one owner, repository ("repo") or author at a time, chosen on the header with &lt; and &gt;, or from a list with O; left out, the tabs are not narrowed. The one chosen is kept for the next launch.
+
 ### list.bell
 
 boolean · Default: `false`

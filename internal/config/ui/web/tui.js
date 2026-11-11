@@ -36,7 +36,9 @@ const SCENES={
 // o: p palette, cols, tabs, exclude, owners, stale, mark rule, hide rule, spin, keys for the status line, scene (merge or keys, the scenes the settings playground shows), all
 function drawTui(o){const p=o.p,prs=o.prs||[],v=o.v||(()=>'n'),at=o.at||0,lay=o.layout&&o.layout.names.length?o.layout:null,placed=x=>lay?lay.at[x.i]:-1,hidden=x=>o.exclude.some((r,i)=>v('exclude',i,x)==='y')||(lay&&lay.show[placed(x)]==='excluded'&&!lay.pending.has(x.i)),shown=prs.filter(x=>!hidden(x)),listed=o.hide?prs:shown,tab=o.tabs[at]||{},inbox=tab.kind==='inbox',hit=(r,x)=>r?v(r.kind,r.i,x):'n',g=new Grid(COLS,o.all?40:LINES);
   const cols=o.cols.filter(c=>c!=='why'||prs.some(z=>z.why)),W={...CW,title:Math.max(10,COLS-1-LEAD-cols.filter(c=>c!=='title').reduce((n,c)=>n+CW[c]+2,0)-2)},tabBg=mix(p.base,p.blue,p.dark?.35:.25),pick=mix(p.base,p.mauve,p.dark?.2:.14);
-  let x=g.put(0,0,[['desk',p.blue,p.surface0,1],[' // ',p.dim],[`@${o.viewer||'octocat'}`,p.overlay],['   ']]);
+  // With a scope set, the scope switch takes the viewer's place, as wide as the longest value (at most 24 cells), on all.
+  const sv=z=>o.scope==='owner'?z.repo.split('/')[0]:o.scope==='repo'?z.repo:z.author,sw2=o.scope?Math.min(24,Math.max(3,...prs.map(z=>sw(sv(z))))):0;
+  let x=g.put(0,0,[['desk',p.blue,p.surface0,1],[' // ',p.dim],...(o.scope?[['‹',p.dim],[' '],['all'.padEnd(sw2),p.subtext0],[' '],['›',p.dim]]:[[`@${o.viewer||'octocat'}`,p.overlay]]),['   ']]);
   g.tabs=[];o.tabs.forEach((t,i)=>{const n=i===at?shown.length:o.count?o.count(t):'?',from=x;x=g.put(x,0,i===at?[[` ${i+1} `,p.subtext0,tabBg],[`${t.name||'inbox'} (${n}) `,p.text,tabBg,1]]:[[`${i+1} `,p.dim],[t.name||'inbox',p.subtext0],[` (${n})`,p.dim]]);g.tabs.push({i,name:t.name||'inbox',x:from,w:x-from});x=g.put(x,0,[[i===at?'  ':'   ']])});
   const q=r=>prs.filter(z=>hit(r,z)==='?').length,note=[...(o.mark?[`${shown.filter(z=>hit(o.mark,z)==='y').length} selected`+(q(o.mark)?`, ${q(o.mark)} ?`:'')]:o.hide?[`${prs.filter(z=>hit(o.hide,z)==='y').length} excluded`+(q(o.hide)?`, ${q(o.hide)} ?`:'')]:[])].join(' · ')+(o.spin?` ${o.spin}`:'');
   g.put(COLS-sw(note),0,[[note,o.mark?p.mauve:p.subtext0]]);

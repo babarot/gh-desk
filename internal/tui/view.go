@@ -93,6 +93,11 @@ func (m *Model) render() (string, *tea.Cursor) {
 		popup := m.renderPick()
 		m.popupAt = boxAt(popup, 2, m.width)
 		lines = m.overlay(lines, popup, 2, m.width)
+	case m.chooser != nil:
+		popup, at := m.renderChooser()
+		m.popupAt = boxAt(popup, 2, m.width)
+		lines = m.overlay(lines, popup, 2, m.width)
+		cur = inPopup(m.chooser.input.Cursor(), popup, 2+at, m.width)
 	case m.menu != nil:
 		cur = nil
 		popup := m.renderMenu()
@@ -263,9 +268,39 @@ func tabsAfter(to, n int) string {
 	return ""
 }
 
-// headerLead is what the header shows before the tabs.
+// headerLead is what the header shows before the tabs: the viewer, or with
+// a scope set, the scope switch in its place (scopeSwitch).
 func (m *Model) headerLead() string {
+	if m.set.Scope != "" {
+		return m.st.app.Render("desk") + m.st.dim.Render(" // ") + m.scopeSwitch() + "   "
+	}
 	return m.st.app.Render("desk") + m.st.dim.Render(" // ") + m.st.muted.Render(m.viewerName()) + "   "
+}
+
+// maxScopeWidth is the most cells the scope switch gives a value; a longer
+// one is cut.
+const maxScopeWidth = 24
+
+// scopeSwitch is the value chosen between the marks that step to the one
+// before and after it: as wide as the longest value, so that the tabs do
+// not move as it changes, and in the active color while one is chosen.
+func (m *Model) scopeSwitch() string {
+	st := m.st
+	w := m.scopeNameWidth()
+	name := st.sub0.Render(fit(allScope, w))
+	if m.scope != "" {
+		name = st.blue.Bold(true).Render(fit(safeLine(m.scope), w))
+	}
+	return st.dim.Render("‹") + " " + name + " " + st.dim.Render("›")
+}
+
+// scopeNameWidth is the cells the scope switch gives the value's name.
+func (m *Model) scopeNameWidth() int {
+	w := lipgloss.Width(allScope)
+	for _, v := range m.scopeChoices() {
+		w = max(w, lipgloss.Width(safeLine(v)))
+	}
+	return min(w, maxScopeWidth)
 }
 
 // viewerName is the viewer as the header shows it, which a click opens.
@@ -298,6 +333,10 @@ func (m *Model) tabLabel(i int) string {
 		count = "-"
 	case t.loaded && (t.inbox || t.err == nil) && m.narrowed(t):
 		count, narrowed = fmt.Sprint(m.narrowedCount(t)), true
+	case t.loaded && (t.inbox || t.err == nil) && m.scoped():
+		// A scope is no narrowing typed: its count is the tab's, of the
+		// value chosen, counted as the narrowed rows are.
+		count = fmt.Sprint(m.narrowedCount(t))
 	case t.inbox && t.loaded:
 		count = fmt.Sprint(m.unreadShown(t))
 	case t.loaded && t.err == nil:
@@ -420,7 +459,7 @@ func (m *Model) hints() string {
 		as = []keymap.Action{"confirm"}
 	case m.picker != nil:
 		as = []keymap.Action{"toggle_rule", "choose", "add_to_selection", "filter_by_rule"}
-	case m.notesAt != nil, m.menu != nil:
+	case m.notesAt != nil, m.menu != nil, m.chooser != nil:
 		as = []keymap.Action{"choose"}
 	case m.compose != nil:
 		as = []keymap.Action{"next_kind", "post", "editor"}

@@ -1,0 +1,100 @@
+-- screen --
+desk // ‹ acme ›    1 review (3)   2 mine (0)   3 involved (0)   4 inbox (1)
+    PR                        TITLE                           AUTHOR          CI  MERGE  REVIEW   WHY         SIZE          AGE
+  ▾ requested from you 1           ╭ choose an owner for every tab ───────────────────────────╮
+▎ ● api#12                    Add r│ ┃                                                        │   you         +40 −3         3h
+  ▸ requested from a team 1        │                                                          │
+  ▸ bots 1                         │                            review  mine  involved  inbox │
+                                   │     all                         3     1         0      1 │
+                                   │ ▎ • acme                        3     0         0      1 │
+                                   │     me                          0     1         0      0 │
+                                   │                                                          │
+                                   │ type to narrow · ↑↓ move · enter choose · esc cancel     │
+                                   ╰──────────────────────────────────────────────────────────╯
+
+
+
+
+
+
+
+
+╭  overview   diff (2)  ────────────────────────────────────────────────────────────────────────────────── acme/api#12 · J/K · v ╮
+│ #12 Add retries to the client                                                       alice │ status    open                     │
+│ ▾ description ─────────────────────────────────────────────────────────────────────────── │ merge     approve → merge now      │
+│ │ What                                                                                    │ requested me @core                 │
+│ │ Retry failed requests.                                                                  │ checks    ✓1                       │
+│ ╵                                                                                         │ size      +40 −3 · 2 files         │
+│                                                                                           │ branch    retries                  │
+│ ▾ checks (1)  ✓1 ──────────────────────────────────────────────────────────────────────── │           → main                   │
+│ │ ✓ test                                                                                  │ updated   3h ago                   │
+│ ╵                                                                                         │                                    │
+│                                                                                           │                                    │
+╰────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+
+enter choose · esc back
+-- styles --
+L1 0-76 fg=#706f87
+L2 4-127 fg=#706f87
+L3 2-24 fg=#706f87
+L3 35-36 fg=#96bfff
+L3 37-66 fg=#d0d6e8 bold
+L3 67-95 fg=#96bfff
+L4 0-35 fg=#706f87
+L4 35-36 fg=#96bfff
+L4 37-93 fg=c7 bg=c0
+L4 94-95 fg=#96bfff
+L4 98-127 fg=#706f87
+L5 2-27 fg=#706f87
+L5 35-95 fg=#96bfff
+L6 2-10 fg=#706f87
+L6 35-36 fg=#96bfff
+L6 64-93 fg=#706f87
+L6 94-95 fg=#96bfff
+L7 35-36 fg=#96bfff
+L7 41-44 fg=#d0d6e8
+L7 69-76 fg=#d4b0ff
+L7 85-86 fg=#706f87
+L7 92-93 fg=#d4b0ff
+L7 94-95 fg=#96bfff
+L8 35-36 fg=#96bfff
+L8 37-41 fg=#96bfff bg=#3b3b52
+L8 41-69 fg=#d0d6e8 bg=#3b3b52
+L8 69-75 fg=#d4b0ff bg=#3b3b52
+L8 75-92 fg=#706f87 bg=#3b3b52
+L8 92-93 fg=#d4b0ff bg=#3b3b52
+L8 94-95 fg=#96bfff
+L9 35-36 fg=#96bfff
+L9 41-43 fg=#d0d6e8
+L9 69-70 fg=#706f87
+L9 75-76 fg=#d4b0ff
+L9 85-93 fg=#706f87
+L9 94-95 fg=#96bfff
+L10 35-95 fg=#96bfff
+L11 35-36 fg=#96bfff
+L11 37-41 fg=#96bfff bold
+L11 42-51 fg=#8888a4
+L11 52-53 fg=#706f87
+L11 54-56 fg=#96bfff bold
+L11 57-61 fg=#8888a4
+L11 62-63 fg=#706f87
+L11 64-69 fg=#96bfff bold
+L11 70-76 fg=#8888a4
+L11 77-78 fg=#706f87
+L11 79-82 fg=#96bfff bold
+L11 83-89 fg=#8888a4
+L11 94-95 fg=#96bfff
+L12 35-95 fg=#96bfff
+L21 0-130 fg=#706f87
+L22 0-130 fg=#706f87
+L23 0-130 fg=#706f87
+L24 0-130 fg=#706f87
+L25 0-130 fg=#706f87
+L26 0-130 fg=#706f87
+L27 0-130 fg=#706f87
+L28 0-130 fg=#706f87
+L29 0-130 fg=#706f87
+L30 0-130 fg=#706f87
+L31 0-130 fg=#706f87
+L32 0-130 fg=#706f87
+L34 0-23 fg=#706f87

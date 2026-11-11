@@ -28,7 +28,7 @@ func (m *Model) tick() tea.Cmd {
 func (m *Model) autoRefresh() tea.Cmd {
 	// Rules approve whatever is open: they change no row under the user.
 	auto := m.autoApprove()
-	if m.bulk != nil || m.compose != nil || m.notesAt != nil || m.picker != nil || m.menu != nil || m.typingChat() || m.viewer == "" {
+	if m.bulk != nil || m.compose != nil || m.notesAt != nil || m.picker != nil || m.chooser != nil || m.menu != nil || m.typingChat() || m.viewer == "" {
 		return tea.Batch(auto, m.tick())
 	}
 	m.fadeResults()
@@ -214,11 +214,11 @@ func (m *Model) moved(t *tab) {
 
 // stays reports whether the row of the pull request t's cursor is on may
 // stay after it left the rows: not when what the user did leaves it out,
-// put away with d or h, filtered out by what is typed, or in a group
-// folded.
+// put away with d or h, filtered out by what is typed or by the scope
+// chosen, or in a section folded.
 func (m *Model) stays(t *tab) bool {
 	p := t.at.pr
-	if t.hidden[p.Key] || !matches(p, m.filter) {
+	if t.hidden[p.Key] || !matches(p, m.filter) || !m.inScope(p) {
 		return false
 	}
 	return !t.foldedAt(m.sectionOf(t, p))

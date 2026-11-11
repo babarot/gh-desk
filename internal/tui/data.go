@@ -539,11 +539,11 @@ func (m *Model) updatePR(p model.PR) {
 	}
 }
 
-// passes reports whether p is shown under the filter typed and the rules
-// the rows are narrowed to, as of now. Every place that asks whether a row
+// passes reports whether p is shown under the scope chosen, the filter
+// typed and the rules the rows are narrowed to, as of now. Every place that asks whether a row
 // is shown asks this, so nothing hidden by a filter is acted on.
 func (m *Model) passes(p model.PR, filter string, rules []plan.Rule, now time.Time) bool {
-	return matches(p, filter) && (len(rules) == 0 || matchesAll(rules, p, m.viewer, m.ruleFacts(p, now)))
+	return m.inScope(p) && matches(p, filter) && (len(rules) == 0 || matchesAll(rules, p, m.viewer, m.ruleFacts(p, now)))
 }
 
 // current is the row under the cursor, if any.
@@ -716,6 +716,8 @@ func (m *Model) searchPage(i, gen int, after string, more bool) tea.Cmd {
 
 // handleData takes in what a command read.
 func (m *Model) handleData(msg tea.Msg) tea.Cmd {
+	// A message may finish the reading the scope kept waits for.
+	defer m.checkScope()
 	switch msg := msg.(type) {
 	case viewerMsg:
 		if msg.err != nil {

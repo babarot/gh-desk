@@ -79,6 +79,19 @@ To leave pull requests out of one tab only, give the tab a section with `show = 
 
 A tab says how many it leaves out on the last line of its list, and its count in the tab's title leaves them out. While `/` filters the rows, that line counts only those the filter matches, still out of sight. `a` shows them, dimmed and marked ⊘, and hides them again; the status line and the pane say which rule leaves out the row under the cursor. What is left out is never selected, by a section's head or by `S`, nor put away by `d`. A rule is matched again at every draw, so a pull request leaves or comes back as it changes. One whose CI, size, review or labels are not read yet stays until they are, its PR column shimmering, or marked `?` with `theme.shimmer = false`, and the cursor stays on its pull request when rows above it leave.
 
+## One owner across the tabs
+
+`list.scope` narrows every tab at once to one owner, one repository (`"repo"`) or one author:
+
+```toml
+[list]
+scope = "owner"
+```
+
+The header then shows the value chosen where your login was, `desk // ‹ all ›`. `>` and `<` go to the next and the previous value, by name and round to `all`; `O` opens a list of the values with how many rows each tab holds of them, narrowed by what you type. A click on `‹` or `›` steps as the keys do, and one on the name opens the list. The values are those of the pull requests your tabs read, but those every tab leaves out; one a tab's excluded section leaves out stays, counted 0.
+
+While a value is chosen, every tab's rows, its count and what acts on its rows (`S`, `V`, `d`, Claude's triage) hold only that value's pull requests, and the PR column leaves out what the header says: the owner, or with a repository the repository. A selection made before stays, as one a filter hides does. The value is kept for the next launch; if no tab holds it once every tab is read, the tabs start at `all`, and the next launch tries it again. Rules that approve on their own and the bell are not narrowed. `?` says whom you are signed in as.
+
 ## Narrowing a tab
 
 `/` filters the rows by what you type. Each word, split by spaces, must be found in the pull request's key, title or author, in any order and ignoring case, so `retries alice` shows alice's pull requests about retries. A title is drawn with its shortcodes, such as `:sparkles:`, as emoji, and either finds it. A word can ask one field alone:

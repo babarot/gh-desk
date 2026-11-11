@@ -81,3 +81,32 @@ func TestLayout(t *testing.T) {
 		t.Fatalf("PreviewHeight = %d, %v; want 20, nil", h, err)
 	}
 }
+
+// The scope and the pane's height are kept apart: saving one keeps the
+// other, and a value of another scope is not given back.
+func TestLayoutScope(t *testing.T) {
+	dir := t.TempDir()
+	l := OpenLayout(dir)
+	if v, err := l.Scope("owner"); err != nil || v != "" {
+		t.Fatalf("Scope before any = %q, %v", v, err)
+	}
+	if err := l.SavePreviewHeight(12); err != nil {
+		t.Fatal(err)
+	}
+	if err := l.SaveScope("owner", "acme"); err != nil {
+		t.Fatal(err)
+	}
+	if err := l.SavePreviewHeight(14); err != nil {
+		t.Fatal(err)
+	}
+	l = OpenLayout(dir)
+	if v, err := l.Scope("owner"); err != nil || v != "acme" {
+		t.Errorf("Scope(owner) = %q, %v; want acme", v, err)
+	}
+	if v, _ := l.Scope("repo"); v != "" {
+		t.Errorf("Scope(repo) = %q; want none, as acme is an owner", v)
+	}
+	if h, _ := l.PreviewHeight(); h != 14 {
+		t.Errorf("PreviewHeight = %d; want 14", h)
+	}
+}

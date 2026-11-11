@@ -83,11 +83,15 @@ var Defaults = []Def{
 	{"tab_8", ScopeList, []string{"8"}, "tab 8"},
 	{"tab_9", ScopeList, []string{"9"}, "tab 9"},
 	{"menu", ScopeList, []string{"enter"}, "actions"},
-	{"expand", ScopeList, []string{"l", "right"}, "unfold group / next pane tab"},
-	{"collapse", ScopeList, []string{"h", "left"}, "fold group / previous pane tab"},
+	{"expand", ScopeList, []string{"l", "right"}, "unfold section / next pane tab"},
+	{"collapse", ScopeList, []string{"h", "left"}, "fold section / previous pane tab"},
 	{"select", ScopeList, []string{"space"}, "select"},
 	{"select_shown", ScopeList, []string{"V"}, "select shown"},
 	{"select_rule", ScopeList, []string{"S"}, "select by rule"},
+	// Do nothing but tell so while list.scope is not set.
+	{"next_scope", ScopeList, []string{">"}, "next in the scope"},
+	{"prev_scope", ScopeList, []string{"<"}, "previous in the scope"},
+	{"choose_scope", ScopeList, []string{"O"}, "choose in the scope"},
 	// Takes the selection away or, with none, brings the last one back.
 	{"clear_selection", ScopeList, []string{"u"}, "clear / restore selection"},
 	{"retry", ScopeList, []string{"."}, "try again"},
