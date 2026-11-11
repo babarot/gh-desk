@@ -1146,6 +1146,253 @@
      }
     }
    ],
+   "sections": [
+    {
+     "key": "repos",
+     "doc": "owner/repo globs the repository must match one of; * matches any part of the owner or the name.",
+     "kind": {
+      "type": "config.listKind",
+      "name": "list of strings",
+      "nonEmpty": true
+     }
+    },
+    {
+     "key": "authors",
+     "doc": "The logins the author must be one of; bots without app/.",
+     "kind": {
+      "type": "config.listKind",
+      "name": "list of strings",
+      "nonEmpty": true
+     }
+    },
+    {
+     "key": "title",
+     "doc": "A regular expression the title must match, as written: a shortcode such as `:arrow_up:` is matched as itself, not as its emoji. An empty one sets no condition.",
+     "kind": {
+      "type": "config.stringKind",
+      "name": "string"
+     }
+    },
+    {
+     "key": "max_files",
+     "doc": "The most files it may change.",
+     "kind": {
+      "type": "config.intKind",
+      "name": "integer, 1 or more",
+      "min": 1
+     }
+    },
+    {
+     "key": "max_lines",
+     "doc": "The most lines it may add and delete together: the sum of the two numbers SIZE shows.",
+     "kind": {
+      "type": "config.intKind",
+      "name": "integer, 1 or more",
+      "min": 1
+     }
+    },
+    {
+     "key": "min_files",
+     "doc": "The least files it may change.",
+     "kind": {
+      "type": "config.intKind",
+      "name": "integer, 1 or more",
+      "min": 1
+     }
+    },
+    {
+     "key": "min_lines",
+     "doc": "The least lines it may add and delete together.",
+     "kind": {
+      "type": "config.intKind",
+      "name": "integer, 1 or more",
+      "min": 1
+     }
+    },
+    {
+     "key": "updated_within_days",
+     "doc": "The most days, of 24 hours, since it was last updated: a label or a bot's comment updates it too. An old pull request updated lately matches.",
+     "kind": {
+      "type": "config.intKind",
+      "name": "integer, 1 to 36500",
+      "min": 1,
+      "max": 36500
+     }
+    },
+    {
+     "key": "created_within_days",
+     "doc": "The most days, of 24 hours, since it was created.",
+     "kind": {
+      "type": "config.intKind",
+      "name": "integer, 1 to 36500",
+      "min": 1,
+      "max": 36500
+     }
+    },
+    {
+     "key": "updated_before_days",
+     "doc": "The least days, of 24 hours, since it was last updated, as AGE counts them in a search tab.",
+     "kind": {
+      "type": "config.intKind",
+      "name": "integer, 1 to 36500",
+      "min": 1,
+      "max": 36500
+     }
+    },
+    {
+     "key": "created_before_days",
+     "doc": "The least days, of 24 hours, since it was created.",
+     "kind": {
+      "type": "config.intKind",
+      "name": "integer, 1 to 36500",
+      "min": 1,
+      "max": 36500
+     }
+    },
+    {
+     "key": "bot",
+     "doc": "true: the author must be a bot; false: a person.",
+     "kind": {
+      "type": "config.boolKind",
+      "name": "boolean"
+     }
+    },
+    {
+     "key": "mine",
+     "doc": "true: it must be your own pull request; false: someone else's.",
+     "kind": {
+      "type": "config.boolKind",
+      "name": "boolean"
+     }
+    },
+    {
+     "key": "draft",
+     "doc": "true: it must be a draft, which S never selects, so [[select]] does not take true; false: ready for review.",
+     "kind": {
+      "type": "config.boolKind",
+      "name": "boolean"
+     }
+    },
+    {
+     "key": "state",
+     "doc": "The states it must be in one of: \"open\", \"merged\" or \"closed\"; S selects open ones only, so [[select]] takes \"open\" alone.",
+     "kind": {
+      "type": "config.listKind",
+      "name": "list of `open`, `merged`, `closed`",
+      "values": [
+       "open",
+       "merged",
+       "closed"
+      ],
+      "nonEmpty": true
+     }
+    },
+    {
+     "key": "checks",
+     "doc": "The states its checks must be in one of: \"passing\" (passed, none at all, or only checks.approval pending), \"failing\" or \"pending\" (still running).",
+     "kind": {
+      "type": "config.listKind",
+      "name": "list of `passing`, `failing`, `pending`",
+      "values": [
+       "passing",
+       "failing",
+       "pending"
+      ],
+      "nonEmpty": true
+     }
+    },
+    {
+     "key": "decision",
+     "doc": "The review decisions REVIEW shows, one of which it must have; \"none\" is none, as in a repository that requires no review.",
+     "kind": {
+      "type": "config.listKind",
+      "name": "list of `approved`, `changes_requested`, `review_required`, `none`",
+      "values": [
+       "approved",
+       "changes_requested",
+       "review_required",
+       "none"
+      ],
+      "nonEmpty": true
+     }
+    },
+    {
+     "key": "merge",
+     "doc": "Whether GitHub would let it be merged now, one of: \"ready\" (the merge button can be pressed), \"behind\" (its branch must be brought up to date), \"conflict\" (it conflicts with its base), \"blocked\" (its reviews or required checks hold it, or it is a draft) or \"unknown\" (GitHub is still working it out).",
+     "kind": {
+      "type": "config.listKind",
+      "name": "list of `ready`, `behind`, `conflict`, `blocked`, `unknown`",
+      "values": [
+       "ready",
+       "behind",
+       "conflict",
+       "blocked",
+       "unknown"
+      ],
+      "nonEmpty": true
+     }
+    },
+    {
+     "key": "labels",
+     "doc": "Labels one of which it must have.",
+     "kind": {
+      "type": "config.listKind",
+      "name": "list of strings",
+      "nonEmpty": true
+     }
+    },
+    {
+     "key": "approved_by_me",
+     "doc": "true: your latest review must approve it, a person's pull request too, unlike the built-in \"approved by me\"; false: none of yours does.",
+     "kind": {
+      "type": "config.boolKind",
+      "name": "boolean"
+     }
+    },
+    {
+     "key": "reviewed_by_me",
+     "doc": "true: you must have reviewed it, whatever the review said; false: you have not.",
+     "kind": {
+      "type": "config.boolKind",
+      "name": "boolean"
+     }
+    },
+    {
+     "key": "requested",
+     "doc": "Whom a review must be asked of, one of them: \"me\", a team as \"@slug\", or \"@*\" for any team.",
+     "kind": {
+      "type": "config.listKind",
+      "name": "list of strings",
+      "nonEmpty": true
+     }
+    },
+    {
+     "key": "reasons",
+     "doc": "Reasons of a notification, one of which the row's must have; S and a rule that approves judge a pull request without one, so [[select]] and [[auto_approve]] do not take it.",
+     "kind": {
+      "type": "config.listKind",
+      "name": "list of `approval_requested`, `assign`, `author`, `ci_activity`, `comment`, `invitation`, `manual`, `member_feature_requested`, `mention`, `review_requested`, `security_advisory_credit`, `security_alert`, `state_change`, `subscribed`, `team_mention`",
+      "values": [
+       "approval_requested",
+       "assign",
+       "author",
+       "ci_activity",
+       "comment",
+       "invitation",
+       "manual",
+       "member_feature_requested",
+       "mention",
+       "review_requested",
+       "security_advisory_credit",
+       "security_alert",
+       "state_change",
+       "subscribed",
+       "team_mention"
+      ],
+      "nonEmpty": true
+     }
+    }
+   ],
    "select": [
     {
      "key": "name",
@@ -1986,7 +2233,146 @@
      2,
      2
     ],
-    "pending": []
+    "pending": [],
+    "why": {
+     "0": [
+      {
+       "key": "bot",
+       "state": "yes",
+       "values": [
+        "true"
+       ]
+      }
+     ],
+     "1": [
+      {
+       "key": "bot",
+       "state": "yes",
+       "values": [
+        "true"
+       ]
+      }
+     ],
+     "10": [
+      {
+       "key": "bot",
+       "state": "yes",
+       "values": [
+        "false"
+       ]
+      }
+     ],
+     "11": [
+      {
+       "key": "bot",
+       "state": "yes",
+       "values": [
+        "false"
+       ]
+      }
+     ],
+     "12": [
+      {
+       "key": "bot",
+       "state": "yes",
+       "values": [
+        "false"
+       ]
+      }
+     ],
+     "2": [
+      {
+       "key": "bot",
+       "state": "yes",
+       "values": [
+        "true"
+       ]
+      }
+     ],
+     "3": [
+      {
+       "key": "bot",
+       "state": "yes",
+       "values": [
+        "false"
+       ]
+      },
+      {
+       "key": "requested",
+       "state": "yes",
+       "values": [
+        "me"
+       ],
+       "matched": [
+        "me"
+       ]
+      }
+     ],
+     "4": [
+      {
+       "key": "bot",
+       "state": "yes",
+       "values": [
+        "false"
+       ]
+      }
+     ],
+     "5": [
+      {
+       "key": "bot",
+       "state": "yes",
+       "values": [
+        "true"
+       ]
+      }
+     ],
+     "6": [
+      {
+       "key": "bot",
+       "state": "yes",
+       "values": [
+        "false"
+       ]
+      },
+      {
+       "key": "requested",
+       "state": "yes",
+       "values": [
+        "me"
+       ],
+       "matched": [
+        "me"
+       ]
+      }
+     ],
+     "7": [
+      {
+       "key": "bot",
+       "state": "yes",
+       "values": [
+        "false"
+       ]
+      }
+     ],
+     "8": [
+      {
+       "key": "bot",
+       "state": "yes",
+       "values": [
+        "false"
+       ]
+      }
+     ],
+     "9": [
+      {
+       "key": "bot",
+       "state": "yes",
+       "values": [
+        "false"
+       ]
+      }
+     ]
+    }
    },
    {
     "names": [
@@ -2014,7 +2400,126 @@
      0,
      0
     ],
-    "pending": []
+    "pending": [],
+    "why": {
+     "0": [
+      {
+       "key": "draft",
+       "state": "yes",
+       "values": [
+        "false"
+       ]
+      }
+     ],
+     "1": [
+      {
+       "key": "draft",
+       "state": "yes",
+       "values": [
+        "false"
+       ]
+      }
+     ],
+     "10": [
+      {
+       "key": "draft",
+       "state": "yes",
+       "values": [
+        "false"
+       ]
+      }
+     ],
+     "11": [
+      {
+       "key": "draft",
+       "state": "yes",
+       "values": [
+        "false"
+       ]
+      }
+     ],
+     "12": [
+      {
+       "key": "draft",
+       "state": "yes",
+       "values": [
+        "false"
+       ]
+      }
+     ],
+     "2": [
+      {
+       "key": "draft",
+       "state": "yes",
+       "values": [
+        "false"
+       ]
+      }
+     ],
+     "3": [
+      {
+       "key": "draft",
+       "state": "yes",
+       "values": [
+        "false"
+       ]
+      }
+     ],
+     "4": [
+      {
+       "key": "draft",
+       "state": "yes",
+       "values": [
+        "true"
+       ]
+      }
+     ],
+     "5": [
+      {
+       "key": "draft",
+       "state": "yes",
+       "values": [
+        "false"
+       ]
+      }
+     ],
+     "6": [
+      {
+       "key": "draft",
+       "state": "yes",
+       "values": [
+        "false"
+       ]
+      }
+     ],
+     "7": [
+      {
+       "key": "draft",
+       "state": "yes",
+       "values": [
+        "false"
+       ]
+      }
+     ],
+     "8": [
+      {
+       "key": "draft",
+       "state": "yes",
+       "values": [
+        "false"
+       ]
+      }
+     ],
+     "9": [
+      {
+       "key": "draft",
+       "state": "yes",
+       "values": [
+        "false"
+       ]
+      }
+     ]
+    }
    },
    {
     "names": [],
@@ -2034,7 +2539,8 @@
      -1,
      -1
     ],
-    "pending": []
+    "pending": [],
+    "why": {}
    },
    {
     "names": [],
@@ -2054,7 +2560,8 @@
      -1,
      -1
     ],
-    "pending": []
+    "pending": [],
+    "why": {}
    }
   ]
  },

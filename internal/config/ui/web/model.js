@@ -44,6 +44,13 @@ function checkValue(k,v){const t=k.type.replace('config.','');
   if(t==='stringKind'&&k.nonEmpty&&!v)return'This cannot be empty.';
   if(t==='listKind'&&k.nonEmpty&&!v.length)return'Choose at least one.';
   return''}
+// What internal/config tells of a rule's or a section's conditions, shown in the rule's card: a list must name at least one value, a count must be 1 or more. A title left empty sets none (ADR-111).
+const word=k=>(k[0].toUpperCase()+k.slice(1)).replace(/_/g,' ');
+function condProblems(r,at,ps){for(const[k,v]of Object.entries(r)){if(['name','show','query','dry_run'].includes(k))continue;
+  if(Array.isArray(v)&&!v.length)ps.push({at,msg:`${word(k)}: choose at least one, or remove this condition.`});
+  if(typeof v==='number'&&v<1)ps.push({at,msg:`${word(k)}: 1 or more.`})}}
+// Whether r sets a condition, as internal/config reads it: a title left empty sets none.
+const hasCond=r=>Object.keys(r).some(k=>!['name','show','query','dry_run'].includes(k)&&r[k]!==''&&!(Array.isArray(r[k])&&!r[k].length));
 function problems(d){const ps=[];
   for(const s of DATA.settings)if(s.key in d.vals){const m=checkValue(s.kind,d.vals[s.key]);if(m)ps.push({at:s.key,msg:m});if(s.kind.type.endsWith('globsKind'))for(const v of d.vals[s.key]){const c=checkItem('glob',v);if(c&&!c.warn)ps.push({at:s.key,msg:c.msg})}}
   const rules=(n,named)=>{const seen={};(d.arr[n]||[]).forEach((r,i)=>{const at=`${n}/${i}`;
@@ -51,9 +58,19 @@ function problems(d){const ps=[];
     if(r.name){if(seen[r.name])ps.push({at,msg:`The name “${r.name}” is used twice.`});seen[r.name]=1}
     for(const k of ['repos','authors'])for(const v of r[k]||[]){const c=checkItem(itemType(k),v);if(c&&!c.warn)ps.push({at:`${at}/${k}`,msg:c.msg})}
     if(r.title!==undefined){try{goRe(r.title)}catch(e){ps.push({at,msg:'The title pattern is not a valid regular expression.'})}}
-    if(!Object.keys(r).some(k=>!['name','query','dry_run'].includes(k)&&r[k]!==''&&!(Array.isArray(r[k])&&!r[k].length))&&!(n==='auto_approve'&&r.query))ps.push({at,msg:'Add a condition, or this rule matches every pull request.'})})};
+    condProblems(r,at,ps);
+    if(!hasCond(r)&&!(n==='auto_approve'&&r.query))ps.push({at,msg:'Add a condition, or this rule matches every pull request.'})})};
   rules('select',true);rules('exclude',false);rules('auto_approve',false);
-  if(d.arr.tabs){const t=d.arr.tabs;if(t.filter(x=>x.kind==='inbox').length!==1)ps.push({at:'tabs',msg:'Keep one inbox tab.'});if(t.length>9)ps.push({at:'tabs',msg:'Keep nine tabs or fewer.'});t.forEach((x,i)=>{if(x.kind!=='inbox'&&!x.query)ps.push({at:`tabs/${i}`,msg:'A tab needs a search.'})})}
+  if(d.arr.tabs){const t=d.arr.tabs;if(t.filter(x=>x.kind==='inbox').length!==1)ps.push({at:'tabs',msg:'Keep one inbox tab.'});if(t.length>9)ps.push({at:'tabs',msg:'Keep nine tabs or fewer.'});t.forEach((x,i)=>{if(x.kind!=='inbox'&&!x.query)ps.push({at:`tabs/${i}`,msg:'A tab needs a search.'});
+    // A tab's sections, as internal/config checks them.
+    const seen={};(x.sections||[]).forEach((r,j)=>{const at=`tabs/${i}/sections/${j}`,cond=hasCond(r);condProblems(r,at,ps);
+      if('name' in r&&!String(r.name).trim())ps.push({at,msg:'Give it a name, or leave the name out for a section with no head.'});
+      if(r.name){if(seen[r.name])ps.push({at,msg:`The name “${r.name}” is used twice in the tab.`});seen[r.name]=1}
+      if(!r.name&&r.show==='folded')ps.push({at,msg:'A section with no name has no head to unfold it by: give it a name, or show it open.'});
+      if(!r.name&&r.show==='excluded'&&!cond)ps.push({at,msg:'With no name and no condition, it leaves out every pull request left: give it a name or a condition.'});
+      if(x.kind!=='inbox'&&r.reasons)ps.push({at,msg:'Reasons are read only in the inbox: the rows of a search have no notification.'});
+      for(const k of ['repos','authors'])for(const v of r[k]||[]){const c=checkItem(itemType(k),v);if(c&&!c.warn)ps.push({at:`${at}/${k}`,msg:c.msg})}
+      if(r.title!==undefined){try{goRe(r.title)}catch(e){ps.push({at,msg:'The title pattern is not a valid regular expression.'})}}})})}
   const seen={};for(const k of KEYS){const v=d.keys[k.action];if(!v)continue;for(const key of[].concat(v)){const id=k.scope+'/'+key;if(seen[id])ps.push({at:'key/'+k.action,msg:`${key} is also set for ${seen[id].replace(/_/g,' ')}.`});seen[id]=k.action}}
   return ps}
 // The rows of a tab: made up when no list was read, null when its search was not.

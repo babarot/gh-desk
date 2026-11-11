@@ -76,6 +76,10 @@ func UI() UIData {
 			d.Elems[a.Name] = append(d.Elems[a.Name], UIElem{e.Key, e.Doc, uiKind(e.Kind)})
 		}
 	}
+	// A tab's sections, which the page edits as it edits rules.
+	for _, e := range sectionElems {
+		d.Elems["sections"] = append(d.Elems["sections"], UIElem{e.Key, e.Doc, uiKind(e.Kind)})
+	}
 	return d
 }
 

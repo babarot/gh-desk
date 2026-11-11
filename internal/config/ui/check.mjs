@@ -68,6 +68,26 @@ for (const r of [{ title: 'Renovate' }, { authors: ['renovate'], title: '' }, { 
   if (mod.problems(e).length) fail(`the rule ${JSON.stringify(r)} is told: ${JSON.stringify(mod.problems(e))}`);
 }
 
+// A tab's sections are told what internal/config tells of them.
+for (const [sections, want] of [
+  [[{ show: 'folded', bot: true }], 'no head to unfold it by'],
+  [[{ show: 'excluded' }], 'leaves out every pull request left'],
+  [[{ name: 'a' }, { name: 'a', bot: true }], 'used twice in the tab'],
+  [[{ name: 'asked', reasons: ['mention'] }], 'read only in the inbox'],
+  [[{ name: 'a', authors: [] }], 'choose at least one'],
+  [[{ name: 'a', max_lines: 0 }], '1 or more'],
+  [[{ show: 'excluded', title: '' }], 'leaves out every pull request left'],
+]) {
+  const e = mod.load({});
+  e.arr.tabs = [{ name: 'r', query: 'is:pr', sections }, { kind: 'inbox' }];
+  if (!mod.problems(e).some(p => p.at.startsWith('tabs/0/sections/') && p.msg.includes(want))) fail(`the sections ${JSON.stringify(sections)} are not told: ${want}`);
+}
+{
+  const e = mod.load({});
+  e.arr.tabs = [{ name: 'r', query: 'is:pr', sections: [{ name: 'can merge', merge: ['ready'], show: 'excluded' }, { draft: true }] }, { kind: 'inbox', sections: [{ name: 'asked', reasons: ['review_requested'] }] }];
+  if (mod.problems(e).length) fail('sections that gh-desk takes are told: ' + JSON.stringify(mod.problems(e)));
+}
+
 // What it writes, from a file that uses every shape of value. A Go test
 // reads it back and compares it with input.json.
 const file = JSON.parse(read('testdata/input.json'));
