@@ -1808,12 +1808,36 @@
     "limit": 100,
     "name": "involved",
     "query": "is:open is:pr involves:@me -author:@me -review-requested:@me archived:false",
+    "sections": [
+     {
+      "bot": false
+     },
+     {
+      "bot": true,
+      "name": "bots",
+      "show": "folded"
+     }
+    ],
     "sort": "updated"
    },
    {
     "kind": "inbox",
     "limit": 100,
     "name": "inbox",
+    "sections": [
+     {
+      "name": "review requests",
+      "reasons": [
+       "review_requested"
+      ]
+     },
+     {
+      "name": "mentions",
+      "reasons": [
+       "mention"
+      ]
+     }
+    ],
     "show_settled": false
    }
   ],
@@ -2522,43 +2546,177 @@
     }
    },
    {
-    "names": [],
-    "show": [],
+    "names": [
+     "",
+     "bots",
+     "other"
+    ],
+    "show": [
+     "open",
+     "folded",
+     "open"
+    ],
     "at": [
-     -1,
-     -1,
-     -1,
-     -1,
-     -1,
-     -1,
-     -1,
-     -1,
-     -1,
-     -1,
-     -1,
-     -1,
-     -1
+     1,
+     1,
+     1,
+     0,
+     0,
+     1,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0
     ],
     "pending": [],
-    "why": {}
+    "why": {
+     "0": [
+      {
+       "key": "bot",
+       "state": "yes",
+       "values": [
+        "true"
+       ]
+      }
+     ],
+     "1": [
+      {
+       "key": "bot",
+       "state": "yes",
+       "values": [
+        "true"
+       ]
+      }
+     ],
+     "10": [
+      {
+       "key": "bot",
+       "state": "yes",
+       "values": [
+        "false"
+       ]
+      }
+     ],
+     "11": [
+      {
+       "key": "bot",
+       "state": "yes",
+       "values": [
+        "false"
+       ]
+      }
+     ],
+     "12": [
+      {
+       "key": "bot",
+       "state": "yes",
+       "values": [
+        "false"
+       ]
+      }
+     ],
+     "2": [
+      {
+       "key": "bot",
+       "state": "yes",
+       "values": [
+        "true"
+       ]
+      }
+     ],
+     "3": [
+      {
+       "key": "bot",
+       "state": "yes",
+       "values": [
+        "false"
+       ]
+      }
+     ],
+     "4": [
+      {
+       "key": "bot",
+       "state": "yes",
+       "values": [
+        "false"
+       ]
+      }
+     ],
+     "5": [
+      {
+       "key": "bot",
+       "state": "yes",
+       "values": [
+        "true"
+       ]
+      }
+     ],
+     "6": [
+      {
+       "key": "bot",
+       "state": "yes",
+       "values": [
+        "false"
+       ]
+      }
+     ],
+     "7": [
+      {
+       "key": "bot",
+       "state": "yes",
+       "values": [
+        "false"
+       ]
+      }
+     ],
+     "8": [
+      {
+       "key": "bot",
+       "state": "yes",
+       "values": [
+        "false"
+       ]
+      }
+     ],
+     "9": [
+      {
+       "key": "bot",
+       "state": "yes",
+       "values": [
+        "false"
+       ]
+      }
+     ]
+    }
    },
    {
-    "names": [],
-    "show": [],
+    "names": [
+     "review requests",
+     "mentions",
+     "other"
+    ],
+    "show": [
+     "open",
+     "open",
+     "open"
+    ],
     "at": [
-     -1,
-     -1,
-     -1,
-     -1,
-     -1,
-     -1,
-     -1,
-     -1,
-     -1,
-     -1,
-     -1,
-     -1,
-     -1
+     2,
+     2,
+     2,
+     2,
+     2,
+     2,
+     2,
+     2,
+     2,
+     2,
+     2,
+     2,
+     2
     ],
     "pending": [],
     "why": {}

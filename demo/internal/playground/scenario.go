@@ -143,9 +143,10 @@ func Scenarios() []Scenario {
 		// that brought it; back at the top, the one there marked done.
 		{Name: "inbox", Title: "The pull requests in your notifications, read and marked done", Steps: []Step{
 			{Action: "tab_4", Hold: time.Second},
-			{Action: "down", Hold: time.Second},
+			// The inbox opens on its first notification, under the head of
+			// its review requests; the top is that head.
 			{Action: "down", Hold: 2 * time.Second},
-			{Action: "top", Hold: 2 * time.Second},
+			{Action: "up", Hold: 2 * time.Second},
 			{Action: "hide", Hold: time.Second},
 		}},
 		// The keys: the list's own first, then down the popup to another

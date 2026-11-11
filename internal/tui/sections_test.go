@@ -220,4 +220,20 @@ func TestInboxSectionsByReason(t *testing.T) {
 	if asked, row := strings.Index(s, "▾ asked"), strings.Index(s, "api#12"); asked < 0 || row < asked {
 		t.Errorf("the notification asking for a review is not under its section:\n%s", s)
 	}
+	// The cursor starts on the first notification, not on the head above it.
+	if r, ok := m.current(); !ok || r.kind != rowPR {
+		t.Errorf("the cursor is on %+v", r)
+	}
+}
+
+// A head of the inbox selects the notifications' pull requests under it,
+// as a search tab's head does its rows.
+func TestAnInboxHeadSelects(t *testing.T) {
+	set := testSettings()
+	set.Tabs[3].Sections = []plan.Section{{Name: "asked", Show: plan.ShowOpen, Rule: plan.Rule{Reasons: []string{"review_requested"}}}}
+	m := startSource(t, fixture(), set)
+	press(m, "4", "k", "space")
+	if r, _ := m.current(); r.kind != rowGroup || len(m.selected) != 1 || !m.isSelected(key("acme", "api", 12)) {
+		t.Errorf("on %+v, selected %v", r, m.selected)
+	}
 }

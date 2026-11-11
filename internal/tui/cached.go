@@ -47,6 +47,7 @@ func (m *Model) loadCached() {
 			}
 			m.setNotifs(t, in.Notifs)
 			t.inboxPRs, t.loaded, t.asOf, t.readAt = prs, true, in.Read, in.Read
+			m.toFirstPR(t)
 			seen(in.Read)
 			n++
 			continue

@@ -40,11 +40,19 @@ sections = [
 [[tabs]]
 name = "involved"
 query = "is:open is:pr involves:@me -author:@me -review-requested:@me archived:false"
+sections = [
+  { bot = false },
+  { name = "bots", bot = true, show = "folded" },
+]
 
 [[tabs]]
 kind = "inbox"
 name = "inbox"
 show_settled = false
+sections = [
+  { name = "review requests", reasons = ["review_requested"] },
+  { name = "mentions", reasons = ["mention"] },
+]
 ```
 
 | Key | Type | |

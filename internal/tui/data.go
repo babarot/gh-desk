@@ -746,6 +746,9 @@ func (m *Model) handleData(msg tea.Msg) tea.Cmd {
 		first := firstInbox(t, msg.notifs)
 		m.noteNewUnread(t, msg.notifs)
 		keys := m.setNotifs(t, msg.notifs)
+		// A section's head may be the first row; the cursor starts on the
+		// first notification, as a search tab's does.
+		m.firstRows(t)
 		gen := msg.gen
 		return tea.Batch(m.readInboxFirst(gen, first), func() tea.Msg {
 			prs, err := m.src.PullRequests(m.ctx, keys)
@@ -766,6 +769,7 @@ func (m *Model) handleData(msg tea.Msg) tea.Cmd {
 				t.inboxPRs[k] = safePR(p)
 			}
 		}
+		m.firstRows(t)
 		if msg.err != nil {
 			return tea.Batch(m.ensure(), m.ringBell(t))
 		}

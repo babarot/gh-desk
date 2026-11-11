@@ -608,7 +608,8 @@ func (m *Model) jumpTo(k model.PRKey) tea.Cmd {
 	for i, t := range m.tabs {
 		t.ruleFilter = nil
 		if t.grouped {
-			for _, p := range t.prs {
+			// allOf, not t.prs: the inbox's are its notifications'.
+			for _, p := range m.allOf(t) {
 				if p.Key == k {
 					m.unfoldFor(t, p)
 				}

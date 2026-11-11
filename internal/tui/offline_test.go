@@ -13,7 +13,9 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
+	"github.com/babarot/gh-desk/internal/listcache"
 	"github.com/babarot/gh-desk/internal/model"
+	"github.com/babarot/gh-desk/internal/plan"
 	"github.com/babarot/gh-desk/internal/runner"
 	"github.com/babarot/gh-desk/internal/tui/keymap"
 )
@@ -287,5 +289,24 @@ func TestSettingsOnAnEmptyTab(t *testing.T) {
 	screen(m)
 	if tb := m.tab(); tb.sel < 0 || tb.offset < 0 {
 		t.Errorf("an empty tab's cursor is at %d, %d", tb.sel, tb.offset)
+	}
+}
+
+// An inbox shown from the lists last read, as the settings page shows it,
+// starts on its first notification, not on the head above it: nothing is
+// read after to move it there.
+func TestCachedInboxStartsOnANotification(t *testing.T) {
+	p := model.PR{Key: key("acme", "api", 12), Title: "Add retries to the client", Author: "alice", State: model.StateOpen}
+	lists := &fakeLists{lists: map[string]listcache.List{}, inbox: &listcache.Inbox{Read: earlier, PRs: []model.PR{p},
+		Notifs: []model.Notification{{ThreadID: "n1", Key: p.Key, Reason: "review_requested", Unread: true, Updated: earlier}}}}
+	set := testSettings()
+	set.Tabs[3].Sections = []plan.Section{{Name: "asked", Show: plan.ShowOpen, Rule: plan.Rule{Reasons: []string{"review_requested"}}}}
+	set.Viewer, set.Lists, set.Offline = "me", lists, true
+	m := New(&offlineSource{fakeSource: fixture()}, &fakeRunner{results: map[model.PRKey]runner.Event{}}, nil, keymap.Default(), nil, set)
+	m.Update(tea.WindowSizeMsg{Width: 130, Height: 34})
+	run(m, m.Init())
+	press(m, "4")
+	if r, ok := m.current(); !ok || r.kind != rowPR {
+		t.Errorf("the cursor is on %+v\n%s", r, screen(m))
 	}
 }
