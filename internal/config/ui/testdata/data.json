@@ -102,7 +102,7 @@
     "doc": "The actions the menu of enter offers, in the order given. One left out is not in the menu; its key still runs it from the list.",
     "kind": {
      "type": "config.listKind",
-     "name": "list of `ask_claude`, `browse`, `review`, `comment`, `approve`, `merge`, `draft`, `close`, `hide`",
+     "name": "list of `ask_claude`, `browse`, `review`, `comment`, `approve`, `merge`, `stop`, `draft`, `close`, `hide`",
      "values": [
       "ask_claude",
       "browse",
@@ -110,6 +110,7 @@
       "comment",
       "approve",
       "merge",
+      "stop",
       "draft",
       "close",
       "hide"
@@ -123,6 +124,7 @@
      "comment",
      "approve",
      "merge",
+     "stop",
      "draft",
      "close",
      "hide"
@@ -3000,6 +3002,14 @@
    "action": "merge",
    "keys": [
     "M"
+   ],
+   "scope": "list",
+   "scopeWords": "The list and its preview pane"
+  },
+  {
+   "action": "stop",
+   "keys": [
+    "X"
    ],
    "scope": "list",
    "scopeWords": "The list and its preview pane"

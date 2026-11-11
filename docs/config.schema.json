@@ -666,6 +666,7 @@
               "comment",
               "approve",
               "merge",
+              "stop",
               "draft",
               "close",
               "hide"

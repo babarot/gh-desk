@@ -62,6 +62,7 @@ browse = []
 | `u` | `clear_selection` | clear / restore selection |
 | `A` | `approve` | approve |
 | `M` | `merge` | merge |
+| `X` | `stop` | stop |
 | `D` | `draft` | draft / ready |
 | (none) | `close` | close |
 | `c` | `comment` | comment |

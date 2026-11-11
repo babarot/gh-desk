@@ -10,13 +10,13 @@ desk // @me    1 review (3)   2 mine (1)   3 involved (0)   4 inbox (1)
                        │   comment               c      comment on its conversation                       │
                        │   approve               A      send an approving review                          │
                        │   merge                 M      approve → merge now                               │
+                       │   stop                  X      not at work                                       │
                        │   draft / ready         D      someone else's pull request                       │
                        │   close                        close it, as the next popup says                  │
                        │   hide / done           d      hide it from this tab                             │
                        │                                                                                  │
                        │ enter run · or the action's key · esc close                                      │
                        ╰──────────────────────────────────────────────────────────────────────────────────╯
-
 
 
 ╭  overview   diff (2)  ────────────────────────────────────────────────────────────────────────────────── acme/api#12 · J/K · v ╮
@@ -80,28 +80,31 @@ L11 49-50 fg=#1e66f5 bold
 L11 56-75 fg=#7c7f93
 L11 106-107 fg=#1e66f5
 L12 23-24 fg=#1e66f5
-L12 27-83 fg=#9ca0b0
+L12 27-67 fg=#9ca0b0
 L12 106-107 fg=#1e66f5
 L13 23-24 fg=#1e66f5
-L13 27-32 fg=#5c5f77
-L13 56-88 fg=#7c7f93
+L13 27-83 fg=#9ca0b0
 L13 106-107 fg=#1e66f5
 L14 23-24 fg=#1e66f5
-L14 27-38 fg=#5c5f77
-L14 49-50 fg=#1e66f5 bold
-L14 56-77 fg=#7c7f93
+L14 27-32 fg=#5c5f77
+L14 56-88 fg=#7c7f93
 L14 106-107 fg=#1e66f5
-L15 23-107 fg=#1e66f5
-L16 23-24 fg=#1e66f5
-L16 25-30 fg=#1e66f5 bold
-L16 31-34 fg=#7c7f93
-L16 35-36 fg=#9ca0b0
-L16 37-56 fg=#7c7f93
-L16 57-58 fg=#9ca0b0
-L16 59-62 fg=#1e66f5 bold
-L16 63-68 fg=#7c7f93
-L16 106-107 fg=#1e66f5
-L17 23-107 fg=#1e66f5
+L15 23-24 fg=#1e66f5
+L15 27-38 fg=#5c5f77
+L15 49-50 fg=#1e66f5 bold
+L15 56-77 fg=#7c7f93
+L15 106-107 fg=#1e66f5
+L16 23-107 fg=#1e66f5
+L17 23-24 fg=#1e66f5
+L17 25-30 fg=#1e66f5 bold
+L17 31-34 fg=#7c7f93
+L17 35-36 fg=#9ca0b0
+L17 37-56 fg=#7c7f93
+L17 57-58 fg=#9ca0b0
+L17 59-62 fg=#1e66f5 bold
+L17 63-68 fg=#7c7f93
+L17 106-107 fg=#1e66f5
+L18 23-107 fg=#1e66f5
 L21 0-130 fg=#9ca0b0
 L22 0-130 fg=#9ca0b0
 L23 0-130 fg=#9ca0b0

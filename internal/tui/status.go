@@ -64,7 +64,19 @@ func (m *Model) statusText() string {
 	case statusline.Refusal:
 		return m.st.peach.Render(text)
 	case statusline.Activity:
-		return m.activityText()
+		out := m.activityText()
+		if m.batchActivity() != "" && m.stoppable() {
+			out += m.stopHint()
+		}
+		return out
+	case statusline.Row:
+		out := m.st.muted.Render(text)
+		if p, _, ok := m.currentPR(); ok {
+			if pg, has := m.progress[p.Key]; has && pg.result == runner.Running {
+				out += m.stopHint()
+			}
+		}
+		return out
 	}
 	return m.st.muted.Render(text)
 }

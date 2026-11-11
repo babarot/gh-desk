@@ -108,6 +108,8 @@ func (m *Model) listKey(k string) tea.Cmd {
 		return m.startApprove()
 	case is("merge"):
 		return m.startBulk(runner.Merge)
+	case is("stop"):
+		return m.stopWork()
 	case is("draft"):
 		return m.startDraft()
 	case is("close"):

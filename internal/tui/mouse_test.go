@@ -382,7 +382,7 @@ func TestClickInTheScrolledMenu(t *testing.T) {
 	m := start(t, fixture(), keymap.Default())
 	m.Update(tea.WindowSizeMsg{Width: 130, Height: 14})
 	press(m, "enter")
-	for range 8 {
+	for range 10 {
 		mouseAt(m, tea.MouseWheelMsg{X: 60, Y: 6, Button: tea.MouseWheelDown})
 	}
 	x, y := lineOf(t, m, "hide it from this tab")

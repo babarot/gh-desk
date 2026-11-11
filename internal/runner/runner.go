@@ -250,6 +250,9 @@ type Event struct {
 	// Locked is set on a skip because the merge would wait while another
 	// gh-desk holds the record of pending merges.
 	Locked bool
+	// StoppedByUser is set on the Stopped event of a job the user stopped
+	// (Stop), as against one stopped by what it read.
+	StoppedByUser bool
 	// Step is the step a Running event starts or goes on with; empty
 	// for one that is no step of its own, such as reading it again.
 	Step Step
@@ -319,6 +322,9 @@ type Runner struct {
 	merges map[string]map[model.PRKey]*activeMerge
 	// reads are, by repository, the waits sharing a read. Guarded by mu.
 	reads map[string]*repoReads
+	// stops are the stoppers of the pull requests in busy, from their
+	// claim until they are released. Guarded by mu.
+	stops map[model.PRKey]*stopper
 	// wmu guards store and canWait, which Adopt sets after the start.
 	wmu     sync.Mutex
 	store   Store
@@ -347,6 +353,10 @@ func (r *Runner) release(k model.PRKey) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	delete(r.busy, k)
+	if s := r.stops[k]; s != nil {
+		s.cancel()
+		delete(r.stops, k)
+	}
 	r.untrack(k)
 }
 
@@ -424,7 +434,7 @@ func (r *Runner) Wait() { r.active.Wait() }
 
 // New returns a Runner.
 func New(gh GitHub, log *slog.Logger, opt Options) *Runner {
-	return &Runner{gh: gh, opt: opt.withDefaults(), log: log, busy: map[model.PRKey]bool{}, lanes: map[string][]*ticket{}, merges: map[string]map[model.PRKey]*activeMerge{}, reads: map[string]*repoReads{}, store: opt.Store, canWait: opt.CanWait}
+	return &Runner{gh: gh, opt: opt.withDefaults(), log: log, busy: map[model.PRKey]bool{}, lanes: map[string][]*ticket{}, merges: map[string]map[model.PRKey]*activeMerge{}, reads: map[string]*repoReads{}, stops: map[model.PRKey]*stopper{}, store: opt.Store, canWait: opt.CanWait}
 }
 
 // StartReview runs a batch that sends rv to each pull request, as Start
@@ -514,6 +524,8 @@ func (r *Runner) run(ctx context.Context, kind Kind, items []Item, resume map[mo
 		merge, lane bool
 		// unread says why its branches could not be read.
 		unread string
+		// stop is how the user stops it, on a claimed one.
+		stop *stopper
 	}
 	slots := map[string][]*slot{}
 	r.mu.Lock()
@@ -522,6 +534,13 @@ func (r *Runner) run(ctx context.Context, kind Kind, items []Item, resume map[mo
 			s := &slot{it: it, claimed: !r.busy[it.PR.Key]}
 			if s.claimed {
 				r.busy[it.PR.Key] = true
+				s.stop = newStopper(ctx)
+				// A watch resumed from the record was handed to GitHub
+				// before: a stop leaves it alone from its claim on.
+				if p, ok := resume[it.PR.Key]; ok && p.Watching {
+					s.stop.handed = true
+				}
+				r.stops[it.PR.Key] = s.stop
 				s.lane = inLane(kind, resume, it.PR.Key)
 				if s.merge = isMerge(kind, resume, it.PR.Key); s.merge {
 					r.track(it.PR.Key)
@@ -555,6 +574,13 @@ func (r *Runner) run(ctx context.Context, kind Kind, items []Item, resume map[mo
 			j.say(Skipped, "already being merged or watched")
 			return
 		}
+		j.stop = s.stop
+		if j.halted() {
+			// Stopped before its turn in the batch came.
+			j.finish()
+			r.release(it.PR.Key)
+			return
+		}
 		switch p, ok := resume[it.PR.Key]; {
 		case s.unread != "":
 			// Nothing is written: which merge it waits for is not known.
@@ -577,7 +603,10 @@ func (r *Runner) run(ctx context.Context, kind Kind, items []Item, resume map[mo
 		default:
 			j.merge()
 		}
+		// A job handed to a goroutine (watching, or an approval that
+		// waits) is that goroutine's to end.
 		if !j.watching {
+			j.finish()
 			r.release(it.PR.Key)
 		}
 	}
@@ -655,13 +684,21 @@ type job struct {
 	// head: the user's yes, or gh-desk marking it ready or updating its
 	// branch. Jobs it starts are waited for even before they show.
 	trigger plan.Trigger
+	// stop is how the user stops the job; nil on one that was not claimed.
+	stop *stopper
+	// ended is set once the job said how it ended. Only the goroutine that
+	// runs the job reads or writes it.
+	ended bool
+	// byUser is set once the job ends as the user stopped it.
+	byUser bool
 }
 
 func (j *job) say(res Result, text string) {
-	j.emit(Event{Key: j.it.PR.Key, Result: res, Text: text, Approved: j.approved, Readied: j.readied, Closed: j.closed})
+	j.emit(Event{Key: j.it.PR.Key, Result: res, Text: text, Approved: j.approved, Readied: j.readied, Closed: j.closed, StoppedByUser: j.byUser})
 	if !res.Final() {
 		return
 	}
+	j.ended = true
 	j.log.Info("pr end", logging.KeyStep, resultWord[res], "why", text)
 	// The record goes only with an end that is known: not when gh-desk
 	// is quitting, not when a read or a write failed midway, and not when
@@ -728,14 +765,19 @@ func lastStep(mi model.MergeInfo) Step {
 // locked skips a merge that would wait without the record of pending
 // merges, which another gh-desk holds.
 func (j *job) locked(text string) {
+	j.ended = true
 	j.emit(Event{Key: j.it.PR.Key, Result: Skipped, Text: text, Approved: j.approved, Readied: j.readied, Locked: true})
 	j.log.Info("pr end", logging.KeyStep, resultWord[Skipped], "why", text)
 }
 
-// unsure ends the job keeping its record: something failed midway.
+// unsure ends the job keeping its record: something failed midway. One
+// the user stopped has no record any more, and is not gone on with.
 func (j *job) unsure(text string) {
 	j.keep = true
-	if j.record {
+	switch {
+	case j.halted():
+		text += " · stopped by you"
+	case j.record:
 		text += " · goes on at the next launch"
 	}
 	j.say(Failed, text)
@@ -746,6 +788,16 @@ func (j *job) unsure(text string) {
 func (j *job) save() bool {
 	if !j.record {
 		return true
+	}
+	if s := j.stop; s != nil {
+		// A stop forgets the record under the same lock: it is not
+		// written back once forgotten, unless the pull request was
+		// handed to GitHub meanwhile.
+		s.mu.Lock()
+		defer s.mu.Unlock()
+		if s.stopped && !s.handed {
+			return true
+		}
 	}
 	j.pend.Key, j.pend.ID, j.pend.Head = j.it.PR.Key, j.it.PR.ID, j.head
 	j.pend.Author, j.pend.AuthorIsBot = j.it.PR.Author, j.it.PR.AuthorIsBot
@@ -805,6 +857,7 @@ func (j *job) resume() {
 		j.approved, j.pend.Approving = true, false
 	}
 	if j.pend.Watching {
+		j.handOver(mi.InQueue)
 		if mi.InQueue {
 			j.say(Queued, "in the merge queue")
 		} else {
@@ -837,6 +890,7 @@ func (j *job) waitToApprove(body string) {
 	j.wg.Go(func() {
 		defer j.r.release(j.it.PR.Key)
 		j.approveAfterJobs()
+		j.finish()
 	})
 }
 
@@ -863,6 +917,7 @@ func (j *job) resumeApproval() {
 	j.wg.Go(func() {
 		defer j.r.release(j.it.PR.Key)
 		j.approveAfterJobs()
+		j.finish()
 	})
 }
 
@@ -1014,6 +1069,9 @@ func (j *job) review(rv ReviewText) {
 		return
 	}
 	word := reviewWord[rv.Event]
+	if j.halted() {
+		return
+	}
 	j.forecast([]Step{StepReview})
 	j.step(StepReview, "sending the "+word)
 	pr := j.it.PR
@@ -1037,6 +1095,9 @@ func (j *job) markReady() {
 		j.say(Skipped, d.Reason)
 		return
 	}
+	if j.halted() {
+		return
+	}
 	j.forecast([]Step{StepReady})
 	j.step(StepReady, "marking ready")
 	if err := j.r.gh.MarkReady(j.ctx, j.it.PR.Key, j.it.PR.ID, j.head); err != nil {
@@ -1057,6 +1118,9 @@ func (j *job) convertToDraft() {
 		j.say(Skipped, d.Reason)
 		return
 	}
+	if j.halted() {
+		return
+	}
 	j.forecast([]Step{StepDraft})
 	j.step(StepDraft, "converting to draft")
 	if err := j.r.gh.ConvertToDraft(j.ctx, j.it.PR.Key, j.it.PR.ID, j.head); err != nil {
@@ -1068,6 +1132,9 @@ func (j *job) convertToDraft() {
 
 // sendApproval approves with body, which may be empty.
 func (j *job) sendApproval(body string) bool {
+	if j.halted() {
+		return false
+	}
 	j.step(StepApprove, "approving")
 	// Recorded as on its way first: should gh-desk stop before the
 	// result is recorded, the next launch does not know whether the
@@ -1075,6 +1142,11 @@ func (j *job) sendApproval(body string) bool {
 	j.pend.Approving = true
 	if !j.save() {
 		j.say(Failed, "could not record the pending merge; nothing was sent")
+		return false
+	}
+	// A stop that came while it was recorded forgot the record: nothing
+	// is sent.
+	if j.halted() {
 		return false
 	}
 	pr := j.it.PR
@@ -1246,7 +1318,7 @@ func (j *job) write() {
 // enterLane waits for a merge the pull request is based on, then for its
 // turn in the lane.
 func (j *job) enterLane() (*ticket, bool) {
-	switch j.r.waitForBase(j.ctx, j.it.PR.Key) {
+	switch j.r.waitForBase(j.waitCtx(), j.it.PR.Key) {
 	case baseCanceled:
 		return nil, false
 	case baseCycle:
@@ -1262,7 +1334,7 @@ func (j *job) enterLane() (*ticket, bool) {
 	select {
 	case <-t.turn:
 		return t, true
-	case <-j.ctx.Done():
+	case <-j.waitCtx().Done():
 		j.r.leave(t)
 		return nil, false
 	}
@@ -1343,12 +1415,18 @@ func (j *job) redrafted(d plan.Decision) bool {
 // readyToMerge marks the draft ready for review, on the head the user saw,
 // as the first step of its merge.
 func (j *job) readyToMerge() bool {
+	if j.halted() {
+		return false
+	}
 	j.step(StepReady, "marking ready")
 	// Recorded first, as an approval is: should gh-desk stop before the
 	// result is known, a draft found at the next launch stops the merge.
 	j.pend.Readied = true
 	if !j.save() {
 		j.say(Failed, "could not record the pending merge; nothing was sent")
+		return false
+	}
+	if j.halted() {
 		return false
 	}
 	if err := j.r.gh.MarkReady(j.ctx, j.it.PR.Key, j.it.PR.ID, j.head); err != nil {
@@ -1389,9 +1467,13 @@ func (j *job) mergeDecided(d plan.Decision) {
 }
 
 func (j *job) mergeNow(method model.MergeMethod) bool {
+	if j.halted() {
+		return false
+	}
 	j.step(StepMerge, "merging")
 	err := j.r.gh.Merge(j.ctx, j.it.PR.Key, j.it.PR.ID, j.head, method)
 	if err == nil {
+		j.ended = true
 		j.emit(Event{Key: j.it.PR.Key, Result: Merged, Text: "merged", Approved: j.approved, Readied: j.readied, Method: method})
 		j.log.Info("pr end", logging.KeyStep, resultWord[Merged], "method", string(method))
 		j.forget()
@@ -1416,6 +1498,9 @@ func (j *job) mergeNow(method model.MergeMethod) bool {
 // enqueue puts the pull request in its base branch's merge queue, on the
 // confirmed head, and watches it there.
 func (j *job) enqueue() {
+	if j.halted() {
+		return
+	}
 	j.step(StepEnqueue, "adding to the merge queue")
 	err := j.r.gh.Enqueue(j.ctx, j.it.PR.Key, j.it.PR.ID, j.head)
 	if err == nil {
@@ -1444,13 +1529,15 @@ func (j *job) queued() {
 		j.say(Queued, "in the merge queue")
 		return
 	}
-	j.pend.Watching, j.pend.Queued = true, true
-	j.save()
+	j.handOver(true)
 	j.say(Queued, "in the merge queue")
 	j.startWatch()
 }
 
 func (j *job) autoMerge(method model.MergeMethod, queue bool) {
+	if j.halted() {
+		return
+	}
 	j.step(StepAutoMerge, "turning on auto-merge")
 	err := j.r.gh.EnableAutoMerge(j.ctx, j.it.PR.Key, j.it.PR.ID, j.head, method)
 	if errors.Is(err, ErrCleanStatus) {
@@ -1465,8 +1552,7 @@ func (j *job) autoMerge(method model.MergeMethod, queue bool) {
 		j.unsure("auto-merge failed: " + short(err))
 		return
 	}
-	j.pend.Watching = true
-	j.save()
+	j.handOver(false)
 	j.say(AutoMergeOn, "auto-merge on")
 	j.startWatch()
 }
@@ -1492,7 +1578,7 @@ func (j *job) watch() {
 	// the log tells what GitHub's auto-merge is waiting on.
 	var state model.MergeState
 	var inQueue, seen bool
-	for j.sleep(j.r.opt.PollSlow) {
+	for j.sleepIn(j.ctx, j.r.opt.PollSlow) {
 		got, err := j.r.gh.MergeInfo(j.ctx, []string{j.it.PR.ID}, false)
 		mi, ok := got[j.it.PR.ID]
 		if err == nil && ok && mi.State == model.StateOpen && (mi.MergeState != state || mi.InQueue != inQueue || !seen) {
@@ -1559,6 +1645,9 @@ func (j *job) watch() {
 func (j *job) updateBranch(base string) bool {
 	if base == "" {
 		j.say(Stopped, "could not read the base branch")
+		return false
+	}
+	if j.halted() {
 		return false
 	}
 	j.step(StepUpdate, "updating the branch")
@@ -1760,7 +1849,7 @@ func (j *job) pause(w *waitLog, mi model.MergeInfo) bool {
 	left := max(j.r.opt.WaitTimeout-j.pend.ChecksWaited, 0)
 	sleeper := &waiter{id: j.it.PR.ID, head: j.head, light: onlyJobsAtWork(mi), every: every,
 		due: now.Add(every), force: now.Add(min(j.r.opt.FullRead, left)), wake: make(chan struct{})}
-	if !j.r.awaitRead(j.ctx, j.it.PR.Key.Repository(), sleeper) {
+	if !j.r.awaitRead(j.waitCtx(), j.it.PR.Key.Repository(), sleeper) {
 		w.end("canceled")
 		return false
 	}
@@ -1879,16 +1968,30 @@ func (j *job) wait() bool {
 	}
 }
 
-// sleep waits d, or returns false when the batch is canceled.
-func (j *job) sleep(d time.Duration) bool {
+// sleep waits d, or returns false when the batch is canceled or the user
+// stopped the job.
+func (j *job) sleep(d time.Duration) bool { return j.sleepIn(j.waitCtx(), d) }
+
+// sleepIn waits d, or returns false when ctx ends first. A watch sleeps in
+// the batch's context: the user cannot stop it (ADR-121).
+func (j *job) sleepIn(ctx context.Context, d time.Duration) bool {
 	t := time.NewTimer(d)
 	defer t.Stop()
 	select {
 	case <-t.C:
 		return true
-	case <-j.ctx.Done():
+	case <-ctx.Done():
 		return false
 	}
+}
+
+// waitCtx is what the job's waits end with: the batch's context, or the
+// user's stop.
+func (j *job) waitCtx() context.Context {
+	if j.stop != nil {
+		return j.stop.ctx
+	}
+	return j.ctx
 }
 
 // short is the first line of an error, for a row.
@@ -1905,6 +2008,9 @@ func short(err error) string {
 // user confirmed is: one that moved is stopped as it is for any write.
 func (j *job) comment(body string) {
 	if _, ok := j.read(false); !ok {
+		return
+	}
+	if j.halted() {
 		return
 	}
 	j.forecast([]Step{StepComment})
@@ -1944,6 +2050,9 @@ func (j *job) closePR(ct CloseText) {
 	if d.Delete {
 		steps = append(steps, StepDeleteRef)
 	}
+	if j.halted() {
+		return
+	}
 	j.forecast(steps)
 	done := ""
 	if ct.Body != "" {
@@ -1972,6 +2081,10 @@ func (j *job) closePR(ct CloseText) {
 			j.say(Stopped, done+"head changed · not closed")
 			return
 		}
+	}
+	if j.halted() {
+		j.stoppedByUser(done)
+		return
 	}
 	j.step(StepClose, "closing")
 	if err := j.r.gh.Close(j.ctx, j.it.PR.Key, j.it.PR.ID, j.head); err != nil {
@@ -2006,6 +2119,10 @@ func (j *job) closePR(ct CloseText) {
 	}
 	if keep != "" {
 		j.say(Closed, "closed · branch kept: "+keep)
+		return
+	}
+	if j.halted() {
+		j.say(Closed, "closed · branch kept: stopped by you")
 		return
 	}
 	j.step(StepDeleteRef, "deleting the branch")

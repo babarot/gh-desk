@@ -97,6 +97,7 @@ var Defaults = []Def{
 	{"retry", ScopeList, []string{"."}, "try again"},
 	{"approve", ScopeList, []string{"A"}, "approve"},
 	{"merge", ScopeList, []string{"M"}, "merge"},
+	{"stop", ScopeList, []string{"X"}, "stop"},
 	{"draft", ScopeList, []string{"D"}, "draft / ready"},
 	// No key of its own: one stray key press would start closing pull
 	// requests. It is reached from the menu (ADR-066).
