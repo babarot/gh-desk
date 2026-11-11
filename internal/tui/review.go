@@ -156,8 +156,8 @@ func (m *Model) composeKey(msg tea.KeyPressMsg) tea.Cmd {
 			return nil
 		}
 		if !c.single {
-			// The popup reads each pull request again and asks; the
-			// review stays under it until its batch starts.
+			// The popup reads each pull request again and asks, in place
+			// of this one; the review is kept until its batch starts.
 			return m.startBulkFor(runner.Review, runner.ReviewText{Event: ev, Body: body}, c.prs)
 		}
 		// The text is the review's field the popup shows and a batch keeps.

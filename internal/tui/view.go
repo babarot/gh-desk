@@ -68,8 +68,10 @@ func (m *Model) render() (string, *tea.Cursor) {
 			lines[1+i] = place(lines[1+i], s, m.width-w)
 		}
 	}
-	if m.compose != nil {
-		// Under the confirm popup when a review is posted.
+	if m.compose != nil && m.bulk == nil {
+		// The confirm popup of what was written takes its place, in a box
+		// as wide, and esc there gives the text box back: no box is drawn
+		// over another (ADR-097).
 		popup, at := m.renderCompose()
 		lines = m.overlay(lines, popup, 2, m.width)
 		cur = inPopup(m.compose.ta.Cursor(), popup, 2+at, m.width)

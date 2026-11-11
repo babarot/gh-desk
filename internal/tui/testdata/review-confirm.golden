@@ -1,23 +1,23 @@
 -- screen --
 desk // @me    1 review (3)   2 mine (1)   3 involved (0)   4 inbox (1)
     PR                        TITLE                           AUTHOR          CI  MERGE  REVIEW   WHY         SIZE          AGE
-  ▾╭ review comment ──────────────────────────────────────────────────────────────────────────────────────────────────────────╮
-▎ ●│   Looks good, one question.                                                                                              │
-  ▸│                                                                                                                          │
-  ▸│ ✓ acme/api#12 Add retries to the client                                                                                  │
-   │   └ comment                                                                                                              │
-   │                                                                                                                          │
-   │ GitHub cannot take a review back. Each is sent on the head shown when it was read.                                       │
-   │                                                                                                                          │
-   │ send the review comment? y yes · esc no                                                                                  │
-   ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
-               │ ┃                                                                                                │
-               │ ┃                                                                                                │
-               │ ┃                                                                                                │
-               │ ┃                                                                                                │
+  ▾ requested f╭ review comment ──────────────────────────────────────────────────────────────────────────────────╮
+▎ ● api#12     │   Looks good, one question.                                                                      │3         3h
+  ▸ requested f│                                                                                                  │
+  ▸ bots 1     │ ✓ acme/api#12 Add retries to the client                                                          │
+               │   └ comment                                                                                      │
                │                                                                                                  │
-               │ ctrl+s post · tab kind · ctrl+e $EDITOR · esc discard                                            │
+               │ GitHub cannot take a review back. Each is sent on the head shown when it was read.               │
+               │                                                                                                  │
+               │ send the review comment? y yes · esc no                                                          │
                ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
+
+
+
+
+
+
+
 
 ╭  overview   diff (2)  ────────────────────────────────────────────────────────────────────────────────── acme/api#12 · J/K · v ╮
 │ #12 Add retries to the client                                                       alice │ status    open                     │
@@ -36,48 +36,42 @@ y yes · esc back
 -- styles --
 L1 0-71 fg=#706f87
 L2 4-127 fg=#706f87
-L3 2-3 fg=#706f87
-L3 3-4 fg=#96bfff
-L3 5-19 fg=#d0d6e8 bold
-L3 20-127 fg=#96bfff
-L4 0-3 fg=#706f87
-L4 3-4 fg=#96bfff
-L4 7-32 fg=#b0b8d1
-L4 126-127 fg=#96bfff
-L5 2-3 fg=#706f87
-L5 3-127 fg=#96bfff
-L6 2-3 fg=#706f87
-L6 3-4 fg=#96bfff
-L6 5-6 fg=#d4b0ff
-L6 7-15 fg=#d0d6e8
-L6 15-18 fg=#8888a4
-L6 19-44 fg=#d0d6e8
-L6 126-127 fg=#96bfff
-L7 3-4 fg=#96bfff
-L7 7-8 fg=#525270
-L7 9-16 fg=#b5f0b0
-L7 126-127 fg=#96bfff
-L8 3-127 fg=#96bfff
-L9 3-4 fg=#96bfff
-L9 5-87 fg=#706f87
-L9 126-127 fg=#96bfff
-L10 3-127 fg=#96bfff
-L11 3-4 fg=#96bfff
-L11 5-29 fg=#b0b8d1
-L11 30-31 fg=#96bfff bold
-L11 32-35 fg=#8888a4
-L11 36-37 fg=#706f87
-L11 38-41 fg=#96bfff bold
-L11 42-44 fg=#8888a4
-L11 126-127 fg=#96bfff
-L12 3-127 fg=#96bfff
-L13 15-115 fg=#706f87
-L14 15-115 fg=#706f87
-L15 15-115 fg=#706f87
-L16 15-115 fg=#706f87
-L17 15-115 fg=#706f87
-L18 15-115 fg=#706f87
-L19 15-115 fg=#706f87
+L3 2-15 fg=#706f87
+L3 15-16 fg=#96bfff
+L3 17-31 fg=#d0d6e8 bold
+L3 32-115 fg=#96bfff
+L4 0-10 fg=#706f87
+L4 15-16 fg=#96bfff
+L4 19-44 fg=#b0b8d1
+L4 114-115 fg=#96bfff
+L4 115-127 fg=#706f87
+L5 2-15 fg=#706f87
+L5 15-115 fg=#96bfff
+L6 2-10 fg=#706f87
+L6 15-16 fg=#96bfff
+L6 17-18 fg=#d4b0ff
+L6 19-27 fg=#d0d6e8
+L6 27-30 fg=#8888a4
+L6 31-56 fg=#d0d6e8
+L6 114-115 fg=#96bfff
+L7 15-16 fg=#96bfff
+L7 19-20 fg=#525270
+L7 21-28 fg=#b5f0b0
+L7 114-115 fg=#96bfff
+L8 15-115 fg=#96bfff
+L9 15-16 fg=#96bfff
+L9 17-99 fg=#706f87
+L9 114-115 fg=#96bfff
+L10 15-115 fg=#96bfff
+L11 15-16 fg=#96bfff
+L11 17-41 fg=#b0b8d1
+L11 42-43 fg=#96bfff bold
+L11 44-47 fg=#8888a4
+L11 48-49 fg=#706f87
+L11 50-53 fg=#96bfff bold
+L11 54-56 fg=#8888a4
+L11 114-115 fg=#96bfff
+L12 15-115 fg=#96bfff
 L21 0-130 fg=#706f87
 L22 0-130 fg=#706f87
 L23 0-130 fg=#706f87
