@@ -523,6 +523,10 @@ func (m *Model) runBulk() tea.Cmd {
 func (m *Model) renderBulk() []string {
 	b, st := m.bulk, m.st
 	w := min(max(m.width-6, 40), 130)
+	if m.compose != nil {
+		// In place of the popup the text was written in.
+		w = composeWidth(m.width)
+	}
 	verb := b.verb()
 	if b.kind == runner.Merge {
 		ready, approve := false, false
