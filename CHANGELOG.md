@@ -1,5 +1,16 @@
 # Changelog
 
+## [v0.18.0](https://github.com/babarot/gh-desk/compare/v0.17.1...v0.18.0) - 2026-11-11
+### New Features
+- Let a rule ask whether a pull request can be merged now by @babarot in https://github.com/babarot/gh-desk/pull/133
+- Show only the selection on the header, and drop b by @babarot in https://github.com/babarot/gh-desk/pull/136
+- Split tabs into sections written in the config file by @babarot in https://github.com/babarot/gh-desk/pull/137
+- Narrow every tab to one owner, repository or author by @babarot in https://github.com/babarot/gh-desk/pull/138
+- Edit a tab's sections on the settings page by @babarot in https://github.com/babarot/gh-desk/pull/139
+- Split the default inbox and involved tab by @babarot in https://github.com/babarot/gh-desk/pull/140
+### Refactorings
+- Build the rows of a tab from sections by @babarot in https://github.com/babarot/gh-desk/pull/135
+
 ## [v0.17.1](https://github.com/babarot/gh-desk/compare/v0.17.0...v0.17.1) - 2026-11-10
 ### Improvements
 - Drop columns before TITLE narrows, and keep the PR number by @babarot in https://github.com/babarot/gh-desk/pull/131
