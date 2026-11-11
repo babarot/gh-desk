@@ -271,6 +271,9 @@ type placement struct {
 	Show    []string `json:"show"`
 	At      []int    `json:"at"`
 	Pending []int    `json:"pending"`
+	// Why is what the conditions of the section a row is in make of it,
+	// by row; none for a row in other as what no section takes.
+	Why map[int][]cond `json:"why"`
 }
 
 // judge reads src as a config file and judges its rules.
@@ -315,7 +318,7 @@ func (p *preview) judge(src []byte, now time.Time) ([]byte, error) {
 	out.Tabs = []placement{}
 	for _, t := range cfg.Tabs {
 		ss, other := plan.Layout(sections(t.Sections))
-		pl := placement{Names: []string{}, Show: []string{}, At: make([]int, len(p.rows)), Pending: []int{}}
+		pl := placement{Names: []string{}, Show: []string{}, At: make([]int, len(p.rows)), Pending: []int{}, Why: map[int][]cond{}}
 		for _, s := range ss {
 			pl.Names, pl.Show = append(pl.Names, s.Name), append(pl.Show, string(s.Show))
 		}
@@ -324,6 +327,11 @@ func (p *preview) judge(src []byte, now time.Time) ([]byte, error) {
 			pl.At[i] = at
 			if pending {
 				pl.Pending = append(pl.Pending, i)
+			}
+			// A row the section named other takes as what no section
+			// does has no reason of that section's.
+			if at >= 0 && at < len(t.Sections) && ss[at].Rule.Judge(r.pr, p.viewer, facts(r)) == plan.Yes {
+				pl.Why[i] = explained(ss[at].Rule.Explain(r.pr, p.viewer, facts(r)))
 			}
 		}
 		out.Tabs = append(out.Tabs, pl)

@@ -188,3 +188,31 @@ decision = ["none"]
 		t.Errorf("why %+v", got)
 	}
 }
+
+// Each row of a tab comes with the section it is in and what that
+// section's conditions make of it; one in other as what no section takes
+// comes with none.
+func TestPreviewSaysWhyARowIsInItsSection(t *testing.T) {
+	bot := model.PR{Key: previewKey(1), Author: "app/renovate", AuthorIsBot: true, State: model.StateOpen, HeadOID: "h", HeavyHead: "h"}
+	person := model.PR{Key: previewKey(2), Author: "alice", State: model.StateOpen, HeadOID: "h", HeavyHead: "h"}
+	p := cachedPreview(t, []model.PR{bot, person}, nil)
+	j := judged(t, p, `
+[[tabs]]
+name = "r"
+query = "is:open"
+sections = [ { name = "bots", bot = true, show = "folded" } ]
+
+[[tabs]]
+kind = "inbox"
+`)
+	pl := j.Tabs[0]
+	if !slices.Equal(pl.Names, []string{"bots", "other"}) || !slices.Equal(pl.At, []int{0, 1}) {
+		t.Fatalf("placement %+v", pl)
+	}
+	if w := pl.Why[0]; len(w) != 1 || w[0].Key != "bot" || w[0].State != "yes" {
+		t.Errorf("why of the bot's = %+v", w)
+	}
+	if _, ok := pl.Why[1]; ok {
+		t.Errorf("the row in other has a why: %+v", pl.Why[1])
+	}
+}
