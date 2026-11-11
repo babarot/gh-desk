@@ -166,11 +166,11 @@ func (m *Model) listKey(k string) tea.Cmd {
 		case is("select"):
 			// A section's head selects every pull request in it, or clears
 			// them when all are selected.
+			// The rows, not t.prs: the inbox's are its notifications.
 			var in []model.PRKey
-			now := m.set.Now()
-			for _, p := range t.prs {
-				if x, ok := m.shows(t, p, nil, m.filter, t.ruleFilter, now); ok && x.at == r.section {
-					in = append(in, p.Key)
+			for _, o := range m.rowsOf(t, m.filter, t.ruleFilter, nil) {
+				if o.kind == rowPR && o.ex.at == r.section && !slices.Contains(in, o.pr.Key) {
+					in = append(in, o.pr.Key)
 				}
 			}
 			all := len(in) > 0

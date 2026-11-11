@@ -521,6 +521,26 @@ func mineSections() []Section {
 	}
 }
 
+// involvedSections are the sections of the default tab of the pull
+// requests one is involved in otherwise: the bots' folded under the rest,
+// which have no head.
+func involvedSections() []Section {
+	return []Section{
+		{Show: "open", Conditions: Conditions{Bot: new(false)}},
+		{Name: "bots", Show: "folded", Conditions: Conditions{Bot: new(true)}},
+	}
+}
+
+// inboxSections are the sections of the default inbox, by what a
+// notification asks of one: a review, an answer, or reading the rest,
+// which other takes.
+func inboxSections() []Section {
+	return []Section{
+		{Name: "review requests", Show: "open", Conditions: Conditions{Reasons: []string{"review_requested"}}},
+		{Name: "mentions", Show: "open", Conditions: Conditions{Reasons: []string{"mention"}}},
+	}
+}
+
 // Default is the config with every setting at its default.
 func Default() File {
 	return File{
@@ -528,8 +548,9 @@ func Default() File {
 			{Kind: "search", Name: "review", Query: "is:open is:pr review-requested:@me archived:false", Sections: reviewSections(),
 				Sort: "updated", Limit: 100},
 			{Kind: "search", Name: "mine", Query: "is:open is:pr author:@me archived:false", Sections: mineSections(), Sort: "updated", Limit: 100},
-			{Kind: "search", Name: "involved", Query: "is:open is:pr involves:@me -author:@me -review-requested:@me archived:false", Sort: "updated", Limit: 100},
-			{Kind: "inbox", Name: "inbox", Limit: 100},
+			{Kind: "search", Name: "involved", Query: "is:open is:pr involves:@me -author:@me -review-requested:@me archived:false", Sections: involvedSections(),
+				Sort: "updated", Limit: 100},
+			{Kind: "inbox", Name: "inbox", Sections: inboxSections(), Limit: 100},
 		},
 		List:        List{Refresh: dur("3m"), StaleDays: days(30), Columns: slices.Clone(Columns)},
 		Menu:        Menu{Actions: slices.Clone(MenuActions)},
