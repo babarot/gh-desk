@@ -3,6 +3,7 @@
 ## Status
 
 Accepted
+Partly replaced by ADR-124
 
 ## Context
 
