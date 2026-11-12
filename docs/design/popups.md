@@ -46,7 +46,7 @@ Keys are written as actions; their default keys are in [internal/tui/keymap](../
 
 The hints in a popup's frame are made from its parts and its own keys. A popup may mark a few of its own keys as its most important actions; only those are also shown on the key line while it is open (ADR-125). Today the key line repeats the popup's keys in other words.
 
-A popup's own keys are read after the text box and before its other parts: `next_kind`, `post` and `editor` in compose; `include_failing`, `wait_for_checks` and `delete_branch` in the confirm; `toggle_rule`, `add_to_selection` and `filter_by_rule` in the picker; `triage_apply` in the triage; `release_notes` and `fold` in the `?` list; each item's action in the menu.
+A popup's own keys are declared for the state it is in, and are read after the keys that type a character (which go to a focused text box) and before its other parts: `next_kind`, `post` and `editor` in compose; `include_failing`, `wait_for_checks` and `delete_branch` in the confirm; `toggle_rule`, `add_to_selection` and `filter_by_rule` in the picker; `triage_apply` in the triage; `release_notes` and `fold` in the `?` list; each item's action in the menu.
 
 ### Today
 
