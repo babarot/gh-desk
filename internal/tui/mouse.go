@@ -490,20 +490,9 @@ func (m *Model) popupMouse(msg tea.MouseMsg) (cmd tea.Cmd, ok bool) {
 			return m.bulkKey(keymap.Back), true
 		}
 	case m.notesAt != nil:
-		v := m.notesAt
-		n := len(m.noteLines())
-		if run, closed := m.listMouse(msg, &v.pointer, &v.sel, n); closed {
-			m.notesAt = nil
-		} else if run {
-			return m.chooseNote(), true
-		}
+		return m.popupListMouse(m.notesSpec(), msg), true
 	case m.picker != nil:
-		v := m.picker
-		if run, closed := m.listMouse(msg, &v.pointer, &v.sel, len(m.rules())); closed {
-			m.picker = nil
-		} else if run {
-			return m.chooseRules(false), true
-		}
+		return m.popupListMouse(m.pickSpec(), msg), true
 	case m.chooser != nil:
 		c := m.chooser
 		if run, closed := m.listMouse(msg, &c.pointer, &c.sel, len(m.chooserValues())); closed {
@@ -512,7 +501,9 @@ func (m *Model) popupMouse(msg tea.MouseMsg) (cmd tea.Cmd, ok bool) {
 			return m.chooseScope(), true
 		}
 	case m.menu != nil:
-		return m.menuMouse(msg), true
+		if p := m.menuSpec(); p.list != nil {
+			return m.popupListMouse(p, msg), true
+		}
 	case m.triage != nil && m.triage.open:
 		tr := m.triage
 		top := tr.top

@@ -50,11 +50,11 @@ A popup's own keys are declared for the state it is in, and are read after the k
 
 ### Today
 
-Each popup reads its keys in its own function (`menuKey`, `bulkKeyMsg`, `composeKey`, `pickKey`, `chooserKey`, `notesKey`, `triageKey`, `helpKey`, `releaseBoxKey`), so the parts above take different keys from popup to popup:
+The menu, the picker and the notifications are read by the shared layer in [popupkeys.go](../../internal/tui/popupkeys.go): each declares its list, its own keys and its opener (`menuSpec`, `pickSpec`, `notesSpec`), and its mouse input goes through the same layer. The other popups read their keys in their own function (`bulkKeyMsg`, `composeKey`, `chooserKey`, `triageKey`, `helpKey`, `releaseBoxKey`), so the parts above still take different keys there:
 
-- Lists move on `up` and `down` everywhere, whose keys include `ctrl+n` and `ctrl+p`; on `top` and `bottom` only in the menu. Bodies scroll by page only in the `?` list and the release notes.
+- Lists move on `up` and `down` everywhere, whose keys include `ctrl+n` and `ctrl+p`; on `top`, `bottom` and by page in the menu, the picker and the notifications, not in the scope chooser or the triage's list of names. Bodies scroll by page only in the `?` list and the release notes.
 - `history_next` and `history_prev` claim the keys of `down` and `up` ([keymap](../../internal/tui/keymap)): a text box tries them first, and moves its cursor when there is nothing to recall.
-- The opening action closes the picker, the notifications, the `?` list and the release notes, and is ignored or typed in the others. `quit` closes the notifications, the `?` list and the release notes.
+- The opening action closes the picker, the notifications, the `?` list and the release notes, and is ignored or typed in the others. `quit` closes the `?` list and the release notes.
 - `esc` throws a comment or a review away at once.
 - Entering a text box is `write_comment` in the confirm of a close and `triage_more` in the triage, which happen to share a default key.
 - The foot of each popup is written by hand, apart from the key line the keymap makes.
@@ -73,11 +73,9 @@ Today: seven popups are drawn from `popupTop`. The `?` list and the release note
 flowchart TB
   subgraph keys["keys"]
     K["Model.key"] --> SW{"which popup is open"}
-    SW --> MK["menuKey"]
+    SW --> SH["popupKey: menu, picker, notifications"]
     SW --> BK["bulkKeyMsg"]
-    SW --> PK["pickKey"]
     SW --> CK["chooserKey"]
-    SW --> NK["notesKey"]
     SW --> TK["triageKey"]
     SW --> HK["helpKey / releaseBoxKey"]
     SW --> CPK["composeKey"]

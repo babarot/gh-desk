@@ -221,34 +221,39 @@ func ruleNames(rs []plan.Rule) string {
 	return strings.Join(names, " + ")
 }
 
-func (m *Model) pickKey(k string) tea.Cmd {
-	rs := m.rules()
+// pickSpec is the picker as the shared popup layer reads it: a list of the
+// rules, with its own keys to check a rule, add what they match to the
+// selection, and show only that (ADR-125).
+func (m *Model) pickSpec() popupSpec {
 	v := m.picker
-	is := func(a keymap.Action) bool { return m.keys.Matches(a, k) }
-	switch {
-	case k == keymap.Back, is("select_rule"):
-		m.picker = nil
-	case is("down"):
-		v.sel = min(v.sel+1, len(rs)-1)
-	case is("up"):
-		v.sel = max(v.sel-1, 0)
-	case is("toggle_rule"):
-		if v.checked == nil {
-			v.checked = map[int]bool{}
-		}
-		if v.checked[v.sel] {
-			delete(v.checked, v.sel)
-		} else {
-			v.checked[v.sel] = true
-		}
-	case is("choose") || is("add_to_selection"):
-		return m.chooseRules(is("add_to_selection"))
-	case is("filter_by_rule") && m.pickReady():
-		chosen := m.chosen()
-		m.picker = nil
-		return m.filterByRules(chosen)
+	return popupSpec{
+		list: &popupList{sel: &v.sel, n: len(m.rules()), ptr: &v.pointer,
+			choose: func() tea.Cmd { return m.chooseRules(false) }},
+		own: []ownKey{
+			{"toggle_rule", func() tea.Cmd {
+				if v.checked == nil {
+					v.checked = map[int]bool{}
+				}
+				if v.checked[v.sel] {
+					delete(v.checked, v.sel)
+				} else {
+					v.checked[v.sel] = true
+				}
+				return nil
+			}},
+			{"add_to_selection", func() tea.Cmd { return m.chooseRules(true) }},
+			{"filter_by_rule", func() tea.Cmd {
+				if !m.pickReady() {
+					return nil
+				}
+				chosen := m.chosen()
+				m.picker = nil
+				return m.filterByRules(chosen)
+			}},
+		},
+		opener: "select_rule",
+		close:  func() { m.picker = nil },
 	}
-	return nil
 }
 
 // chooseRules selects what the rules chosen match, once they can be
