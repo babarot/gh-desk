@@ -8,7 +8,7 @@ import (
 	"github.com/babarot/gh-desk/internal/model"
 )
 
-// stopper is how the user stops the job on one pull request (ADR-121).
+// stopper is how the user stops the job on one pull request (ADR-122).
 // Quitting and stopping both end the job's waits, but only a stop forgets
 // its record, so the next launch does not resume it.
 type stopper struct {

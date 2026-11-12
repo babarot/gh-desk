@@ -12,7 +12,7 @@ import (
 
 // stopKinds sorts the pull requests a stop is asked for: those a job of
 // this gh-desk waits on, which it stops; those handed to auto-merge or a
-// merge queue, which are GitHub's and left alone (ADR-121); and the rest,
+// merge queue, which are GitHub's and left alone (ADR-122); and the rest,
 // at work nowhere here.
 func (m *Model) stopKinds(prs []model.PR) (atWork, handed, idle []model.PRKey) {
 	for _, p := range prs {

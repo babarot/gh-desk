@@ -1,4 +1,4 @@
-# ADR-121: What waits can be stopped without quitting
+# ADR-122: What waits can be stopped without quitting
 
 ## Status
 

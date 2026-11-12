@@ -87,7 +87,7 @@ func (m *Model) retryBatch(bs *batchState) bool {
 		switch {
 		case p.byUser:
 			// The user stopped it: a decision, as a skip is, not
-			// offered again (ADR-121).
+			// offered again (ADR-122).
 		case p.result == runner.Failed, p.result == runner.Stopped:
 			left = append(left, k)
 		}
