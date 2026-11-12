@@ -19,6 +19,27 @@ import (
 // popupTop is the screen row a popup is drawn from.
 const popupTop = 2
 
+// A popup is one of two widths: narrow for a short list to choose from,
+// wide for anything to read or write (ADR-125). They are constants, not
+// settings: they only keep popups alike, so that one popup taking the place
+// of another keeps its width where it can.
+const (
+	popupNarrow = 84
+	popupWide   = 110
+)
+
+// popupWidthOn is the width of a popup on a screen w wide.
+func popupWidthOn(w int, wide bool) int {
+	most := popupNarrow
+	if wide {
+		most = popupWide
+	}
+	return min(max(w-8, 40), most)
+}
+
+// popupWidth is the width of a popup on this screen.
+func (m *Model) popupWidth(wide bool) int { return popupWidthOn(m.width, wide) }
+
 // popupHeight is how many lines a popup may take: from popupTop down to
 // above the status and key lines, which stay in sight under it.
 func (m *Model) popupHeight() int { return max(m.height-popupTop-2, 5) }

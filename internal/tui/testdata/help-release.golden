@@ -1,151 +1,184 @@
 -- screen --
 desk // @me    1 review (3)   2 mine (1)   3 involved (0)   4 inbox (1)
     PR                        TITLE                           AUTHOR          CI  MERGE  REVIEW   WHY         SIZE          AGE
-  ▾ requested from you 1
-▎ ● api#12                    Add retries to the client       alice           ✓          ○        you         +40 −3         3h
-  ▸ requested from a team 1
-  ▸ bots 1                       ╭ keys · z fold · esc close ───────────────────────────────────╮
-                                 │           gh-desk 0.7.0 · https://github.com/babarot/gh-desk │
-                                 │                     0.8.0 is out · gh extension upgrade desk │
-                                 │                                              w release notes │
-                                 │                                                              │
-                                 │ ▾ the list and its preview · works here ──────────────────── │
-                                 │   tab             next tab                                   │
-                                 │   shift+tab       previous tab                               │
-                                 │   1 2 3 4         tab 1 to 4                                 │
-                                 │   enter           actions                                    │
-                                 │   l right         unfold section / next pane tab             │
-                                 │   h left          fold section / previous pane tab           │
-                                 │   space           select                                     │
-                                 │   V               select shown                               │
-                                 │   S               select by rule                             │
-╭  overview   diff (2)  ─────────│   >               next in the scope                          │───────── acme/api#12 · J/K · v ╮
-│ #12 Add retries to the client  │   <               previous in the scope                      │tus    open                     │
-│ ▾ description ─────────────────│   O               choose in the scope                        │ge     approve → merge now      │
-│ │ What                         │   u               clear / restore selection                  │uested me @core                 │
-│ │ Retry failed requests.       │   A               approve                                    │cks    ✓1                       │
-│ ╵                              │   M               merge                                      │e      +40 −3 · 2 files         │
-│                                │   X               stop                                       │nch    retries                  │
-│ ▾ checks (1)  ✓1 ──────────────╰─────────────────────────────────────────── ↓ 30 · j k wheel ─╯       → main                   │
-│ │ ✓ test                                                                                  │ updated   3h ago                   │
-│ ╵                                                                                         │                                    │
-│                                                                                           │                                    │
-╰────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+  ▾ requested from you ╭ keys · z fold · esc close ───────────────────────────────────────────────────────╮
+▎ ● api#12             │                               gh-desk 0.7.0 · https://github.com/babarot/gh-desk │   +40 −3         3h
+  ▸ requested from a te│                                         0.8.0 is out · gh extension upgrade desk │
+  ▸ bots 1             │                                                                  w release notes │
+                       │                                                                                  │
+                       │ ▾ the list and its preview · works here ──────────────────────────────────────── │
+                       │   tab             next tab                                                       │
+                       │   shift+tab       previous tab                                                   │
+                       │   1 2 3 4         tab 1 to 4                                                     │
+                       │   enter           actions                                                        │
+                       │   l right         unfold section / next pane tab                                 │
+                       │   h left          fold section / previous pane tab                               │
+                       │   space           select                                                         │
+                       │   V               select shown                                                   │
+                       │   S               select by rule                                                 │
+                       │   >               next in the scope                                              │
+                       │   <               previous in the scope                                          │
+                       │   O               choose in the scope                                            │
+╭  overview   diff (2) │   u               clear / restore selection                                      │acme/api#12 · J/K · v ╮
+│ #12 Add retries to th│   A               approve                                                        │n                     │
+│ ▾ description ───────│   M               merge                                                          │rove → merge now      │
+│ │ What               │   X               stop                                                           │@core                 │
+│ │ Retry failed reques│   D               draft / ready                                                  │                      │
+│ ╵                    │   c               comment                                                        │ −3 · 2 files         │
+│                      │   R               review                                                         │ries                  │
+│ ▾ checks (1)  ✓1 ────│   C               triage with claude                                             │ain                   │
+│ │ ✓ test             │   i               ask claude about it                                            │ago                   │
+│ ╵                    │   o               browser                                                        │                      │
+│                      │   y               copy url                                                       │                      │
+╰──────────────────────╰─────────────────────────────────────────────────────────────── ↓ 23 · j k wheel ─╯──────────────────────╯
 
 esc close
 -- styles --
 L1 0-71 fg=#706f87
 L2 4-127 fg=#706f87
-L3 2-24 fg=#706f87
-L4 0-127 fg=#706f87
-L5 2-27 fg=#706f87
+L3 2-22 fg=#706f87
+L3 23-24 fg=#96bfff
+L3 25-50 fg=#d0d6e8 bold
+L3 51-107 fg=#96bfff
+L4 0-10 fg=#706f87
+L4 23-24 fg=#96bfff
+L4 55-105 fg=#706f87
+L4 106-107 fg=#96bfff
+L4 110-127 fg=#706f87
+L5 2-23 fg=#706f87
+L5 23-24 fg=#96bfff
+L5 65-77 fg=#b5f0b0
+L5 78-79 fg=#706f87
+L5 80-105 fg=#96bfff bold
+L5 106-107 fg=#96bfff
 L6 2-10 fg=#706f87
-L6 33-34 fg=#96bfff
-L6 35-60 fg=#d0d6e8 bold
-L6 61-97 fg=#96bfff
-L7 33-34 fg=#96bfff
-L7 45-95 fg=#706f87
-L7 96-97 fg=#96bfff
-L8 33-34 fg=#96bfff
-L8 55-67 fg=#b5f0b0
-L8 68-69 fg=#706f87
-L8 70-95 fg=#96bfff bold
-L8 96-97 fg=#96bfff
-L9 33-34 fg=#96bfff
-L9 80-81 fg=#96bfff bold
-L9 82-95 fg=#8888a4
-L9 96-97 fg=#96bfff
-L10 33-97 fg=#96bfff
-L11 33-36 fg=#96bfff
-L11 37-61 fg=#96bfff bold
-L11 62-74 fg=#706f87
-L11 75-95 fg=#525270
-L11 96-97 fg=#96bfff
-L12 33-34 fg=#96bfff
-L12 37-40 fg=#96bfff bold
-L12 53-61 fg=#8888a4
-L12 96-97 fg=#96bfff
-L13 33-34 fg=#96bfff
-L13 37-46 fg=#96bfff bold
-L13 53-65 fg=#8888a4
-L13 96-97 fg=#96bfff
-L14 33-34 fg=#96bfff
-L14 37-44 fg=#96bfff bold
-L14 53-63 fg=#8888a4
-L14 96-97 fg=#96bfff
-L15 33-34 fg=#96bfff
-L15 37-42 fg=#96bfff bold
-L15 53-60 fg=#8888a4
-L15 96-97 fg=#96bfff
-L16 33-34 fg=#96bfff
-L16 37-44 fg=#96bfff bold
-L16 53-83 fg=#8888a4
-L16 96-97 fg=#96bfff
-L17 33-34 fg=#96bfff
-L17 37-43 fg=#96bfff bold
-L17 53-85 fg=#8888a4
-L17 96-97 fg=#96bfff
-L18 33-34 fg=#96bfff
-L18 37-42 fg=#96bfff bold
-L18 53-59 fg=#8888a4
-L18 96-97 fg=#96bfff
-L19 33-34 fg=#96bfff
-L19 37-38 fg=#96bfff bold
-L19 53-65 fg=#8888a4
-L19 96-97 fg=#96bfff
-L20 33-34 fg=#96bfff
-L20 37-38 fg=#96bfff bold
-L20 53-67 fg=#8888a4
-L20 96-97 fg=#96bfff
-L21 0-33 fg=#706f87
-L21 33-34 fg=#96bfff
-L21 37-38 fg=#96bfff bold
-L21 53-70 fg=#8888a4
-L21 96-97 fg=#96bfff
-L21 97-130 fg=#706f87
-L22 0-31 fg=#706f87
-L22 33-34 fg=#96bfff
-L22 37-38 fg=#96bfff bold
-L22 53-74 fg=#8888a4
-L22 96-97 fg=#96bfff
-L22 97-130 fg=#706f87
-L23 0-33 fg=#706f87
-L23 33-34 fg=#96bfff
-L23 37-38 fg=#96bfff bold
-L23 53-72 fg=#8888a4
-L23 96-97 fg=#96bfff
-L23 97-130 fg=#706f87
+L6 23-24 fg=#96bfff
+L6 90-91 fg=#96bfff bold
+L6 92-105 fg=#8888a4
+L6 106-107 fg=#96bfff
+L7 23-107 fg=#96bfff
+L8 23-26 fg=#96bfff
+L8 27-51 fg=#96bfff bold
+L8 52-64 fg=#706f87
+L8 65-105 fg=#525270
+L8 106-107 fg=#96bfff
+L9 23-24 fg=#96bfff
+L9 27-30 fg=#96bfff bold
+L9 43-51 fg=#8888a4
+L9 106-107 fg=#96bfff
+L10 23-24 fg=#96bfff
+L10 27-36 fg=#96bfff bold
+L10 43-55 fg=#8888a4
+L10 106-107 fg=#96bfff
+L11 23-24 fg=#96bfff
+L11 27-34 fg=#96bfff bold
+L11 43-53 fg=#8888a4
+L11 106-107 fg=#96bfff
+L12 23-24 fg=#96bfff
+L12 27-32 fg=#96bfff bold
+L12 43-50 fg=#8888a4
+L12 106-107 fg=#96bfff
+L13 23-24 fg=#96bfff
+L13 27-34 fg=#96bfff bold
+L13 43-73 fg=#8888a4
+L13 106-107 fg=#96bfff
+L14 23-24 fg=#96bfff
+L14 27-33 fg=#96bfff bold
+L14 43-75 fg=#8888a4
+L14 106-107 fg=#96bfff
+L15 23-24 fg=#96bfff
+L15 27-32 fg=#96bfff bold
+L15 43-49 fg=#8888a4
+L15 106-107 fg=#96bfff
+L16 23-24 fg=#96bfff
+L16 27-28 fg=#96bfff bold
+L16 43-55 fg=#8888a4
+L16 106-107 fg=#96bfff
+L17 23-24 fg=#96bfff
+L17 27-28 fg=#96bfff bold
+L17 43-57 fg=#8888a4
+L17 106-107 fg=#96bfff
+L18 23-24 fg=#96bfff
+L18 27-28 fg=#96bfff bold
+L18 43-60 fg=#8888a4
+L18 106-107 fg=#96bfff
+L19 23-24 fg=#96bfff
+L19 27-28 fg=#96bfff bold
+L19 43-64 fg=#8888a4
+L19 106-107 fg=#96bfff
+L20 23-24 fg=#96bfff
+L20 27-28 fg=#96bfff bold
+L20 43-62 fg=#8888a4
+L20 106-107 fg=#96bfff
+L21 0-22 fg=#706f87
+L21 23-24 fg=#96bfff
+L21 27-28 fg=#96bfff bold
+L21 43-68 fg=#8888a4
+L21 106-107 fg=#96bfff
+L21 107-130 fg=#706f87
+L22 0-23 fg=#706f87
+L22 23-24 fg=#96bfff
+L22 27-28 fg=#96bfff bold
+L22 43-50 fg=#8888a4
+L22 106-107 fg=#96bfff
+L22 107-130 fg=#706f87
+L23 0-23 fg=#706f87
+L23 23-24 fg=#96bfff
+L23 27-28 fg=#96bfff bold
+L23 43-48 fg=#8888a4
+L23 106-107 fg=#96bfff
+L23 107-130 fg=#706f87
 L24 0-8 fg=#706f87
-L24 33-34 fg=#96bfff
-L24 37-38 fg=#96bfff bold
-L24 53-78 fg=#8888a4
-L24 96-97 fg=#96bfff
-L24 97-130 fg=#706f87
-L25 0-26 fg=#706f87
-L25 33-34 fg=#96bfff
-L25 37-38 fg=#96bfff bold
-L25 53-60 fg=#8888a4
-L25 96-97 fg=#96bfff
-L25 97-130 fg=#706f87
+L24 23-24 fg=#96bfff
+L24 27-28 fg=#96bfff bold
+L24 43-47 fg=#8888a4
+L24 106-107 fg=#96bfff
+L24 107-130 fg=#706f87
+L25 0-23 fg=#706f87
+L25 23-24 fg=#96bfff
+L25 27-28 fg=#96bfff bold
+L25 43-56 fg=#8888a4
+L25 106-107 fg=#96bfff
+L25 129-130 fg=#706f87
 L26 0-3 fg=#706f87
-L26 33-34 fg=#96bfff
-L26 37-38 fg=#96bfff bold
-L26 53-58 fg=#8888a4
-L26 96-97 fg=#96bfff
-L26 97-130 fg=#706f87
+L26 23-24 fg=#96bfff
+L26 27-28 fg=#96bfff bold
+L26 43-50 fg=#8888a4
+L26 106-107 fg=#96bfff
+L26 108-130 fg=#706f87
 L27 0-1 fg=#706f87
-L27 33-34 fg=#96bfff
-L27 37-38 fg=#96bfff bold
-L27 53-57 fg=#8888a4
-L27 96-97 fg=#96bfff
-L27 97-130 fg=#706f87
-L28 0-33 fg=#706f87
-L28 33-77 fg=#96bfff
-L28 78-94 fg=#706f87
-L28 95-97 fg=#96bfff
-L28 104-130 fg=#706f87
-L29 0-130 fg=#706f87
-L30 0-130 fg=#706f87
-L31 0-130 fg=#706f87
-L32 0-130 fg=#706f87
+L27 23-24 fg=#96bfff
+L27 27-28 fg=#96bfff bold
+L27 43-49 fg=#8888a4
+L27 106-107 fg=#96bfff
+L27 107-130 fg=#706f87
+L28 0-23 fg=#706f87
+L28 23-24 fg=#96bfff
+L28 27-28 fg=#96bfff bold
+L28 43-61 fg=#8888a4
+L28 106-107 fg=#96bfff
+L28 107-130 fg=#706f87
+L29 0-10 fg=#706f87
+L29 23-24 fg=#96bfff
+L29 27-28 fg=#96bfff bold
+L29 43-62 fg=#8888a4
+L29 106-107 fg=#96bfff
+L29 107-130 fg=#706f87
+L30 0-3 fg=#706f87
+L30 23-24 fg=#96bfff
+L30 27-28 fg=#96bfff bold
+L30 43-50 fg=#8888a4
+L30 106-107 fg=#96bfff
+L30 129-130 fg=#706f87
+L31 0-1 fg=#706f87
+L31 23-24 fg=#96bfff
+L31 27-28 fg=#96bfff bold
+L31 43-51 fg=#8888a4
+L31 106-107 fg=#96bfff
+L31 129-130 fg=#706f87
+L32 0-23 fg=#706f87
+L32 23-87 fg=#96bfff
+L32 88-104 fg=#706f87
+L32 105-107 fg=#96bfff
+L32 107-130 fg=#706f87
 L34 0-9 fg=#706f87

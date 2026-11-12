@@ -41,7 +41,7 @@ type compose struct {
 }
 
 // composeWidth is the width of the popup on a screen w wide.
-func composeWidth(w int) int { return min(max(w-8, 40), 100) }
+func composeWidth(w int) int { return popupWidthOn(w, true) }
 
 // resize fits the text area in the popup on a screen w by h: the popup
 // takes up to seven lines besides it, more when the keys of its pull

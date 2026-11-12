@@ -130,7 +130,7 @@ func (m *Model) closeTriage() {
 	tr.input.Blur()
 }
 
-func (m *Model) triageWidth() int { return min(max(m.width-8, 40), 110) }
+func (m *Model) triageWidth() int { return m.popupWidth(true) }
 
 // triageKey reads a key in the triage. The list of names offered while
 // # or @ is typed, and the search of the questions, are levels over the

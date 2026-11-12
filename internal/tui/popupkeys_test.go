@@ -372,3 +372,36 @@ func TestScopeChooserTellsUntypedMovingKeys(t *testing.T) {
 		t.Errorf("the chooser tells keys that type for moving:\n%s", s)
 	}
 }
+
+// Every popup is drawn from the same row, in one of two widths: the ? list
+// and the release notes no longer stand centered, and a click outside the
+// release notes goes back to the ? list, as a click outside a popup closes
+// it (ADR-053, ADR-125).
+func TestPopupsStandAtTheTop(t *testing.T) {
+	m := startReleases(t, &Release{Running: "0.7.0", How: "gh extension upgrade desk", Latest: "0.8.0", Source: &fakeReleases{list: releaseList()}})
+	top := func() int {
+		for i, l := range strings.Split(screen(m), "\n") {
+			if strings.Contains(l, "╭") && !strings.Contains(l, "overview") && !strings.Contains(l, "preview") {
+				return i
+			}
+		}
+		return -1
+	}
+	press(m, "?")
+	if got := top(); got != popupTop {
+		t.Errorf("the ? list is drawn from row %d, want %d", got, popupTop)
+	}
+	press(m, "w")
+	if got := top(); got != popupTop {
+		t.Errorf("the release notes are drawn from row %d, want %d", got, popupTop)
+	}
+	mouseAt(m, tea.MouseClickMsg{X: 1, Y: m.height - 3, Button: tea.MouseLeft})
+	if m.relBox != nil || !m.help {
+		t.Errorf("a click outside the release notes left relBox %v, help %v", m.relBox, m.help)
+	}
+	for _, w := range []int{popupNarrow, popupWide} {
+		if got := m.popupWidth(w == popupWide); got != w {
+			t.Errorf("on a 130-cell screen a popup is %d wide, want %d", got, w)
+		}
+	}
+}

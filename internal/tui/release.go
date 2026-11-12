@@ -217,9 +217,8 @@ func (m *Model) openReleaseNotes() tea.Cmd {
 func (m *Model) releaseSpec() popupSpec {
 	return popupSpec{
 		closeWords: "back",
-		// Its box takes no click: it is drawn where the ? list was.
-		body:  &popupBody{scroll: m.scrollReleaseNotes, page: m.releaseNotesHeight(), click: func(int, int) {}},
-		close: func() { m.relBox = nil },
+		body:       &popupBody{scroll: m.scrollReleaseNotes, page: m.releaseNotesHeight()},
+		close:      func() { m.relBox = nil },
 	}
 }
 
@@ -230,10 +229,11 @@ func (m *Model) scrollReleaseNotes(d int) {
 }
 
 // releaseNotesWidth is the width of the box of release notes.
-func (m *Model) releaseNotesWidth() int { return min(max(m.width-8, 30), 100) }
+func (m *Model) releaseNotesWidth() int { return m.popupWidth(true) }
 
-// releaseNotesHeight is how many lines of notes the box shows.
-func (m *Model) releaseNotesHeight() int { return max(m.height-6, 3) }
+// releaseNotesHeight is how many lines of notes the box shows: as many as a
+// popup may take, inside its frame.
+func (m *Model) releaseNotesHeight() int { return max(m.popupHeight()-2, 3) }
 
 // releaseNotesLines are the lines of the box of release notes, inner cells wide:
 // every release read, newest first, with the one running marked installed
@@ -296,5 +296,8 @@ func (m *Model) renderReleaseNotes(lines []string) []string {
 	if len(all) > h {
 		b[len(b)-1] = scrollEdge(st, w, top, len(all)-top-h, m.scrollKeys()+" wheel")
 	}
-	return m.overlay(lines, b, max((len(lines)-len(b))/2, 0), m.width)
+	// From the row every popup is drawn from, where a click outside it
+	// can be told (ADR-053, ADR-125).
+	m.popupAt = boxAt(b, popupTop, m.width)
+	return m.overlay(lines, b, popupTop, m.width)
 }
