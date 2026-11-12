@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"slices"
 	"testing"
 
 	"github.com/babarot/gh-desk/internal/model"
@@ -63,5 +64,24 @@ func TestReadFromBeforeRefreshIsDropped(t *testing.T) {
 	}
 	if e := m.cache.details[p.Key]; e == nil || e.val.Body != "fresh" {
 		t.Errorf("detail = %+v, want the read after the refresh", e)
+	}
+}
+
+// The clock reads the tabs not shown too, so that one shown later is as
+// fresh as the one shown (ADR-123).
+func TestTheClockReadsTabsNotShown(t *testing.T) {
+	f := fixture()
+	m := start(t, f, keymap.Default())
+	if m.tabs[m.cur].name != "review" {
+		t.Fatalf("shown tab = %q", m.tabs[m.cur].name)
+	}
+	mine := slices.IndexFunc(m.tabs, func(tb *tab) bool { return tb.name == "mine" })
+	gone := f.searches["mine"][0].Key
+	// Merged elsewhere while the review tab was shown.
+	f.searches["mine"] = nil
+	_, cmd := m.Update(tickMsg{})
+	run(m, cmd)
+	if slices.ContainsFunc(m.allOf(m.tabs[mine]), func(p model.PR) bool { return p.Key == gone }) {
+		t.Error("the mine tab kept a pull request GitHub no longer lists")
 	}
 }

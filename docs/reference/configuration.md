@@ -192,7 +192,7 @@ Rules that approve, without a confirm, the pull requests they match while gh-des
 
 duration or "off" · Default: `"3m"`
 
-Refresh the shown tab this often, as a Go duration such as "3m" or "90s"; "off" refreshes only when r is pressed.
+Refresh every tab this often, as a Go duration such as "3m" or "90s"; "off" refreshes only when r is pressed.
 
 ### list.stale_days
 

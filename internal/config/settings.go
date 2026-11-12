@@ -491,7 +491,7 @@ var tables = []table{
 // settings are every key of the tables, table by table in their order.
 var settings = []setting{
 	{Key: "list.refresh", Kind: durationKind{Off: true}, Value: func(f File) any { return f.List.Refresh },
-		Doc: `Refresh the shown tab this often, as a Go duration such as "3m" or "90s"; "off" refreshes only when r is pressed.`},
+		Doc: `Refresh every tab this often, as a Go duration such as "3m" or "90s"; "off" refreshes only when r is pressed.`},
 	{Key: "list.stale_days", Display: true, Kind: daysKind{}, Value: func(f File) any { return f.List.StaleDays },
 		Doc: `Mark AGE when a pull request has not been updated for this many days, or "off".`},
 	{Key: "list.home_owners", Kind: listKind{}, Value: func(f File) any { return f.List.HomeOwners },

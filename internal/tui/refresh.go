@@ -21,7 +21,8 @@ func (m *Model) tick() tea.Cmd {
 	return m.after(m.set.Refresh, tickMsg{})
 }
 
-// autoRefresh reads the shown tab and the notifications again. It leaves
+// autoRefresh reads every tab again, the notifications among them, so
+// that a tab shown later is as fresh as the one shown (ADR-123). It leaves
 // the results on the rows but those of reviews shown long enough; while a
 // popup is open it waits for the next tick, so what is being confirmed
 // does not change under the user.
@@ -33,9 +34,9 @@ func (m *Model) autoRefresh() tea.Cmd {
 	}
 	m.fadeResults()
 	if m.rereading == nil {
-		m.rereading = &rereading{by: "clock", start: m.set.Now(), tabs: m.reloadTabs()}
+		m.rereading = &rereading{by: "clock", start: m.set.Now(), tabs: m.allTabs()}
 	}
-	return tea.Batch(m.reload(), m.tick(), auto)
+	return tea.Batch(m.loadAll(), m.tick(), auto)
 }
 
 // rereading is a reading of the lists again, by r or by the clock, kept
@@ -44,6 +45,15 @@ type rereading struct {
 	by    string
 	start time.Time
 	tabs  []int
+}
+
+// allTabs are the tabs the clock reads: every one.
+func (m *Model) allTabs() []int {
+	tabs := make([]int, len(m.tabs))
+	for i := range tabs {
+		tabs[i] = i
+	}
+	return tabs
 }
 
 // reloadTabs are the tabs reload reads: the shown one and the inbox.
