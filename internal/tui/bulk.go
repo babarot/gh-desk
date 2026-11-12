@@ -448,15 +448,19 @@ func (m *Model) bulkSpec() popupSpec {
 			return nil
 		}})
 	}
-	return popupSpec{
-		// Kept within the body when it is drawn.
-		body: &popupBody{scroll: func(d int) { b.offset = max(b.offset+d, 0) }, page: b.rows},
-		question: &popupQuestion{confirm: func() tea.Cmd {
+	var question *popupQuestion
+	if !writing {
+		question = &popupQuestion{confirm: func() tea.Cmd {
 			if b.loading {
 				return nil
 			}
 			return m.runBulk()
-		}},
+		}}
+	}
+	return popupSpec{
+		question: question,
+		// Kept within the body when it is drawn.
+		body: &popupBody{scroll: func(d int) { b.offset = max(b.offset+d, 0) }, page: b.rows},
 		own:  own,
 		text: text,
 		close: func() {

@@ -5,6 +5,8 @@ import (
 	"strings"
 	"testing"
 
+	tea "charm.land/bubbletea/v2"
+
 	"github.com/babarot/gh-desk/internal/model"
 	"github.com/babarot/gh-desk/internal/plan"
 	"github.com/babarot/gh-desk/internal/runner"
@@ -254,5 +256,25 @@ func TestScopeChooserKeys(t *testing.T) {
 	press(m, "esc")
 	if m.chooser != nil {
 		t.Error("esc did not close the chooser")
+	}
+}
+
+// A paste goes only into a text box with the focus: out of the text box of
+// a review Claude drafted, it reaches neither the review nor the question
+// box of the chat under it.
+func TestPasteOutOfTheComposeTextBox(t *testing.T) {
+	m, _ := startWith(t, fixture(), keymap.Default())
+	fakeClaudeOf(t, m)
+	press(m, "i", "o", "n", "e", "enter")
+	c := m.chat()
+	press(m, "ctrl+x")
+	if m.compose == nil {
+		t.Fatal("ctrl+x did not open the drafted review")
+	}
+	review := m.compose.ta.Value()
+	press(m, "esc")
+	run(m, m.paste(tea.PasteMsg{Content: "pasted"}))
+	if strings.Contains(c.input.Value(), "pasted") || m.compose.ta.Value() != review {
+		t.Errorf("the paste went in: chat %q, review %q", c.input.Value(), m.compose.ta.Value())
 	}
 }

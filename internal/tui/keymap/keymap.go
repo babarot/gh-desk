@@ -47,9 +47,11 @@ const (
 var borrowed = map[Scope][]Action{
 	ScopeHelp: {"fold"},
 	ScopeChat: {"complete", "expand"},
-	// The confirm popup of a close and the triage hold a text box.
+	// The confirm popup of a close, the triage and the popup a review is
+	// written in hold a text box, which write enters.
 	ScopeConfirm: {"write"},
 	ScopeTriage:  {"write"},
+	ScopeCompose: {"write"},
 }
 
 // claims are the actions that may share the keys of a nav action, by the

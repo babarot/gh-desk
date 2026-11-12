@@ -631,8 +631,13 @@ func (m *Model) paste(msg tea.PasteMsg) tea.Cmd {
 			return s.edit(msg)
 		}
 		return editAsk(&m.triage.recall, &m.triage.input, msg)
-	case m.compose != nil && m.compose.ta.Focused():
-		return m.compose.update(msg)
+	case m.compose != nil:
+		// Pasted text goes only into the text box with the focus; nothing
+		// under the popup takes it.
+		if m.compose.ta.Focused() {
+			return m.compose.update(msg)
+		}
+		return nil
 	case m.typingChat():
 		c := m.chat()
 		if c.search != nil {

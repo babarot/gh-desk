@@ -62,6 +62,12 @@ func (m *Model) chooserSpec() popupSpec {
 	vs := m.chooserValues()
 	return popupSpec{
 		list: &popupList{sel: &c.sel, n: len(vs), ptr: &c.pointer, choose: m.chooseScope},
+		// The keys that go through the questions asked elsewhere move here
+		// too, whatever they are set to, as they type nothing.
+		own: []ownKey{
+			{"history_next", func() tea.Cmd { c.sel = min(c.sel+1, max(len(vs)-1, 0)); return nil }},
+			{"history_prev", func() tea.Cmd { c.sel = max(c.sel-1, 0); return nil }},
+		},
 		text: &popupText{
 			focused: true,
 			edit: func(msg tea.Msg) tea.Cmd {
