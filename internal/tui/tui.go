@@ -187,7 +187,7 @@ type Settings struct {
 	// History keeps the questions of a triage; nil keeps them only while
 	// gh-desk runs.
 	History askbox.Store
-	// Refresh is how often the shown tab is read again; zero turns it off.
+	// Refresh is how often every tab is read again; zero turns it off.
 	Refresh time.Duration
 	// Now is the clock, for tests; nil is time.Now.
 	Now func() time.Time

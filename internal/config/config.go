@@ -130,8 +130,8 @@ func (t Tab) Inbox() bool { return t.Kind == "inbox" }
 
 // List configures the list of pull requests.
 type List struct {
-	// Refresh is how often the shown tab is read again; Off reads it only
-	// on a refresh (r).
+	// Refresh is how often every tab is read again; Off reads them only
+	// at launch and on a refresh (r).
 	Refresh Duration
 	// StaleDays is the age past which AGE is marked; Off marks none.
 	StaleDays Days

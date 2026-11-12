@@ -134,7 +134,7 @@ func TestConfigReference(t *testing.T) {
 	for _, tt := range []struct{ name, want string }{
 		{"merge", "[merge]\n"},
 		{"claude", "[claude.mcp]\n"},
-		{"list.refresh", "[list]\n# Refresh the shown tab"},
+		{"list.refresh", "[list]\n# Refresh every tab"},
 		{"select", "# [[select]]\n# name = \"small\""},
 		{"select.max_lines", "[[select]]\n# The most lines"},
 		{"exclude", "# [[exclude]]\n"},

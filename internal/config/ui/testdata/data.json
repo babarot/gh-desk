@@ -5,7 +5,7 @@
     "key": "list.refresh",
     "table": "list",
     "name": "refresh",
-    "doc": "Refresh the shown tab this often, as a Go duration such as \"3m\" or \"90s\"; \"off\" refreshes only when r is pressed.",
+    "doc": "Refresh every tab this often, as a Go duration such as \"3m\" or \"90s\"; \"off\" refreshes only when r is pressed.",
     "kind": {
      "type": "config.durationKind",
      "name": "duration or \"off\"",
