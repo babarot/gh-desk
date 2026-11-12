@@ -85,7 +85,7 @@ browse = []
 | `-` | `preview_shrink` | shorter pane |
 | `L` | `log` | log |
 
-## A menu or a list popup
+## A popup's list or text box
 
 | Key | Action | Does |
 |---|---|---|

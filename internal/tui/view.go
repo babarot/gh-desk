@@ -70,7 +70,7 @@ func (m *Model) render() (string, *tea.Cursor) {
 	if m.compose != nil && m.bulk == nil {
 		// The confirm popup of what was written takes its place, in a box
 		// as wide, and esc there gives the text box back: no box is drawn
-		// over another (ADR-097).
+		// over another (ADR-121).
 		popup, at := m.renderCompose()
 		lines = m.overlay(lines, popup, popupTop, m.width)
 		cur = inPopup(m.compose.ta.Cursor(), popup, popupTop+at, m.width)

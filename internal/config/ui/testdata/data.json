@@ -3188,7 +3188,7 @@
     "enter"
    ],
    "scope": "popup",
-   "scopeWords": "The menu of enter, and the popups that pick from a list"
+   "scopeWords": "Popups: choosing from their lists, and writing in their text boxes"
   },
   {
    "action": "toggle_rule",
@@ -3196,7 +3196,7 @@
     "space"
    ],
    "scope": "popup",
-   "scopeWords": "The menu of enter, and the popups that pick from a list"
+   "scopeWords": "Popups: choosing from their lists, and writing in their text boxes"
   },
   {
    "action": "add_to_selection",
@@ -3204,7 +3204,7 @@
     "a"
    ],
    "scope": "popup",
-   "scopeWords": "The menu of enter, and the popups that pick from a list"
+   "scopeWords": "Popups: choosing from their lists, and writing in their text boxes"
   },
   {
    "action": "filter_by_rule",
@@ -3212,7 +3212,7 @@
     "f"
    ],
    "scope": "popup",
-   "scopeWords": "The menu of enter, and the popups that pick from a list"
+   "scopeWords": "Popups: choosing from their lists, and writing in their text boxes"
   },
   {
    "action": "write",
@@ -3220,7 +3220,7 @@
     "i"
    ],
    "scope": "popup",
-   "scopeWords": "The menu of enter, and the popups that pick from a list"
+   "scopeWords": "Popups: choosing from their lists, and writing in their text boxes"
   },
   {
    "action": "confirm",
@@ -3357,7 +3357,7 @@
     "enter"
    ],
    "scope": "input",
-   "scopeWords": "Typing in the filter"
+   "scopeWords": "Typing in the filter or a question to Claude"
   },
   {
    "action": "complete",
@@ -3365,7 +3365,7 @@
     "tab"
    ],
    "scope": "input",
-   "scopeWords": "Typing in the filter"
+   "scopeWords": "Typing in the filter or a question to Claude"
   },
   {
    "action": "erase",
@@ -3373,7 +3373,7 @@
     "backspace"
    ],
    "scope": "input",
-   "scopeWords": "Typing in the filter"
+   "scopeWords": "Typing in the filter or a question to Claude"
   },
   {
    "action": "erase_word",
@@ -3381,7 +3381,7 @@
     "ctrl+w"
    ],
    "scope": "input",
-   "scopeWords": "Typing in the filter"
+   "scopeWords": "Typing in the filter or a question to Claude"
   },
   {
    "action": "release_notes",
