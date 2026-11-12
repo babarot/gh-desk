@@ -308,37 +308,41 @@ func stateWords(s model.PRState) string {
 	return "not open"
 }
 
-func (m *Model) menuKey(k string) tea.Cmd {
+// menuSpec is the menu as the shared popup layer reads it: a list of the
+// actions, each also run by its own key (ADR-125). With nothing to act
+// on, the menu closes.
+func (m *Model) menuSpec() popupSpec {
+	closeMenu := func() { m.menu = nil }
 	its := m.menuItems()
 	if len(its) == 0 {
 		m.menu = nil
-		return nil
+		return popupSpec{close: closeMenu}
 	}
 	v := m.menu
 	v.sel = min(v.sel, len(its)-1)
-	is := func(a keymap.Action) bool { return m.keys.Matches(a, k) }
-	switch {
-	case k == keymap.Back:
-		m.menu = nil
-	case is("down"):
-		v.sel = min(v.sel+1, len(its)-1)
-	case is("up"):
-		v.sel = max(v.sel-1, 0)
-	case is("top"):
-		v.sel = 0
-	case is("bottom"):
-		v.sel = len(its) - 1
-	case is("choose"):
-		return m.runMenu(its[v.sel])
-	default:
-		for i, it := range its {
-			if m.keys.Matches(it.action, k) {
-				v.sel = i
-				return m.runMenu(it)
-			}
-		}
+	own := make([]ownKey, len(its))
+	for i, it := range its {
+		own[i] = ownKey{action: it.action, run: func() tea.Cmd {
+			v.sel = i
+			return m.runMenu(it)
+		}}
 	}
-	return nil
+	return popupSpec{
+		list: &popupList{sel: &v.sel, n: len(its), ptr: &v.pointer,
+			choose: func() tea.Cmd { return m.runMenu(its[v.sel]) },
+			// Marking done in the inbox writes to GitHub with no popup
+			// to confirm it, so a click does not (ADR-012, ADR-053).
+			click: func() tea.Cmd {
+				if it := its[v.sel]; it.action == "hide" && m.tab().inbox && !it.off {
+					m.refuse(m.keys.Help(it.action) + ": press " + m.firstKey(it.action) + ", as a click does not mark done on GitHub")
+					return nil
+				}
+				return m.runMenu(its[v.sel])
+			}},
+		own:    own,
+		opener: "menu",
+		close:  closeMenu,
+	}
 }
 
 // runMenu runs an item as its key on the list would. One that cannot run
@@ -445,31 +449,6 @@ func (m *Model) renderMenu() []string {
 		m.menu.items = boxItems(owner, top, len(out), len(foot))
 	}
 	return out
-}
-
-// menuMouse is mouse input with the menu open: an item is run by a
-// second click on it, but for marking done in the inbox, which writes to
-// GitHub with no popup to confirm it (ADR-012, ADR-053).
-func (m *Model) menuMouse(msg tea.MouseMsg) tea.Cmd {
-	v := m.menu
-	its := m.menuItems()
-	if len(its) == 0 {
-		m.menu = nil
-		return nil
-	}
-	v.sel = min(v.sel, len(its)-1)
-	run, closed := m.listMouse(msg, &v.pointer, &v.sel, len(its))
-	switch {
-	case closed:
-		m.menu = nil
-	case run:
-		if it := its[v.sel]; it.action == "hide" && m.tab().inbox && !it.off {
-			m.refuse(m.keys.Help(it.action) + ": press " + m.firstKey(it.action) + ", as a click does not mark done on GitHub")
-			return nil
-		}
-		return m.runMenu(its[v.sel])
-	}
-	return nil
 }
 
 // menuKeyHint is an action's key in the menu; none for one without a

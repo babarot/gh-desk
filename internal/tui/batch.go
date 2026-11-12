@@ -569,21 +569,15 @@ func (m *Model) noteLines() []noteLine {
 	return out
 }
 
-func (m *Model) notesKey(k string) tea.Cmd {
-	ls := m.noteLines()
+// notesSpec is the notifications as the shared popup layer reads them: a
+// list of their lines, choose going to the pull request of one (ADR-125).
+func (m *Model) notesSpec() popupSpec {
 	v := m.notesAt
-	is := func(a keymap.Action) bool { return m.keys.Matches(a, k) }
-	switch {
-	case k == keymap.Back, is("events"), is("quit"):
-		m.notesAt = nil
-	case is("down"):
-		v.sel = min(v.sel+1, max(len(ls)-1, 0))
-	case is("up"):
-		v.sel = max(v.sel-1, 0)
-	case is("choose"):
-		return m.chooseNote()
+	return popupSpec{
+		list:   &popupList{sel: &v.sel, n: len(m.noteLines()), ptr: &v.pointer, choose: m.chooseNote},
+		opener: "events",
+		close:  func() { m.notesAt = nil },
 	}
-	return nil
 }
 
 // chooseNote goes to the pull request of the line under the cursor: an

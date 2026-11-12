@@ -583,13 +583,13 @@ func (m *Model) key(msg tea.KeyPressMsg) tea.Cmd {
 	case m.bulk != nil:
 		return m.bulkKeyMsg(msg)
 	case m.notesAt != nil:
-		return m.notesKey(k)
+		return m.popupKey(m.notesSpec(), k)
 	case m.picker != nil:
-		return m.pickKey(k)
+		return m.popupKey(m.pickSpec(), k)
 	case m.chooser != nil:
 		return m.chooserKey(msg)
 	case m.menu != nil:
-		return m.menuKey(k)
+		return m.popupKey(m.menuSpec(), k)
 	case m.triage != nil && m.triage.open:
 		return m.triageKey(msg)
 	case m.help && m.relBox != nil:
