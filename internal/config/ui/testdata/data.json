@@ -2762,6 +2762,7 @@
    "action": "up",
    "keys": [
     "up",
+    "ctrl+p",
     "k"
    ],
    "scope": "nav",
@@ -2771,6 +2772,7 @@
    "action": "down",
    "keys": [
     "down",
+    "ctrl+n",
     "j"
    ],
    "scope": "nav",

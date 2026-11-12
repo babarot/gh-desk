@@ -28,8 +28,8 @@ browse = []
 
 | Key | Action | Does |
 |---|---|---|
-| `up` `k` | `up` | up |
-| `down` `j` | `down` | down |
+| `up` `ctrl+p` `k` | `up` | up |
+| `down` `ctrl+n` `j` | `down` | down |
 | `home` `g` | `top` | top |
 | `end` `G` | `bottom` | bottom |
 | `pgup` `ctrl+u` | `page_up` | page up |

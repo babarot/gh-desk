@@ -52,7 +52,8 @@ A popup's own keys are declared for the state it is in, and are read after the k
 
 Each popup reads its keys in its own function (`menuKey`, `bulkKeyMsg`, `composeKey`, `pickKey`, `chooserKey`, `notesKey`, `triageKey`, `helpKey`, `releaseBoxKey`), so the parts above take different keys from popup to popup:
 
-- Lists move on `up` and `down` everywhere; on `top` and `bottom` only in the menu; on `history_next` and `history_prev` only in the scope chooser and the triage's list of names. Bodies scroll by page only in the `?` list and the release notes.
+- Lists move on `up` and `down` everywhere, whose keys include `ctrl+n` and `ctrl+p`; on `top` and `bottom` only in the menu. Bodies scroll by page only in the `?` list and the release notes.
+- `history_next` and `history_prev` claim the keys of `down` and `up` ([keymap](../../internal/tui/keymap)): a text box tries them first, and moves its cursor when there is nothing to recall.
 - The opening action closes the picker, the notifications, the `?` list and the release notes, and is ignored or typed in the others. `quit` closes the notifications, the `?` list and the release notes.
 - `esc` throws a comment or a review away at once.
 - Entering a text box is `write_comment` in the confirm of a close and `triage_more` in the triage, which happen to share a default key.

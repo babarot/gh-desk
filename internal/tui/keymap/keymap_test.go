@@ -45,7 +45,7 @@ func TestApply(t *testing.T) {
 		{
 			name:  "set key takes it from a default nav key",
 			set:   map[string][]string{"approve": {"j"}},
-			check: map[Action][]string{"approve": {"j"}, "down": {"down"}},
+			check: map[Action][]string{"approve": {"j"}, "down": {"down", "ctrl+n"}},
 		},
 		{
 			name:  "scopes that do not meet keep their keys",
@@ -186,5 +186,42 @@ func TestHelpBorrowsFold(t *testing.T) {
 	m, ps := Apply(Default(), map[string][]string{"fold": {"w"}})
 	if len(ps) != 0 || len(m.Keys("release_notes")) != 0 || !m.Matches("fold", "w") {
 		t.Errorf("problems %+v, release_notes %v", ps, m.Keys("release_notes"))
+	}
+}
+
+// An action shares the keys of the nav action it claims, and with no other:
+// a nav key set for any other action is still a mistake (ADR-125).
+func TestClaims(t *testing.T) {
+	m := Default()
+	if !m.Matches("down", "ctrl+n") || !m.Matches("history_next", "ctrl+n") {
+		t.Errorf("ctrl+n is not both down and history_next: %v, %v", m.Keys("down"), m.Keys("history_next"))
+	}
+	if !m.Matches("up", "ctrl+p") || !m.Matches("history_prev", "ctrl+p") {
+		t.Errorf("ctrl+p is not both up and history_prev: %v, %v", m.Keys("up"), m.Keys("history_prev"))
+	}
+	// A key set for the claiming action, or the claimed one, stays on both.
+	m, ps := Apply(Default(), map[string][]string{"history_next": {"ctrl+j"}, "down": {"down", "ctrl+j"}})
+	if len(ps) > 0 || !m.Matches("history_next", "ctrl+j") || !m.Matches("down", "ctrl+j") {
+		t.Errorf("problems %+v, history_next %v, down %v", ps, m.Keys("history_next"), m.Keys("down"))
+	}
+	// A claim is between two actions: history_next does not claim up.
+	if _, ps := Apply(Default(), map[string][]string{"history_next": {"k"}, "up": {"k"}}); len(ps) != 1 {
+		t.Errorf("history_next on up's key: problems %+v", ps)
+	}
+	// Another action of the same scope cannot take a nav key.
+	if _, ps := Apply(Default(), map[string][]string{"chat_restart": {"ctrl+n"}, "down": {"ctrl+n"}}); len(ps) != 1 {
+		t.Errorf("chat_restart on down's key: problems %+v", ps)
+	}
+}
+
+// ctrl+n and ctrl+p are neither the first nor the last key of down and up,
+// whose first and last keys the hints show.
+func TestMovingKeysKeepTheirHints(t *testing.T) {
+	m := Default()
+	for a, want := range map[Action][2]string{"down": {"down", "j"}, "up": {"up", "k"}} {
+		ks := m.Keys(a)
+		if ks[0] != want[0] || ks[len(ks)-1] != want[1] {
+			t.Errorf("%s keys %v: want %s first and %s last", a, ks, want[0], want[1])
+		}
 	}
 }
