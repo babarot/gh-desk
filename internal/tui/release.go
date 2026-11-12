@@ -213,18 +213,13 @@ func (m *Model) openReleaseNotes() tea.Cmd {
 }
 
 // releaseSpec is the box of release notes as the shared popup layer reads
-// it: a body of the notes. It closes back to the ? list, as it opened from
-// it, and help closes both (ADR-125).
+// it: a body of the notes. esc closes it back to the ? list, as it opened
+// from it (ADR-125).
 func (m *Model) releaseSpec() popupSpec {
 	return popupSpec{
 		// Its box takes no click: it is drawn where the ? list was.
-		body: &popupBody{scroll: m.scrollReleaseNotes, page: m.releaseNotesHeight(), click: func(int, int) {}},
-		own: []ownKey{{"help", func() tea.Cmd {
-			m.relBox, m.help = nil, false
-			return nil
-		}}},
-		opener: "release_notes",
-		close:  func() { m.relBox = nil },
+		body:  &popupBody{scroll: m.scrollReleaseNotes, page: m.releaseNotesHeight(), click: func(int, int) {}},
+		close: func() { m.relBox = nil },
 	}
 }
 
@@ -296,7 +291,7 @@ func (m *Model) renderReleaseNotes(lines []string) []string {
 	h := min(len(all), m.releaseNotesHeight())
 	top := max(min(m.relBox.top, len(all)-h), 0)
 	m.relBox.top = top
-	title := strings.Join([]string{"release notes", m.scrollKeys() + " scroll", m.firstKey("release_notes") + " " + keymap.Back + " back"}, " · ")
+	title := strings.Join([]string{"release notes", m.scrollKeys() + " scroll", keymap.Back + " back"}, " · ")
 	b := box(st, title, all[top:top+h], w)
 	if len(all) > h {
 		b[len(b)-1] = scrollEdge(st, w, top, len(all)-top-h, m.scrollKeys()+" wheel")

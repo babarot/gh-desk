@@ -22,10 +22,8 @@ type popupSpec struct {
 	question *popupQuestion
 	// own are the popup's own keys, read before its parts.
 	own []ownKey
-	// opener is the action that opened the popup; it closes it, unless a
-	// part reads its key first.
-	opener keymap.Action
-	// close closes the popup, on esc, on the opener and on a click outside.
+	// close closes the popup, on esc and on a click outside. The key that
+	// opened it does not (ADR-125).
 	close func()
 }
 
@@ -67,8 +65,8 @@ type ownKey struct {
 }
 
 // popupKey reads a key with the popup of p open: esc and the popup's own
-// keys first, then the keys of its parts, then the opener. quit is not
-// read: it never closes a popup, and never quits from one.
+// keys first, then the keys of its parts. esc alone closes it; quit is
+// not read, so it never closes a popup and never quits from one.
 func (m *Model) popupKey(p popupSpec, k string) tea.Cmd {
 	if k == keymap.Back {
 		p.close()
@@ -89,9 +87,6 @@ func (m *Model) popupKey(p popupSpec, k string) tea.Cmd {
 	}
 	if q := p.question; q != nil && m.keys.Matches("confirm", k) {
 		return q.confirm()
-	}
-	if p.opener != "" && m.keys.Matches(p.opener, k) {
-		p.close()
 	}
 	return nil
 }

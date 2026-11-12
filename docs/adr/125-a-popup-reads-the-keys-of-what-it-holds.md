@@ -30,7 +30,8 @@ Which popups there are, what each holds and how they are drawn is in [docs/desig
 
 - `esc` steps out one level in every popup, from the innermost one the popup has at that moment: a list of suggestions or a search opened over a text box (ADR-097, ADR-098), a request on its way (ADR-095), the text box, then the popup itself, which goes back to what it was opened from (the popup it took the place of, ADR-121, or the screen). The popup declares which of these levels it has. What was written in a text box is thrown away only when its popup is closed.
 - A popup whose text box has the focus as long as the popup is open, with no keys of its own without it, has no level between the two: `esc` closes it at once.
-- The key that opened a popup closes it, unless a part of the popup reads that key first, or closing would throw away what was written in it. What was written is thrown away only by `esc`.
+- A popup is closed by `esc` alone. The key that opened it does not close it: inside the popup, that key is free for the popup's own use, as any key is, and means the same in no other popup by accident.
+- Rejected: the key that opened a popup closing it too, as `?` did the `?` list. It held only where no part of the popup read that key first: the menu's `enter` chooses, a text box types its letter, a popup opened by several actions has no one key, and a popup holding what was written would lose it. The user would have to learn popup by popup where it closes, and a key pressed twice would close what it had just opened.
 - `quit` quits gh-desk and does nothing else. It is not read while a popup is open: it never closes a popup, and never quits from one. Stepping back with `esc` never quits, however often it is pressed, and the two are kept apart so that closing a popup cannot quit by mistake.
 - Rejected: `quit` closing a popup that has no text box with the focus. The same key would close in one place and quit one press later.
 
@@ -52,7 +53,7 @@ Which popups there are, what each holds and how they are drawn is in [docs/desig
 - A new popup declares its parts and reads only its own keys. It does not handle moving, `esc` or entering its text box, and does not write its hints.
 - An action of a popup must not take a key of nav or of a part the popup holds, unless it is declared as a claim.
 - The actions that entered a text box in one popup each give way to one action. As ADR-023 decides for every renamed action, a key set under an old name is a mistake that names the new one, and gh-desk does not start until the config file is changed.
-- Closing the notifications and the `?` list no longer takes `quit`, and throwing away a comment or a review being written takes `esc` twice.
+- The notifications, the picker and the `?` list are closed by `esc`, no longer by `quit` or the key that opened them, and throwing away a comment or a review being written takes `esc` twice.
 
 ## Not decided here
 

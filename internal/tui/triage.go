@@ -214,9 +214,8 @@ func (m *Model) triageSpec() popupSpec {
 			tr.top = max(tr.top+d, 0)
 			tr.follow = false
 		}},
-		own:    own,
-		opener: "triage",
-		close:  m.closeTriage,
+		own:   own,
+		close: m.closeTriage,
 	}
 }
 

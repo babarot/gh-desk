@@ -38,7 +38,7 @@ Keys are written as actions; their default keys are in [internal/tui/keymap](../
 
 | Part | Target: what the shared layer reads |
 |---|---|
-| every popup | `esc` steps out of the innermost level the popup declares (suggestions or a search over a text box, a request on its way, the text box, the popup); the action that opened it closes it, unless a part reads that key first or something written would be lost; `quit` is not read |
+| every popup | `esc` steps out of the innermost level the popup declares (suggestions or a search over a text box, a request on its way, the text box, the popup); `esc` alone closes it; neither the action that opened it nor `quit` does |
 | list | nav's `up`, `down`, `top`, `bottom`, `page_up`, `page_down` move the cursor; `choose` |
 | body | the same nav actions scroll |
 | text box | with the focus, every key that types a character and every key no step before it takes (its own editing keys); the popup's other parts read only keys that type nothing and the nav keys it does not edit with. Without the focus, one action enters it |
@@ -54,7 +54,7 @@ The shared layer in [popupkeys.go](../../internal/tui/popupkeys.go) reads lists,
 
 - Lists move on `up` and `down` everywhere, whose keys include `ctrl+n` and `ctrl+p`; on `top`, `bottom` and by page in the menu, the picker and the notifications, not in the scope chooser or the triage's list of names. Bodies scroll on all of nav.
 - `history_next` and `history_prev` claim the keys of `down` and `up` ([keymap](../../internal/tui/keymap)): a text box tries them first, and moves its cursor when there is nothing to recall.
-- The opening action closes the picker, the notifications, the `?` list, the release notes and the triage once answered; the confirm popup declares none, since several actions open it. `quit` is read in no popup.
+- `esc` alone closes the popups on the shared layer; the action that opened one does not, and `quit` is read in no popup.
 - `esc` throws a comment or a review away at once.
 - Entering a text box is `write_comment` in the confirm of a close and `triage_more` in the triage, which happen to share a default key.
 - The foot of each popup is written by hand, apart from the key line the keymap makes.

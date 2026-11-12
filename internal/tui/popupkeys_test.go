@@ -68,8 +68,8 @@ func TestPopupListsMoveOnNav(t *testing.T) {
 	}
 }
 
-// esc closes a popup that holds a list, and so does the key that opened it
-// unless the list reads it; quit neither closes it nor quits (ADR-125).
+// esc alone closes a popup that holds a list: the key that opened it does
+// not, and quit neither closes it nor quits (ADR-125).
 func TestPopupListsClose(t *testing.T) {
 	for _, p := range listPopups() {
 		t.Run(p.name, func(t *testing.T) {
@@ -79,15 +79,16 @@ func TestPopupListsClose(t *testing.T) {
 			if quits(cmd) || !p.shown(m) {
 				t.Fatalf("q quit (%v) or closed the popup (%v)", quits(cmd), !p.shown(m))
 			}
+			// The menu's enter chooses, and runs an action.
+			if p.name != "menu" {
+				press(m, p.opener)
+				if !p.shown(m) {
+					t.Errorf("%s closed it", p.opener)
+				}
+			}
 			press(m, "esc")
 			if p.shown(m) {
 				t.Error("esc did not close it")
-			}
-			p.open(m)
-			press(m, p.opener)
-			// The menu's enter chooses, so it runs an action instead.
-			if p.name != "menu" && p.shown(m) {
-				t.Errorf("%s did not close it", p.opener)
 			}
 		})
 	}
@@ -168,30 +169,34 @@ func TestPopupBodiesScrollOnNav(t *testing.T) {
 	}
 }
 
-// The key that opened a popup with a body closes it; the release notes go
-// back to the ? list on theirs and on esc, and ? closes both.
+// esc alone closes a popup with a body, and the release notes go back to
+// the ? list on it; the key that opened one does not close it (ADR-125).
 func TestPopupBodiesClose(t *testing.T) {
 	m, _ := startWith(t, fixture(), keymap.Default())
 	press(m, "?", "?")
+	if !m.help {
+		t.Error("? closed the ? list")
+	}
+	press(m, "esc")
 	if m.help {
-		t.Error("? did not close the ? list")
+		t.Error("esc did not close the ? list")
 	}
 	m = startReleases(t, &Release{Running: "0.7.0", How: "gh extension upgrade desk", Latest: "0.8.0", Source: &fakeReleases{list: releaseList()}})
-	press(m, "?", "w", "w")
-	if m.relBox != nil || !m.help {
-		t.Errorf("w did not go back to the ? list: relBox %v, help %v", m.relBox, m.help)
+	press(m, "?", "w", "w", "?")
+	if m.relBox == nil || !m.help {
+		t.Errorf("w or ? closed the release notes: relBox %v, help %v", m.relBox, m.help)
 	}
-	press(m, "w", "esc")
+	press(m, "esc")
 	if m.relBox != nil || !m.help {
 		t.Errorf("esc did not go back to the ? list: relBox %v, help %v", m.relBox, m.help)
 	}
-	press(m, "w", "?")
-	if m.relBox != nil || m.help {
-		t.Errorf("? did not close both: relBox %v, help %v", m.relBox, m.help)
-	}
 	tm, _ := startTriage(t, `{"reply":"Nothing to do.","actions":[]}`)
 	press(tm, "C")
+	if !tm.triage.open {
+		t.Error("C closed the triage")
+	}
+	press(tm, "esc")
 	if tm.triage.open {
-		t.Error("C did not close the triage")
+		t.Error("esc did not close the triage")
 	}
 }

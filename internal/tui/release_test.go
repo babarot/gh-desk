@@ -190,9 +190,10 @@ func TestReleaseNotesWithoutTelling(t *testing.T) {
 	if !m.help || m.relBox != nil {
 		t.Errorf("esc left help %v, box %v", m.help, m.relBox != nil)
 	}
-	press(m, "w", "?")
+	// esc steps back one at a time: to the ? list, then out of it.
+	press(m, "w", "esc", "esc")
 	if m.help || m.relBox != nil {
-		t.Errorf("? left help %v, box %v", m.help, m.relBox != nil)
+		t.Errorf("esc twice left help %v, box %v", m.help, m.relBox != nil)
 	}
 }
 

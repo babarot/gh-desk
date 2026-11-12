@@ -252,10 +252,9 @@ func (m *Model) helpSpec() popupSpec {
 		own = append(own, ownKey{"release_notes", m.openReleaseNotes})
 	}
 	return popupSpec{
-		body:   &popupBody{scroll: m.scrollHelp, page: h, click: m.helpClick},
-		own:    own,
-		opener: "help",
-		close:  func() { m.help, m.relBox = false, nil },
+		body:  &popupBody{scroll: m.scrollHelp, page: h, click: m.helpClick},
+		own:   own,
+		close: func() { m.help, m.relBox = false, nil },
 	}
 }
 
@@ -287,7 +286,7 @@ func (m *Model) renderHelp(lines []string) []string {
 	st := m.st
 	all, heads, top, h := m.helpShown()
 	w := m.helpWidth()
-	box := box(st, "keys · "+m.firstKey("fold")+" fold · "+m.firstKey("help")+" esc close", all[top:top+h], w)
+	box := box(st, "keys · "+m.firstKey("fold")+" fold · "+keymap.Back+" close", all[top:top+h], w)
 	if len(all) > h {
 		box[len(box)-1] = scrollEdge(st, w, top, len(all)-top-h, m.scrollKeys()+" wheel")
 	}

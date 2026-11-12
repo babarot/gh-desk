@@ -574,9 +574,8 @@ func (m *Model) noteLines() []noteLine {
 func (m *Model) notesSpec() popupSpec {
 	v := m.notesAt
 	return popupSpec{
-		list:   &popupList{sel: &v.sel, n: len(m.noteLines()), ptr: &v.pointer, choose: m.chooseNote},
-		opener: "events",
-		close:  func() { m.notesAt = nil },
+		list:  &popupList{sel: &v.sel, n: len(m.noteLines()), ptr: &v.pointer, choose: m.chooseNote},
+		close: func() { m.notesAt = nil },
 	}
 }
 

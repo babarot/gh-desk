@@ -339,9 +339,8 @@ func (m *Model) menuSpec() popupSpec {
 				}
 				return m.runMenu(its[v.sel])
 			}},
-		own:    own,
-		opener: "menu",
-		close:  closeMenu,
+		own:   own,
+		close: closeMenu,
 	}
 }
 
