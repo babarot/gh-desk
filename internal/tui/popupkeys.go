@@ -146,8 +146,14 @@ func (m *Model) popupHints(p popupSpec) (hs []popupHint, esc string) {
 		add("confirm", q.words, true)
 	}
 	if l := p.list; l != nil {
-		if l.moveHint {
-			hs = append(hs, popupHint{key: arrowKey(m.untypedKey("up")) + arrowKey(m.untypedKey("down")), words: "move"})
+		// A key that types is the text box's; with none other, no key is
+		// told for moving.
+		if up, down := m.untypedKey("up", "history_prev"), m.untypedKey("down", "history_next"); l.moveHint && up != "" && down != "" {
+			key := arrowKey(up) + arrowKey(down)
+			if up != "up" || down != "down" {
+				key = up + "/" + down
+			}
+			hs = append(hs, popupHint{key: key, words: "move"})
 		}
 		add("choose", l.chooseWords, false)
 	}
@@ -179,26 +185,25 @@ func (m *Model) popupHints(p popupSpec) (hs []popupHint, esc string) {
 	return hs, esc
 }
 
-// untypedKey is the first key of a that types nothing, which reaches a
-// list beside a text box with the focus; the first key with none.
-func (m *Model) untypedKey(a keymap.Action) string {
-	for _, k := range m.keys.Keys(a) {
-		if len([]rune(k)) > 1 {
-			return k
+// untypedKey is the first key of the actions as that types nothing, which
+// reaches a list beside a text box with the focus; "" with none.
+func (m *Model) untypedKey(as ...keymap.Action) string {
+	for _, a := range as {
+		for _, k := range m.keys.Keys(a) {
+			if len([]rune(k)) > 1 {
+				return k
+			}
 		}
 	}
-	return m.firstKey(a)
+	return ""
 }
 
 // arrowKey writes up and down as arrows, which take one cell.
 func arrowKey(k string) string {
-	switch k {
-	case "up":
+	if k == "up" {
 		return "↑"
-	case "down":
-		return "↓"
 	}
-	return k
+	return "↓"
 }
 
 // popupFootParts are the keys at the foot of the popup of p, each a key

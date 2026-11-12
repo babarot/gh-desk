@@ -353,4 +353,22 @@ func TestScopeChooserTellsUntypedMovingKeys(t *testing.T) {
 	if s := screen(m); !strings.Contains(s, "↑↓ move") || strings.Contains(s, "kj move") {
 		t.Errorf("the chooser does not tell the arrows:\n%s", s)
 	}
+	// With only letters for up and down, the keys of the questions move it.
+	km, _ = keymap.Apply(keymap.Default(), map[string][]string{"up": {"k"}, "down": {"j"}})
+	m = New(fixture(), &fakeRunner{}, &fakeClaude{}, km, nil, set)
+	m.Update(tea.WindowSizeMsg{Width: 130, Height: 34})
+	run(m, m.Init())
+	press(m, "O")
+	if s := screen(m); !strings.Contains(s, "ctrl+p/ctrl+n move") {
+		t.Errorf("the chooser does not tell the keys of the questions:\n%s", s)
+	}
+	// With no key that types nothing, it tells none.
+	km, _ = keymap.Apply(keymap.Default(), map[string][]string{"up": {"k"}, "down": {"j"}, "history_prev": {}, "history_next": {}})
+	m = New(fixture(), &fakeRunner{}, &fakeClaude{}, km, nil, set)
+	m.Update(tea.WindowSizeMsg{Width: 130, Height: 34})
+	run(m, m.Init())
+	press(m, "O")
+	if s := screen(m); strings.Contains(s, "move") {
+		t.Errorf("the chooser tells keys that type for moving:\n%s", s)
+	}
 }
