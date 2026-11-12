@@ -15,7 +15,6 @@ import (
 	"github.com/babarot/gh-desk/internal/model"
 	"github.com/babarot/gh-desk/internal/plan"
 	"github.com/babarot/gh-desk/internal/runner"
-	"github.com/babarot/gh-desk/internal/tui/keymap"
 )
 
 // bulk is the confirm popup of a review, a merge or a ready for review, of
@@ -428,13 +427,13 @@ func (m *Model) bulkSpec() popupSpec {
 	// letter is typed, and none confirms (ADR-066).
 	writing := text != nil && text.focused
 	if b.approves() && !b.loading && !writing {
-		own = append(own, ownKey{"include_failing", func() tea.Cmd {
+		own = append(own, ownKey{action: "include_failing", hide: true, run: func() tea.Cmd {
 			b.includeFailing = !b.includeFailing
 			m.decideBulk()
 			return nil
 		}})
 		if b.atWork() > 0 {
-			own = append(own, ownKey{"wait_for_checks", func() tea.Cmd {
+			own = append(own, ownKey{action: "wait_for_checks", hide: true, run: func() tea.Cmd {
 				b.waitJobs = !b.waitJobs
 				m.decideBulk()
 				return nil
@@ -442,14 +441,17 @@ func (m *Model) bulkSpec() popupSpec {
 		}
 	}
 	if b.close != nil && !writing {
-		own = append(own, ownKey{"delete_branch", func() tea.Cmd {
+		own = append(own, ownKey{action: "delete_branch", run: func() tea.Cmd {
 			b.close.del = !b.close.del
 			m.decideBulk()
 			return nil
 		}})
 	}
+	// The body tells the keys of failing checks and of waiting, beside what
+	// they change; nothing can be confirmed until every pull request is
+	// read again.
 	var question *popupQuestion
-	if !writing {
+	if !writing && !b.loading {
 		question = &popupQuestion{confirm: func() tea.Cmd {
 			if b.loading {
 				return nil
@@ -457,8 +459,13 @@ func (m *Model) bulkSpec() popupSpec {
 			return m.runBulk()
 		}}
 	}
+	closeWords := "no"
+	if b.loading {
+		closeWords = "cancel"
+	}
 	return popupSpec{
-		question: question,
+		closeWords: closeWords,
+		question:   question,
 		// Kept within the body when it is drawn.
 		body: &popupBody{scroll: func(d int) { b.offset = max(b.offset+d, 0) }, page: b.rows},
 		own:  own,
@@ -774,8 +781,7 @@ func (m *Model) renderBulk() []string {
 		if n := len(b.items); n > 1 {
 			what, title = fmt.Sprintf("reading %d of %d…", read, n), fmt.Sprintf("%s %d", verb, n)
 		}
-		foot := []string{m.steady(st.muted, what) +
-			st.dim.Render(" · ") + st.key.Render(keymap.Back) + " " + st.muted.Render("cancel")}
+		foot := []string{m.popupFoot(m.bulkSpec(), m.steady(st.muted, what)+st.dim.Render(" · "))}
 		foot, inputAt := m.withCloseFoot(foot, inner)
 		out, top := scrollBox(st, title, lines, foot, w, m.popupHeight(), b.offset, keepLines{}, m.scrollKeys())
 		b.offset = top
@@ -783,15 +789,12 @@ func (m *Model) renderBulk() []string {
 		m.placeCloseInput(out, foot, inputAt)
 		return out
 	}
-	ask := st.sub0.Render(hint) + st.key.Render(m.firstKey("confirm")) + " " + st.muted.Render("yes")
-	if b.close != nil {
-		ask += st.dim.Render(" · ") + st.key.Render(m.firstKey("delete_branch")) + " " + st.muted.Render(m.keys.Help("delete_branch"))
-		ask += st.dim.Render(" · ") + st.key.Render(m.firstKey("write")) + " " + st.muted.Render("write a comment")
-	}
-	ask += st.dim.Render(" · ") + st.key.Render(keymap.Back) + " " + st.muted.Render("no")
+	// While the comment has the focus, the foot tells only how to leave it.
+	lead := st.sub0.Render(hint)
 	if b.close != nil && b.close.editing {
-		ask = st.key.Render(keymap.Back) + " " + st.muted.Render("done writing")
+		lead = ""
 	}
+	ask := m.popupFoot(m.bulkSpec(), lead)
 	foot, inputAt := m.withCloseFoot([]string{"", ask}, inner)
 	title := verb
 	if len(b.items) > 1 {

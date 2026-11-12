@@ -58,5 +58,5 @@ Which popups there are, what each holds and how they are drawn is in [docs/desig
 ## Not decided here
 
 - The name of the action that enters a text box, and of the scopes the shared layer reads.
-- Which keys of which popup are marked for the key line.
+- Which keys of which popup are marked for the key line: decided in ADR-126.
 - Whether the claude pane and the log viewer, which take the keys but are not popups, read the shared layer.

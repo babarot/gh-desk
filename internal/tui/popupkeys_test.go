@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
+	"github.com/charmbracelet/x/ansi"
 
 	"github.com/babarot/gh-desk/internal/model"
 	"github.com/babarot/gh-desk/internal/plan"
@@ -276,5 +277,98 @@ func TestPasteOutOfTheComposeTextBox(t *testing.T) {
 	run(m, m.paste(tea.PasteMsg{Content: "pasted"}))
 	if strings.Contains(c.input.Value(), "pasted") || m.compose.ta.Value() != review {
 		t.Errorf("the paste went in: chat %q, review %q", c.input.Value(), m.compose.ta.Value())
+	}
+}
+
+// While a popup is open, the key line holds only its most important keys,
+// the writes, and what esc does there; the rest are in its frame (ADR-125).
+func TestKeyLineUnderAPopup(t *testing.T) {
+	cases := []struct {
+		name string
+		open func(*testing.T) *Model
+		want string
+	}{
+		{"menu", func(t *testing.T) *Model {
+			m, _ := startWith(t, fixture(), keymap.Default())
+			press(m, "enter")
+			return m
+		}, "esc close"},
+		{"confirm", func(t *testing.T) *Model {
+			m, _ := startWith(t, fixture(), keymap.Default())
+			press(m, "A")
+			if m.bulk == nil || m.bulk.loading {
+				t.Fatalf("A did not open a confirm popup that was read: %+v", m.bulk)
+			}
+			return m
+		}, "y yes · esc no"},
+		{"compose", func(t *testing.T) *Model {
+			m, _ := startWith(t, fixture(), keymap.Default())
+			press(m, "R")
+			return m
+		}, "ctrl+s post · esc done writing"},
+		{"compose out of its text box", func(t *testing.T) *Model {
+			m, _ := startWith(t, fixture(), keymap.Default())
+			press(m, "R", "esc")
+			return m
+		}, "ctrl+s post · esc discard"},
+		{"triage's names offered over its text box", func(t *testing.T) *Model {
+			m, _ := startWith(t, fixture(), keymap.Default())
+			fakeClaudeOf(t, m)
+			press(m, "C", "#")
+			if len(m.askMenu()) == 0 {
+				t.Fatal("# offered no names")
+			}
+			return m
+		}, "esc close"},
+		{"? list", func(t *testing.T) *Model {
+			m, _ := startWith(t, fixture(), keymap.Default())
+			press(m, "?")
+			return m
+		}, "esc close"},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			m := c.open(t)
+			if got := ansi.Strip(m.hints()); got != c.want {
+				t.Errorf("key line %q, want %q", got, c.want)
+			}
+		})
+	}
+}
+
+// The scope chooser tells the keys that move its list among those that
+// type nothing, as its text box takes letters, whatever order they are set
+// in.
+func TestScopeChooserTellsUntypedMovingKeys(t *testing.T) {
+	km, ps := keymap.Apply(keymap.Default(), map[string][]string{"up": {"k", "space", "up"}, "down": {"j", "down"}})
+	if len(ps) > 0 {
+		t.Fatal(ps)
+	}
+	set, _ := scopedBy(ScopeOwner, "")
+	set.Viewer = "me"
+	m := New(fixture(), &fakeRunner{}, &fakeClaude{}, km, nil, set)
+	m.Update(tea.WindowSizeMsg{Width: 130, Height: 34})
+	run(m, m.Init())
+	press(m, "O")
+	if s := screen(m); !strings.Contains(s, "↑↓ move") || strings.Contains(s, "space") {
+		t.Errorf("the chooser does not tell the arrows:\n%s", s)
+	}
+	// With only letters for up and down, the keys of the questions move it.
+	km, _ = keymap.Apply(keymap.Default(), map[string][]string{"up": {"k"}, "down": {"j"}})
+	m = New(fixture(), &fakeRunner{}, &fakeClaude{}, km, nil, set)
+	m.Update(tea.WindowSizeMsg{Width: 130, Height: 34})
+	run(m, m.Init())
+	press(m, "O")
+	if s := screen(m); !strings.Contains(s, "ctrl+p/ctrl+n move") {
+		t.Errorf("the chooser does not tell the keys of the questions:\n%s", s)
+	}
+	// With no key that types nothing, it tells none.
+	km, _ = keymap.Apply(keymap.Default(), map[string][]string{"up": {"k"}, "down": {"j"}, "history_prev": {}, "history_next": {}})
+	m = New(fixture(), &fakeRunner{}, &fakeClaude{}, km, nil, set)
+	m.Update(tea.WindowSizeMsg{Width: 130, Height: 34})
+	run(m, m.Init())
+	press(m, "O")
+	if s := screen(m); strings.Contains(s, "move") {
+		t.Errorf("the chooser tells keys that type for moving:\n%s", s)
 	}
 }

@@ -11,7 +11,6 @@ import (
 	"github.com/babarot/gh-desk/internal/logging"
 	"github.com/babarot/gh-desk/internal/model"
 	"github.com/babarot/gh-desk/internal/release"
-	"github.com/babarot/gh-desk/internal/tui/keymap"
 )
 
 // Release is what gh-desk knows of its own releases at start, where it
@@ -217,6 +216,7 @@ func (m *Model) openReleaseNotes() tea.Cmd {
 // from it (ADR-125).
 func (m *Model) releaseSpec() popupSpec {
 	return popupSpec{
+		closeWords: "back",
 		// Its box takes no click: it is drawn where the ? list was.
 		body:  &popupBody{scroll: m.scrollReleaseNotes, page: m.releaseNotesHeight(), click: func(int, int) {}},
 		close: func() { m.relBox = nil },
@@ -291,7 +291,7 @@ func (m *Model) renderReleaseNotes(lines []string) []string {
 	h := min(len(all), m.releaseNotesHeight())
 	top := max(min(m.relBox.top, len(all)-h), 0)
 	m.relBox.top = top
-	title := strings.Join([]string{"release notes", m.scrollKeys() + " scroll", keymap.Back + " back"}, " · ")
+	title := strings.Join([]string{"release notes", m.scrollKeys() + " scroll", m.popupFootText(m.releaseSpec())}, " · ")
 	b := box(st, title, all[top:top+h], w)
 	if len(all) > h {
 		b[len(b)-1] = scrollEdge(st, w, top, len(all)-top-h, m.scrollKeys()+" wheel")

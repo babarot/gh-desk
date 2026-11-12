@@ -178,7 +178,8 @@ func (m *Model) closeText(f *closeForm) *popupText {
 			m.decideBulk()
 			return cmd
 		},
-		editNav: navActions,
+		editNav:    navActions,
+		writeWords: "write a comment",
 	}
 }
 

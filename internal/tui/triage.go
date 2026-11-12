@@ -161,8 +161,11 @@ func (m *Model) triageSpec(armed bool) popupSpec {
 	switch {
 	case tr.typing:
 		qs := claude.TriageQuestions()
+		// complete is told while it has something to fill in.
+		ghost := askGhost(&tr.input, &tr.recall, qs, tr.history)
+		suggested := ghost != "" || nextSuggestion(qs, tr.input.Value()) != ""
 		own := []ownKey{
-			{"accept", func() tea.Cmd {
+			{action: "accept", words: "send", run: func() tea.Cmd {
 				q := strings.TrimSpace(tr.input.Value())
 				if q == "" {
 					return nil
@@ -173,12 +176,12 @@ func (m *Model) triageSpec(armed bool) popupSpec {
 				tr.input.Blur()
 				return m.askTriage(q)
 			}},
-			{"history_search", func() tea.Cmd { return m.openSearch(&tr.search, &tr.input, tr.history) }},
-			{"complete", func() tea.Cmd {
+			{action: "history_search", hide: len(tr.history) == 0, run: func() tea.Cmd { return m.openSearch(&tr.search, &tr.input, tr.history) }},
+			{action: "complete", hide: !suggested, run: func() tea.Cmd {
 				completeAsk(&tr.recall, &tr.input, qs, tr.history)
 				return nil
 			}},
-			{"chat_restart", func() tea.Cmd {
+			{action: "chat_restart", hide: true, run: func() tea.Cmd {
 				switch {
 				case len(tr.turns) == 0:
 					m.refuse("nothing has been asked yet")
@@ -193,8 +196,8 @@ func (m *Model) triageSpec(armed bool) popupSpec {
 		}
 		// The rest of a question shows faintly after the cursor; expand
 		// fills it in, and moves the cursor otherwise.
-		if askGhost(&tr.input, &tr.recall, qs, tr.history) != "" {
-			own = append(own, ownKey{"expand", func() tea.Cmd {
+		if ghost != "" {
+			own = append(own, ownKey{action: "expand", hide: true, run: func() tea.Cmd {
 				completeAsk(&tr.recall, &tr.input, qs, tr.history)
 				return nil
 			}})
@@ -210,8 +213,9 @@ func (m *Model) triageSpec(armed bool) popupSpec {
 						m.closeTriage()
 					}
 				},
-				edit:    func(msg tea.Msg) tea.Cmd { return editAsk(&tr.recall, &tr.input, msg) },
-				editNav: navActions,
+				blurWords: "back",
+				edit:      func(msg tea.Msg) tea.Cmd { return editAsk(&tr.recall, &tr.input, msg) },
+				editNav:   navActions,
 				claim: func(msg tea.KeyPressMsg) bool {
 					return m.recallKey(&tr.recall, &tr.input, tr.history, msg)
 				},
@@ -219,8 +223,13 @@ func (m *Model) triageSpec(armed bool) popupSpec {
 			close: m.closeTriage,
 		}
 	case tr.asking:
+		backWords := "stop"
+		if tr.stopping {
+			backWords = "back"
+		}
 		return popupSpec{
-			own: []ownKey{{"chat_close", func() tea.Cmd { m.closeTriage(); return nil }}},
+			backWords: backWords,
+			own:       []ownKey{{action: "chat_close", run: func() tea.Cmd { m.closeTriage(); return nil }}},
 			back: func() {
 				if tr.stopping {
 					m.closeTriage()
@@ -233,7 +242,7 @@ func (m *Model) triageSpec(armed bool) popupSpec {
 	}
 	var own []ownKey
 	if m.applicable() {
-		own = append(own, ownKey{"triage_apply", m.applyTriage})
+		own = append(own, ownKey{action: "triage_apply", keyLine: true, run: m.applyTriage})
 	}
 	return popupSpec{
 		body: &popupBody{page: tr.rows, scroll: func(d int) {
@@ -241,7 +250,7 @@ func (m *Model) triageSpec(armed bool) popupSpec {
 			tr.top = max(tr.top+d, 0)
 			tr.follow = false
 		}},
-		text:  &popupText{focus: m.typeTriage},
+		text:  &popupText{focus: m.typeTriage, writeWords: "ask more"},
 		own:   own,
 		close: m.closeTriage,
 	}
@@ -601,11 +610,7 @@ func (m *Model) renderTriage() ([]string, int) {
 			what = "stopping…"
 		}
 		body = append(body, spaces(chatMargin)+m.working(st.muted, what)+" "+st.dim.Render(elapsed(m.set.Now().Sub(tr.since))))
-		back := "stop"
-		if tr.stopping {
-			back = "back"
-		}
-		foot = append(foot, m.footKeys([]keymap.Action{"chat_close"}, "", back))
+		foot = append(foot, m.popupFoot(m.triageSpec(false), ""))
 	case tr.search != nil:
 		foot = append(foot, strings.Split(tr.search.input.View(), "\n")...)
 		foot = append(foot, m.searchLines(tr.search, tr.history, inner, searchRows(m.popupHeight()-3, triageSearchRows))...)
@@ -622,18 +627,11 @@ func (m *Model) renderTriage() ([]string, int) {
 			foot = append(foot, m.footKeys([]keymap.Action{"accept"}, "fill in", "close"))
 			break
 		}
-		as := []keymap.Action{"accept"}
-		if ghost != "" || nextSuggestion(claude.TriageQuestions(), tr.input.Value()) != "" {
-			as = append(as, "complete")
-		}
-		if len(tr.history) > 0 {
-			as = append(as, "history_search")
-		}
-		keys := m.footKeys(as, "send", "back")
+		lead := ""
 		if hint := m.recallHint(&tr.recall, tr.history); hint != "" {
-			keys = hint + st.dim.Render(" · ") + keys
+			lead = hint + st.dim.Render(" · ")
 		}
-		foot = append(foot, keys)
+		foot = append(foot, m.popupFoot(m.triageSpec(false), lead))
 	default:
 		for i, s := range m.checkPlan() {
 			num := fmt.Sprintf("%d ", i+1)
@@ -651,11 +649,7 @@ func (m *Model) renderTriage() ([]string, int) {
 		if len(tr.actions) > 0 {
 			body = append(body, "")
 		}
-		var as []keymap.Action
-		if m.applicable() {
-			as = append(as, "triage_apply")
-		}
-		foot = append(foot, m.footKeys(append(as, "write"), "", "close"))
+		foot = append(foot, m.popupFoot(m.triageSpec(false), ""))
 	}
 	if len(tr.turns) == 0 && !tr.asking {
 		body = append(m.triageWelcome(m.popupHeight()-2-len(foot)), body...)
@@ -770,12 +764,8 @@ func (m *Model) footKeys(as []keymap.Action, accept, back string) string {
 	var parts []string
 	for _, a := range as {
 		help := m.keys.Help(a)
-		switch {
-		case a == "accept" && accept != "":
+		if a == "accept" && accept != "" {
 			help = accept
-		case a == "write":
-			// Writing in the triage is asking Claude more.
-			help = "ask more"
 		}
 		parts = append(parts, m.st.key.Render(m.firstKey(a))+" "+m.st.muted.Render(help))
 	}

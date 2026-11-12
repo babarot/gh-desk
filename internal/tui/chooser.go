@@ -61,12 +61,12 @@ func (m *Model) chooserSpec() popupSpec {
 	c := m.chooser
 	vs := m.chooserValues()
 	return popupSpec{
-		list: &popupList{sel: &c.sel, n: len(vs), ptr: &c.pointer, choose: m.chooseScope},
+		list: &popupList{sel: &c.sel, n: len(vs), ptr: &c.pointer, choose: m.chooseScope, moveHint: true},
 		// The keys that go through the questions asked elsewhere move here
 		// too, whatever they are set to, as they type nothing.
 		own: []ownKey{
-			{"history_next", func() tea.Cmd { c.sel = min(c.sel+1, max(len(vs)-1, 0)); return nil }},
-			{"history_prev", func() tea.Cmd { c.sel = max(c.sel-1, 0); return nil }},
+			{action: "history_next", hide: true, run: func() tea.Cmd { c.sel = min(c.sel+1, max(len(vs)-1, 0)); return nil }},
+			{action: "history_prev", hide: true, run: func() tea.Cmd { c.sel = max(c.sel-1, 0); return nil }},
 		},
 		text: &popupText{
 			focused: true,
@@ -79,9 +79,11 @@ func (m *Model) chooserSpec() popupSpec {
 				}
 				return cmd
 			},
-			editNav: []keymap.Action{"top", "bottom", "page_up", "page_down"},
+			editNav:   []keymap.Action{"top", "bottom", "page_up", "page_down"},
+			typeWords: "to narrow",
 		},
-		close: func() { m.chooser = nil },
+		closeWords: "cancel",
+		close:      func() { m.chooser = nil },
 	}
 }
 
@@ -205,11 +207,7 @@ func (m *Model) renderChooser() ([]string, int) {
 		items = append(items, -1)
 	}
 	lines = append(lines, "")
-	foot := keyLines(st, inner,
-		st.key.Render("type")+" "+st.muted.Render("to narrow"),
-		st.key.Render("↑↓")+" "+st.muted.Render("move"),
-		st.key.Render(m.firstKey("choose"))+" "+st.muted.Render("choose"),
-		st.key.Render(keymap.Back)+" "+st.muted.Render("cancel"))
+	foot := keyLines(st, inner, m.popupFootParts(m.chooserSpec())...)
 	lines = append(lines, foot...)
 	items = append(items, noItems(1+len(foot)+1)...)
 	c.items = items

@@ -44,7 +44,7 @@ Keys are written as actions; their default keys are in [internal/tui/keymap](../
 | text box | with the focus, every key that types a character and every key no step before it takes (its own editing keys); the popup's other parts read only keys that type nothing and the nav keys it does not edit with. Without the focus, one action enters it |
 | question that writes | `confirm`, never while a text box has the focus (ADR-066) |
 
-The hints in a popup's frame are made from its parts and its own keys. A popup may mark a few of its own keys as its most important actions; only those are also shown on the key line while it is open (ADR-125). Today the key line repeats the popup's keys in other words.
+The hints in a popup's frame are made from its parts and its own keys. A popup marks the keys that write or lead on to a write (the question, `post`, `triage_apply`); only those, and what `esc` does, are also shown on the key line while it is open (ADR-125, ADR-126).
 
 A popup's own keys are declared for the state it is in, and are read after the keys that type a character (which go to a focused text box) and before its other parts: `next_kind`, `post` and `editor` in compose; `include_failing`, `wait_for_checks` and `delete_branch` in the confirm; `toggle_rule`, `add_to_selection` and `filter_by_rule` in the picker; `triage_apply` in the triage; `release_notes` and `fold` in the `?` list; each item's action in the menu.
 
@@ -56,7 +56,7 @@ Every popup reads its keys through the shared layer in [popupkeys.go](../../inte
 - `history_next` and `history_prev` claim the keys of `down` and `up` ([keymap](../../internal/tui/keymap)): a text box tries them first, and moves its cursor when there is nothing to recall.
 - `esc` alone closes a popup; the action that opened one does not, and `quit` is read in no popup. A comment or a review is thrown away by the second `esc`, the first leaving its text box.
 - `write` enters a text box in every popup that has one.
-- The foot of each popup is written by hand, apart from the key line the keymap makes.
+- The foot of each popup, and the key line under it, are made from its declaration (`popupHints`): its parts and its own keys through the keymap, each with the words the popup gives it. The key line holds only the keys marked as the popup's most important, the writes (ADR-126), and what `esc` does.
 
 ## Placement
 

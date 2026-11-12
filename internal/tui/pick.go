@@ -11,7 +11,6 @@ import (
 
 	"github.com/babarot/gh-desk/internal/model"
 	"github.com/babarot/gh-desk/internal/plan"
-	"github.com/babarot/gh-desk/internal/tui/keymap"
 )
 
 // pick is the popup of S: the rules, how many pull requests of the tab each
@@ -228,9 +227,9 @@ func (m *Model) pickSpec() popupSpec {
 	v := m.picker
 	return popupSpec{
 		list: &popupList{sel: &v.sel, n: len(m.rules()), ptr: &v.pointer,
-			choose: func() tea.Cmd { return m.chooseRules(false) }},
+			choose: func() tea.Cmd { return m.chooseRules(false) }, chooseWords: "select these"},
 		own: []ownKey{
-			{"toggle_rule", func() tea.Cmd {
+			{action: "toggle_rule", words: "check", run: func() tea.Cmd {
 				if v.checked == nil {
 					v.checked = map[int]bool{}
 				}
@@ -241,8 +240,8 @@ func (m *Model) pickSpec() popupSpec {
 				}
 				return nil
 			}},
-			{"add_to_selection", func() tea.Cmd { return m.chooseRules(true) }},
-			{"filter_by_rule", func() tea.Cmd {
+			{action: "add_to_selection", words: "add them", run: func() tea.Cmd { return m.chooseRules(true) }},
+			{action: "filter_by_rule", run: func() tea.Cmd {
 				if !m.pickReady() {
 					return nil
 				}
@@ -251,7 +250,8 @@ func (m *Model) pickSpec() popupSpec {
 				return m.filterByRules(chosen)
 			}},
 		},
-		close: func() { m.picker = nil },
+		closeWords: "cancel",
+		close:      func() { m.picker = nil },
 	}
 }
 
@@ -378,12 +378,7 @@ func (m *Model) renderPick() []string {
 			lines = append(lines, "  "+fit(name, 30)+" "+st.sub0.Render(shownTitle(p.Title)))
 		}
 	}
-	foot := append([]string{""}, keyLines(st, inner,
-		st.key.Render(m.firstKey("toggle_rule"))+" "+st.muted.Render("check"),
-		st.key.Render(m.firstKey("choose"))+" "+st.muted.Render("select these"),
-		st.key.Render(m.firstKey("add_to_selection"))+" "+st.muted.Render("add them"),
-		st.key.Render(m.firstKey("filter_by_rule"))+" "+st.muted.Render("show only these"),
-		st.key.Render(keymap.Back)+" "+st.muted.Render("cancel"))...)
+	foot := append([]string{""}, keyLines(st, inner, m.popupFootParts(m.pickSpec())...)...)
 	out, top := scrollBox(st, "select by rule", lines, foot, w, m.popupHeight(), v.top, keep, "")
 	v.top = top
 	v.items = boxItems(owner, top, len(out), len(foot))

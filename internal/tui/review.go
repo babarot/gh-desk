@@ -12,7 +12,6 @@ import (
 
 	"github.com/babarot/gh-desk/internal/model"
 	"github.com/babarot/gh-desk/internal/runner"
-	"github.com/babarot/gh-desk/internal/tui/keymap"
 )
 
 // kinds are the kinds of review, in the order the review popup cycles
@@ -145,13 +144,7 @@ func (m *Model) composeSpec() popupSpec {
 	c := m.compose
 	return popupSpec{
 		own: []ownKey{
-			{"next_kind", func() tea.Cmd {
-				if !c.own && !c.single {
-					c.kind = (c.kind + 1) % len(kinds)
-				}
-				return nil
-			}},
-			{"post", func() tea.Cmd {
+			{action: "post", keyLine: true, run: func() tea.Cmd {
 				ev := kinds[c.kind]
 				body := strings.TrimSpace(c.ta.Value())
 				if body == "" && (c.single || ev != model.EventApprove) {
@@ -168,7 +161,13 @@ func (m *Model) composeSpec() popupSpec {
 				// keeps.
 				return m.startBulkFor(runner.Comment, runner.ReviewText{Body: body}, c.prs)
 			}},
-			{"editor", m.openEditor},
+			{action: "next_kind", words: "kind", hide: c.single, run: func() tea.Cmd {
+				if !c.own && !c.single {
+					c.kind = (c.kind + 1) % len(kinds)
+				}
+				return nil
+			}},
+			{action: "editor", words: "$EDITOR", run: m.openEditor},
 		},
 		text: &popupText{
 			focused: c.ta.Focused(),
@@ -177,6 +176,7 @@ func (m *Model) composeSpec() popupSpec {
 			edit:    c.update,
 			editNav: navActions,
 		},
+		closeWords: "discard",
 		close: func() {
 			m.compose = nil
 			m.say(sentWord(c.single, kinds[c.kind]) + " discarded")
@@ -253,7 +253,6 @@ func (m *Model) renderCompose() ([]string, int) {
 		lines = keysLines(st.sub0, c.prs, composeWidth(m.width)-4, composeKeysLines)
 	}
 	title := prsWord(c.prs) + " · review"
-	keys := st.key.Render(m.firstKey("post")) + " " + st.muted.Render("post")
 	if c.single {
 		title = prsWord(c.prs) + " · comment"
 		lines = append(lines, "")
@@ -267,21 +266,11 @@ func (m *Model) renderCompose() ([]string, int) {
 			ks = append(ks, pill(st.subOn, off, kindWords[k], i == c.kind))
 		}
 		lines = append(lines, strings.Join(ks, tabGap), "")
-		keys += st.dim.Render(" · ") + st.key.Render(m.firstKey("next_kind")) + " " + st.muted.Render("kind")
-	}
-	// esc takes the focus out of the text box first, and write puts it
-	// back; out of it, esc throws the text away.
-	back := "done writing"
-	if !c.ta.Focused() {
-		back = "discard"
-		keys = st.key.Render(m.firstKey("write")) + " " + st.muted.Render("write") + st.dim.Render(" · ") + keys
 	}
 	// Below the box's top edge.
 	at := 1 + len(lines)
 	lines = append(lines, strings.Split(c.ta.View(), "\n")...)
-	lines = append(lines, "", keys+
-		st.dim.Render(" · ")+st.key.Render(m.firstKey("editor"))+" "+st.muted.Render("$EDITOR")+
-		st.dim.Render(" · ")+st.key.Render(keymap.Back)+" "+st.muted.Render(back))
+	lines = append(lines, "", m.popupFoot(m.composeSpec(), ""))
 	return box(st, title, lines, composeWidth(m.width)), at
 }
 
