@@ -20,13 +20,15 @@ Which popups there are, what each holds and how they are drawn is in [docs/desig
 - A text box with the focus is read first, and takes every key that types a character. The keys of the popup's other parts, a list in it among them, are then read only from keys that type nothing.
 - A list and a body move on the same actions, nav's (ADR-004): one moves its cursor, the other scrolls. Every popup with either reads all of them.
 - One action enters a popup's text box when it does not have the focus, the same in every popup.
-- The hints of a popup, in its frame and on the key line, are made from the parts it declares and its own keys, through the keymap. No popup writes its keys by hand.
+- The hints of a popup are made from the parts it declares and its own keys, through the keymap. No popup writes its keys by hand.
+- A popup tells its keys in its frame. The key line, while a popup is open, shows none of them except the few the popup marks as its most important actions, which it shows in its frame as well. ADR-024 keeps a key told elsewhere off the key line; this replaces that rule for a popup's marked keys, so that the action that matters most can be found where the eye goes for keys, whatever the popup.
+- Rejected: the key line repeating every key of the popup, as it did. It is cut first on a narrow terminal, and it said the popup's keys in other words than the popup did.
 - Rejected: leaving each popup to read its keys, with a test that they agree. It checks agreement after the fact, and every new popup would again be written by hand.
 
 ### What steps out, and what quits
 
 - `esc` steps out one level in every popup: from a text box to the popup holding it, from a popup to what it was opened from (the popup it took the place of, ADR-121, or the screen). What was written in a text box is thrown away only when its popup is closed.
-- The key that opened a popup closes it, unless a part of the popup reads that key first.
+- The key that opened a popup closes it, unless a part of the popup reads that key first, or closing would throw away what was written in it. What was written is thrown away only by `esc`.
 - `quit` quits gh-desk and does nothing else. It is not read while a popup is open: it never closes a popup, and never quits from one. Stepping back with `esc` never quits, however often it is pressed, and the two are kept apart so that closing a popup cannot quit by mistake.
 - Rejected: `quit` closing a popup that has no text box with the focus. The same key would close in one place and quit one press later.
 
@@ -52,5 +54,5 @@ Which popups there are, what each holds and how they are drawn is in [docs/desig
 ## Not decided here
 
 - The name of the action that enters a text box, and of the scopes the shared layer reads.
-- Whether the key line shows a popup's keys while the popup shows them in its frame.
+- Which keys of which popup are marked for the key line.
 - Whether the claude pane and the log viewer, which take the keys but are not popups, read the shared layer.

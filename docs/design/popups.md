@@ -44,6 +44,8 @@ Keys are written as actions; their default keys are in [internal/tui/keymap](../
 | text box | with the focus, every key that types a character, and the keys it claims (cursor, history); without it, one action enters it, and `esc` from it goes back to the popup |
 | question that writes | `confirm` |
 
+The hints in a popup's frame are made from its parts and its own keys. A popup may mark a few of its own keys as its most important actions; only those are also shown on the key line while it is open (ADR-125). Today the key line repeats the popup's keys in other words.
+
 A popup's own keys are read after the text box and before its other parts: `next_kind`, `post` and `editor` in compose; `include_failing`, `wait_for_checks` and `delete_branch` in the confirm; `toggle_rule`, `add_to_selection` and `filter_by_rule` in the picker; `triage_apply` in the triage; `release_notes` and `fold` in the `?` list; each item's action in the menu.
 
 ### Today
