@@ -683,13 +683,13 @@ var scopeWords = map[keymap.Scope]string{
 	keymap.ScopeGlobal:  "Anywhere",
 	keymap.ScopeNav:     "Moving, in every list and pane",
 	keymap.ScopeList:    "The list and its preview pane",
-	keymap.ScopePopup:   "The menu of enter, and the popups that pick from a list",
+	keymap.ScopePopup:   "Popups: choosing from their lists, and writing in their text boxes",
 	keymap.ScopeConfirm: "A confirm popup",
 	keymap.ScopeTriage:  "The list, while Claude's plan is shown",
 	keymap.ScopeLog:     "The log viewer",
 	keymap.ScopeChat:    "Asking Claude",
 	keymap.ScopeCompose: "Writing a review",
-	keymap.ScopeInput:   "Typing in the filter",
+	keymap.ScopeInput:   "Typing in the filter or a question to Claude",
 	keymap.ScopeHelp:    "The ? list of keys",
 }
 
