@@ -451,3 +451,21 @@ func TestPopupsFitANarrowScreen(t *testing.T) {
 		}
 	}
 }
+
+// A notification's toast shows while a review is written, as on the screen
+// under it, and not over the other popups.
+func TestToastOverAReviewBeingWritten(t *testing.T) {
+	m, _ := startWith(t, fixture(), keymap.Default())
+	press(m, "R")
+	m.pushNote("✓", "merged elsewhere", []noteItem{{key: key("acme", "api", 12), text: "merged", result: runner.Merged}})
+	if m.toast == nil {
+		t.Fatal("a notification showed no toast")
+	}
+	if s := screen(m); !strings.Contains(s, "merged elsewhere") {
+		t.Errorf("no toast over the review being written:\n%s", s)
+	}
+	press(m, "esc", "esc", "enter")
+	if s := screen(m); strings.Contains(s, "merged elsewhere") {
+		t.Errorf("a toast over the menu:\n%s", s)
+	}
+}

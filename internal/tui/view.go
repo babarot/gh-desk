@@ -88,11 +88,11 @@ func (m *Model) render() (string, *tea.Cursor) {
 		if t := p.text; t != nil && t.focused && t.cursor != nil && at >= 0 {
 			cur = inPopup(t.cursor(), popup, top+at, m.width)
 		}
-	case m.toast != nil && len(lines) > 3:
-		toast := m.st.border.Render("╭ ") + m.noteIcon(m.toast.icon) + " " + m.st.sub1.Render(m.toast.title) + " " +
-			m.st.dim.Render("· "+m.firstKey("events")+" to see") + m.st.border.Render(" ╮")
-		at := len(lines) - 3
-		lines[at] = place(lines[at], toast, max(m.width-lipgloss.Width(toast)-1, 0))
+		if p.toast {
+			lines = m.drawToast(lines)
+		}
+	case m.toast != nil:
+		lines = m.drawToast(lines)
 	}
 	if len(lines) > m.height {
 		lines = lines[:m.height]
@@ -427,6 +427,19 @@ func (m *Model) openPopup() (popupSpec, bool) {
 		return m.composeSpec(), true
 	}
 	return popupSpec{}, false
+}
+
+// drawToast puts the toast of a notification over the line above the
+// status line, at its right, when there is one and room for it.
+func (m *Model) drawToast(lines []string) []string {
+	if m.toast == nil || len(lines) <= 3 {
+		return lines
+	}
+	toast := m.st.border.Render("╭ ") + m.noteIcon(m.toast.icon) + " " + m.st.sub1.Render(m.toast.title) + " " +
+		m.st.dim.Render("· "+m.firstKey("events")+" to see") + m.st.border.Render(" ╮")
+	at := len(lines) - 3
+	lines[at] = place(lines[at], toast, max(m.width-lipgloss.Width(toast)-1, 0))
+	return lines
 }
 
 // popupBoxHeight is how many lines the box of the popup open takes, drawn

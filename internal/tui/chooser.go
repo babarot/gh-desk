@@ -81,7 +81,7 @@ func (m *Model) chooserSpec() popupSpec {
 				return cmd
 			},
 			editNav:   []keymap.Action{"top", "bottom", "page_up", "page_down"},
-			cursor:    c.input.Cursor,
+			cursor:    func() *tea.Cursor { return c.input.Cursor() },
 			typeWords: "to narrow",
 		},
 		closeWords: "cancel",

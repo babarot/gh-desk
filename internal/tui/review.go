@@ -143,6 +143,9 @@ func (m *Model) composeSpec() popupSpec {
 	c := m.compose
 	return popupSpec{
 		draw: m.renderCompose,
+		// A notification arriving while a review is written is told as
+		// on the screen under it.
+		toast: true,
 		own: []ownKey{
 			{action: "post", keyLine: true, run: func() tea.Cmd {
 				ev := kinds[c.kind]
@@ -172,7 +175,7 @@ func (m *Model) composeSpec() popupSpec {
 		text: &popupText{
 			focused: c.ta.Focused(),
 			focus:   c.ta.Focus,
-			cursor:  c.ta.Cursor,
+			cursor:  func() *tea.Cursor { return c.ta.Cursor() },
 			blur:    c.ta.Blur,
 			edit:    c.update,
 			editNav: navActions,

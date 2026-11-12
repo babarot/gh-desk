@@ -163,7 +163,7 @@ func (m *Model) closeText(f *closeForm) *popupText {
 	return &popupText{
 		focused: f.editing,
 		focus:   f.focus,
-		cursor:  f.ta.Cursor,
+		cursor:  func() *tea.Cursor { return f.ta.Cursor() },
 		blur: func() {
 			f.editing = false
 			f.ta.Blur()

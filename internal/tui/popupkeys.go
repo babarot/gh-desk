@@ -47,6 +47,9 @@ type popupSpec struct {
 	closeWords, backWords string
 	// note is words that tell of keys no part names, after the parts'.
 	note string
+	// toast lets a notification's toast show over the screen while the
+	// popup is open, as it does with none.
+	toast bool
 }
 
 // popupText is a text box. While it has the focus it takes every key that
@@ -66,7 +69,9 @@ type popupText struct {
 	// the popup's list or body.
 	editNav []keymap.Action
 	// cursor is where its cursor is inside it, for the terminal to show
-	// the text being composed there.
+	// the text being composed there. It reads the text box when called,
+	// after the draw has sized it: a textarea is a value, and a method
+	// value would keep the copy taken when the declaration was built.
 	cursor func() *tea.Cursor
 	// claim tries the actions that claim nav keys, such as recalling the
 	// questions asked before, and reports whether one took the key.
