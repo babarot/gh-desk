@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 
 	"github.com/babarot/gh-desk/internal/tui/keymap"
@@ -241,28 +242,20 @@ func (m *Model) lastKey(a keymap.Action) string {
 	return "(unbound)"
 }
 
-// helpKey is a key pressed with the ? popup open: it scrolls the popup,
-// folds a section, or closes it.
-func (m *Model) helpKey(k string) {
+// helpSpec is the ? popup as the shared popup layer reads it: a body of
+// the keys, with its own keys to fold a section and to open the release
+// notes (ADR-125). A click folds a section, or closes it outside.
+func (m *Model) helpSpec() popupSpec {
 	_, _, _, h := m.helpShown()
-	page := max(h-1, 1)
-	switch {
-	case k == keymap.Back || m.keys.Matches("help", k) || m.keys.Matches("quit", k):
-		m.help, m.relBox = false, nil
-	case m.keys.Matches("fold", k):
-		m.foldHelp()
-	case m.keys.Matches("down", k):
-		m.scrollHelp(1)
-	case m.keys.Matches("up", k):
-		m.scrollHelp(-1)
-	case m.keys.Matches("page_down", k):
-		m.scrollHelp(page)
-	case m.keys.Matches("page_up", k):
-		m.scrollHelp(-page)
-	case m.keys.Matches("bottom", k):
-		m.scrollHelp(1 << 20)
-	case m.keys.Matches("top", k):
-		m.scrollHelp(-(1 << 20))
+	own := []ownKey{{"fold", func() tea.Cmd { m.foldHelp(); return nil }}}
+	if m.set.Release != nil {
+		own = append(own, ownKey{"release_notes", m.openReleaseNotes})
+	}
+	return popupSpec{
+		body:   &popupBody{scroll: m.scrollHelp, page: h, click: m.helpClick},
+		own:    own,
+		opener: "help",
+		close:  func() { m.help, m.relBox = false, nil },
 	}
 }
 

@@ -212,27 +212,19 @@ func (m *Model) openReleaseNotes() tea.Cmd {
 	return m.readReleases()
 }
 
-// releaseBoxKey is a key pressed with the box of release notes open: it
-// scrolls the box, goes back to the ? list, or closes both.
-func (m *Model) releaseBoxKey(k string) {
-	page := max(m.releaseNotesHeight()-1, 1)
-	switch {
-	case k == keymap.Back || m.keys.Matches("release_notes", k):
-		m.relBox = nil
-	case m.keys.Matches("help", k) || m.keys.Matches("quit", k):
-		m.relBox, m.help = nil, false
-	case m.keys.Matches("down", k):
-		m.scrollReleaseNotes(1)
-	case m.keys.Matches("up", k):
-		m.scrollReleaseNotes(-1)
-	case m.keys.Matches("page_down", k):
-		m.scrollReleaseNotes(page)
-	case m.keys.Matches("page_up", k):
-		m.scrollReleaseNotes(-page)
-	case m.keys.Matches("bottom", k):
-		m.scrollReleaseNotes(1 << 20)
-	case m.keys.Matches("top", k):
-		m.scrollReleaseNotes(-(1 << 20))
+// releaseSpec is the box of release notes as the shared popup layer reads
+// it: a body of the notes. It closes back to the ? list, as it opened from
+// it, and help closes both (ADR-125).
+func (m *Model) releaseSpec() popupSpec {
+	return popupSpec{
+		// Its box takes no click: it is drawn where the ? list was.
+		body: &popupBody{scroll: m.scrollReleaseNotes, page: m.releaseNotesHeight(), click: func(int, int) {}},
+		own: []ownKey{{"help", func() tea.Cmd {
+			m.relBox, m.help = nil, false
+			return nil
+		}}},
+		opener: "release_notes",
+		close:  func() { m.relBox = nil },
 	}
 }
 

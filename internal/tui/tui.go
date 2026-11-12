@@ -593,14 +593,9 @@ func (m *Model) key(msg tea.KeyPressMsg) tea.Cmd {
 	case m.triage != nil && m.triage.open:
 		return m.triageKey(msg)
 	case m.help && m.relBox != nil:
-		m.releaseBoxKey(k)
-		return nil
+		return m.popupKey(m.releaseSpec(), k)
 	case m.help:
-		if m.set.Release != nil && m.keys.Matches("release_notes", k) {
-			return m.openReleaseNotes()
-		}
-		m.helpKey(k)
-		return nil
+		return m.popupKey(m.helpSpec(), k)
 	case m.filtering:
 		return m.filterKey(msg)
 	case m.compose != nil:

@@ -50,11 +50,11 @@ A popup's own keys are declared for the state it is in, and are read after the k
 
 ### Today
 
-The menu, the picker and the notifications are read by the shared layer in [popupkeys.go](../../internal/tui/popupkeys.go): each declares its list, its own keys and its opener (`menuSpec`, `pickSpec`, `notesSpec`), and its mouse input goes through the same layer. The other popups read their keys in their own function (`bulkKeyMsg`, `composeKey`, `chooserKey`, `triageKey`, `helpKey`, `releaseBoxKey`), so the parts above still take different keys there:
+The shared layer in [popupkeys.go](../../internal/tui/popupkeys.go) reads lists, bodies and the question that writes. The menu, the picker and the notifications declare a list (`menuSpec`, `pickSpec`, `notesSpec`); the `?` list, the release notes, the confirm popup and the triage once Claude has answered declare a body (`helpSpec`, `releaseSpec`, `bulkSpec`, `triageSpec`), and the confirm popup its question. Their mouse input goes through the same layer. Text boxes are not in it yet: the comment of a close while it has the focus (`bulkKeyMsg`), the triage while a question is typed or a request is on its way (`triageKey`), the scope chooser (`chooserKey`) and the comment and the review (`composeKey`) read their keys themselves, so the parts above still take different keys there:
 
-- Lists move on `up` and `down` everywhere, whose keys include `ctrl+n` and `ctrl+p`; on `top`, `bottom` and by page in the menu, the picker and the notifications, not in the scope chooser or the triage's list of names. Bodies scroll by page only in the `?` list and the release notes.
+- Lists move on `up` and `down` everywhere, whose keys include `ctrl+n` and `ctrl+p`; on `top`, `bottom` and by page in the menu, the picker and the notifications, not in the scope chooser or the triage's list of names. Bodies scroll on all of nav.
 - `history_next` and `history_prev` claim the keys of `down` and `up` ([keymap](../../internal/tui/keymap)): a text box tries them first, and moves its cursor when there is nothing to recall.
-- The opening action closes the picker, the notifications, the `?` list and the release notes, and is ignored or typed in the others. `quit` closes the `?` list and the release notes.
+- The opening action closes the picker, the notifications, the `?` list, the release notes and the triage once answered; the confirm popup declares none, since several actions open it. `quit` is read in no popup.
 - `esc` throws a comment or a review away at once.
 - Entering a text box is `write_comment` in the confirm of a close and `triage_more` in the triage, which happen to share a default key.
 - The foot of each popup is written by hand, apart from the key line the keymap makes.
@@ -73,11 +73,10 @@ Today: seven popups are drawn from `popupTop`. The `?` list and the release note
 flowchart TB
   subgraph keys["keys"]
     K["Model.key"] --> SW{"which popup is open"}
-    SW --> SH["popupKey: menu, picker, notifications"]
-    SW --> BK["bulkKeyMsg"]
+    SW --> SH["popupKey: menu, picker, notifications, ?, release notes, confirm, triage answered"]
+    SW --> BK["bulkKeyMsg: the comment of a close"]
     SW --> CK["chooserKey"]
-    SW --> TK["triageKey"]
-    SW --> HK["helpKey / releaseBoxKey"]
+    SW --> TK["triageKey: typing, a request on its way"]
     SW --> CPK["composeKey"]
   end
   subgraph draw["drawing"]

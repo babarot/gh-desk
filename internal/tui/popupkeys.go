@@ -16,6 +16,10 @@ import (
 type popupSpec struct {
 	// list is the list the popup holds, if it holds one.
 	list *popupList
+	// body is the text it holds to read, if it holds one.
+	body *popupBody
+	// question is the write it asks to confirm, if it asks one.
+	question *popupQuestion
 	// own are the popup's own keys, read before its parts.
 	own []ownKey
 	// opener is the action that opened the popup; it closes it, unless a
@@ -36,6 +40,24 @@ type popupList struct {
 	choose func() tea.Cmd
 	// click runs it on a second click; nil runs choose (ADR-053).
 	click func() tea.Cmd
+}
+
+// popupBody is text to read that scrolls: nav scrolls it by a line, a
+// page or to an end, and the wheel by a few lines.
+type popupBody struct {
+	// scroll moves the first line shown by d, kept within the body.
+	scroll func(d int)
+	// page is how many lines the popup shows of it.
+	page int
+	// click takes a left click instead of the shared layer, which closes
+	// the popup on a click outside it; nil has the layer do that.
+	click func(x, y int)
+}
+
+// popupQuestion is a write to GitHub the popup asks to confirm: confirm
+// runs it. It is never read while a text box has the focus (ADR-066).
+type popupQuestion struct {
+	confirm func() tea.Cmd
 }
 
 // ownKey is a key of the popup's own: its action, and what it does.
@@ -61,6 +83,12 @@ func (m *Model) popupKey(p popupSpec, k string) tea.Cmd {
 		if cmd, ok := m.popupListKey(l, k); ok {
 			return cmd
 		}
+	}
+	if b := p.body; b != nil && m.popupBodyKey(b, k) {
+		return nil
+	}
+	if q := p.question; q != nil && m.keys.Matches("confirm", k) {
+		return q.confirm()
 	}
 	if p.opener != "" && m.keys.Matches(p.opener, k) {
 		p.close()
@@ -99,6 +127,30 @@ func (m *Model) popupListKey(l *popupList, k string) (tea.Cmd, bool) {
 	return nil, true
 }
 
+// popupBodyKey reads the keys of a body: nav scrolls it. It reports
+// whether it read the key.
+func (m *Model) popupBodyKey(b *popupBody, k string) bool {
+	is := func(a keymap.Action) bool { return m.keys.Matches(a, k) }
+	page := max(b.page-1, 1)
+	switch {
+	case is("down"):
+		b.scroll(1)
+	case is("up"):
+		b.scroll(-1)
+	case is("page_down"):
+		b.scroll(page)
+	case is("page_up"):
+		b.scroll(-page)
+	case is("bottom"):
+		b.scroll(1 << 20)
+	case is("top"):
+		b.scroll(-(1 << 20))
+	default:
+		return false
+	}
+	return true
+}
+
 // shownItems is how many items of a list its box shows, as the box was
 // last drawn.
 func shownItems(p *pointer) int {
@@ -126,4 +178,28 @@ func (m *Model) popupListMouse(p popupSpec, msg tea.MouseMsg) tea.Cmd {
 		return l.choose()
 	}
 	return nil
+}
+
+// popupBodyMouse is mouse input on the popup of p, which holds a body: the
+// wheel scrolls it, and a click outside closes the popup, unless the body
+// takes its clicks itself.
+func (m *Model) popupBodyMouse(p popupSpec, msg tea.MouseMsg) {
+	b := p.body
+	switch msg := msg.(type) {
+	case tea.MouseWheelMsg:
+		switch msg.Button {
+		case tea.MouseWheelDown:
+			b.scroll(wheelLines)
+		case tea.MouseWheelUp:
+			b.scroll(-wheelLines)
+		}
+	case tea.MouseClickMsg:
+		switch {
+		case msg.Button != tea.MouseLeft:
+		case b.click != nil:
+			b.click(msg.X, msg.Y)
+		case !m.popupAt.has(msg.X, msg.Y):
+			p.close()
+		}
+	}
 }
