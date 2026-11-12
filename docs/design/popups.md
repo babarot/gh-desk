@@ -42,7 +42,7 @@ Keys are written as actions; their default keys are in [internal/tui/keymap](../
 | list | nav's `up`, `down`, `top`, `bottom`, `page_up`, `page_down` move the cursor; `choose` |
 | body | the same nav actions scroll |
 | text box | with the focus, every key that types a character and every key no step before it takes (its own editing keys); the popup's other parts read only keys that type nothing and the nav keys it does not edit with. Without the focus, one action enters it |
-| question that writes | `confirm` |
+| question that writes | `confirm`, never while a text box has the focus (ADR-066) |
 
 The hints in a popup's frame are made from its parts and its own keys. A popup may mark a few of its own keys as its most important actions; only those are also shown on the key line while it is open (ADR-125). Today the key line repeats the popup's keys in other words.
 
