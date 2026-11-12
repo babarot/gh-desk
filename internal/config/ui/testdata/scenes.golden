@@ -1,9 +1,9 @@
 === merge
-╭ approve and merge ─────────────────────────────────────────────────────────────────────────────────────────────────────────╮
-│ ✓ acme/web#228 Add a dark theme to the settings page                                                                       │
-│   └ approve → merge now                                                                                                    │
-│                                                                                                                            │
-│ GitHub cannot take an approval or a merge back. Each acts only on the head shown when it was read.                         │
-│                                                                                                                            │
-│ approve and merge this pull request? y yes · esc no                                                                        │
-╰────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+╭ approve and merge ─────────────────────────────────────────────────────────────────────────────────────────╮
+│ ✓ acme/web#228 Add a dark theme to the settings page                                                       │
+│   └ approve → merge now                                                                                    │
+│                                                                                                            │
+│ GitHub cannot take an approval or a merge back. Each acts only on the head shown when it was read.         │
+│                                                                                                            │
+│ approve and merge this pull request? y yes · esc no                                                        │
+╰────────────────────────────────────────────────────────────────────────────────────────────────────────────╯

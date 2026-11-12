@@ -404,7 +404,7 @@ func (m *Model) runMenu(it menuItem) tea.Cmd {
 
 func (m *Model) renderMenu() []string {
 	st := m.st
-	w := min(max(m.width-8, 40), 84)
+	w := m.popupWidth(false)
 	inner := w - 4
 	prs := m.menuTargets()
 	its := m.menuItems()

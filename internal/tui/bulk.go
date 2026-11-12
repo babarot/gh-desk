@@ -560,11 +560,8 @@ func (m *Model) runBulk() tea.Cmd {
 // renderBulk draws the confirm popup.
 func (m *Model) renderBulk() []string {
 	b, st := m.bulk, m.st
-	w := min(max(m.width-6, 40), 130)
-	if m.compose != nil {
-		// In place of the popup the text was written in.
-		w = composeWidth(m.width)
-	}
+	// As wide as the popup a review is written in, whose place it takes.
+	w := m.popupWidth(true)
 	verb := b.verb()
 	if b.kind == runner.Merge {
 		ready, approve := false, false

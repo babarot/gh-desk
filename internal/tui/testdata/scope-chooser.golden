@@ -1,16 +1,16 @@
 -- screen --
 desk // ‹ acme ›    1 review (3)   2 mine (0)   3 involved (0)   4 inbox (1)
     PR                        TITLE                           AUTHOR          CI  MERGE  REVIEW   WHY         SIZE          AGE
-  ▾ requested from you 1           ╭ choose an owner for every tab ───────────────────────────╮
-▎ ● api#12                    Add r│ ┃                                                        │   you         +40 −3         3h
-  ▸ requested from a team 1        │                                                          │
-  ▸ bots 1                         │                            review  mine  involved  inbox │
-                                   │     all                         3     1         0      1 │
-                                   │ ▎ • acme                        3     0         0      1 │
-                                   │     me                          0     1         0      0 │
-                                   │                                                          │
-                                   │ type to narrow · ↑↓ move · enter choose · esc cancel     │
-                                   ╰──────────────────────────────────────────────────────────╯
+  ▾ requested from you ╭ choose an owner for every tab ───────────────────────────────────────────────────╮
+▎ ● api#12             │ ┃                                                                                │   +40 −3         3h
+  ▸ requested from a te│                                                                                  │
+  ▸ bots 1             │                                                    review  mine  involved  inbox │
+                       │     all                                                 3     1         0      1 │
+                       │ ▎ • acme                                                3     0         0      1 │
+                       │     me                                                  0     1         0      0 │
+                       │                                                                                  │
+                       │ type to narrow · ↑↓ move · enter choose · esc cancel                             │
+                       ╰──────────────────────────────────────────────────────────────────────────────────╯
 
 
 
@@ -36,55 +36,55 @@ esc cancel
 -- styles --
 L1 0-76 fg=#706f87
 L2 4-127 fg=#706f87
-L3 2-24 fg=#706f87
-L3 35-36 fg=#96bfff
-L3 37-66 fg=#d0d6e8 bold
-L3 67-95 fg=#96bfff
-L4 0-35 fg=#706f87
-L4 35-36 fg=#96bfff
-L4 37-93 fg=c7 bg=c0
-L4 94-95 fg=#96bfff
-L4 98-127 fg=#706f87
-L5 2-27 fg=#706f87
-L5 35-95 fg=#96bfff
+L3 2-22 fg=#706f87
+L3 23-24 fg=#96bfff
+L3 25-54 fg=#d0d6e8 bold
+L3 55-107 fg=#96bfff
+L4 0-10 fg=#706f87
+L4 23-24 fg=#96bfff
+L4 25-105 fg=c7 bg=c0
+L4 106-107 fg=#96bfff
+L4 110-127 fg=#706f87
+L5 2-23 fg=#706f87
+L5 23-107 fg=#96bfff
 L6 2-10 fg=#706f87
-L6 35-36 fg=#96bfff
-L6 64-93 fg=#706f87
-L6 94-95 fg=#96bfff
-L7 35-36 fg=#96bfff
-L7 41-44 fg=#d0d6e8
-L7 69-76 fg=#d4b0ff
-L7 85-86 fg=#706f87
-L7 92-93 fg=#d4b0ff
-L7 94-95 fg=#96bfff
-L8 35-36 fg=#96bfff
-L8 37-41 fg=#96bfff bg=#3b3b52
-L8 41-69 fg=#d0d6e8 bg=#3b3b52
-L8 69-75 fg=#d4b0ff bg=#3b3b52
-L8 75-92 fg=#706f87 bg=#3b3b52
-L8 92-93 fg=#d4b0ff bg=#3b3b52
-L8 94-95 fg=#96bfff
-L9 35-36 fg=#96bfff
-L9 41-43 fg=#d0d6e8
-L9 69-70 fg=#706f87
-L9 75-76 fg=#d4b0ff
-L9 85-93 fg=#706f87
-L9 94-95 fg=#96bfff
-L10 35-95 fg=#96bfff
-L11 35-36 fg=#96bfff
-L11 37-41 fg=#96bfff bold
-L11 42-51 fg=#8888a4
-L11 52-53 fg=#706f87
-L11 54-56 fg=#96bfff bold
-L11 57-61 fg=#8888a4
-L11 62-63 fg=#706f87
-L11 64-69 fg=#96bfff bold
-L11 70-76 fg=#8888a4
-L11 77-78 fg=#706f87
-L11 79-82 fg=#96bfff bold
-L11 83-89 fg=#8888a4
-L11 94-95 fg=#96bfff
-L12 35-95 fg=#96bfff
+L6 23-24 fg=#96bfff
+L6 76-105 fg=#706f87
+L6 106-107 fg=#96bfff
+L7 23-24 fg=#96bfff
+L7 29-32 fg=#d0d6e8
+L7 81-88 fg=#d4b0ff
+L7 97-98 fg=#706f87
+L7 104-105 fg=#d4b0ff
+L7 106-107 fg=#96bfff
+L8 23-24 fg=#96bfff
+L8 25-29 fg=#96bfff bg=#3b3b52
+L8 29-81 fg=#d0d6e8 bg=#3b3b52
+L8 81-87 fg=#d4b0ff bg=#3b3b52
+L8 87-104 fg=#706f87 bg=#3b3b52
+L8 104-105 fg=#d4b0ff bg=#3b3b52
+L8 106-107 fg=#96bfff
+L9 23-24 fg=#96bfff
+L9 29-31 fg=#d0d6e8
+L9 81-82 fg=#706f87
+L9 87-88 fg=#d4b0ff
+L9 97-105 fg=#706f87
+L9 106-107 fg=#96bfff
+L10 23-107 fg=#96bfff
+L11 23-24 fg=#96bfff
+L11 25-29 fg=#96bfff bold
+L11 30-39 fg=#8888a4
+L11 40-41 fg=#706f87
+L11 42-44 fg=#96bfff bold
+L11 45-49 fg=#8888a4
+L11 50-51 fg=#706f87
+L11 52-57 fg=#96bfff bold
+L11 58-64 fg=#8888a4
+L11 65-66 fg=#706f87
+L11 67-70 fg=#96bfff bold
+L11 71-77 fg=#8888a4
+L11 106-107 fg=#96bfff
+L12 23-107 fg=#96bfff
 L21 0-130 fg=#706f87
 L22 0-130 fg=#706f87
 L23 0-130 fg=#706f87

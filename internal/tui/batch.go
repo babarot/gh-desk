@@ -636,7 +636,7 @@ func (m *Model) jumpTo(k model.PRKey) tea.Cmd {
 
 func (m *Model) renderNotes() []string {
 	st := m.st
-	w := min(max(m.width-8, 40), 110)
+	w := m.popupWidth(true)
 	inner := w - 4
 	ls := m.noteLines()
 	v := m.notesAt

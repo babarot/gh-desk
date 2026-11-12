@@ -188,12 +188,12 @@ func (m *Model) helpLines(w int) ([]string, []string) {
 }
 
 // helpWidth is the width of the ? popup's box.
-func (m *Model) helpWidth() int { return min(64, max(m.width-2, 30)) }
+func (m *Model) helpWidth() int { return m.popupWidth(false) }
 
-// helpHeight is how many of n lines the ? popup shows at once: at most
-// about two thirds of the terminal, so that the screen stays around it.
+// helpHeight is how many of n lines the ? popup shows at once: as many as
+// a popup may take, inside its frame.
 func (m *Model) helpHeight(n int) int {
-	return max(min(n, (m.height-2)*2/3), 1)
+	return max(min(n, m.popupHeight()-2), 1)
 }
 
 // helpShown are the ? popup's lines and the titles of their headers, with
@@ -280,7 +280,7 @@ type helpBox struct {
 	heads      []string
 }
 
-// renderHelp is the ? popup centered over lines: the part of its lines
+// renderHelp is the ? popup over lines, from popupTop: the part of its lines
 // scrolled to, in a box whose bottom edge tells how much is above and
 // below.
 func (m *Model) renderHelp(lines []string) []string {
@@ -291,7 +291,7 @@ func (m *Model) renderHelp(lines []string) []string {
 	if len(all) > h {
 		box[len(box)-1] = scrollEdge(st, w, top, len(all)-top-h, m.scrollKeys()+" wheel")
 	}
-	y := max((len(lines)-len(box))/2, 0)
-	m.helpBox = helpBox{x: max((m.width-w)/2, 0), y: y, w: w, h: len(box), heads: heads[top : top+h]}
-	return m.overlay(lines, box, y, m.width)
+	// From the row every popup is drawn from (ADR-125).
+	m.helpBox = helpBox{x: max((m.width-w)/2, 0), y: popupTop, w: w, h: len(box), heads: heads[top : top+h]}
+	return m.overlay(lines, box, popupTop, m.width)
 }

@@ -319,7 +319,7 @@ func (m *Model) filterByRules(rs []plan.Rule) tea.Cmd {
 
 func (m *Model) renderPick() []string {
 	st, v := m.st, m.picker
-	w := min(max(m.width-8, 40), 110)
+	w := m.popupWidth(true)
 	inner := w - 4
 	rs := m.rules()
 	var lines []string

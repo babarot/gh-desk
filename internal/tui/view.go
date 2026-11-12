@@ -72,49 +72,49 @@ func (m *Model) render() (string, *tea.Cursor) {
 		// as wide, and esc there gives the text box back: no box is drawn
 		// over another (ADR-097).
 		popup, at := m.renderCompose()
-		lines = m.overlay(lines, popup, 2, m.width)
-		cur = inPopup(m.compose.ta.Cursor(), popup, 2+at, m.width)
+		lines = m.overlay(lines, popup, popupTop, m.width)
+		cur = inPopup(m.compose.ta.Cursor(), popup, popupTop+at, m.width)
 	}
 	switch {
 	case m.bulk != nil:
 		cur = nil
 		popup := m.renderBulk()
-		m.popupAt = boxAt(popup, 2, m.width)
-		lines = m.overlay(lines, popup, 2, m.width)
+		m.popupAt = boxAt(popup, popupTop, m.width)
+		lines = m.overlay(lines, popup, popupTop, m.width)
 		if f := m.bulk.close; f != nil && f.editing {
-			cur = inPopup(f.ta.Cursor(), popup, 2+f.at, m.width)
+			cur = inPopup(f.ta.Cursor(), popup, popupTop+f.at, m.width)
 		}
 	case m.notesAt != nil:
 		cur = nil
 		popup := m.renderNotes()
-		m.popupAt = boxAt(popup, 2, m.width)
-		lines = m.overlay(lines, popup, 2, m.width)
+		m.popupAt = boxAt(popup, popupTop, m.width)
+		lines = m.overlay(lines, popup, popupTop, m.width)
 	case m.picker != nil:
 		cur = nil
 		popup := m.renderPick()
-		m.popupAt = boxAt(popup, 2, m.width)
-		lines = m.overlay(lines, popup, 2, m.width)
+		m.popupAt = boxAt(popup, popupTop, m.width)
+		lines = m.overlay(lines, popup, popupTop, m.width)
 	case m.chooser != nil:
 		popup, at := m.renderChooser()
-		m.popupAt = boxAt(popup, 2, m.width)
-		lines = m.overlay(lines, popup, 2, m.width)
-		cur = inPopup(m.chooser.input.Cursor(), popup, 2+at, m.width)
+		m.popupAt = boxAt(popup, popupTop, m.width)
+		lines = m.overlay(lines, popup, popupTop, m.width)
+		cur = inPopup(m.chooser.input.Cursor(), popup, popupTop+at, m.width)
 	case m.menu != nil:
 		cur = nil
 		popup := m.renderMenu()
-		m.popupAt = boxAt(popup, 2, m.width)
-		lines = m.overlay(lines, popup, 2, m.width)
+		m.popupAt = boxAt(popup, popupTop, m.width)
+		lines = m.overlay(lines, popup, popupTop, m.width)
 	case m.triage != nil && m.triage.open:
 		popup, at := m.renderTriage()
-		m.popupAt = boxAt(popup, 2, m.width)
-		lines = m.overlay(lines, popup, 2, m.width)
+		m.popupAt = boxAt(popup, popupTop, m.width)
+		lines = m.overlay(lines, popup, popupTop, m.width)
 		cur = nil
 		if at >= 0 {
 			in := &m.triage.input
 			if s := m.triage.search; s != nil {
 				in = &s.input
 			}
-			cur = inPopup(in.Cursor(), popup, 2+at, m.width)
+			cur = inPopup(in.Cursor(), popup, popupTop+at, m.width)
 		}
 	case m.help:
 		cur = nil
