@@ -280,7 +280,7 @@ type helpBox struct {
 	heads      []string
 }
 
-// renderHelp is the ? popup centered over lines: the part of its lines
+// renderHelp is the ? popup over lines, from popupTop: the part of its lines
 // scrolled to, in a box whose bottom edge tells how much is above and
 // below.
 func (m *Model) renderHelp(lines []string) []string {

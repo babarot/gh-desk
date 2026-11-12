@@ -28,13 +28,14 @@ const (
 	popupWide   = 110
 )
 
-// popupWidthOn is the width of a popup on a screen w wide.
+// popupWidthOn is the width of a popup on a screen w wide, never wider
+// than the screen.
 func popupWidthOn(w int, wide bool) int {
 	most := popupNarrow
 	if wide {
 		most = popupWide
 	}
-	return min(max(w-8, 40), most)
+	return min(max(w-8, 40), most, max(w, 1))
 }
 
 // popupWidth is the width of a popup on this screen.

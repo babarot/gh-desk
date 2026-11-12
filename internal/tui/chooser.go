@@ -143,13 +143,9 @@ func (m *Model) scopeTitle() string {
 func (m *Model) renderChooser() ([]string, int) {
 	st, c := m.st, m.chooser
 	vs := m.chooserValues()
-	cols := m.scopeColumns(vs, m.popupWidth(true)-4)
-	// Narrow, as a list to choose from, unless the names and counts need
-	// the wide one.
+	// Narrow, as a list to choose from (ADR-125); a long name is cut.
 	w := m.popupWidth(false)
-	if scopeLead+cols.name+cols.sum+4 > w {
-		w = m.popupWidth(true)
-	}
+	cols := m.scopeColumns(vs, w-4)
 	inner := w - 4
 	// The counts go to the right edge: the names take what is left.
 	cols.name = max(cols.name, inner-scopeLead-cols.sum)

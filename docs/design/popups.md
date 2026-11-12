@@ -22,7 +22,7 @@ The claude pane and the log viewer take the keys too, but are not popups (ADR-07
 | confirm | `bulk` | the writing actions, `post` of compose, `triage_apply` | body, question; a text box for a close | wide |
 | compose (comment, review) | `compose` | `comment`, `review` | text box | wide |
 | picker | `picker` | `select_rule` | list | wide |
-| scope chooser | `chooser` | `choose_scope` | text box, list | narrow, wide when its names and counts need it |
+| scope chooser | `chooser` | `choose_scope` | text box, list | narrow |
 | notifications | `notesAt` | `events` | list | wide |
 | triage | `triage` (`open`) | `triage` | body, text box; a list of names while `#` or `@` is typed; a search of the questions | wide |
 | `?` list | `help` | `help` | body | narrow |
