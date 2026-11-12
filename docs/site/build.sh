@@ -7,8 +7,9 @@
 # directory's README.md, which GitHub shows with the directory, is the
 # page of its section on the site. They
 # are copied into a Hugo site in a directory of its own, each given the
-# front matter Hugo needs. docs/adr, docs/architecture.md and docs/site
-# are not pages; a link to them leads to GitHub (layouts/_markup).
+# front matter Hugo needs. docs/adr, docs/design, docs/architecture.md
+# and docs/site are not pages; a link to them leads to GitHub
+# (layouts/_markup).
 #
 # A base URL other than hugo.yaml's is given with BASE_URL, as
 # demo/site/serve.sh does.
@@ -96,7 +97,7 @@ while IFS= read -r -d '' src; do
     echo '---'
     tail -n +2 "$src"
   } >"$target"
-done < <(find "$docs_dir" \( -path "$site_dir" -o -path "$docs_dir/adr" \) -prune -o \
+done < <(find "$docs_dir" \( -path "$site_dir" -o -path "$docs_dir/adr" -o -path "$docs_dir/design" \) -prune -o \
   -type f -name '*.md' ! -path "$docs_dir/architecture.md" -print0)
 
 # A section with no README.md of its own still needs a page.

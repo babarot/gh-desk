@@ -20,7 +20,8 @@ type Action string
 
 // Scope is where an action's keys are read. An action in ScopeGlobal or
 // ScopeNav is read in every other scope too, so its keys may not be used by
-// any other action; an action in another scope only shares its scope.
+// any other action, but one that claims it (see claims); an action in
+// another scope only shares its scope.
 type Scope string
 
 const (
@@ -48,6 +49,16 @@ var borrowed = map[Scope][]Action{
 	ScopeChat: {"complete", "expand"},
 }
 
+// claims are the actions that may share the keys of a nav action, by the
+// action they share: where both are read, the claiming one is tried first
+// and passes the key on when it has nothing to do with it (ADR-125).
+// Recalling the questions asked before moves through them on the keys that
+// move up and down, at the first and last rows of a text box (ADR-096).
+var claims = map[Action]Action{
+	"history_prev": "up",
+	"history_next": "down",
+}
+
 // Def is an action with its default keys and the words the key hints show.
 type Def struct {
 	Action Action
@@ -64,8 +75,10 @@ var Defaults = []Def{
 	{"refresh", ScopeGlobal, []string{"r"}, "refresh"},
 	{"events", ScopeGlobal, []string{"n"}, "notifications"},
 
-	{"up", ScopeNav, []string{"up", "k"}, "up"},
-	{"down", ScopeNav, []string{"down", "j"}, "down"},
+	// ctrl+p and ctrl+n move as the arrows and k and j do. They are not
+	// first or last: the hints name an action by its first or last key.
+	{"up", ScopeNav, []string{"up", "ctrl+p", "k"}, "up"},
+	{"down", ScopeNav, []string{"down", "ctrl+n", "j"}, "down"},
 	{"top", ScopeNav, []string{"home", "g"}, "top"},
 	{"bottom", ScopeNav, []string{"end", "G"}, "bottom"},
 	{"page_up", ScopeNav, []string{"pgup", "ctrl+u"}, "page up"},
@@ -147,8 +160,8 @@ var Defaults = []Def{
 	{"draft_review", ScopeChat, []string{"ctrl+x"}, "draft review"},
 	{"open_claude", ScopeChat, []string{"ctrl+o"}, "open in claude code"},
 	{"chat_restart", ScopeChat, []string{"ctrl+l"}, "start over"},
-	// up and down recall questions too, as nav's own keys cannot be set
-	// here; these are the keys that do nothing else in a text box.
+	// These claim nav's up and down (see claims): a text box tries them
+	// first, and moves its cursor when there is nothing to recall.
 	{"history_prev", ScopeChat, []string{"ctrl+p"}, "previous question"},
 	{"history_next", ScopeChat, []string{"ctrl+n"}, "next question"},
 	{"history_search", ScopeChat, []string{"ctrl+r"}, "search the questions"},
@@ -340,8 +353,12 @@ func meets(a, b Scope) bool {
 }
 
 // meet reports whether the keys of a and b can be read at the same time:
-// their scopes meet, or the scope of one reads the other.
+// their scopes meet, or the scope of one reads the other. An action and the
+// nav action it claims share keys, so their keys are not said to meet.
 func meet(a, b Def) bool {
+	if claims[a.Action] == b.Action || claims[b.Action] == a.Action {
+		return false
+	}
 	return meets(a.Scope, b.Scope) || slices.Contains(borrowed[a.Scope], b.Action) || slices.Contains(borrowed[b.Scope], a.Action)
 }
 

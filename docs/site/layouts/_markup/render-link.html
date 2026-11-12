@@ -63,7 +63,7 @@ leads on the site:
   {{- if $page -}}
     {{- $href = $page.RelPermalink -}}
     {{- with $u.Fragment }}{{ $href = printf "%s#%s" $href . }}{{ end -}}
-  {{- else if or (eq $target "adr") (strings.HasPrefix $target "adr/") (eq $target "architecture.md") (strings.HasPrefix $target "../") -}}
+  {{- else if or (eq $target "adr") (strings.HasPrefix $target "adr/") (eq $target "design") (strings.HasPrefix $target "design/") (eq $target "architecture.md") (strings.HasPrefix $target "../") -}}
     {{- /* docs/ sits at the top of the repository, so a path is the
            repository's from there. */ -}}
     {{- $href = printf "%s/blob/main/%s" site.Params.repository (path.Clean (path.Join "docs" $target)) -}}
