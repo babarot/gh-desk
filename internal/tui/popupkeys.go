@@ -190,13 +190,17 @@ func (m *Model) popupHints(p popupSpec) (hs []popupHint, esc string) {
 func (m *Model) untypedKey(as ...keymap.Action) string {
 	for _, a := range as {
 		for _, k := range m.keys.Keys(a) {
-			if len([]rune(k)) > 1 {
+			if !typesText(k) {
 				return k
 			}
 		}
 	}
 	return ""
 }
+
+// typesText reports whether the key k, as the keymap writes it, types a
+// character into a text box: a single character, or space.
+func typesText(k string) bool { return len([]rune(k)) == 1 || k == "space" }
 
 // arrowKey writes up and down as arrows, which take one cell.
 func arrowKey(k string) string {

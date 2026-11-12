@@ -340,7 +340,7 @@ func TestKeyLineUnderAPopup(t *testing.T) {
 // type nothing, as its text box takes letters, whatever order they are set
 // in.
 func TestScopeChooserTellsUntypedMovingKeys(t *testing.T) {
-	km, ps := keymap.Apply(keymap.Default(), map[string][]string{"up": {"k", "up"}, "down": {"j", "down"}})
+	km, ps := keymap.Apply(keymap.Default(), map[string][]string{"up": {"k", "space", "up"}, "down": {"j", "down"}})
 	if len(ps) > 0 {
 		t.Fatal(ps)
 	}
@@ -350,7 +350,7 @@ func TestScopeChooserTellsUntypedMovingKeys(t *testing.T) {
 	m.Update(tea.WindowSizeMsg{Width: 130, Height: 34})
 	run(m, m.Init())
 	press(m, "O")
-	if s := screen(m); !strings.Contains(s, "↑↓ move") || strings.Contains(s, "kj move") {
+	if s := screen(m); !strings.Contains(s, "↑↓ move") || strings.Contains(s, "space") {
 		t.Errorf("the chooser does not tell the arrows:\n%s", s)
 	}
 	// With only letters for up and down, the keys of the questions move it.
