@@ -12,11 +12,11 @@ Drawing every popup a quarter down the screen instead was tried in a mock: the s
 
 ## Decision
 
-- When a popup opens with none open, it is placed a quarter down the screen. A popup too tall to fit below that is placed higher, as far from the top of the list as from the status line, and never above the row ADR-125 drew popups from.
+- When a popup opens with none open, it is placed a quarter down the screen. A popup tall enough that, placed there, it would leave less room under it than above it is placed higher instead, centered: as far from the top of the screen as from its bottom, and never above the row ADR-125 drew popups from. A popup never sits lower than centered.
 - The row is decided once, when the first popup opens, by the height that popup has then. It holds while popups are open: a popup that takes the place of another (ADR-121) opens on the same row, and a popup whose height changes grows or shrinks downward from it. It is decided again when the terminal is resized, and when a popup opens after all have closed.
 - The row is not a setting. A quarter, the measure of where the eye is, is a constant.
 - This replaces, in ADR-125, the sentence "Every popup is drawn from the same row near the top of the screen and grows downward, scrolling past the height it may take." The rest of that bullet, and its rejected alternative, still hold.
-- Rejected: every popup a quarter down. A tall popup runs to the bottom, with the space above it empty, and loses lines it had.
+- Rejected: every popup a quarter down. A tall popup runs toward the bottom, with more space above it than under it, and one that does not fit loses lines it had.
 - Rejected: shrinking a popup so that the space under it matches the space above. A tall popup loses a third of its lines, and scrolls for what it showed before.
 - Rejected: centering each popup by its height as long as it is open. It moves whenever its height changes, which ADR-125 rejected.
 - Rejected: placing a popup by the row of the cursor. It would open at a different height for each row, and have little room near the bottom.

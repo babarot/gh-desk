@@ -58,7 +58,7 @@ Every popup reads its keys through the shared layer in [popupkeys.go](../../inte
 
 ## Placement
 
-A popup is placed when it opens with none open (`placePopup` in [popup.go](../../internal/tui/popup.go), called from `render` in [view.go](../../internal/tui/view.go)): a quarter down the screen, or higher for one too tall to fit below that, as far from the top of the list as from the status line, and never above `popupTopMost` (ADR-127). The row is kept in `Model.popTop` while popups are open, so one taking the place of another opens there, and is decided again on a resize or when a popup opens after all have closed. From that row a popup grows down to `popupHeight` and scrolls its body past it, keeping its foot in sight.
+A popup is placed when it opens with none open (`placePopup` in [popup.go](../../internal/tui/popup.go), called from `render` in [view.go](../../internal/tui/view.go)): a quarter down the screen, or centered when that would leave less room under it than above it, and never above `popupTopMost` (ADR-127). The row is kept in `Model.popTop` while popups are open, so one taking the place of another opens there, and is decided again on a resize or when a popup opens after all have closed. From that row a popup grows down to `popupHeight` and scrolls its body past it, keeping its foot in sight.
 
 Its width is `popupWidth`, narrow or wide from two constants there; a popup that takes the place of another (the confirm popup of a review) is as wide as the one it replaces.
 

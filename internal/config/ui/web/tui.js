@@ -29,8 +29,8 @@ function box(g,p,x,y,w,title,lines,right){const f=p.blue,h=lines.length+2,t=` ${
   g.put(x,y+h-1,[['╰'+'─'.repeat(w-2)+'╯',f,p.base]]);return g}
 const MENU={ask_claude:['ask claude about it','talk with claude about its diff'],browse:['browser','open it on github.com'],review:['review','comment, approve or request changes in a review'],comment:['comment','comment on its conversation'],approve:['approve','send an approving review'],merge:['merge','merge it, as the next popup decides'],draft:['draft / ready',"someone else's pull request"],close:['close','close it, as the next popup says'],hide:['hide / done','hide it from this tab']};
 const status=(g,y,p,parts)=>(g.clear(0,y,g.w,1),g.put(0,y,parts.flatMap(([k,w],i)=>[...(i?[[' · ',p.dim]]:[]),[k,p.blue,null,1],[' '+w,p.dim]])));
-// popTop is the row a popup h lines tall opens on: a quarter down, or higher
-// for one that would not fit below that (ADR-127).
+// popTop is the row a popup h lines tall opens on: a quarter down, or
+// centered when that would leave less room under it than above it (ADR-127).
 const popTop=(g,h)=>Math.min(Math.max(2,g.h>>2),Math.max(2,(g.h-h)>>1));
 const SCENES={
   merge(g,o){const p=o.p,x=o.cur,b=[[['✓ ',p.green],[`${x.repo}#${x.n} `,p.subtext1],[x.title,p.text]],[['  └ approve → merge now',p.overlay]],[[' ']],[['GitHub cannot take an approval or a merge back. Each acts only on the head shown when it was read.',p.yellow]],[[' ']],[['approve and merge this pull request? ',p.text],['y',p.blue,null,1],[' yes · ',p.dim],['esc',p.blue,null,1],[' no',p.dim]]];box(g,p,(g.w-110)>>1,popTop(g,b.length+2),110,'approve and merge',b)},

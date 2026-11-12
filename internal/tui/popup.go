@@ -25,9 +25,8 @@ const popupTopMost = 2
 func (m *Model) popupTop() int { return cmp.Or(m.popTop, popupTopMost) }
 
 // placePopup decides the row popups are drawn from, when one opens from
-// none: a quarter down the screen, where the eye is, or higher for a
-// popup that would not fit below it, so that it is as far from the top as
-// from the bottom. It holds while popups are open, one taking the place of
+// none: a quarter down the screen, where the eye is, or centered for a
+// popup that would leave less room under it than above it there. It holds while popups are open, one taking the place of
 // another or changing its height, so that nothing in them moves
 // (ADR-127).
 func (m *Model) placePopup() int {
