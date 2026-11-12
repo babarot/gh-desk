@@ -1,5 +1,14 @@
 # Changelog
 
+## [v0.19.0](https://github.com/babarot/gh-desk/compare/v0.18.0...v0.19.0) - 2026-11-12
+### New Features
+- Stop what waits without quitting by @babarot in https://github.com/babarot/gh-desk/pull/144
+### Bug fixes
+- Build with Go 1.26.11 for a vulnerability in net/http by @babarot in https://github.com/babarot/gh-desk/pull/142
+### Improvements
+- Confirm a comment or a review in place of its text box by @babarot in https://github.com/babarot/gh-desk/pull/141
+- Read every tab on the automatic refresh by @babarot in https://github.com/babarot/gh-desk/pull/146
+
 ## [v0.18.0](https://github.com/babarot/gh-desk/compare/v0.17.1...v0.18.0) - 2026-11-11
 ### New Features
 - Let a rule ask whether a pull request can be merged now by @babarot in https://github.com/babarot/gh-desk/pull/133
