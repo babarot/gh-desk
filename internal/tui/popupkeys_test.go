@@ -405,3 +405,23 @@ func TestPopupsStandAtTheTop(t *testing.T) {
 		}
 	}
 }
+
+// On a screen narrower than a popup's least width, a popup is no wider
+// than the screen, and its top edge, with a long title and its info, is no
+// wider than the box.
+func TestPopupsFitANarrowScreen(t *testing.T) {
+	for _, wide := range []bool{false, true} {
+		if got := popupWidthOn(32, wide); got > 32 {
+			t.Errorf("a popup is %d wide on a 32-cell screen", got)
+		}
+	}
+	m, _ := startWith(t, fixture(), keymap.Default())
+	for _, info := range []string{"", "plan only"} {
+		for _, w := range []int{12, 24, 40} {
+			top := boxTop(m.st, "release notes · j k scroll · esc back", info, w)
+			if got := ansi.StringWidth(top); got != w {
+				t.Errorf("the top edge is %d wide in a box %d wide (info %q): %q", got, w, info, ansi.Strip(top))
+			}
+		}
+	}
+}

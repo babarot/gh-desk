@@ -9,6 +9,7 @@ import (
 	"charm.land/bubbles/v2/textarea"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
+	"github.com/charmbracelet/x/ansi"
 
 	"github.com/babarot/gh-desk/internal/model"
 	"github.com/babarot/gh-desk/internal/runner"
@@ -322,11 +323,18 @@ func newInput(st styles) textarea.Model {
 // boxTop is the top edge of a popup's box, w wide, with title on its left
 // and, when given, info on its right.
 func boxTop(st styles, title, info string, w int) string {
-	head := st.focus.Render("╭ ") + st.title.Render(title) + " "
 	right := st.focus.Render("╮")
 	if info != "" {
 		right = st.dim.Render(" "+info+" ") + st.focus.Render("─╮")
 	}
+	// The title is cut, and then the info dropped, so that the edge is no
+	// wider than the box on a narrow screen.
+	room := w - 3 - lipgloss.Width(right)
+	if room < 1 && info != "" {
+		right = st.focus.Render("╮")
+		room = w - 4
+	}
+	head := st.focus.Render("╭ ") + st.title.Render(ansi.Truncate(title, max(room, 0), "…")) + " "
 	return head + st.focus.Render(strings.Repeat("─", max(w-lipgloss.Width(head)-lipgloss.Width(right), 0))) + right
 }
 
