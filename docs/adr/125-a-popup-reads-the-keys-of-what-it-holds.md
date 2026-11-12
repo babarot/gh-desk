@@ -17,7 +17,7 @@ Which popups there are, what each holds and how they are drawn is in [docs/desig
 ### Keys come from the parts a popup holds
 
 - A popup declares the parts it holds, from a few kinds: a list to choose from, a body to read, a text box, a question that writes to GitHub. A layer shared by every popup reads the keys of those parts, the same in every popup; a popup reads only the keys that are its own.
-- A text box with the focus is read first, and takes every key that types a character. The keys of the popup's other parts, a list in it among them, are then read only from keys that type nothing.
+- While a text box has the focus, it takes every key that types a character, and every key that no step before it takes: editing keys it has of its own (deleting, moving along a line) reach it whatever they are. The popup's own keys are read before it, so a popup can keep a key the text box would otherwise take. The popup's other parts, a list in it among them, read only keys that type nothing, and only the nav keys the text box does not use for editing.
 - A list and a body move on the same actions, nav's (ADR-004): one moves its cursor, the other scrolls. Every popup with either reads all of them.
 - One action enters a popup's text box when it does not have the focus, the same in every popup.
 - The hints of a popup are made from the parts it declares and its own keys, through the keymap. No popup writes its keys by hand.
@@ -27,7 +27,8 @@ Which popups there are, what each holds and how they are drawn is in [docs/desig
 
 ### What steps out, and what quits
 
-- `esc` steps out one level in every popup: from a text box to the popup holding it, from a popup to what it was opened from (the popup it took the place of, ADR-121, or the screen). What was written in a text box is thrown away only when its popup is closed.
+- `esc` steps out one level in every popup, from the innermost one the popup has at that moment: a list of suggestions or a search opened over a text box (ADR-097, ADR-098), a request on its way (ADR-095), the text box, then the popup itself, which goes back to what it was opened from (the popup it took the place of, ADR-121, or the screen). The popup declares which of these levels it has. What was written in a text box is thrown away only when its popup is closed.
+- A popup whose text box has the focus as long as the popup is open, with no keys of its own without it, has no level between the two: `esc` closes it at once.
 - The key that opened a popup closes it, unless a part of the popup reads that key first, or closing would throw away what was written in it. What was written is thrown away only by `esc`.
 - `quit` quits gh-desk and does nothing else. It is not read while a popup is open: it never closes a popup, and never quits from one. Stepping back with `esc` never quits, however often it is pressed, and the two are kept apart so that closing a popup cannot quit by mistake.
 - Rejected: `quit` closing a popup that has no text box with the focus. The same key would close in one place and quit one press later.
@@ -35,7 +36,8 @@ Which popups there are, what each holds and how they are drawn is in [docs/desig
 ### Moving keys are one set, and a part may claim some of them
 
 - nav's up and down hold the keys that terminal programs commonly move by in a list, including those a text box uses for its history; moving is set once, under nav, and works the same in the list, the panes and every popup.
-- A part may claim a nav key for a meaning of its own: a text box keeps keys for its cursor and its history. A claim is declared in [internal/tui/keymap](../../internal/tui/keymap) with the scope that makes it, and the keymap's check allows a nav key in that scope only when it is declared; any other nav key used by another action stays a mistake in the config file (ADR-004).
+- An action may claim the keys of one nav action for a meaning of its own where both are read: recalling the questions asked before claims the keys of moving up and down. A claim names the two actions, and is declared in [internal/tui/keymap](../../internal/tui/keymap); the keymap's check lets the two share keys and nothing else, and any other nav key used by another action stays a mistake in the config file. This replaces, in ADR-004, the words "`global` and `nav` keys are read everywhere, so they may not be reused" for the nav actions claimed: they may be reused by the action that claims them.
+- Rejected: a scope claiming every nav key at once. Any action of that scope could then take a moving key, and which of the two a key does would depend on where the cursor is.
 - Rejected: separate actions for moving in a popup. The same keys would be set twice, and a popup would again move on keys the list does not.
 
 ### Where a popup stands
@@ -48,7 +50,7 @@ Which popups there are, what each holds and how they are drawn is in [docs/desig
 
 - A new popup declares its parts and reads only its own keys. It does not handle moving, `esc` or entering its text box, and does not write its hints.
 - An action of a popup must not take a key of nav or of a part the popup holds, unless it is declared as a claim.
-- The actions that entered a text box in one popup each give way to one action; keys set for them under `[keys]` are read under it through the renamed actions (ADR-023).
+- The actions that entered a text box in one popup each give way to one action. As ADR-023 decides for every renamed action, a key set under an old name is a mistake that names the new one, and gh-desk does not start until the config file is changed.
 - Closing the notifications and the `?` list no longer takes `quit`, and throwing away a comment or a review being written takes `esc` twice.
 
 ## Not decided here

@@ -38,10 +38,10 @@ Keys are written as actions; their default keys are in [internal/tui/keymap](../
 
 | Part | Target: what the shared layer reads |
 |---|---|
-| every popup | `esc` steps out one level; the action that opened it closes it, unless a part reads that key first; `quit` is not read |
+| every popup | `esc` steps out of the innermost level the popup declares (suggestions or a search over a text box, a request on its way, the text box, the popup); the action that opened it closes it, unless a part reads that key first or something written would be lost; `quit` is not read |
 | list | nav's `up`, `down`, `top`, `bottom`, `page_up`, `page_down` move the cursor; `choose` |
 | body | the same nav actions scroll |
-| text box | with the focus, every key that types a character, and the keys it claims (cursor, history); without it, one action enters it, and `esc` from it goes back to the popup |
+| text box | with the focus, every key that types a character and every key no step before it takes (its own editing keys); the popup's other parts read only keys that type nothing and the nav keys it does not edit with. Without the focus, one action enters it |
 | question that writes | `confirm` |
 
 The hints in a popup's frame are made from its parts and its own keys. A popup may mark a few of its own keys as its most important actions; only those are also shown on the key line while it is open (ADR-125). Today the key line repeats the popup's keys in other words.
