@@ -1973,7 +1973,7 @@ func (j *job) wait() bool {
 func (j *job) sleep(d time.Duration) bool { return j.sleepIn(j.waitCtx(), d) }
 
 // sleepIn waits d, or returns false when ctx ends first. A watch sleeps in
-// the batch's context: the user cannot stop it (ADR-121).
+// the batch's context: the user cannot stop it (ADR-122).
 func (j *job) sleepIn(ctx context.Context, d time.Duration) bool {
 	t := time.NewTimer(d)
 	defer t.Stop()

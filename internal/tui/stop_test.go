@@ -109,7 +109,7 @@ func TestStatusTellsTheStopKey(t *testing.T) {
 }
 
 // What the user stopped is a decision: the batch's note counts it apart,
-// without the mark of a failure, and . does not offer it again (ADR-121).
+// without the mark of a failure, and . does not offer it again (ADR-122).
 func TestStoppedByYouIsNotTriedAgain(t *testing.T) {
 	m := start(t, fixture(), keymap.Default())
 	mine, moved := key("acme", "api", 12), key("acme", "web", 7)

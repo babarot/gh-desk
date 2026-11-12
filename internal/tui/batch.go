@@ -32,7 +32,7 @@ type progress struct {
 	locked bool
 	// ended is when the result came, zero while a step is running.
 	ended time.Time
-	// byUser is set on a result the user stopped (ADR-121).
+	// byUser is set on a result the user stopped (ADR-122).
 	byUser bool
 }
 
