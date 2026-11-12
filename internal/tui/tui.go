@@ -68,6 +68,9 @@ type Runner interface {
 	StartClose(ctx context.Context, ct runner.CloseText, items []runner.Item) (string, <-chan runner.Event)
 	StartComment(ctx context.Context, body string, items []runner.Item) (string, <-chan runner.Event)
 	Resume(ctx context.Context, ps []model.Pending) (string, <-chan runner.Event)
+	// Stop stops the jobs on keys at their next wait, and returns those
+	// it asked to stop.
+	Stop(keys []model.PRKey) []model.PRKey
 }
 
 // Tab is a tab: pull requests found by a search, or the inbox.

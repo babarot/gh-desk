@@ -176,6 +176,8 @@ func (r previewRunner) StartClose(_ context.Context, _ runner.CloseText, items [
 func (r previewRunner) StartComment(_ context.Context, _ string, items []runner.Item) (string, <-chan runner.Event) {
 	return r.refuse(items)
 }
+func (r previewRunner) Stop([]model.PRKey) []model.PRKey { return nil }
+
 func (r previewRunner) Resume(_ context.Context, ps []model.Pending) (string, <-chan runner.Event) {
 	items := make([]runner.Item, len(ps))
 	for i, p := range ps {

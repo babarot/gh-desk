@@ -83,8 +83,12 @@ type retry struct {
 func (m *Model) retryBatch(bs *batchState) bool {
 	var left []model.PRKey
 	for _, k := range bs.order {
-		switch bs.done[k].result {
-		case runner.Failed, runner.Stopped:
+		p := bs.done[k]
+		switch {
+		case p.byUser:
+			// The user stopped it: a decision, as a skip is, not
+			// offered again (ADR-121).
+		case p.result == runner.Failed, p.result == runner.Stopped:
 			left = append(left, k)
 		}
 	}

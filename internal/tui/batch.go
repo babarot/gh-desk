@@ -32,6 +32,8 @@ type progress struct {
 	locked bool
 	// ended is when the result came, zero while a step is running.
 	ended time.Time
+	// byUser is set on a result the user stopped (ADR-121).
+	byUser bool
 }
 
 // hold keeps the pull request of k as it is now, unless it is kept
@@ -224,7 +226,7 @@ func (m *Model) event(msg eventMsg) tea.Cmd {
 	// cleaned as they arrive, before the row, the status line or the
 	// progress pane draws them.
 	ev.Text = safeLine(ev.Text)
-	pg := progress{text: ev.Text, result: ev.Result, watch: ev.Watch}
+	pg := progress{text: ev.Text, result: ev.Result, watch: ev.Watch, byUser: ev.StoppedByUser}
 	if ev.Result.Final() {
 		pg.ended = m.set.Now()
 	}
@@ -343,10 +345,17 @@ func (m *Model) doneAfterReview(k model.PRKey) tea.Cmd {
 
 func (m *Model) noteBatch(bs *batchState) tea.Cmd {
 	count := map[runner.Result]int{}
+	byUser := 0
 	var items []noteItem
 	for _, k := range bs.order {
 		p := bs.done[k]
-		count[p.result]++
+		if p.byUser {
+			// Stopped by the user: a decision, told apart from what
+			// stopped on its own.
+			byUser++
+		} else {
+			count[p.result]++
+		}
 		text := p.text
 		if r, ok := bs.auto[k]; ok {
 			text += " · " + r
@@ -379,6 +388,9 @@ func (m *Model) noteBatch(bs *batchState) tea.Cmd {
 	}
 	if n := count[runner.Stopped] + count[runner.Failed]; n > 0 {
 		parts = append(parts, fmt.Sprintf("%d stopped", n))
+	}
+	if byUser > 0 {
+		parts = append(parts, fmt.Sprintf("%d stopped by you", byUser))
 	}
 	if n := len(bs.skipped) + count[runner.Skipped]; n > 0 {
 		parts = append(parts, fmt.Sprintf("%d skipped", n))

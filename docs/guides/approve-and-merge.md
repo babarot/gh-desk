@@ -74,8 +74,14 @@ While a batch runs, the top of it has a line for each pull request: the steps it
 
 The log shows what the log file has, and no more; `--debug` adds every read.
 
+## Stopping what waits
+
+`X` stops the merges and approvals that wait, on the selection or the pull request under the cursor, without quitting. Each stops at its next wait: a write already on its way is sent, and nothing more is written. What was written before stays on GitHub, such as an approval sent before the merge waited. A stopped pull request is not gone on with at the next launch, and `.` does not offer it again; to merge it after all, press `u` to bring the selection back and `M`.
+
+A pull request on auto-merge or in a merge queue is GitHub's to merge, and `X` leaves it alone. Turn auto-merge off, or take it out of the queue, on GitHub.
+
 ## Waiting survives quitting
 
-There is no background process. What a merge or an approval is waiting for is recorded, and the next launch goes on with it, reading each pull request again first. Only the time gh-desk runs counts against the timeouts. A second gh-desk started meanwhile skips merges and approvals that would wait.
+There is no background process. What a merge or an approval is waiting for is recorded, and the next launch goes on with it, reading each pull request again first; what you stopped with `X` is not. Only the time gh-desk runs counts against the timeouts. A second gh-desk started meanwhile skips merges and approvals that would wait.
 
 See [`[merge]`](../reference/configuration.md#merge) and [`[checks]`](../reference/configuration.md#checks) for the settings.

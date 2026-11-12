@@ -23,7 +23,7 @@ type actionMenu struct {
 
 // menuActions are the actions the menu can offer, in their default order:
 // what reads a pull request, then what answers it, then what finishes it.
-var menuActions = []keymap.Action{"ask_claude", "browse", "review", "comment", "approve", "merge", "draft", "close", "hide"}
+var menuActions = []keymap.Action{"ask_claude", "browse", "review", "comment", "approve", "merge", "stop", "draft", "close", "hide"}
 
 // MenuActions are the actions the menu can offer, in their default order.
 func MenuActions() []string {
@@ -134,6 +134,8 @@ func (m *Model) aboutOne(a keymap.Action, p model.PR) (string, bool) {
 		return "close it, as the next popup says", false
 	case "comment":
 		return "comment on its conversation", false
+	case "stop":
+		return m.aboutStop([]model.PR{p})
 	case "review":
 		if m.own(p) {
 			return "comment in a review of your own pull request", false
@@ -187,6 +189,8 @@ func (m *Model) aboutMany(a keymap.Action, prs []model.PR) (string, bool) {
 			return "none of them can be merged", true
 		}
 		return of("merge", n), false
+	case "stop":
+		return m.aboutStop(prs)
 	case "draft":
 		kind, n, why := m.draftOf(prs)
 		switch {
@@ -350,6 +354,8 @@ func (m *Model) runMenu(it menuItem) tea.Cmd {
 		return m.startApprove()
 	case "merge":
 		return m.startBulk(runner.Merge)
+	case "stop":
+		return m.stopWork()
 	case "draft":
 		return m.startDraft()
 	case "close":

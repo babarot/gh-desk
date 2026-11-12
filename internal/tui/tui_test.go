@@ -189,6 +189,14 @@ type fakeRunner struct {
 	results  map[model.PRKey]runner.Event
 	resumed  []model.Pending
 	closes   []runner.CloseText
+	// stopped are the keys Stop was asked for, each call's in turn.
+	stopped [][]model.PRKey
+}
+
+// Stop asks for every key, as the runner does for a job at work.
+func (r *fakeRunner) Stop(keys []model.PRKey) []model.PRKey {
+	r.stopped = append(r.stopped, keys)
+	return keys
 }
 
 // StartClose closes each pull request, saying first that the comment was
