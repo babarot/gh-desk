@@ -311,6 +311,15 @@ func TestKeyLineUnderAPopup(t *testing.T) {
 			press(m, "R", "esc")
 			return m
 		}, "ctrl+s post · esc discard"},
+		{"triage's names offered over its text box", func(t *testing.T) *Model {
+			m, _ := startWith(t, fixture(), keymap.Default())
+			fakeClaudeOf(t, m)
+			press(m, "C", "#")
+			if len(m.askMenu()) == 0 {
+				t.Fatal("# offered no names")
+			}
+			return m
+		}, "esc close"},
 		{"? list", func(t *testing.T) *Model {
 			m, _ := startWith(t, fixture(), keymap.Default())
 			press(m, "?")
@@ -324,5 +333,24 @@ func TestKeyLineUnderAPopup(t *testing.T) {
 				t.Errorf("key line %q, want %q", got, c.want)
 			}
 		})
+	}
+}
+
+// The scope chooser tells the keys that move its list among those that
+// type nothing, as its text box takes letters, whatever order they are set
+// in.
+func TestScopeChooserTellsUntypedMovingKeys(t *testing.T) {
+	km, ps := keymap.Apply(keymap.Default(), map[string][]string{"up": {"k", "up"}, "down": {"j", "down"}})
+	if len(ps) > 0 {
+		t.Fatal(ps)
+	}
+	set, _ := scopedBy(ScopeOwner, "")
+	set.Viewer = "me"
+	m := New(fixture(), &fakeRunner{}, &fakeClaude{}, km, nil, set)
+	m.Update(tea.WindowSizeMsg{Width: 130, Height: 34})
+	run(m, m.Init())
+	press(m, "O")
+	if s := screen(m); !strings.Contains(s, "↑↓ move") || strings.Contains(s, "kj move") {
+		t.Errorf("the chooser does not tell the arrows:\n%s", s)
 	}
 }

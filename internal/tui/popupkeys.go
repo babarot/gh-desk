@@ -147,7 +147,7 @@ func (m *Model) popupHints(p popupSpec) (hs []popupHint, esc string) {
 	}
 	if l := p.list; l != nil {
 		if l.moveHint {
-			hs = append(hs, popupHint{key: arrowKey(m.firstKey("up")) + arrowKey(m.firstKey("down")), words: "move"})
+			hs = append(hs, popupHint{key: arrowKey(m.untypedKey("up")) + arrowKey(m.untypedKey("down")), words: "move"})
 		}
 		add("choose", l.chooseWords, false)
 	}
@@ -177,6 +177,17 @@ func (m *Model) popupHints(p popupSpec) (hs []popupHint, esc string) {
 		esc = cmp.Or(p.closeWords, "close")
 	}
 	return hs, esc
+}
+
+// untypedKey is the first key of a that types nothing, which reaches a
+// list beside a text box with the focus; the first key with none.
+func (m *Model) untypedKey(a keymap.Action) string {
+	for _, k := range m.keys.Keys(a) {
+		if len([]rune(k)) > 1 {
+			return k
+		}
+	}
+	return m.firstKey(a)
 }
 
 // arrowKey writes up and down as arrows, which take one cell.

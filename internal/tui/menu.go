@@ -329,7 +329,6 @@ func (m *Model) menuSpec() popupSpec {
 		return popupSpec{close: closeMenu}
 	}
 	v := m.menu
-	v.sel = min(v.sel, len(its)-1)
 	own := make([]ownKey, len(its))
 	for i, it := range its {
 		// The menu tells each item's key on its line.

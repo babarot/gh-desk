@@ -479,10 +479,11 @@ func (m *Model) hints() string {
 	recall := ""
 	switch {
 	case m.triage != nil && m.triage.open && m.triage.typing && len(m.askMenu()) > 0:
-		// Levels over the triage's text box that read their own keys.
-		as, back = []keymap.Action{"accept", "complete"}, "close"
+		// Levels over the triage's text box that read their own keys, and
+		// tell them in the popup's frame (ADR-126).
+		back = "close"
 	case m.triage != nil && m.triage.open && m.triage.typing && m.triage.search != nil:
-		as, back = []keymap.Action{"accept", "history_search"}, "cancel"
+		back = "cancel"
 	case m.popupOpen():
 		// A popup tells its keys in its frame; the key line holds only its
 		// most important ones (ADR-125).
