@@ -170,7 +170,7 @@ func (m *Model) popupHints(p popupSpec) (hs []popupHint, esc string) {
 	}
 	switch {
 	case p.back != nil:
-		esc = p.backWords
+		esc = cmp.Or(p.backWords, "back")
 	case typing && t.blur != nil:
 		esc = cmp.Or(t.blurWords, "done writing")
 	default:

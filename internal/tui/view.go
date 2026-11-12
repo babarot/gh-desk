@@ -436,14 +436,8 @@ var toldInPlace = map[keymap.Action]bool{
 	"retry": true, "chat_restart": true, "release_notes": true,
 }
 
-// hints is the key line of what has the focus. It holds the ways in (the
-// menu of enter, and ? for every key) and the keys nothing else on the
-// screen tells: the menu shows what can be done to a pull request, the
-// preview pane its own keys, and the header the key of the events.
 // openPopup is the popup that takes the keys, as the shared popup layer
 // reads it, in the order Model.key looks for one; ok is false with none.
-func (m *Model) popupOpen() bool { _, ok := m.openPopup(); return ok }
-
 func (m *Model) openPopup() (popupSpec, bool) {
 	switch {
 	case m.bulk != nil:
@@ -470,6 +464,13 @@ func (m *Model) openPopup() (popupSpec, bool) {
 	return popupSpec{}, false
 }
 
+// popupOpen reports whether a popup takes the keys.
+func (m *Model) popupOpen() bool { _, ok := m.openPopup(); return ok }
+
+// hints is the key line of what has the focus. It holds the ways in (the
+// menu of enter, and ? for every key) and the keys nothing else on the
+// screen tells: the menu shows what can be done to a pull request, the
+// preview pane its own keys, and the header the key of the events.
 func (m *Model) hints() string {
 	var as []keymap.Action
 	// esc is told where it steps back; on the list it clears a selection or

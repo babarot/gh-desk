@@ -308,10 +308,6 @@ func stateWords(s model.PRState) string {
 	return "not open"
 }
 
-// menuSpec is the menu as the shared popup layer reads it: a list of the
-// actions, each also run by its own key (ADR-125). It changes nothing, so
-// that the hints can be drawn from it; with nothing to act on it holds no
-// list, and the keys close the menu (menuGone).
 // menuGone closes the menu when there is nothing left for it to act on,
 // and reports whether it did.
 func (m *Model) menuGone() bool {
@@ -322,6 +318,10 @@ func (m *Model) menuGone() bool {
 	return true
 }
 
+// menuSpec is the menu as the shared popup layer reads it: a list of the
+// actions, each also run by its own key (ADR-125). It changes nothing, so
+// that the hints can be drawn from it; with nothing to act on it holds no
+// list, and the keys close the menu (menuGone).
 func (m *Model) menuSpec() popupSpec {
 	closeMenu := func() { m.menu = nil }
 	its := m.menuItems()
