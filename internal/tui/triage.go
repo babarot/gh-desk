@@ -57,6 +57,8 @@ type triage struct {
 	// shown (follow).
 	top    int
 	follow bool
+	// rows is how many lines of it the popup last showed.
+	rows int
 	// model is the model of the last answer.
 	model string
 	// history are the questions asked, the newest first, and recall the
@@ -189,21 +191,32 @@ func (m *Model) triageKey(msg tea.KeyPressMsg) tea.Cmd {
 		case k == keymap.Back, is("chat_close"):
 			m.closeTriage()
 		}
-	case k == keymap.Back:
-		m.closeTriage()
-	case is("triage_apply") && m.applicable():
-		return m.applyTriage()
-	case is("triage_more"):
-		return m.typeTriage()
-	case is("down"):
-		// Kept within the conversation when it is drawn.
-		tr.top++
-		tr.follow = false
-	case is("up"):
-		tr.top = max(tr.top-1, 0)
-		tr.follow = false
+	default:
+		return m.popupKey(m.triageSpec(), k)
 	}
 	return nil
+}
+
+// triageSpec is the triage, once Claude has answered, as the shared popup
+// layer reads it: a body of the conversation, with its own keys to apply
+// the plan and to ask more (ADR-125). While a question is typed or a
+// request is on its way, triageKey reads the keys itself.
+func (m *Model) triageSpec() popupSpec {
+	tr := m.triage
+	var own []ownKey
+	if m.applicable() {
+		own = append(own, ownKey{"triage_apply", m.applyTriage})
+	}
+	own = append(own, ownKey{"triage_more", m.typeTriage})
+	return popupSpec{
+		body: &popupBody{page: tr.rows, scroll: func(d int) {
+			// Kept within the conversation when it is drawn.
+			tr.top = max(tr.top+d, 0)
+			tr.follow = false
+		}},
+		own:   own,
+		close: m.closeTriage,
+	}
 }
 
 // askTriage sends a request with the lists as they are now.
@@ -640,6 +653,7 @@ func (m *Model) renderTriage() ([]string, int) {
 	}
 	out[0] = boxTop(st, title, info, w)
 	tr.top = top
+	tr.rows = bodyRows(m.popupHeight(), foot)
 	at := -1
 	if tr.typing {
 		// The text box opens the foot, above the bottom edge.

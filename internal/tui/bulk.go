@@ -32,8 +32,10 @@ type bulk struct {
 	loading bool
 	left    int
 	err     error
-	// offset is the first line of the popup's body shown.
+	// offset is the first line of the popup's body shown, and rows how
+	// many lines of it the popup last showed.
 	offset         int
+	rows           int
 	includeFailing bool
 	// waitJobs is set while approvals wait for the jobs at work on their
 	// head, as they do unless the user says otherwise.
@@ -410,37 +412,58 @@ func (m *Model) decideBulk() {
 	}
 }
 
-func (m *Model) bulkKey(k string) tea.Cmd {
+func (m *Model) bulkKey(k string) tea.Cmd { return m.popupKey(m.bulkSpec(), k) }
+
+// bulkSpec is the confirm popup as the shared popup layer reads it: a body
+// of what each pull request will have done to it, the write it asks to
+// confirm once every one is read again, and its own keys for what may be
+// changed of the write (ADR-125). Its text box, while it has the focus,
+// is read before the layer (bulkKeyMsg).
+func (m *Model) bulkSpec() popupSpec {
 	b := m.bulk
-	is := func(a keymap.Action) bool { return m.keys.Matches(a, k) }
-	switch {
-	case k == keymap.Back:
-		// A review being written is under the popup, and comes back.
-		if b.close != nil {
-			m.unsentClose = b.close.ta.Value()
+	var own []ownKey
+	if b.approves() && !b.loading {
+		own = append(own, ownKey{"include_failing", func() tea.Cmd {
+			b.includeFailing = !b.includeFailing
+			m.decideBulk()
+			return nil
+		}})
+		if b.atWork() > 0 {
+			own = append(own, ownKey{"wait_for_checks", func() tea.Cmd {
+				b.waitJobs = !b.waitJobs
+				m.decideBulk()
+				return nil
+			}})
 		}
-		m.bulk = nil
-		m.say("canceled")
-	case is("down"):
-		// Kept within the body when it is drawn.
-		b.offset++
-	case is("up"):
-		b.offset = max(b.offset-1, 0)
-	case is("include_failing") && b.approves() && !b.loading:
-		b.includeFailing = !b.includeFailing
-		m.decideBulk()
-	case is("wait_for_checks") && b.approves() && b.atWork() > 0 && !b.loading:
-		b.waitJobs = !b.waitJobs
-		m.decideBulk()
-	case is("delete_branch") && b.close != nil:
-		b.close.del = !b.close.del
-		m.decideBulk()
-	case is("write_comment") && b.close != nil:
-		return b.close.focus()
-	case is("confirm") && !b.loading:
-		return m.runBulk()
 	}
-	return nil
+	if b.close != nil {
+		own = append(own,
+			ownKey{"delete_branch", func() tea.Cmd {
+				b.close.del = !b.close.del
+				m.decideBulk()
+				return nil
+			}},
+			ownKey{"write_comment", b.close.focus})
+	}
+	return popupSpec{
+		// Kept within the body when it is drawn.
+		body: &popupBody{scroll: func(d int) { b.offset = max(b.offset+d, 0) }, page: b.rows},
+		question: &popupQuestion{confirm: func() tea.Cmd {
+			if b.loading {
+				return nil
+			}
+			return m.runBulk()
+		}},
+		own: own,
+		close: func() {
+			// A review being written is under the popup, and comes back.
+			if b.close != nil {
+				m.unsentClose = b.close.ta.Value()
+			}
+			m.bulk = nil
+			m.say("canceled")
+		},
+	}
 }
 
 // runBulk starts the batch: the pull requests of the popup leave the
@@ -748,6 +771,7 @@ func (m *Model) renderBulk() []string {
 		foot, inputAt := m.withCloseFoot(foot, inner)
 		out, top := scrollBox(st, title, lines, foot, w, m.popupHeight(), b.offset, keepLines{}, m.scrollKeys())
 		b.offset = top
+		b.rows = bodyRows(m.popupHeight(), foot)
 		m.placeCloseInput(out, foot, inputAt)
 		return out
 	}
@@ -768,6 +792,7 @@ func (m *Model) renderBulk() []string {
 	}
 	out, top := scrollBox(st, title, lines, foot, w, m.popupHeight(), b.offset, keepLines{}, m.scrollKeys())
 	b.offset = top
+	b.rows = bodyRows(m.popupHeight(), foot)
 	m.placeCloseInput(out, foot, inputAt)
 	return out
 }

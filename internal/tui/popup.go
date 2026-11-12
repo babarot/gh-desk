@@ -88,7 +88,7 @@ type keepLines struct{ from, n int }
 // to scroll. It returns the box and the top it drew from, for the caller
 // to keep.
 func scrollBox(st styles, title string, body, foot []string, w, h, top int, keep keepLines, keys string) ([]string, int) {
-	room := max(h-2-len(foot), 1)
+	room := bodyRows(h, foot)
 	if keep.n > 0 {
 		top = max(top, keep.from+keep.n-room)
 		top = min(top, keep.from)
@@ -101,6 +101,9 @@ func scrollBox(st styles, title string, body, foot []string, w, h, top int, keep
 	}
 	return out, top
 }
+
+// bodyRows is how many lines of its body a scrollBox h tall with foot shows.
+func bodyRows(h int, foot []string) int { return max(h-2-len(foot), 1) }
 
 // scrollEdge is the bottom edge of a box w wide that tells how many lines
 // are above and below what it shows, and the keys that scroll it.

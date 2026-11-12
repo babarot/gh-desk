@@ -93,7 +93,7 @@ func TestHelpScrolls(t *testing.T) {
 	if m.helpTop != end-wheelLines {
 		t.Errorf("the wheel scrolled to %d, want %d", m.helpTop, end-wheelLines)
 	}
-	press(m, "?", "?")
+	press(m, "esc", "?")
 	if !m.help || m.helpTop != 0 {
 		t.Errorf("? again opens the popup at %d, want its top", m.helpTop)
 	}

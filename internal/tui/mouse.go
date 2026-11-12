@@ -10,7 +10,6 @@ import (
 	"github.com/charmbracelet/x/ansi"
 
 	"github.com/babarot/gh-desk/internal/model"
-	"github.com/babarot/gh-desk/internal/tui/keymap"
 )
 
 // The mouse points: it picks a tab or a row, folds a group with a click,
@@ -486,9 +485,7 @@ func (m *Model) popupMouse(msg tea.MouseMsg) (cmd tea.Cmd, ok bool) {
 				return cmd, true
 			}
 		}
-		if m.scrollMouse(msg, &m.bulk.offset) {
-			return m.bulkKey(keymap.Back), true
-		}
+		m.popupBodyMouse(m.bulkSpec(), msg)
 	case m.notesAt != nil:
 		return m.popupListMouse(m.notesSpec(), msg), true
 	case m.picker != nil:
@@ -504,6 +501,8 @@ func (m *Model) popupMouse(msg tea.MouseMsg) (cmd tea.Cmd, ok bool) {
 		if p := m.menuSpec(); p.list != nil {
 			return m.popupListMouse(p, msg), true
 		}
+	case m.triage != nil && m.triage.open && !m.triage.typing && !m.triage.asking:
+		m.popupBodyMouse(m.triageSpec(), msg)
 	case m.triage != nil && m.triage.open:
 		tr := m.triage
 		top := tr.top
@@ -516,28 +515,9 @@ func (m *Model) popupMouse(msg tea.MouseMsg) (cmd tea.Cmd, ok bool) {
 			tr.follow = false
 		}
 	case m.help && m.relBox != nil:
-		if msg, ok := msg.(tea.MouseWheelMsg); ok {
-			switch msg.Button {
-			case tea.MouseWheelDown:
-				m.scrollReleaseNotes(wheelLines)
-			case tea.MouseWheelUp:
-				m.scrollReleaseNotes(-wheelLines)
-			}
-		}
+		m.popupBodyMouse(m.releaseSpec(), msg)
 	case m.help:
-		switch msg := msg.(type) {
-		case tea.MouseClickMsg:
-			if msg.Button == tea.MouseLeft {
-				m.helpClick(msg.X, msg.Y)
-			}
-		case tea.MouseWheelMsg:
-			switch msg.Button {
-			case tea.MouseWheelDown:
-				m.scrollHelp(wheelLines)
-			case tea.MouseWheelUp:
-				m.scrollHelp(-wheelLines)
-			}
-		}
+		m.popupBodyMouse(m.helpSpec(), msg)
 	case m.compose != nil:
 	default:
 		return nil, false

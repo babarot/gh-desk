@@ -4,7 +4,7 @@ desk // @me    1 review (3)   2 mine (1)   3 involved (0)   4 inbox (1)
   ▾ requested from you 1
 ▎ ● api#12                    Add retries to the client       alice           ✓          ○        you         +40 −3         3h
   ▸ requested from a team 1
-  ▸ bots 1                       ╭ keys · z fold · ? esc close ─────────────────────────────────╮
+  ▸ bots 1                       ╭ keys · z fold · esc close ───────────────────────────────────╮
                                  │           gh-desk 0.7.0 · https://github.com/babarot/gh-desk │
                                  │                     0.8.0 is out · gh extension upgrade desk │
                                  │                                              w release notes │
@@ -41,8 +41,8 @@ L4 0-127 fg=#706f87
 L5 2-27 fg=#706f87
 L6 2-10 fg=#706f87
 L6 33-34 fg=#96bfff
-L6 35-62 fg=#d0d6e8 bold
-L6 63-97 fg=#96bfff
+L6 35-60 fg=#d0d6e8 bold
+L6 61-97 fg=#96bfff
 L7 33-34 fg=#96bfff
 L7 45-95 fg=#706f87
 L7 96-97 fg=#96bfff

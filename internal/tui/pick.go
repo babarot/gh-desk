@@ -251,8 +251,7 @@ func (m *Model) pickSpec() popupSpec {
 				return m.filterByRules(chosen)
 			}},
 		},
-		opener: "select_rule",
-		close:  func() { m.picker = nil },
+		close: func() { m.picker = nil },
 	}
 }
 
