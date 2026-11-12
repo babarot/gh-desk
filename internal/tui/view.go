@@ -59,6 +59,14 @@ func (m *Model) render() (string, *tea.Cursor) {
 	b.WriteString(fit(m.statusText(), m.width) + "\n")
 	b.WriteString(fit(m.hints(), m.width))
 	lines := m.drawArmed(strings.Split(b.String(), "\n"))
+	// Popups are placed when the first of them opens, and stay where they
+	// are while any is open (ADR-127).
+	switch {
+	case !m.popupOpen():
+		m.popTop = 0
+	case m.popTop == 0:
+		m.popTop = m.placePopup()
+	}
 	if m.logv != nil && !m.logInPane() {
 		// Over the list's right side, from under the header to above the
 		// status line; what is under it is not dimmed, as it is no popup.
@@ -72,49 +80,49 @@ func (m *Model) render() (string, *tea.Cursor) {
 		// as wide, and esc there gives the text box back: no box is drawn
 		// over another (ADR-121).
 		popup, at := m.renderCompose()
-		lines = m.overlay(lines, popup, popupTop, m.width)
-		cur = inPopup(m.compose.ta.Cursor(), popup, popupTop+at, m.width)
+		lines = m.overlay(lines, popup, m.popupTop(), m.width)
+		cur = inPopup(m.compose.ta.Cursor(), popup, m.popupTop()+at, m.width)
 	}
 	switch {
 	case m.bulk != nil:
 		cur = nil
 		popup := m.renderBulk()
-		m.popupAt = boxAt(popup, popupTop, m.width)
-		lines = m.overlay(lines, popup, popupTop, m.width)
+		m.popupAt = boxAt(popup, m.popupTop(), m.width)
+		lines = m.overlay(lines, popup, m.popupTop(), m.width)
 		if f := m.bulk.close; f != nil && f.editing {
-			cur = inPopup(f.ta.Cursor(), popup, popupTop+f.at, m.width)
+			cur = inPopup(f.ta.Cursor(), popup, m.popupTop()+f.at, m.width)
 		}
 	case m.notesAt != nil:
 		cur = nil
 		popup := m.renderNotes()
-		m.popupAt = boxAt(popup, popupTop, m.width)
-		lines = m.overlay(lines, popup, popupTop, m.width)
+		m.popupAt = boxAt(popup, m.popupTop(), m.width)
+		lines = m.overlay(lines, popup, m.popupTop(), m.width)
 	case m.picker != nil:
 		cur = nil
 		popup := m.renderPick()
-		m.popupAt = boxAt(popup, popupTop, m.width)
-		lines = m.overlay(lines, popup, popupTop, m.width)
+		m.popupAt = boxAt(popup, m.popupTop(), m.width)
+		lines = m.overlay(lines, popup, m.popupTop(), m.width)
 	case m.chooser != nil:
 		popup, at := m.renderChooser()
-		m.popupAt = boxAt(popup, popupTop, m.width)
-		lines = m.overlay(lines, popup, popupTop, m.width)
-		cur = inPopup(m.chooser.input.Cursor(), popup, popupTop+at, m.width)
+		m.popupAt = boxAt(popup, m.popupTop(), m.width)
+		lines = m.overlay(lines, popup, m.popupTop(), m.width)
+		cur = inPopup(m.chooser.input.Cursor(), popup, m.popupTop()+at, m.width)
 	case m.menu != nil:
 		cur = nil
 		popup := m.renderMenu()
-		m.popupAt = boxAt(popup, popupTop, m.width)
-		lines = m.overlay(lines, popup, popupTop, m.width)
+		m.popupAt = boxAt(popup, m.popupTop(), m.width)
+		lines = m.overlay(lines, popup, m.popupTop(), m.width)
 	case m.triage != nil && m.triage.open:
 		popup, at := m.renderTriage()
-		m.popupAt = boxAt(popup, popupTop, m.width)
-		lines = m.overlay(lines, popup, popupTop, m.width)
+		m.popupAt = boxAt(popup, m.popupTop(), m.width)
+		lines = m.overlay(lines, popup, m.popupTop(), m.width)
 		cur = nil
 		if at >= 0 {
 			in := &m.triage.input
 			if s := m.triage.search; s != nil {
 				in = &s.input
 			}
-			cur = inPopup(in.Cursor(), popup, popupTop+at, m.width)
+			cur = inPopup(in.Cursor(), popup, m.popupTop()+at, m.width)
 		}
 	case m.help:
 		cur = nil
@@ -462,6 +470,33 @@ func (m *Model) openPopup() (popupSpec, bool) {
 		return m.composeSpec(), true
 	}
 	return popupSpec{}, false
+}
+
+// popupBoxHeight is how many lines the box of the popup open takes, drawn
+// as it would be now.
+func (m *Model) popupBoxHeight() int {
+	var box []string
+	switch {
+	case m.bulk != nil:
+		box = m.renderBulk()
+	case m.notesAt != nil:
+		box = m.renderNotes()
+	case m.picker != nil:
+		box = m.renderPick()
+	case m.chooser != nil:
+		box, _ = m.renderChooser()
+	case m.menu != nil:
+		box = m.renderMenu()
+	case m.triage != nil && m.triage.open:
+		box, _ = m.renderTriage()
+	case m.help && m.relBox != nil:
+		box = m.releaseNotesBox()
+	case m.help:
+		box, _ = m.helpBoxLines()
+	case m.compose != nil:
+		box, _ = m.renderCompose()
+	}
+	return len(box)
 }
 
 // popupOpen reports whether a popup takes the keys.

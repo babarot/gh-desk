@@ -1,6 +1,6 @@
 # Popups
 
-What a popup is in `internal/tui`, which popups there are, what each holds, and how they are drawn and read keys. The rules are in [ADR-121](../adr/121-no-popup-is-drawn-over-another.md) (one popup at a time), [ADR-079](../adr/079-what-takes-the-keys-says-so-by-its-frame.md) (the frame tells what takes the keys), [ADR-125](../adr/125-a-popup-reads-the-keys-of-what-it-holds.md) (keys come from what a popup holds; where it stands) and [ADR-126](../adr/126-the-key-line-under-a-popup-tells-its-writes.md) (the key line under a popup).
+What a popup is in `internal/tui`, which popups there are, what each holds, and how they are drawn and read keys. The rules are in [ADR-121](../adr/121-no-popup-is-drawn-over-another.md) (one popup at a time), [ADR-079](../adr/079-what-takes-the-keys-says-so-by-its-frame.md) (the frame tells what takes the keys), [ADR-125](../adr/125-a-popup-reads-the-keys-of-what-it-holds.md) (keys come from what a popup holds; where it stands) and [ADR-126](../adr/126-the-key-line-under-a-popup-tells-its-writes.md) (the key line under a popup) and [ADR-127](../adr/127-a-popup-opens-where-the-eye-is.md) (the row a popup opens on).
 
 ## What a popup is
 
@@ -8,7 +8,7 @@ A popup is a box drawn over the screen that takes every key while it is open. It
 
 1. The popup builds its lines (`renderMenu`, `renderBulk`, ...).
 2. `box` in [internal/tui](../../internal/tui) puts them in a frame, in the focus color.
-3. `overlay` in [view.go](../../internal/tui/view.go) dims the whole screen to one faint color and places the box over it, from `popupTop` and centered across.
+3. `overlay` in [view.go](../../internal/tui/view.go) dims the whole screen to one faint color and places the box over it, from the row popups are drawn from (`popupTop`) and centered across.
 
 `overlay` is how a popup is drawn, not a popup: it takes any lines. What is drawn over the screen without dimming it is not a popup and does not go through `overlay`: the log viewer, placed beside the list, and a notification's toast.
 
@@ -58,7 +58,9 @@ Every popup reads its keys through the shared layer in [popupkeys.go](../../inte
 
 ## Placement
 
-Every popup is drawn from `popupTop` in [popup.go](../../internal/tui/popup.go), grows down to `popupHeight` and scrolls its body past it, keeping its foot in sight. Its width is `popupWidth`, narrow or wide from two constants there; a popup that takes the place of another (the confirm popup of a review) is as wide as the one it replaces.
+A popup is placed when it opens with none open (`placePopup` in [popup.go](../../internal/tui/popup.go), called from `render` in [view.go](../../internal/tui/view.go)): a quarter down the screen, or higher for one too tall to fit below that, as far from the top of the list as from the status line, and never above `popupTopMost` (ADR-127). The row is kept in `Model.popTop` while popups are open, so one taking the place of another opens there, and is decided again on a resize or when a popup opens after all have closed. From that row a popup grows down to `popupHeight` and scrolls its body past it, keeping its foot in sight.
+
+Its width is `popupWidth`, narrow or wide from two constants there; a popup that takes the place of another (the confirm popup of a review) is as wide as the one it replaces.
 
 ## Diagrams
 
@@ -93,7 +95,7 @@ flowchart TB
     V["View"] --> R["the popup's lines"]
     R --> B["box: frame in the focus color, hints from its parts"]
     B --> O["overlay: dims the screen, places the box"]
-    PL["popupTop; narrow or wide"] -.-> O
+    PL["the row decided when the first popup opens; narrow or wide"] -.-> O
   end
 
   popups --> L

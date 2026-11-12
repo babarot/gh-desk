@@ -285,6 +285,16 @@ func (m *Model) releaseNotesLines(inner int) []string {
 // renderReleaseNotes draws the box of release notes over lines. It takes the
 // keys while it is open, so its frame is in the focus color (ADR-079).
 func (m *Model) renderReleaseNotes(lines []string) []string {
+	b := m.releaseNotesBox()
+	// From the row popups are drawn from, where a click outside it can be
+	// told (ADR-053, ADR-127).
+	m.popupAt = boxAt(b, m.popupTop(), m.width)
+	return m.overlay(lines, b, m.popupTop(), m.width)
+}
+
+// releaseNotesBox is the box of release notes: the part of the notes
+// scrolled to.
+func (m *Model) releaseNotesBox() []string {
 	st := m.st
 	w := m.releaseNotesWidth()
 	all := m.releaseNotesLines(w - 4)
@@ -296,8 +306,5 @@ func (m *Model) renderReleaseNotes(lines []string) []string {
 	if len(all) > h {
 		b[len(b)-1] = scrollEdge(st, w, top, len(all)-top-h, m.scrollKeys()+" wheel")
 	}
-	// From the row every popup is drawn from, where a click outside it
-	// can be told (ADR-053, ADR-125).
-	m.popupAt = boxAt(b, popupTop, m.width)
-	return m.overlay(lines, b, popupTop, m.width)
+	return b
 }

@@ -246,6 +246,9 @@ type Model struct {
 	helpBox       helpBox
 	// popupAt is where the popup shown was last drawn, for the mouse.
 	popupAt popupBox
+	// popTop is the row the popups open now are drawn from, decided when
+	// the first of them opened (placePopup); 0 with none open.
+	popTop int
 	// line is what the status line says (ADR-025), and statusTickAt when
 	// the redraw asked for it is due.
 	line         statusline.Line
@@ -500,6 +503,8 @@ func (m *Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.width, m.height = msg.Width, msg.Height
+		// A popup open is placed again on the new screen.
+		m.popTop = 0
 		if m.logInPane() && m.layout().pane == 0 {
 			// No room left for the log viewer; it would take the keys
 			// unseen.
