@@ -772,7 +772,8 @@ func TestActionMenuSelection(t *testing.T) {
 	if m.menu != nil || m.compose == nil || len(m.compose.prs) != 2 {
 		t.Fatalf("review did not open for the selection: %+v", m.compose)
 	}
-	press(m, "esc", "enter", "A")
+	// esc leaves the review's text box, and then throws it away.
+	press(m, "esc", "esc", "enter", "A")
 	if m.menu != nil || m.bulk == nil || m.bulk.kind != runner.Review {
 		t.Fatalf("approve did not open the approve popup for the selection: %v", m.bulk)
 	}
@@ -1029,12 +1030,25 @@ func TestComposePopup(t *testing.T) {
 	press(m, "c")
 	run(m, m.paste(tea.PasteMsg{Content: "Does this retry on a 429?"}))
 	golden(t, "comment", m)
-	press(m, "esc", "R")
+	press(m, "esc", "esc", "R")
 	run(m, m.paste(tea.PasteMsg{Content: "Does this retry on a 429?"}))
 	golden(t, "compose", m)
+	// esc leaves the text box first, keeping the text, and throws it
+	// away only from outside it (ADR-125).
 	press(m, "esc")
+	if m.compose == nil || m.compose.ta.Focused() || m.compose.ta.Value() != "Does this retry on a 429?" {
+		t.Fatalf("the first esc closed the popup or lost the text: %v", m.compose)
+	}
+	if s := screen(m); !strings.Contains(s, "esc discard") || !strings.Contains(s, "write") {
+		t.Errorf("out of the text box, the foot does not say how to write or discard:\n%s", s)
+	}
+	press(m, "i")
+	if !m.compose.ta.Focused() {
+		t.Error("write did not put the focus back in the text box")
+	}
+	press(m, "esc", "esc")
 	if m.compose != nil {
-		t.Errorf("esc left compose %v", m.compose)
+		t.Errorf("esc twice left compose %v", m.compose)
 	}
 }
 

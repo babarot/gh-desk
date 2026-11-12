@@ -11,7 +11,6 @@ import (
 	"github.com/babarot/gh-desk/internal/model"
 	"github.com/babarot/gh-desk/internal/plan"
 	"github.com/babarot/gh-desk/internal/runner"
-	"github.com/babarot/gh-desk/internal/tui/keymap"
 )
 
 // closeForm is what the confirm popup of a close holds besides its pull
@@ -157,22 +156,30 @@ func (m *Model) basedOnRead(msg basedOnMsg) {
 	m.decideBulk()
 }
 
-// bulkKeyMsg routes a key in the confirm popup: into the text box of a
-// close while it has the focus, to the popup's keys otherwise.
-func (m *Model) bulkKeyMsg(msg tea.KeyPressMsg) tea.Cmd {
-	if f := m.bulk.close; f != nil && f.editing {
-		if msg.String() == keymap.Back {
+// bulkKeyMsg reads a key in the confirm popup, through the shared popup
+// layer.
+func (m *Model) bulkKeyMsg(msg tea.KeyPressMsg) tea.Cmd { return m.popupKey(m.bulkSpec(), msg) }
+
+// closeText is the text box of a close's comment as the shared popup layer
+// reads it: write puts the focus in it, esc takes it out, and what is
+// typed decides the popup again, as the comment changes what it does.
+func (m *Model) closeText(f *closeForm) *popupText {
+	return &popupText{
+		focused: f.editing,
+		focus:   f.focus,
+		blur: func() {
 			f.editing = false
 			f.ta.Blur()
 			m.decideBulk()
-			return nil
-		}
-		var cmd tea.Cmd
-		f.ta, cmd = f.ta.Update(msg)
-		m.decideBulk()
-		return cmd
+		},
+		edit: func(msg tea.Msg) tea.Cmd {
+			var cmd tea.Cmd
+			f.ta, cmd = f.ta.Update(msg)
+			m.decideBulk()
+			return cmd
+		},
+		editNav: navActions,
 	}
-	return m.bulkKey(msg.String())
 }
 
 // closePaste puts pasted text into the text box of a close, only while it

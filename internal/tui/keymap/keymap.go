@@ -47,6 +47,9 @@ const (
 var borrowed = map[Scope][]Action{
 	ScopeHelp: {"fold"},
 	ScopeChat: {"complete", "expand"},
+	// The confirm popup of a close and the triage hold a text box.
+	ScopeConfirm: {"write"},
+	ScopeTriage:  {"write"},
 }
 
 // claims are the actions that may share the keys of a nav action, by the
@@ -142,18 +145,19 @@ var Defaults = []Def{
 	{"toggle_rule", ScopePopup, []string{"space"}, "check a rule"},
 	{"add_to_selection", ScopePopup, []string{"a"}, "add to the selection"},
 	{"filter_by_rule", ScopePopup, []string{"f"}, "show only these"},
+	// write puts the focus in a popup's text box, in every popup that has
+	// one (ADR-125).
+	{"write", ScopePopup, []string{"i"}, "write"},
 
 	// A confirm popup reads no choose, so enter answers it too.
 	{"confirm", ScopeConfirm, []string{"y", "enter"}, "yes"},
 	{"include_failing", ScopeConfirm, []string{"f"}, "include failing"},
 	{"wait_for_checks", ScopeConfirm, []string{"w"}, "wait for checks"},
 	{"delete_branch", ScopeConfirm, []string{"x"}, "delete branches"},
-	{"write_comment", ScopeConfirm, []string{"i"}, "write a comment"},
 
 	{"log_this_pr", ScopeLog, []string{"f"}, "this PR only"},
 
 	{"triage_apply", ScopeTriage, []string{"enter"}, "apply"},
-	{"triage_more", ScopeTriage, []string{"i"}, "ask more"},
 
 	// The text box has the focus while nothing is on its way, so these
 	// keys are not ones it types.
@@ -184,6 +188,8 @@ var Defaults = []Def{
 // entry under an old name is a mistake that names the new one; the old name
 // is not read (ADR-023).
 var renamed = map[string]Action{
+	"write_comment":    "write",
+	"triage_more":      "write",
 	"open":             "menu",
 	"ready_for_review": "draft",
 	"fill_suggestion":  "complete",

@@ -50,13 +50,12 @@ A popup's own keys are declared for the state it is in, and are read after the k
 
 ### Today
 
-The shared layer in [popupkeys.go](../../internal/tui/popupkeys.go) reads lists, bodies and the question that writes. The menu, the picker and the notifications declare a list (`menuSpec`, `pickSpec`, `notesSpec`); the `?` list, the release notes, the confirm popup and the triage once Claude has answered declare a body (`helpSpec`, `releaseSpec`, `bulkSpec`, `triageSpec`), and the confirm popup its question. Their mouse input goes through the same layer. Text boxes are not in it yet: the comment of a close while it has the focus (`bulkKeyMsg`), the triage while a question is typed or a request is on its way (`triageKey`), the scope chooser (`chooserKey`) and the comment and the review (`composeKey`) read their keys themselves, so the parts above still take different keys there:
+Every popup reads its keys through the shared layer in [popupkeys.go](../../internal/tui/popupkeys.go), in the order of ADR-125: each declares its parts and its own keys for the state it is in (`menuSpec`, `pickSpec`, `notesSpec`, `chooserSpec`, `helpSpec`, `releaseSpec`, `bulkSpec`, `composeSpec`, `triageSpec`). Their mouse input goes through the same layer, but for the triage while a question is typed or a request is on its way. Two levels over the triage's text box still read their keys before the layer: the list of names offered while `#` or `@` is typed (`askMenuKey`) and the search of the questions (`searchKey`), whose cursors are `askbox`'s own. What is left of the old shape:
 
-- Lists move on `up` and `down` everywhere, whose keys include `ctrl+n` and `ctrl+p`; on `top`, `bottom` and by page in the menu, the picker and the notifications, not in the scope chooser or the triage's list of names. Bodies scroll on all of nav.
+- Lists move on all of nav, but the triage's list of names and its search, which move on `up` and `down` only. The scope chooser's one-line text box keeps `top`, `bottom` and the page keys for editing.
 - `history_next` and `history_prev` claim the keys of `down` and `up` ([keymap](../../internal/tui/keymap)): a text box tries them first, and moves its cursor when there is nothing to recall.
-- `esc` alone closes the popups on the shared layer; the action that opened one does not, and `quit` is read in no popup.
-- `esc` throws a comment or a review away at once.
-- Entering a text box is `write_comment` in the confirm of a close and `triage_more` in the triage, which happen to share a default key.
+- `esc` alone closes a popup; the action that opened one does not, and `quit` is read in no popup. A comment or a review is thrown away by the second `esc`, the first leaving its text box.
+- `write` enters a text box in every popup that has one.
 - The foot of each popup is written by hand, apart from the key line the keymap makes.
 
 ## Placement
@@ -73,11 +72,8 @@ Today: seven popups are drawn from `popupTop`. The `?` list and the release note
 flowchart TB
   subgraph keys["keys"]
     K["Model.key"] --> SW{"which popup is open"}
-    SW --> SH["popupKey: menu, picker, notifications, ?, release notes, confirm, triage answered"]
-    SW --> BK["bulkKeyMsg: the comment of a close"]
-    SW --> CK["chooserKey"]
-    SW --> TK["triageKey: typing, a request on its way"]
-    SW --> CPK["composeKey"]
+    SW --> SH["popupKey: every popup"]
+    SW --> TK["askMenuKey, searchKey: levels over the triage's text box"]
   end
   subgraph draw["drawing"]
     V["View"] --> RS["renderMenu, renderBulk, ..."]

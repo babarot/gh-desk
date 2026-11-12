@@ -518,7 +518,8 @@ func TestChatRecall(t *testing.T) {
 	press(m, "i", "o", "n", "e", "enter")
 	c := m.chat()
 	press(m, "t", "w", "o", "enter", "ctrl+x")
-	press(m, "esc")
+	// The drafted review's popup: esc leaves its text box, then closes it.
+	press(m, "esc", "esc")
 	press(m, "i")
 	press(m, "up")
 	if got := c.input.Value(); got != "two" {

@@ -200,3 +200,59 @@ func TestPopupBodiesClose(t *testing.T) {
 		t.Error("esc did not close the triage")
 	}
 }
+
+// In the comment of a close, every key is typed and none confirms or
+// changes the popup: enter is a new line, and y, x, f and w are letters
+// (ADR-066, ADR-125). esc takes the focus out, and the popup's keys work
+// again.
+func TestCloseCommentTakesEveryKey(t *testing.T) {
+	m, r := startWith(t, fixture(), keymap.Default())
+	press(m, "enter")
+	for i, it := range m.menuItems() {
+		if it.action == "close" {
+			m.menu.sel = i
+		}
+	}
+	press(m, "enter")
+	if m.bulk == nil || m.bulk.close == nil {
+		t.Fatal("close did not open its popup")
+	}
+	del := m.bulk.close.del
+	press(m, "i", "y", "x", "enter", "f", "w")
+	if m.bulk == nil || len(r.closes) != 0 {
+		t.Fatalf("a key in the comment confirmed the close: %v", r.closes)
+	}
+	if got := m.bulk.close.ta.Value(); got != "yx\nfw" {
+		t.Errorf("the comment is %q, want %q", got, "yx\nfw")
+	}
+	if m.bulk.close.del != del {
+		t.Error("x in the comment changed whether the branches are deleted")
+	}
+	press(m, "esc", "x")
+	if m.bulk == nil || m.bulk.close.editing || m.bulk.close.del == del {
+		t.Errorf("out of the comment, x did not change the check: editing %v", m.bulk.close.editing)
+	}
+}
+
+// The scope chooser types j and k, moves on the arrows and ctrl+n, and esc
+// closes it at once, as its text box has the focus as long as it is open.
+func TestScopeChooserKeys(t *testing.T) {
+	set, _ := scopedBy(ScopeOwner, "")
+	m := startSet(t, set, 130)
+	press(m, "O")
+	if m.chooser == nil {
+		t.Fatal("O did not open the chooser")
+	}
+	press(m, "j", "k")
+	if got := m.chooser.input.Value(); got != "jk" {
+		t.Errorf("typed %q, want jk", got)
+	}
+	press(m, "backspace", "backspace", "ctrl+n")
+	if m.chooser.sel != 1 {
+		t.Errorf("ctrl+n left the cursor on %d", m.chooser.sel)
+	}
+	press(m, "esc")
+	if m.chooser != nil {
+		t.Error("esc did not close the chooser")
+	}
+}
