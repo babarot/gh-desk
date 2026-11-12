@@ -373,12 +373,15 @@ func TestScopeChooserTellsUntypedMovingKeys(t *testing.T) {
 	}
 }
 
-// Every popup is drawn from the same row, in one of two widths: the ? list
-// and the release notes no longer stand centered, and a click outside the
-// release notes goes back to the ? list, as a click outside a popup closes
-// it (ADR-053, ADR-125).
-func TestPopupsStandAtTheTop(t *testing.T) {
+// A popup opens a quarter down the screen, or higher when it would not fit
+// below that, and stays there while popups are open: one taking the place
+// of another, or changing its height, does not move (ADR-127). A click
+// outside the release notes goes back to the ? list (ADR-053). Popups are
+// one of two widths (ADR-125).
+func TestPopupsStandWhereTheEyeIs(t *testing.T) {
 	m := startReleases(t, &Release{Running: "0.7.0", How: "gh extension upgrade desk", Latest: "0.8.0", Source: &fakeReleases{list: releaseList()}})
+	// The first row that opens a box, under the header and the column
+	// heads, and not the preview's.
 	top := func() int {
 		for i, l := range strings.Split(screen(m), "\n") {
 			if strings.Contains(l, "╭") && !strings.Contains(l, "overview") && !strings.Contains(l, "preview") {
@@ -387,13 +390,36 @@ func TestPopupsStandAtTheTop(t *testing.T) {
 		}
 		return -1
 	}
+	quarter := m.height / 4
+	press(m, "enter")
+	if got := top(); got != quarter {
+		t.Errorf("the menu is drawn from row %d, want a quarter down, %d", got, quarter)
+	}
+	press(m, "A")
+	if m.bulk == nil {
+		t.Fatal("A in the menu did not open the confirm popup")
+	}
+	if got := top(); got != quarter {
+		t.Errorf("the confirm popup that took the menu's place is drawn from row %d, want %d", got, quarter)
+	}
+	press(m, "esc")
+	screen(m)
+	if m.popTop != 0 {
+		t.Errorf("with no popup open the row is kept: %d", m.popTop)
+	}
+	// The ? list does not fit below a quarter down, and is centered.
 	press(m, "?")
-	if got := top(); got != popupTop {
-		t.Errorf("the ? list is drawn from row %d, want %d", got, popupTop)
+	if got := top(); got >= quarter {
+		t.Errorf("the ? list is drawn from row %d, not above a quarter down", got)
+	}
+	tall := top()
+	press(m, "z")
+	if got := top(); got != tall {
+		t.Errorf("folding a section moved the ? list from row %d to %d", tall, got)
 	}
 	press(m, "w")
-	if got := top(); got != popupTop {
-		t.Errorf("the release notes are drawn from row %d, want %d", got, popupTop)
+	if got := top(); got != tall {
+		t.Errorf("the release notes are drawn from row %d, want the ? list's %d", got, tall)
 	}
 	mouseAt(m, tea.MouseClickMsg{X: 1, Y: m.height - 3, Button: tea.MouseLeft})
 	if m.relBox != nil || !m.help {
@@ -423,5 +449,23 @@ func TestPopupsFitANarrowScreen(t *testing.T) {
 				t.Errorf("the top edge is %d wide in a box %d wide (info %q): %q", got, w, info, ansi.Strip(top))
 			}
 		}
+	}
+}
+
+// A notification's toast shows while a review is written, as on the screen
+// under it, and not over the other popups.
+func TestToastOverAReviewBeingWritten(t *testing.T) {
+	m, _ := startWith(t, fixture(), keymap.Default())
+	press(m, "R")
+	m.pushNote("✓", "merged elsewhere", []noteItem{{key: key("acme", "api", 12), text: "merged", result: runner.Merged}})
+	if m.toast == nil {
+		t.Fatal("a notification showed no toast")
+	}
+	if s := screen(m); !strings.Contains(s, "merged elsewhere") {
+		t.Errorf("no toast over the review being written:\n%s", s)
+	}
+	press(m, "esc", "esc", "enter")
+	if s := screen(m); strings.Contains(s, "merged elsewhere") {
+		t.Errorf("a toast over the menu:\n%s", s)
 	}
 }

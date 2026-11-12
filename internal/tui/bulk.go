@@ -415,7 +415,7 @@ func (m *Model) decideBulk() {
 // of what each pull request will have done to it, the write it asks to
 // confirm once every one is read again, and its own keys for what may be
 // changed of the write (ADR-125). Its text box, while it has the focus,
-// is read before the layer (bulkKeyMsg).
+// is read first, as the layer reads a text box with the focus.
 func (m *Model) bulkSpec() popupSpec {
 	b := m.bulk
 	var own []ownKey
@@ -463,7 +463,20 @@ func (m *Model) bulkSpec() popupSpec {
 	if b.loading {
 		closeWords = "cancel"
 	}
+	// The check and the text box of a close take their clicks.
+	var mouse func(tea.MouseMsg) (tea.Cmd, bool)
+	if b.close != nil {
+		mouse = m.closeMouse
+	}
 	return popupSpec{
+		mouse: mouse,
+		draw: func() ([]string, int) {
+			lines, at := m.renderBulk(), -1
+			if f := b.close; f != nil && f.editing {
+				at = f.at
+			}
+			return lines, at
+		},
 		closeWords: closeWords,
 		question:   question,
 		// Kept within the body when it is drawn.

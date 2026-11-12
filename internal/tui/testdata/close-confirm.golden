@@ -1,10 +1,16 @@
 -- screen --
 desk // @me    1 review (3)   2 mine (1)   3 involved (0)   4 inbox (1)
     PR                        TITLE                           AUTHOR          CI  MERGE  REVIEW   WHY         SIZE          AGE
-  ▾ reques╭ close ─────────────────────────────────────────────────────────────────────────────────────────────────────╮
-▎ ● api#12│ ✓ acme/api#12 Add retries to the client                                                                    │     3h
-  ▸ reques│   └ close                                                                                                  │
-  ▸ bots 1│                                                                                                            │
+  ▾ requested from you 1
+▎ ● api#12                    Add retries to the client       alice           ✓          ○        you         +40 −3         3h
+  ▸ requested from a team 1
+  ▸ bots 1
+
+
+          ╭ close ─────────────────────────────────────────────────────────────────────────────────────────────────────╮
+          │ ✓ acme/api#12 Add retries to the client                                                                    │
+          │   └ close                                                                                                  │
+          │                                                                                                            │
           │ A closed pull request can be reopened. Each acts only on the head shown when it was read.                  │
           │                                                                                                            │
           │ [ ] delete the head branches  1 of 1 can be deleted                                                        │
@@ -13,16 +19,10 @@ desk // @me    1 review (3)   2 mine (1)   3 involved (0)   4 inbox (1)
           │ ┃   1 Leave a comment (markdown)                                                                           │
           │ ┃ ~                                                                                                        │
           │ ┃ ~                                                                                                        │
-          │ ┃ ~                                                                                                        │
-          │                                                                                                            │
-          │ close this pull request? y yes · i write a comment · x delete branches · esc no                            │
-          ╰────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
-
-
-╭  overview   diff (2)  ────────────────────────────────────────────────────────────────────────────────── acme/api#12 · J/K · v ╮
-│ #12 Add retries to the client                                                       alice │ status    open                     │
-│ ▾ description ─────────────────────────────────────────────────────────────────────────── │ merge     approve → merge now      │
-│ │ What                                                                                    │ requested me @core                 │
+╭  overvie│ ┃ ~                                                                                                        │ J/K · v ╮
+│ #12 Add │                                                                                                            │         │
+│ ▾ descri│ close this pull request? y yes · i write a comment · x delete branches · esc no                            │now      │
+│ │ What  ╰────────────────────────────────────────────────────────────────────────────────────────────────────────────╯         │
 │ │ Retry failed requests.                                                                  │ checks    ✓1                       │
 │ ╵                                                                                         │ size      +40 −3 · 2 files         │
 │                                                                                           │ branch    retries                  │
@@ -36,75 +36,78 @@ y yes · esc no
 -- styles --
 L1 0-71 fg=#706f87
 L2 4-127 fg=#706f87
-L3 2-10 fg=#706f87
-L3 10-11 fg=#96bfff
-L3 12-17 fg=#d0d6e8 bold
-L3 18-120 fg=#96bfff
-L4 0-10 fg=#706f87
-L4 10-11 fg=#96bfff
-L4 12-13 fg=#d4b0ff
-L4 14-22 fg=#d0d6e8
-L4 22-25 fg=#8888a4
-L4 26-51 fg=#d0d6e8
-L4 119-120 fg=#96bfff
-L4 125-127 fg=#706f87
-L5 2-10 fg=#706f87
-L5 10-11 fg=#96bfff
-L5 14-15 fg=#525270
-L5 16-21 fg=#b5f0b0
-L5 119-120 fg=#96bfff
+L3 2-24 fg=#706f87
+L4 0-127 fg=#706f87
+L5 2-27 fg=#706f87
 L6 2-10 fg=#706f87
-L6 10-120 fg=#96bfff
-L7 10-11 fg=#96bfff
-L7 12-101 fg=#706f87
-L7 119-120 fg=#96bfff
-L8 10-120 fg=#96bfff
 L9 10-11 fg=#96bfff
-L9 12-15 fg=#d4b0ff bold
-L9 16-40 fg=#e0e4f0
-L9 42-63 fg=#8888a4
-L9 119-120 fg=#96bfff
-L10 10-120 fg=#96bfff
+L9 12-17 fg=#d0d6e8 bold
+L9 18-120 fg=#96bfff
+L10 10-11 fg=#96bfff
+L10 12-13 fg=#d4b0ff
+L10 14-22 fg=#d0d6e8
+L10 22-25 fg=#8888a4
+L10 26-51 fg=#d0d6e8
+L10 119-120 fg=#96bfff
 L11 10-11 fg=#96bfff
-L11 12-19 fg=#8888a4
-L11 20-30 fg=#706f87
+L11 14-15 fg=#525270
+L11 16-21 fg=#b5f0b0
 L11 119-120 fg=#96bfff
-L12 10-11 fg=#96bfff
-L12 12-17 fg=c7
-L12 18-44 fg=c240
-L12 119-120 fg=#96bfff
+L12 10-120 fg=#96bfff
 L13 10-11 fg=#96bfff
-L13 12-13 fg=c7
-L13 14-15 fg=c0
+L13 12-101 fg=#706f87
 L13 119-120 fg=#96bfff
-L14 10-11 fg=#96bfff
-L14 12-13 fg=c7
-L14 14-15 fg=c0
-L14 119-120 fg=#96bfff
+L14 10-120 fg=#96bfff
 L15 10-11 fg=#96bfff
-L15 12-13 fg=c7
-L15 14-15 fg=c0
+L15 12-15 fg=#d4b0ff bold
+L15 16-40 fg=#e0e4f0
+L15 42-63 fg=#8888a4
 L15 119-120 fg=#96bfff
 L16 10-120 fg=#96bfff
 L17 10-11 fg=#96bfff
-L17 12-36 fg=#b0b8d1
-L17 37-38 fg=#96bfff bold
-L17 39-42 fg=#8888a4
-L17 43-44 fg=#706f87
-L17 45-46 fg=#96bfff bold
-L17 47-62 fg=#8888a4
-L17 63-64 fg=#706f87
-L17 65-66 fg=#96bfff bold
-L17 67-82 fg=#8888a4
-L17 83-84 fg=#706f87
-L17 85-88 fg=#96bfff bold
-L17 89-91 fg=#8888a4
+L17 12-19 fg=#8888a4
+L17 20-30 fg=#706f87
 L17 119-120 fg=#96bfff
-L18 10-120 fg=#96bfff
-L21 0-130 fg=#706f87
-L22 0-130 fg=#706f87
-L23 0-130 fg=#706f87
-L24 0-130 fg=#706f87
+L18 10-11 fg=#96bfff
+L18 12-17 fg=c7
+L18 18-44 fg=c240
+L18 119-120 fg=#96bfff
+L19 10-11 fg=#96bfff
+L19 12-13 fg=c7
+L19 14-15 fg=c0
+L19 119-120 fg=#96bfff
+L20 10-11 fg=#96bfff
+L20 12-13 fg=c7
+L20 14-15 fg=c0
+L20 119-120 fg=#96bfff
+L21 0-10 fg=#706f87
+L21 10-11 fg=#96bfff
+L21 12-13 fg=c7
+L21 14-15 fg=c0
+L21 119-120 fg=#96bfff
+L21 121-130 fg=#706f87
+L22 0-9 fg=#706f87
+L22 10-120 fg=#96bfff
+L22 129-130 fg=#706f87
+L23 0-10 fg=#706f87
+L23 10-11 fg=#96bfff
+L23 12-36 fg=#b0b8d1
+L23 37-38 fg=#96bfff bold
+L23 39-42 fg=#8888a4
+L23 43-44 fg=#706f87
+L23 45-46 fg=#96bfff bold
+L23 47-62 fg=#8888a4
+L23 63-64 fg=#706f87
+L23 65-66 fg=#96bfff bold
+L23 67-82 fg=#8888a4
+L23 83-84 fg=#706f87
+L23 85-88 fg=#96bfff bold
+L23 89-91 fg=#8888a4
+L23 119-120 fg=#96bfff
+L23 120-130 fg=#706f87
+L24 0-8 fg=#706f87
+L24 10-120 fg=#96bfff
+L24 129-130 fg=#706f87
 L25 0-130 fg=#706f87
 L26 0-130 fg=#706f87
 L27 0-130 fg=#706f87

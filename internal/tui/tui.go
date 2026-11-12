@@ -246,6 +246,9 @@ type Model struct {
 	helpBox       helpBox
 	// popupAt is where the popup shown was last drawn, for the mouse.
 	popupAt popupBox
+	// popTop is the row the popups open now are drawn from, decided when
+	// the first of them opened (placePopup); 0 with none open.
+	popTop int
 	// line is what the status line says (ADR-025), and statusTickAt when
 	// the redraw asked for it is due.
 	line         statusline.Line
@@ -500,6 +503,8 @@ func (m *Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.width, m.height = msg.Width, msg.Height
+		// A popup open is placed again on the new screen.
+		m.popTop = 0
 		if m.logInPane() && m.layout().pane == 0 {
 			// No room left for the log viewer; it would take the keys
 			// unseen.
@@ -579,30 +584,13 @@ func (m *Model) key(msg tea.KeyPressMsg) tea.Cmd {
 	if k == keymap.Interrupt {
 		return tea.Quit
 	}
+	// The popup open reads every key, through its declaration.
+	if p, ok := m.openPopup(); ok {
+		return m.popupKey(p, msg)
+	}
 	switch {
-	case m.bulk != nil:
-		return m.bulkKeyMsg(msg)
-	case m.notesAt != nil:
-		return m.popupKey(m.notesSpec(), msg)
-	case m.picker != nil:
-		return m.popupKey(m.pickSpec(), msg)
-	case m.chooser != nil:
-		return m.popupKey(m.chooserSpec(), msg)
-	case m.menu != nil:
-		if m.menuGone() {
-			return nil
-		}
-		return m.popupKey(m.menuSpec(), msg)
-	case m.triage != nil && m.triage.open:
-		return m.triageKey(msg)
-	case m.help && m.relBox != nil:
-		return m.popupKey(m.releaseSpec(), msg)
-	case m.help:
-		return m.popupKey(m.helpSpec(), msg)
 	case m.filtering:
 		return m.filterKey(msg)
-	case m.compose != nil:
-		return m.composeKey(msg)
 	case m.typingChat():
 		return m.chatTyping(msg)
 	}

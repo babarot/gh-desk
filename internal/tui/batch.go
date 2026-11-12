@@ -573,6 +573,7 @@ func (m *Model) noteLines() []noteLine {
 func (m *Model) notesSpec() popupSpec {
 	v := m.notesAt
 	return popupSpec{
+		draw:  func() ([]string, int) { return m.renderNotes(), -1 },
 		list:  &popupList{sel: &v.sel, n: len(m.noteLines()), ptr: &v.pointer, choose: m.chooseNote, chooseWords: "go to the pull request"},
 		close: func() { m.notesAt = nil },
 	}

@@ -1,10 +1,16 @@
 -- screen --
 desk // @me    1 review (3)   2 mine (1)   3 involved (0)   4 inbox (1)
     PR                        TITLE                           AUTHOR          CI  MERGE  REVIEW   WHY         SIZE          AGE
-  ▾ requested from you ╭ acme/api#12 ─────────────────────────────────────────────────────────────────────╮
-▎ ● api#12             │ Add retries to the client                                                        │   +40 −3         3h
-  ▸ requested from a te│                                                                                  │
-  ▸ bots 1             │ ▎ ask claude about it   i      talk with claude about its diff                   │
+  ▾ requested from you 1
+▎ ● api#12                    Add retries to the client       alice           ✓          ○        you         +40 −3         3h
+  ▸ requested from a team 1
+  ▸ bots 1
+
+
+                       ╭ acme/api#12 ─────────────────────────────────────────────────────────────────────╮
+                       │ Add retries to the client                                                        │
+                       │                                                                                  │
+                       │ ▎ ask claude about it   i      talk with claude about its diff                   │
                        │   browser               o      open it on github.com                             │
                        │   review                R      comment, approve or request changes in a review   │
                        │   comment               c      comment on its conversation                       │
@@ -13,16 +19,10 @@ desk // @me    1 review (3)   2 mine (1)   3 involved (0)   4 inbox (1)
                        │   stop                  X      not at work                                       │
                        │   draft / ready         D      someone else's pull request                       │
                        │   close                        close it, as the next popup says                  │
-                       │   hide / done           d      hide it from this tab                             │
-                       │                                                                                  │
-                       │ enter run · or the action's key · esc close                                      │
-                       ╰──────────────────────────────────────────────────────────────────────────────────╯
-
-
-╭  overview   diff (2)  ────────────────────────────────────────────────────────────────────────────────── acme/api#12 · J/K · v ╮
-│ #12 Add retries to the client                                                       alice │ status    open                     │
-│ ▾ description ─────────────────────────────────────────────────────────────────────────── │ merge     approve → merge now      │
-│ │ What                                                                                    │ requested me @core                 │
+╭  overview   diff (2) │   hide / done           d      hide it from this tab                             │acme/api#12 · J/K · v ╮
+│ #12 Add retries to th│                                                                                  │n                     │
+│ ▾ description ───────│ enter run · or the action's key · esc close                                      │rove → merge now      │
+│ │ What               ╰──────────────────────────────────────────────────────────────────────────────────╯@core                 │
 │ │ Retry failed requests.                                                                  │ checks    ✓1                       │
 │ ╵                                                                                         │ size      +40 −3 · 2 files         │
 │                                                                                           │ branch    retries                  │
@@ -36,79 +36,82 @@ esc close
 -- styles --
 L1 0-71 fg=#706f87
 L2 4-127 fg=#706f87
-L3 2-22 fg=#706f87
-L3 23-24 fg=#96bfff
-L3 25-36 fg=#d0d6e8 bold
-L3 37-107 fg=#96bfff
-L4 0-10 fg=#706f87
-L4 23-24 fg=#96bfff
-L4 25-50 fg=#b0b8d1
-L4 106-107 fg=#96bfff
-L4 110-127 fg=#706f87
-L5 2-23 fg=#706f87
-L5 23-107 fg=#96bfff
+L3 2-24 fg=#706f87
+L4 0-127 fg=#706f87
+L5 2-27 fg=#706f87
 L6 2-10 fg=#706f87
-L6 23-24 fg=#96bfff
-L6 25-27 fg=#96bfff bg=#3b3b52
-L6 27-49 fg=#d0d6e8 bg=#3b3b52
-L6 49-56 fg=#96bfff bg=#3b3b52 bold
-L6 56-105 fg=#8888a4 bg=#3b3b52
-L6 106-107 fg=#96bfff
-L7 23-24 fg=#96bfff
-L7 27-34 fg=#d0d6e8
-L7 49-50 fg=#96bfff bold
-L7 56-77 fg=#8888a4
-L7 106-107 fg=#96bfff
-L8 23-24 fg=#96bfff
-L8 27-33 fg=#d0d6e8
-L8 49-50 fg=#96bfff bold
-L8 56-103 fg=#8888a4
-L8 106-107 fg=#96bfff
 L9 23-24 fg=#96bfff
-L9 27-34 fg=#d0d6e8
-L9 49-50 fg=#96bfff bold
-L9 56-83 fg=#8888a4
-L9 106-107 fg=#96bfff
+L9 25-36 fg=#d0d6e8 bold
+L9 37-107 fg=#96bfff
 L10 23-24 fg=#96bfff
-L10 27-34 fg=#d0d6e8
-L10 49-50 fg=#96bfff bold
-L10 56-80 fg=#8888a4
+L10 25-50 fg=#b0b8d1
 L10 106-107 fg=#96bfff
-L11 23-24 fg=#96bfff
-L11 27-32 fg=#d0d6e8
-L11 49-50 fg=#96bfff bold
-L11 56-75 fg=#8888a4
-L11 106-107 fg=#96bfff
+L11 23-107 fg=#96bfff
 L12 23-24 fg=#96bfff
-L12 27-67 fg=#706f87
+L12 25-27 fg=#96bfff bg=#3b3b52
+L12 27-49 fg=#d0d6e8 bg=#3b3b52
+L12 49-56 fg=#96bfff bg=#3b3b52 bold
+L12 56-105 fg=#8888a4 bg=#3b3b52
 L12 106-107 fg=#96bfff
 L13 23-24 fg=#96bfff
-L13 27-83 fg=#706f87
+L13 27-34 fg=#d0d6e8
+L13 49-50 fg=#96bfff bold
+L13 56-77 fg=#8888a4
 L13 106-107 fg=#96bfff
 L14 23-24 fg=#96bfff
-L14 27-32 fg=#d0d6e8
-L14 56-88 fg=#8888a4
+L14 27-33 fg=#d0d6e8
+L14 49-50 fg=#96bfff bold
+L14 56-103 fg=#8888a4
 L14 106-107 fg=#96bfff
 L15 23-24 fg=#96bfff
-L15 27-38 fg=#d0d6e8
+L15 27-34 fg=#d0d6e8
 L15 49-50 fg=#96bfff bold
-L15 56-77 fg=#8888a4
+L15 56-83 fg=#8888a4
 L15 106-107 fg=#96bfff
-L16 23-107 fg=#96bfff
+L16 23-24 fg=#96bfff
+L16 27-34 fg=#d0d6e8
+L16 49-50 fg=#96bfff bold
+L16 56-80 fg=#8888a4
+L16 106-107 fg=#96bfff
 L17 23-24 fg=#96bfff
-L17 25-30 fg=#96bfff bold
-L17 31-34 fg=#8888a4
-L17 35-36 fg=#706f87
-L17 37-56 fg=#8888a4
-L17 57-58 fg=#706f87
-L17 59-62 fg=#96bfff bold
-L17 63-68 fg=#8888a4
+L17 27-32 fg=#d0d6e8
+L17 49-50 fg=#96bfff bold
+L17 56-75 fg=#8888a4
 L17 106-107 fg=#96bfff
-L18 23-107 fg=#96bfff
-L21 0-130 fg=#706f87
-L22 0-130 fg=#706f87
-L23 0-130 fg=#706f87
-L24 0-130 fg=#706f87
+L18 23-24 fg=#96bfff
+L18 27-67 fg=#706f87
+L18 106-107 fg=#96bfff
+L19 23-24 fg=#96bfff
+L19 27-83 fg=#706f87
+L19 106-107 fg=#96bfff
+L20 23-24 fg=#96bfff
+L20 27-32 fg=#d0d6e8
+L20 56-88 fg=#8888a4
+L20 106-107 fg=#96bfff
+L21 0-22 fg=#706f87
+L21 23-24 fg=#96bfff
+L21 27-38 fg=#d0d6e8
+L21 49-50 fg=#96bfff bold
+L21 56-77 fg=#8888a4
+L21 106-107 fg=#96bfff
+L21 107-130 fg=#706f87
+L22 0-23 fg=#706f87
+L22 23-107 fg=#96bfff
+L22 107-130 fg=#706f87
+L23 0-23 fg=#706f87
+L23 23-24 fg=#96bfff
+L23 25-30 fg=#96bfff bold
+L23 31-34 fg=#8888a4
+L23 35-36 fg=#706f87
+L23 37-56 fg=#8888a4
+L23 57-58 fg=#706f87
+L23 59-62 fg=#96bfff bold
+L23 63-68 fg=#8888a4
+L23 106-107 fg=#96bfff
+L23 107-130 fg=#706f87
+L24 0-8 fg=#706f87
+L24 23-107 fg=#96bfff
+L24 107-130 fg=#706f87
 L25 0-130 fg=#706f87
 L26 0-130 fg=#706f87
 L27 0-130 fg=#706f87

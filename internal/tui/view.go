@@ -59,6 +59,14 @@ func (m *Model) render() (string, *tea.Cursor) {
 	b.WriteString(fit(m.statusText(), m.width) + "\n")
 	b.WriteString(fit(m.hints(), m.width))
 	lines := m.drawArmed(strings.Split(b.String(), "\n"))
+	// Popups are placed when the first of them opens, and stay where they
+	// are while any is open (ADR-127).
+	switch {
+	case !m.popupOpen():
+		m.popTop = 0
+	case m.popTop == 0:
+		m.popTop = m.placePopup()
+	}
 	if m.logv != nil && !m.logInPane() {
 		// Over the list's right side, from under the header to above the
 		// status line; what is under it is not dimmed, as it is no popup.
@@ -67,67 +75,24 @@ func (m *Model) render() (string, *tea.Cursor) {
 			lines[1+i] = place(lines[1+i], s, m.width-w)
 		}
 	}
-	if m.compose != nil && m.bulk == nil {
-		// The confirm popup of what was written takes its place, in a box
-		// as wide, and esc there gives the text box back: no box is drawn
-		// over another (ADR-121).
-		popup, at := m.renderCompose()
-		lines = m.overlay(lines, popup, popupTop, m.width)
-		cur = inPopup(m.compose.ta.Cursor(), popup, popupTop+at, m.width)
-	}
-	switch {
-	case m.bulk != nil:
+	switch p, open := m.openPopup(); {
+	case open && p.draw != nil:
+		// The popup open, from its declaration, over the screen dimmed,
+		// from the row popups are drawn from. Only one is drawn: the
+		// confirm popup of what was written takes its place (ADR-121).
+		top := m.popupTop()
+		popup, at := p.draw()
+		m.popupAt = boxAt(popup, top, m.width)
+		lines = m.overlay(lines, popup, top, m.width)
 		cur = nil
-		popup := m.renderBulk()
-		m.popupAt = boxAt(popup, popupTop, m.width)
-		lines = m.overlay(lines, popup, popupTop, m.width)
-		if f := m.bulk.close; f != nil && f.editing {
-			cur = inPopup(f.ta.Cursor(), popup, popupTop+f.at, m.width)
+		if t := p.text; t != nil && t.focused && t.cursor != nil && at >= 0 {
+			cur = inPopup(t.cursor(), popup, top+at, m.width)
 		}
-	case m.notesAt != nil:
-		cur = nil
-		popup := m.renderNotes()
-		m.popupAt = boxAt(popup, popupTop, m.width)
-		lines = m.overlay(lines, popup, popupTop, m.width)
-	case m.picker != nil:
-		cur = nil
-		popup := m.renderPick()
-		m.popupAt = boxAt(popup, popupTop, m.width)
-		lines = m.overlay(lines, popup, popupTop, m.width)
-	case m.chooser != nil:
-		popup, at := m.renderChooser()
-		m.popupAt = boxAt(popup, popupTop, m.width)
-		lines = m.overlay(lines, popup, popupTop, m.width)
-		cur = inPopup(m.chooser.input.Cursor(), popup, popupTop+at, m.width)
-	case m.menu != nil:
-		cur = nil
-		popup := m.renderMenu()
-		m.popupAt = boxAt(popup, popupTop, m.width)
-		lines = m.overlay(lines, popup, popupTop, m.width)
-	case m.triage != nil && m.triage.open:
-		popup, at := m.renderTriage()
-		m.popupAt = boxAt(popup, popupTop, m.width)
-		lines = m.overlay(lines, popup, popupTop, m.width)
-		cur = nil
-		if at >= 0 {
-			in := &m.triage.input
-			if s := m.triage.search; s != nil {
-				in = &s.input
-			}
-			cur = inPopup(in.Cursor(), popup, popupTop+at, m.width)
+		if p.toast {
+			lines = m.drawToast(lines)
 		}
-	case m.help:
-		cur = nil
-		if m.relBox != nil {
-			lines = m.renderReleaseNotes(lines)
-		} else {
-			lines = m.renderHelp(lines)
-		}
-	case m.toast != nil && len(lines) > 3:
-		toast := m.st.border.Render("╭ ") + m.noteIcon(m.toast.icon) + " " + m.st.sub1.Render(m.toast.title) + " " +
-			m.st.dim.Render("· "+m.firstKey("events")+" to see") + m.st.border.Render(" ╮")
-		at := len(lines) - 3
-		lines[at] = place(lines[at], toast, max(m.width-lipgloss.Width(toast)-1, 0))
+	case m.toast != nil:
+		lines = m.drawToast(lines)
 	}
 	if len(lines) > m.height {
 		lines = lines[:m.height]
@@ -451,7 +416,7 @@ func (m *Model) openPopup() (popupSpec, bool) {
 	case m.menu != nil:
 		return m.menuSpec(), true
 	case m.triage != nil && m.triage.open:
-		return m.triageSpec(false), true
+		return m.triageSpec(), true
 	case m.help && m.relBox != nil:
 		return m.releaseSpec(), true
 	case m.help:
@@ -462,6 +427,30 @@ func (m *Model) openPopup() (popupSpec, bool) {
 		return m.composeSpec(), true
 	}
 	return popupSpec{}, false
+}
+
+// drawToast puts the toast of a notification over the line above the
+// status line, at its right, when there is one and room for it.
+func (m *Model) drawToast(lines []string) []string {
+	if m.toast == nil || len(lines) <= 3 {
+		return lines
+	}
+	toast := m.st.border.Render("╭ ") + m.noteIcon(m.toast.icon) + " " + m.st.sub1.Render(m.toast.title) + " " +
+		m.st.dim.Render("· "+m.firstKey("events")+" to see") + m.st.border.Render(" ╮")
+	at := len(lines) - 3
+	lines[at] = place(lines[at], toast, max(m.width-lipgloss.Width(toast)-1, 0))
+	return lines
+}
+
+// popupBoxHeight is how many lines the box of the popup open takes, drawn
+// as it would be now.
+func (m *Model) popupBoxHeight() int {
+	p, ok := m.openPopup()
+	if !ok || p.draw == nil {
+		return 0
+	}
+	lines, _ := p.draw()
+	return len(lines)
 }
 
 // popupOpen reports whether a popup takes the keys.

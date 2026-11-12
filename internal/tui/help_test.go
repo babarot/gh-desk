@@ -34,7 +34,7 @@ func TestHelpUnfoldsTheScreenItWasOpenedFrom(t *testing.T) {
 			t.Errorf("the ? popup has no %q:\n%s", want, s)
 		}
 	}
-	if n := len(m.renderHelp(make([]string, 34))); n != 34 {
+	if n := len(strings.Split(screen(m), "\n")); n != 34 {
 		t.Errorf("the popup changed the screen to %d lines", n)
 	}
 	if !strings.Contains(screen(m), "desk // ") {

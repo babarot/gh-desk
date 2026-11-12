@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"cmp"
 	"fmt"
 	"strings"
 
@@ -16,8 +17,25 @@ import (
 // the screen scrolls its body in scrollBox, keeping its foot (the question
 // and its keys) in sight.
 
-// popupTop is the screen row a popup is drawn from.
-const popupTop = 2
+// popupTopMost is the highest row a popup is drawn from: under the header
+// and the list's column heads.
+const popupTopMost = 2
+
+// popupTop is the row the popup open is drawn from.
+func (m *Model) popupTop() int { return cmp.Or(m.popTop, popupTopMost) }
+
+// placePopup decides the row popups are drawn from, when one opens from
+// none: a quarter down the screen, where the eye is, or centered for a
+// popup that would leave less room under it than above it there. It holds while popups are open, one taking the place of
+// another or changing its height, so that nothing in them moves
+// (ADR-127).
+func (m *Model) placePopup() int {
+	m.popTop = popupTopMost
+	h := m.popupBoxHeight()
+	quarter := max(popupTopMost, m.height/4)
+	centered := max(popupTopMost, (m.height-h)/2)
+	return min(quarter, centered)
+}
 
 // A popup is one of two widths: narrow for a short list to choose from,
 // wide for anything to read or write (ADR-125). They are constants, not
@@ -41,9 +59,9 @@ func popupWidthOn(w int, wide bool) int {
 // popupWidth is the width of a popup on this screen.
 func (m *Model) popupWidth(wide bool) int { return popupWidthOn(m.width, wide) }
 
-// popupHeight is how many lines a popup may take: from popupTop down to
+// popupHeight is how many lines a popup may take: from its top row down to
 // above the status and key lines, which stay in sight under it.
-func (m *Model) popupHeight() int { return max(m.height-popupTop-2, 5) }
+func (m *Model) popupHeight() int { return max(m.height-m.popupTop()-2, 5) }
 
 // hang wraps text to what is left of width after prefix, styles kept:
 // prefix leads the first line and the others are indented as far, so the

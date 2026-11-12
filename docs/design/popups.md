@@ -1,6 +1,6 @@
 # Popups
 
-What a popup is in `internal/tui`, which popups there are, what each holds, and how they are drawn and read keys. The rules are in [ADR-121](../adr/121-no-popup-is-drawn-over-another.md) (one popup at a time), [ADR-079](../adr/079-what-takes-the-keys-says-so-by-its-frame.md) (the frame tells what takes the keys), [ADR-125](../adr/125-a-popup-reads-the-keys-of-what-it-holds.md) (keys come from what a popup holds; where it stands) and [ADR-126](../adr/126-the-key-line-under-a-popup-tells-its-writes.md) (the key line under a popup).
+What a popup is in `internal/tui`, which popups there are, what each holds, and how they are drawn and read keys. The rules are in [ADR-121](../adr/121-no-popup-is-drawn-over-another.md) (one popup at a time), [ADR-079](../adr/079-what-takes-the-keys-says-so-by-its-frame.md) (the frame tells what takes the keys), [ADR-125](../adr/125-a-popup-reads-the-keys-of-what-it-holds.md) (keys come from what a popup holds; where it stands) and [ADR-126](../adr/126-the-key-line-under-a-popup-tells-its-writes.md) (the key line under a popup) and [ADR-127](../adr/127-a-popup-opens-where-the-eye-is.md) (the row a popup opens on).
 
 ## What a popup is
 
@@ -8,7 +8,7 @@ A popup is a box drawn over the screen that takes every key while it is open. It
 
 1. The popup builds its lines (`renderMenu`, `renderBulk`, ...).
 2. `box` in [internal/tui](../../internal/tui) puts them in a frame, in the focus color.
-3. `overlay` in [view.go](../../internal/tui/view.go) dims the whole screen to one faint color and places the box over it, from `popupTop` and centered across.
+3. `overlay` in [view.go](../../internal/tui/view.go) dims the whole screen to one faint color and places the box over it, from the row popups are drawn from (`popupTop`) and centered across.
 
 `overlay` is how a popup is drawn, not a popup: it takes any lines. What is drawn over the screen without dimming it is not a popup and does not go through `overlay`: the log viewer, placed beside the list, and a notification's toast.
 
@@ -48,24 +48,30 @@ A popup's own keys are declared for the state it is in, and are read after the k
 
 ### How it is built
 
-Every popup reads its keys through the shared layer in [popupkeys.go](../../internal/tui/popupkeys.go), in the order of ADR-125: each declares its parts and its own keys for the state it is in (`menuSpec`, `pickSpec`, `notesSpec`, `chooserSpec`, `helpSpec`, `releaseSpec`, `bulkSpec`, `composeSpec`, `triageSpec`), built again for each key and each draw, so a declaration changes nothing. `openPopup` in [view.go](../../internal/tui/view.go) finds the one open. Their mouse input goes through the same layer, but for the triage while a question is typed or a request is on its way.
+A popup is its declaration, a `popupSpec` in [popupkeys.go](../../internal/tui/popupkeys.go) built for the state it is in (`menuSpec`, `pickSpec`, `notesSpec`, `chooserSpec`, `helpSpec`, `releaseSpec`, `bulkSpec`, `composeSpec`, `triageSpec`), built again for each key and each draw, so building one changes nothing. It holds the popup's parts and its own keys, how to draw its box (`draw`), where its text box's cursor is, and the keys and mouse input it takes before the shared layer (`key`, `mouse`).
+
+`openPopup` in [view.go](../../internal/tui/view.go) is the one place that says which popup is open. Everything else reads the declaration it gives: `Model.key` and `popupMouse` hand keys and mouse input to the shared layer, `render` places the popup and draws it, `placePopup` measures it, and `hints` takes the key line from it. A new popup is a declaration and a case in `openPopup`, and nothing more.
 
 - `history_next` and `history_prev` claim the keys of `down` and `up` ([keymap](../../internal/tui/keymap)): a text box tries them first, and moves its cursor when there is nothing to recall.
 - The scope chooser's one-line text box keeps `top`, `bottom` and the page keys for editing, and gives `up` and `down` to its list.
 - A comment or a review is thrown away by the second `esc`, the first leaving its text box.
 - The foot of each popup, and the key line under it, are made from its declaration (`popupHints`), each key with the words the popup gives it.
-- Two levels over the triage's text box read their keys before the layer: the list of names offered while `#` or `@` is typed (`askMenuKey`) and the search of the questions (`searchKey`), whose cursors are `askbox`'s own. They move on `up` and `down` only, and their foot is written in `renderTriage`.
+- Two levels over the triage's text box read their keys before the layer, through the triage's `key`: the list of names offered while `#` or `@` is typed (`askMenuKey`) and the search of the questions (`searchKey`), whose cursors are `askbox`'s own. They move on `up` and `down` only, and their foot is written in `renderTriage`.
+- While a question is typed or a request is on its way, the triage takes the wheel and clicks through its `mouse`, scrolling its conversation.
 
 ## Placement
 
-Every popup is drawn from `popupTop` in [popup.go](../../internal/tui/popup.go), grows down to `popupHeight` and scrolls its body past it, keeping its foot in sight. Its width is `popupWidth`, narrow or wide from two constants there; a popup that takes the place of another (the confirm popup of a review) is as wide as the one it replaces.
+A popup is placed when it opens with none open (`placePopup` in [popup.go](../../internal/tui/popup.go), called from `render` in [view.go](../../internal/tui/view.go)): a quarter down the screen, or centered when that would leave less room under it than above it, and never above `popupTopMost` (ADR-127). The row is kept in `Model.popTop` while popups are open, so one taking the place of another opens there, and is decided again on a resize or when a popup opens after all have closed. From that row a popup grows down to `popupHeight` and scrolls its body past it, keeping its foot in sight.
+
+Its width is `popupWidth`, narrow or wide from two constants there; a popup that takes the place of another (the confirm popup of a review) is as wide as the one it replaces.
 
 ## Diagrams
 
 ```mermaid
 flowchart TB
   subgraph keys["keys"]
-    K["Model.key"] --> L["shared popup layer"]
+    OP["openPopup: the popup open, as its declaration"] --> K["Model.key, popupMouse"]
+    K --> L["shared popup layer"]
     L --> F["fixed keys: ctrl+c; esc steps out"]
     L --> TX["text box with the focus: typing keys, claimed keys"]
     L --> OWN["the popup's own keys"]
@@ -90,10 +96,11 @@ flowchart TB
   end
 
   subgraph draw["drawing"]
-    V["View"] --> R["the popup's lines"]
+    OP --> V["render: placePopup, then the declaration's draw"]
+    V --> R["the popup's lines"]
     R --> B["box: frame in the focus color, hints from its parts"]
     B --> O["overlay: dims the screen, places the box"]
-    PL["popupTop; narrow or wide"] -.-> O
+    PL["the row decided when the first popup opens; narrow or wide"] -.-> O
   end
 
   popups --> L

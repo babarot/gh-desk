@@ -25,6 +25,15 @@ type popupSpec struct {
 	question *popupQuestion
 	// text is the text box it holds, if it holds one.
 	text *popupText
+	// draw draws the popup's box, and says on which of its rows the text
+	// box with the focus starts, or -1. The popup is placed and drawn over
+	// the screen from it (render, placePopup), so a popup declares itself
+	// here and nowhere else.
+	draw func() (lines []string, at int)
+	// key and mouse take keys and mouse input of the popup's own before
+	// the shared layer does, and report whether they took them.
+	key   func(msg tea.KeyPressMsg) (tea.Cmd, bool)
+	mouse func(msg tea.MouseMsg) (tea.Cmd, bool)
 	// own are the popup's own keys, read before its parts.
 	own []ownKey
 	// close closes the popup, on esc and on a click outside. The key that
@@ -38,6 +47,9 @@ type popupSpec struct {
 	closeWords, backWords string
 	// note is words that tell of keys no part names, after the parts'.
 	note string
+	// toast lets a notification's toast show over the screen while the
+	// popup is open, as it does with none.
+	toast bool
 }
 
 // popupText is a text box. While it has the focus it takes every key that
@@ -56,6 +68,11 @@ type popupText struct {
 	// editNav are the nav actions it edits with, which go to it and not to
 	// the popup's list or body.
 	editNav []keymap.Action
+	// cursor is where its cursor is inside it, for the terminal to show
+	// the text being composed there. It reads the text box when called,
+	// after the draw has sized it: a textarea is a value, and a method
+	// value would keep the copy taken when the declaration was built.
+	cursor func() *tea.Cursor
 	// claim tries the actions that claim nav keys, such as recalling the
 	// questions asked before, and reports whether one took the key.
 	claim func(msg tea.KeyPressMsg) bool
@@ -268,6 +285,11 @@ func (m *Model) hintPart(key, words string) string {
 // No question is read while the text box has the focus (ADR-066). quit is
 // not read, so it never closes a popup and never quits from one.
 func (m *Model) popupKey(p popupSpec, msg tea.KeyPressMsg) tea.Cmd {
+	if p.key != nil {
+		if cmd, took := p.key(msg); took {
+			return cmd
+		}
+	}
 	k := msg.String()
 	t := p.text
 	typing := t != nil && t.focused

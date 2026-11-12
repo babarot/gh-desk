@@ -132,32 +132,30 @@ func (m *Model) closeTriage() {
 
 func (m *Model) triageWidth() int { return m.popupWidth(true) }
 
-// triageKey reads a key in the triage. The list of names offered while
-// # or @ is typed, and the search of the questions, are levels over the
-// text box that read their own keys first (ADR-097, ADR-098); the rest goes
-// through the shared popup layer.
-func (m *Model) triageKey(msg tea.KeyPressMsg) tea.Cmd {
-	tr := m.triage
-	switch {
-	case tr.typing && tr.search != nil:
-		return m.searchKey(&tr.search, &tr.input, &tr.recall, tr.history, msg)
-	case tr.typing && len(m.askMenu()) > 0:
-		return m.askMenuKey(msg)
-	}
-	// Starting over takes the key twice in a row.
-	armed := tr.restart
-	tr.restart = false
-	return m.popupKey(m.triageSpec(armed), msg)
-}
-
 // triageSpec is the triage as the shared popup layer reads it, by its
 // state (ADR-125): while a question is typed, a text box with the keys of
 // asking; while a request is on its way, esc stops it and chat_close
 // closes the popup with Claude still at work; once Claude has answered, a
 // body of the conversation, with its own key to apply the plan, and write
-// to ask more. armed is set when the key before was chat_restart.
-func (m *Model) triageSpec(armed bool) popupSpec {
+// to ask more.
+func (m *Model) triageSpec() popupSpec {
 	tr := m.triage
+	// Starting over takes chat_restart twice in a row.
+	armed := tr.restart
+	// While a question is typed or a request is on its way, the wheel
+	// scrolls the conversation and a click outside closes the popup, but
+	// for a request on its way, which is stopped by its key.
+	scroll := func(msg tea.MouseMsg) (tea.Cmd, bool) {
+		top := tr.top
+		if m.scrollMouse(msg, &tr.top) {
+			if !tr.asking {
+				m.closeTriage()
+			}
+		} else if tr.top != top {
+			tr.follow = false
+		}
+		return nil, true
+	}
 	switch {
 	case tr.typing:
 		qs := claude.TriageQuestions()
@@ -203,9 +201,32 @@ func (m *Model) triageSpec(armed bool) popupSpec {
 			}})
 		}
 		return popupSpec{
+			draw:  m.renderTriage,
+			mouse: scroll,
+			// The list of names offered while # or @ is typed, and the
+			// search of the questions, are levels over the text box that
+			// read their own keys first (ADR-097, ADR-098). Any other key
+			// ends a chat_restart waiting for its second press.
+			key: func(msg tea.KeyPressMsg) (tea.Cmd, bool) {
+				switch {
+				case tr.search != nil:
+					return m.searchKey(&tr.search, &tr.input, &tr.recall, tr.history, msg), true
+				case len(m.askMenu()) > 0:
+					return m.askMenuKey(msg), true
+				}
+				tr.restart = false
+				return nil, false
+			},
 			own: own,
 			text: &popupText{
 				focused: true,
+				// The search of the questions, when open, has the cursor.
+				cursor: func() *tea.Cursor {
+					if s := tr.search; s != nil {
+						return s.input.Cursor()
+					}
+					return tr.input.Cursor()
+				},
 				blur: func() {
 					tr.typing = false
 					tr.input.Blur()
@@ -228,6 +249,8 @@ func (m *Model) triageSpec(armed bool) popupSpec {
 			backWords = "back"
 		}
 		return popupSpec{
+			draw:      m.renderTriage,
+			mouse:     scroll,
 			backWords: backWords,
 			own:       []ownKey{{action: "chat_close", run: func() tea.Cmd { m.closeTriage(); return nil }}},
 			back: func() {
@@ -245,6 +268,7 @@ func (m *Model) triageSpec(armed bool) popupSpec {
 		own = append(own, ownKey{action: "triage_apply", keyLine: true, run: m.applyTriage})
 	}
 	return popupSpec{
+		draw: m.renderTriage,
 		body: &popupBody{page: tr.rows, scroll: func(d int) {
 			// Kept within the conversation when it is drawn.
 			tr.top = max(tr.top+d, 0)
@@ -610,7 +634,7 @@ func (m *Model) renderTriage() ([]string, int) {
 			what = "stopping…"
 		}
 		body = append(body, spaces(chatMargin)+m.working(st.muted, what)+" "+st.dim.Render(elapsed(m.set.Now().Sub(tr.since))))
-		foot = append(foot, m.popupFoot(m.triageSpec(false), ""))
+		foot = append(foot, m.popupFoot(m.triageSpec(), ""))
 	case tr.search != nil:
 		foot = append(foot, strings.Split(tr.search.input.View(), "\n")...)
 		foot = append(foot, m.searchLines(tr.search, tr.history, inner, searchRows(m.popupHeight()-3, triageSearchRows))...)
@@ -631,7 +655,7 @@ func (m *Model) renderTriage() ([]string, int) {
 		if hint := m.recallHint(&tr.recall, tr.history); hint != "" {
 			lead = hint + st.dim.Render(" · ")
 		}
-		foot = append(foot, m.popupFoot(m.triageSpec(false), lead))
+		foot = append(foot, m.popupFoot(m.triageSpec(), lead))
 	default:
 		for i, s := range m.checkPlan() {
 			num := fmt.Sprintf("%d ", i+1)
@@ -649,7 +673,7 @@ func (m *Model) renderTriage() ([]string, int) {
 		if len(tr.actions) > 0 {
 			body = append(body, "")
 		}
-		foot = append(foot, m.popupFoot(m.triageSpec(false), ""))
+		foot = append(foot, m.popupFoot(m.triageSpec(), ""))
 	}
 	if len(tr.turns) == 0 && !tr.asking {
 		body = append(m.triageWelcome(m.popupHeight()-2-len(foot)), body...)

@@ -156,10 +156,6 @@ func (m *Model) basedOnRead(msg basedOnMsg) {
 	m.decideBulk()
 }
 
-// bulkKeyMsg reads a key in the confirm popup, through the shared popup
-// layer.
-func (m *Model) bulkKeyMsg(msg tea.KeyPressMsg) tea.Cmd { return m.popupKey(m.bulkSpec(), msg) }
-
 // closeText is the text box of a close's comment as the shared popup layer
 // reads it: write puts the focus in it, esc takes it out, and what is
 // typed decides the popup again, as the comment changes what it does.
@@ -167,6 +163,7 @@ func (m *Model) closeText(f *closeForm) *popupText {
 	return &popupText{
 		focused: f.editing,
 		focus:   f.focus,
+		cursor:  func() *tea.Cursor { return f.ta.Cursor() },
 		blur: func() {
 			f.editing = false
 			f.ta.Blur()
