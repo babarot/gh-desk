@@ -12,7 +12,6 @@ import (
 	"github.com/babarot/gh-desk/internal/model"
 	"github.com/babarot/gh-desk/internal/plan"
 	"github.com/babarot/gh-desk/internal/runner"
-	"github.com/babarot/gh-desk/internal/tui/keymap"
 	"github.com/babarot/gh-desk/internal/tui/statusline"
 )
 
@@ -574,7 +573,7 @@ func (m *Model) noteLines() []noteLine {
 func (m *Model) notesSpec() popupSpec {
 	v := m.notesAt
 	return popupSpec{
-		list:  &popupList{sel: &v.sel, n: len(m.noteLines()), ptr: &v.pointer, choose: m.chooseNote},
+		list:  &popupList{sel: &v.sel, n: len(m.noteLines()), ptr: &v.pointer, choose: m.chooseNote, chooseWords: "go to the pull request"},
 		close: func() { m.notesAt = nil },
 	}
 }
@@ -677,8 +676,7 @@ func (m *Model) renderNotes() []string {
 			owner = append(owner, i)
 		}
 	}
-	foot := []string{"", st.key.Render(m.firstKey("choose")) + " " + st.muted.Render("go to the pull request") +
-		st.dim.Render(" · ") + st.key.Render(keymap.Back) + " " + st.muted.Render("close")}
+	foot := []string{"", m.popupFoot(m.notesSpec(), "")}
 	out, top := scrollBox(st, "notifications", body, foot, w, m.popupHeight(), v.top, keep, "")
 	v.top = top
 	v.items = boxItems(owner, top, len(out), len(foot))

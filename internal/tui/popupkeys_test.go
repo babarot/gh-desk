@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
+	"github.com/charmbracelet/x/ansi"
 
 	"github.com/babarot/gh-desk/internal/model"
 	"github.com/babarot/gh-desk/internal/plan"
@@ -276,5 +277,52 @@ func TestPasteOutOfTheComposeTextBox(t *testing.T) {
 	run(m, m.paste(tea.PasteMsg{Content: "pasted"}))
 	if strings.Contains(c.input.Value(), "pasted") || m.compose.ta.Value() != review {
 		t.Errorf("the paste went in: chat %q, review %q", c.input.Value(), m.compose.ta.Value())
+	}
+}
+
+// While a popup is open, the key line holds only its most important keys,
+// the writes, and what esc does there; the rest are in its frame (ADR-125).
+func TestKeyLineUnderAPopup(t *testing.T) {
+	cases := []struct {
+		name string
+		open func(*testing.T) *Model
+		want string
+	}{
+		{"menu", func(t *testing.T) *Model {
+			m, _ := startWith(t, fixture(), keymap.Default())
+			press(m, "enter")
+			return m
+		}, "esc close"},
+		{"confirm", func(t *testing.T) *Model {
+			m, _ := startWith(t, fixture(), keymap.Default())
+			press(m, "A")
+			if m.bulk == nil || m.bulk.loading {
+				t.Fatalf("A did not open a confirm popup that was read: %+v", m.bulk)
+			}
+			return m
+		}, "y yes · esc no"},
+		{"compose", func(t *testing.T) *Model {
+			m, _ := startWith(t, fixture(), keymap.Default())
+			press(m, "R")
+			return m
+		}, "ctrl+s post · esc done writing"},
+		{"compose out of its text box", func(t *testing.T) *Model {
+			m, _ := startWith(t, fixture(), keymap.Default())
+			press(m, "R", "esc")
+			return m
+		}, "ctrl+s post · esc discard"},
+		{"? list", func(t *testing.T) *Model {
+			m, _ := startWith(t, fixture(), keymap.Default())
+			press(m, "?")
+			return m
+		}, "esc close"},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			m := c.open(t)
+			if got := ansi.Strip(m.hints()); got != c.want {
+				t.Errorf("key line %q, want %q", got, c.want)
+			}
+		})
 	}
 }

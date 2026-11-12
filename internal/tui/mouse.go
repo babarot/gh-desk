@@ -493,8 +493,8 @@ func (m *Model) popupMouse(msg tea.MouseMsg) (cmd tea.Cmd, ok bool) {
 	case m.chooser != nil:
 		return m.popupListMouse(m.chooserSpec(), msg), true
 	case m.menu != nil:
-		if p := m.menuSpec(); p.list != nil {
-			return m.popupListMouse(p, msg), true
+		if !m.menuGone() {
+			return m.popupListMouse(m.menuSpec(), msg), true
 		}
 	case m.triage != nil && m.triage.open && !m.triage.typing && !m.triage.asking:
 		m.popupBodyMouse(m.triageSpec(false), msg)

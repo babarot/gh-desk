@@ -10,7 +10,6 @@ import (
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
 
-	"github.com/babarot/gh-desk/internal/claude"
 	"github.com/babarot/gh-desk/internal/tui/keymap"
 )
 
@@ -441,6 +440,36 @@ var toldInPlace = map[keymap.Action]bool{
 // menu of enter, and ? for every key) and the keys nothing else on the
 // screen tells: the menu shows what can be done to a pull request, the
 // preview pane its own keys, and the header the key of the events.
+// openPopup is the popup that takes the keys, as the shared popup layer
+// reads it, in the order Model.key looks for one; ok is false with none.
+func (m *Model) popupOpen() bool { _, ok := m.openPopup(); return ok }
+
+func (m *Model) openPopup() (popupSpec, bool) {
+	switch {
+	case m.bulk != nil:
+		return m.bulkSpec(), true
+	case m.notesAt != nil:
+		return m.notesSpec(), true
+	case m.picker != nil:
+		return m.pickSpec(), true
+	case m.chooser != nil:
+		return m.chooserSpec(), true
+	case m.menu != nil:
+		return m.menuSpec(), true
+	case m.triage != nil && m.triage.open:
+		return m.triageSpec(false), true
+	case m.help && m.relBox != nil:
+		return m.releaseSpec(), true
+	case m.help:
+		return m.helpSpec(), true
+	case m.filtering:
+		return popupSpec{}, false
+	case m.compose != nil:
+		return m.composeSpec(), true
+	}
+	return popupSpec{}, false
+}
+
 func (m *Model) hints() string {
 	var as []keymap.Action
 	// esc is told where it steps back; on the list it clears a selection or
@@ -448,51 +477,16 @@ func (m *Model) hints() string {
 	back := "back"
 	recall := ""
 	switch {
-	case m.bulk != nil && m.bulk.approves():
-		as = []keymap.Action{"confirm", "include_failing"}
-		if m.bulk.atWork() > 0 {
-			as = append(as, "wait_for_checks")
-		}
-	case m.bulk != nil && m.bulk.close != nil && m.bulk.close.editing:
-		as = nil
-	case m.bulk != nil && m.bulk.close != nil:
-		as = []keymap.Action{"confirm", "delete_branch", "write"}
-	case m.bulk != nil:
-		as = []keymap.Action{"confirm"}
-	case m.picker != nil:
-		as = []keymap.Action{"toggle_rule", "choose", "add_to_selection", "filter_by_rule"}
-	case m.notesAt != nil, m.menu != nil, m.chooser != nil:
-		as = []keymap.Action{"choose"}
-	case m.compose != nil:
-		as = []keymap.Action{"next_kind", "post", "editor"}
-		if !m.compose.ta.Focused() {
-			as = append([]keymap.Action{"write"}, as...)
-		}
-	case m.triage != nil && m.triage.open:
-		switch {
-		case m.triage.typing:
-			as = []keymap.Action{"accept"}
-			if tr := m.triage; nextSuggestion(claude.TriageQuestions(), tr.input.Value()) != "" || askGhost(&tr.input, &tr.recall, claude.TriageQuestions(), tr.history) != "" {
-				as = append(as, "complete")
-			}
-			recall = m.recallHint(&m.triage.recall, m.triage.history)
-			if len(m.askMenu()) > 0 {
-				as, recall, back = []keymap.Action{"accept", "complete"}, "", "close"
-			} else if m.triage.search != nil {
-				as, recall, back = []keymap.Action{"accept", "history_search"}, "", "cancel"
-			} else if len(m.triage.history) > 0 {
-				as = append(as, "history_search")
-			}
-		case m.triage.asking:
-			as = []keymap.Action{"chat_close"}
-			if !m.triage.stopping {
-				back = "stop"
-			}
-		case m.applicable():
-			as = []keymap.Action{"triage_apply", "write"}
-		default:
-			as = []keymap.Action{"write"}
-		}
+	case m.triage != nil && m.triage.open && m.triage.typing && len(m.askMenu()) > 0:
+		// Levels over the triage's text box that read their own keys.
+		as, back = []keymap.Action{"accept", "complete"}, "close"
+	case m.triage != nil && m.triage.open && m.triage.typing && m.triage.search != nil:
+		as, back = []keymap.Action{"accept", "history_search"}, "cancel"
+	case m.popupOpen():
+		// A popup tells its keys in its frame; the key line holds only its
+		// most important ones (ADR-125).
+		p, _ := m.openPopup()
+		return strings.Join(m.popupKeyLine(p), m.st.dim.Render(" · "))
 	case m.filtering:
 		as = []keymap.Action{"accept"}
 		if m.canComplete() {

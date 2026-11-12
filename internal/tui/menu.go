@@ -309,26 +309,37 @@ func stateWords(s model.PRState) string {
 }
 
 // menuSpec is the menu as the shared popup layer reads it: a list of the
-// actions, each also run by its own key (ADR-125). With nothing to act
-// on, the menu closes.
+// actions, each also run by its own key (ADR-125). It changes nothing, so
+// that the hints can be drawn from it; with nothing to act on it holds no
+// list, and the keys close the menu (menuGone).
+// menuGone closes the menu when there is nothing left for it to act on,
+// and reports whether it did.
+func (m *Model) menuGone() bool {
+	if len(m.menuItems()) > 0 {
+		return false
+	}
+	m.menu = nil
+	return true
+}
+
 func (m *Model) menuSpec() popupSpec {
 	closeMenu := func() { m.menu = nil }
 	its := m.menuItems()
 	if len(its) == 0 {
-		m.menu = nil
 		return popupSpec{close: closeMenu}
 	}
 	v := m.menu
 	v.sel = min(v.sel, len(its)-1)
 	own := make([]ownKey, len(its))
 	for i, it := range its {
-		own[i] = ownKey{action: it.action, run: func() tea.Cmd {
+		// The menu tells each item's key on its line.
+		own[i] = ownKey{action: it.action, hide: true, run: func() tea.Cmd {
 			v.sel = i
 			return m.runMenu(it)
 		}}
 	}
 	return popupSpec{
-		list: &popupList{sel: &v.sel, n: len(its), ptr: &v.pointer,
+		list: &popupList{sel: &v.sel, n: len(its), ptr: &v.pointer, chooseWords: "run",
 			choose: func() tea.Cmd { return m.runMenu(its[v.sel]) },
 			// Marking done in the inbox writes to GitHub with no popup
 			// to confirm it, so a click does not (ADR-012, ADR-053).
@@ -340,6 +351,7 @@ func (m *Model) menuSpec() popupSpec {
 				return m.runMenu(its[v.sel])
 			}},
 		own:   own,
+		note:  "or the action's key",
 		close: closeMenu,
 	}
 }
@@ -435,9 +447,7 @@ func (m *Model) renderMenu() []string {
 			owner = append(owner, i)
 		}
 	}
-	foot := []string{"", st.key.Render(m.firstKey("choose")) + " " + st.muted.Render("run") +
-		st.dim.Render(" · ") + st.muted.Render("or the action's key") +
-		st.dim.Render(" · ") + st.key.Render(keymap.Back) + " " + st.muted.Render("close")}
+	foot := []string{"", m.popupFoot(m.menuSpec(), "")}
 	top := 0
 	if m.menu != nil {
 		top = m.menu.top

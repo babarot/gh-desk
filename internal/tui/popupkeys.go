@@ -1,6 +1,9 @@
 package tui
 
 import (
+	"cmp"
+	"strings"
+
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/babarot/gh-desk/internal/tui/keymap"
@@ -30,6 +33,11 @@ type popupSpec struct {
 	// back, when set, is what esc does instead: the popup's innermost
 	// level above its text box, such as stopping a request on its way.
 	back func()
+	// closeWords and backWords say what esc does, closing or going back:
+	// "close" when empty.
+	closeWords, backWords string
+	// note is words that tell of keys no part names, after the parts'.
+	note string
 }
 
 // popupText is a text box. While it has the focus it takes every key that
@@ -51,6 +59,9 @@ type popupText struct {
 	// claim tries the actions that claim nav keys, such as recalling the
 	// questions asked before, and reports whether one took the key.
 	claim func(msg tea.KeyPressMsg) bool
+	// writeWords say what write does, blurWords what esc does from it
+	// ("done writing" when empty), and typeWords what typing does there.
+	writeWords, blurWords, typeWords string
 }
 
 // popupList is a list with a cursor at *sel over n items. nav moves the
@@ -64,6 +75,11 @@ type popupList struct {
 	choose func() tea.Cmd
 	// click runs it on a second click; nil runs choose (ADR-053).
 	click func() tea.Cmd
+	// chooseWords say what choose does: the action's own when empty.
+	chooseWords string
+	// moveHint tells the keys that move it, where a text box takes the
+	// letters that would otherwise.
+	moveHint bool
 }
 
 // popupBody is text to read that scrolls: nav scrolls it by a line, a
@@ -82,12 +98,146 @@ type popupBody struct {
 // runs it. It is never read while a text box has the focus (ADR-066).
 type popupQuestion struct {
 	confirm func() tea.Cmd
+	// words say what confirm does: the action's own when empty.
+	words string
 }
 
 // ownKey is a key of the popup's own: its action, and what it does.
 type ownKey struct {
 	action keymap.Action
 	run    func() tea.Cmd
+	// words say what it does: the action's own when empty. hide keeps it
+	// out of the hints, as the popup tells of it otherwise. keyLine puts it
+	// on the key line too, as one of the popup's most important keys
+	// (ADR-125).
+	words   string
+	hide    bool
+	keyLine bool
+}
+
+// popupHint is a key a popup tells of, and what it does.
+type popupHint struct {
+	key, words string
+	keyLine    bool
+}
+
+// popupHints are the hints of the popup of p, from its parts and its own
+// keys through the keymap, and what esc does there. No popup writes its
+// keys by hand (ADR-125).
+func (m *Model) popupHints(p popupSpec) (hs []popupHint, esc string) {
+	words := func(w string, a keymap.Action) string {
+		if w != "" {
+			return w
+		}
+		return m.keys.Help(a)
+	}
+	add := func(a keymap.Action, w string, line bool) {
+		if ks := m.keys.Keys(a); len(ks) > 0 {
+			hs = append(hs, popupHint{key: ks[0], words: words(w, a), keyLine: line})
+		}
+	}
+	t := p.text
+	typing := t != nil && t.focused
+	if typing && t.typeWords != "" {
+		hs = append(hs, popupHint{key: "type", words: t.typeWords})
+	}
+	// A question writes to GitHub, so it is always on the key line too.
+	if q := p.question; q != nil && !typing {
+		add("confirm", q.words, true)
+	}
+	if l := p.list; l != nil {
+		if l.moveHint {
+			hs = append(hs, popupHint{key: arrowKey(m.firstKey("up")) + arrowKey(m.firstKey("down")), words: "move"})
+		}
+		add("choose", l.chooseWords, false)
+	}
+	// The most important keys come first, then write, then the rest.
+	for _, o := range p.own {
+		if !o.hide && o.keyLine {
+			add(o.action, o.words, true)
+		}
+	}
+	if t != nil && !typing && t.focus != nil {
+		add("write", t.writeWords, false)
+	}
+	for _, o := range p.own {
+		if !o.hide && !o.keyLine {
+			add(o.action, o.words, false)
+		}
+	}
+	if p.note != "" {
+		hs = append(hs, popupHint{words: p.note})
+	}
+	switch {
+	case p.back != nil:
+		esc = p.backWords
+	case typing && t.blur != nil:
+		esc = cmp.Or(t.blurWords, "done writing")
+	default:
+		esc = cmp.Or(p.closeWords, "close")
+	}
+	return hs, esc
+}
+
+// arrowKey writes up and down as arrows, which take one cell.
+func arrowKey(k string) string {
+	switch k {
+	case "up":
+		return "↑"
+	case "down":
+		return "↓"
+	}
+	return k
+}
+
+// popupFootParts are the keys at the foot of the popup of p, each a key
+// and what it does, esc last.
+func (m *Model) popupFootParts(p popupSpec) []string {
+	hs, esc := m.popupHints(p)
+	var parts []string
+	for _, h := range hs {
+		parts = append(parts, m.hintPart(h.key, h.words))
+	}
+	return append(parts, m.hintPart(keymap.Back, esc))
+}
+
+// popupFoot is the line of keys at the foot of the popup of p, after lead:
+// words of the popup's own, such as the question it asks, which end in
+// their own space or separator.
+func (m *Model) popupFoot(p popupSpec, lead string) string {
+	return lead + strings.Join(m.popupFootParts(p), m.st.dim.Render(" · "))
+}
+
+// popupFootText is the keys of the popup of p as plain text, for a title.
+func (m *Model) popupFootText(p popupSpec) string {
+	hs, esc := m.popupHints(p)
+	var parts []string
+	for _, h := range hs {
+		parts = append(parts, strings.TrimSpace(h.key+" "+h.words))
+	}
+	return strings.Join(append(parts, keymap.Back+" "+esc), " · ")
+}
+
+// popupKeyLine are the hints of the popup of p on the key line: only its
+// most important keys, and what esc does (ADR-125, in place of ADR-024's
+// rule for them). The rest are in the popup's frame.
+func (m *Model) popupKeyLine(p popupSpec) []string {
+	hs, esc := m.popupHints(p)
+	var out []string
+	for _, h := range hs {
+		if h.keyLine {
+			out = append(out, m.hintPart(h.key, h.words))
+		}
+	}
+	return append(out, m.hintPart(keymap.Back, esc))
+}
+
+// hintPart is a key and what it does, or words alone with no key.
+func (m *Model) hintPart(key, words string) string {
+	if key == "" {
+		return m.st.muted.Render(words)
+	}
+	return m.st.key.Render(key) + " " + m.st.muted.Render(words)
 }
 
 // popupKey reads a key with the popup of p open, in the order ADR-125

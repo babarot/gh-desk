@@ -589,6 +589,9 @@ func (m *Model) key(msg tea.KeyPressMsg) tea.Cmd {
 	case m.chooser != nil:
 		return m.popupKey(m.chooserSpec(), msg)
 	case m.menu != nil:
+		if m.menuGone() {
+			return nil
+		}
 		return m.popupKey(m.menuSpec(), msg)
 	case m.triage != nil && m.triage.open:
 		return m.triageKey(msg)

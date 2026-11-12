@@ -247,9 +247,10 @@ func (m *Model) lastKey(a keymap.Action) string {
 // notes (ADR-125). A click folds a section, or closes it outside.
 func (m *Model) helpSpec() popupSpec {
 	_, _, _, h := m.helpShown()
-	own := []ownKey{{"fold", func() tea.Cmd { m.foldHelp(); return nil }}}
+	own := []ownKey{{action: "fold", words: "fold", run: func() tea.Cmd { m.foldHelp(); return nil }}}
 	if m.set.Release != nil {
-		own = append(own, ownKey{"release_notes", m.openReleaseNotes})
+		// The list tells the key of the release notes at its top.
+		own = append(own, ownKey{action: "release_notes", hide: true, run: m.openReleaseNotes})
 	}
 	return popupSpec{
 		body:  &popupBody{scroll: m.scrollHelp, page: h, click: m.helpClick},
@@ -286,7 +287,7 @@ func (m *Model) renderHelp(lines []string) []string {
 	st := m.st
 	all, heads, top, h := m.helpShown()
 	w := m.helpWidth()
-	box := box(st, "keys · "+m.firstKey("fold")+" fold · "+keymap.Back+" close", all[top:top+h], w)
+	box := box(st, "keys · "+m.popupFootText(m.helpSpec()), all[top:top+h], w)
 	if len(all) > h {
 		box[len(box)-1] = scrollEdge(st, w, top, len(all)-top-h, m.scrollKeys()+" wheel")
 	}
