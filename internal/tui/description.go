@@ -344,7 +344,9 @@ func (m *Model) facts(p model.PR, d *entry[model.Detail], width int) []line {
 		if len(values) == 0 {
 			return
 		}
-		room := width - factKey
+		// At least one cell, so that a value is cut into pieces on a screen
+		// too narrow for its key.
+		room := max(width-factKey, 1)
 		key := st.muted.Render(name + spaces(factKey-len(name)))
 		cur, n, part := "", 0, name
 		var links []link
