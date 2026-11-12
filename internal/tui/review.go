@@ -135,8 +135,6 @@ func (m *Model) openCompose(c *compose) tea.Cmd {
 	return c.ta.Focus()
 }
 
-func (m *Model) composeKey(msg tea.KeyPressMsg) tea.Cmd { return m.popupKey(m.composeSpec(), msg) }
-
 // composeSpec is the popup a comment or a review is written in, as the
 // shared popup layer reads it: a text box, with the focus when it opens,
 // and the popup's own keys, which work in it and out of it (ADR-125). esc
@@ -144,6 +142,7 @@ func (m *Model) composeKey(msg tea.KeyPressMsg) tea.Cmd { return m.popupKey(m.co
 func (m *Model) composeSpec() popupSpec {
 	c := m.compose
 	return popupSpec{
+		draw: m.renderCompose,
 		own: []ownKey{
 			{action: "post", keyLine: true, run: func() tea.Cmd {
 				ev := kinds[c.kind]
@@ -173,6 +172,7 @@ func (m *Model) composeSpec() popupSpec {
 		text: &popupText{
 			focused: c.ta.Focused(),
 			focus:   c.ta.Focus,
+			cursor:  c.ta.Cursor,
 			blur:    c.ta.Blur,
 			edit:    c.update,
 			editNav: navActions,

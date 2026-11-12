@@ -226,6 +226,7 @@ func ruleNames(rs []plan.Rule) string {
 func (m *Model) pickSpec() popupSpec {
 	v := m.picker
 	return popupSpec{
+		draw: func() ([]string, int) { return m.renderPick(), -1 },
 		list: &popupList{sel: &v.sel, n: len(m.rules()), ptr: &v.pointer,
 			choose: func() tea.Cmd { return m.chooseRules(false) }, chooseWords: "select these"},
 		own: []ownKey{

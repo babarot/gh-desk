@@ -75,61 +75,18 @@ func (m *Model) render() (string, *tea.Cursor) {
 			lines[1+i] = place(lines[1+i], s, m.width-w)
 		}
 	}
-	if m.compose != nil && m.bulk == nil {
-		// The confirm popup of what was written takes its place, in a box
-		// as wide, and esc there gives the text box back: no box is drawn
-		// over another (ADR-121).
-		popup, at := m.renderCompose()
-		lines = m.overlay(lines, popup, m.popupTop(), m.width)
-		cur = inPopup(m.compose.ta.Cursor(), popup, m.popupTop()+at, m.width)
-	}
-	switch {
-	case m.bulk != nil:
+	switch p, open := m.openPopup(); {
+	case open && p.draw != nil:
+		// The popup open, from its declaration, over the screen dimmed,
+		// from the row popups are drawn from. Only one is drawn: the
+		// confirm popup of what was written takes its place (ADR-121).
+		top := m.popupTop()
+		popup, at := p.draw()
+		m.popupAt = boxAt(popup, top, m.width)
+		lines = m.overlay(lines, popup, top, m.width)
 		cur = nil
-		popup := m.renderBulk()
-		m.popupAt = boxAt(popup, m.popupTop(), m.width)
-		lines = m.overlay(lines, popup, m.popupTop(), m.width)
-		if f := m.bulk.close; f != nil && f.editing {
-			cur = inPopup(f.ta.Cursor(), popup, m.popupTop()+f.at, m.width)
-		}
-	case m.notesAt != nil:
-		cur = nil
-		popup := m.renderNotes()
-		m.popupAt = boxAt(popup, m.popupTop(), m.width)
-		lines = m.overlay(lines, popup, m.popupTop(), m.width)
-	case m.picker != nil:
-		cur = nil
-		popup := m.renderPick()
-		m.popupAt = boxAt(popup, m.popupTop(), m.width)
-		lines = m.overlay(lines, popup, m.popupTop(), m.width)
-	case m.chooser != nil:
-		popup, at := m.renderChooser()
-		m.popupAt = boxAt(popup, m.popupTop(), m.width)
-		lines = m.overlay(lines, popup, m.popupTop(), m.width)
-		cur = inPopup(m.chooser.input.Cursor(), popup, m.popupTop()+at, m.width)
-	case m.menu != nil:
-		cur = nil
-		popup := m.renderMenu()
-		m.popupAt = boxAt(popup, m.popupTop(), m.width)
-		lines = m.overlay(lines, popup, m.popupTop(), m.width)
-	case m.triage != nil && m.triage.open:
-		popup, at := m.renderTriage()
-		m.popupAt = boxAt(popup, m.popupTop(), m.width)
-		lines = m.overlay(lines, popup, m.popupTop(), m.width)
-		cur = nil
-		if at >= 0 {
-			in := &m.triage.input
-			if s := m.triage.search; s != nil {
-				in = &s.input
-			}
-			cur = inPopup(in.Cursor(), popup, m.popupTop()+at, m.width)
-		}
-	case m.help:
-		cur = nil
-		if m.relBox != nil {
-			lines = m.renderReleaseNotes(lines)
-		} else {
-			lines = m.renderHelp(lines)
+		if t := p.text; t != nil && t.focused && t.cursor != nil && at >= 0 {
+			cur = inPopup(t.cursor(), popup, top+at, m.width)
 		}
 	case m.toast != nil && len(lines) > 3:
 		toast := m.st.border.Render("╭ ") + m.noteIcon(m.toast.icon) + " " + m.st.sub1.Render(m.toast.title) + " " +
@@ -459,7 +416,7 @@ func (m *Model) openPopup() (popupSpec, bool) {
 	case m.menu != nil:
 		return m.menuSpec(), true
 	case m.triage != nil && m.triage.open:
-		return m.triageSpec(false), true
+		return m.triageSpec(), true
 	case m.help && m.relBox != nil:
 		return m.releaseSpec(), true
 	case m.help:
@@ -475,28 +432,12 @@ func (m *Model) openPopup() (popupSpec, bool) {
 // popupBoxHeight is how many lines the box of the popup open takes, drawn
 // as it would be now.
 func (m *Model) popupBoxHeight() int {
-	var box []string
-	switch {
-	case m.bulk != nil:
-		box = m.renderBulk()
-	case m.notesAt != nil:
-		box = m.renderNotes()
-	case m.picker != nil:
-		box = m.renderPick()
-	case m.chooser != nil:
-		box, _ = m.renderChooser()
-	case m.menu != nil:
-		box = m.renderMenu()
-	case m.triage != nil && m.triage.open:
-		box, _ = m.renderTriage()
-	case m.help && m.relBox != nil:
-		box = m.releaseNotesBox()
-	case m.help:
-		box, _ = m.helpBoxLines()
-	case m.compose != nil:
-		box, _ = m.renderCompose()
+	p, ok := m.openPopup()
+	if !ok || p.draw == nil {
+		return 0
 	}
-	return len(box)
+	lines, _ := p.draw()
+	return len(lines)
 }
 
 // popupOpen reports whether a popup takes the keys.

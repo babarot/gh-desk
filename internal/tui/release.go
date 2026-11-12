@@ -216,6 +216,7 @@ func (m *Model) openReleaseNotes() tea.Cmd {
 // from it (ADR-125).
 func (m *Model) releaseSpec() popupSpec {
 	return popupSpec{
+		draw:       func() ([]string, int) { return m.releaseNotesBox(), -1 },
 		closeWords: "back",
 		body:       &popupBody{scroll: m.scrollReleaseNotes, page: m.releaseNotesHeight()},
 		close:      func() { m.relBox = nil },
@@ -280,16 +281,6 @@ func (m *Model) releaseNotesLines(inner int) []string {
 		}
 	}
 	return out
-}
-
-// renderReleaseNotes draws the box of release notes over lines. It takes the
-// keys while it is open, so its frame is in the focus color (ADR-079).
-func (m *Model) renderReleaseNotes(lines []string) []string {
-	b := m.releaseNotesBox()
-	// From the row popups are drawn from, where a click outside it can be
-	// told (ADR-053, ADR-127).
-	m.popupAt = boxAt(b, m.popupTop(), m.width)
-	return m.overlay(lines, b, m.popupTop(), m.width)
 }
 
 // releaseNotesBox is the box of release notes: the part of the notes

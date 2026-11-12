@@ -253,6 +253,7 @@ func (m *Model) helpSpec() popupSpec {
 		own = append(own, ownKey{action: "release_notes", hide: true, run: m.openReleaseNotes})
 	}
 	return popupSpec{
+		draw:  m.drawHelp,
 		body:  &popupBody{scroll: m.scrollHelp, page: h, click: m.helpClick},
 		own:   own,
 		close: func() { m.help, m.relBox = false, nil },
@@ -280,6 +281,15 @@ type helpBox struct {
 	heads      []string
 }
 
+// drawHelp draws the ? popup's box, and keeps where it is for a click,
+// which folds a section of it (helpClick).
+func (m *Model) drawHelp() ([]string, int) {
+	b, heads := m.helpBoxLines()
+	w := m.helpWidth()
+	m.helpBox = helpBox{x: max((m.width-w)/2, 0), y: m.popupTop(), w: w, h: len(b), heads: heads}
+	return b, -1
+}
+
 // helpBoxLines are the ? popup's box: the part of its lines scrolled to,
 // in a box whose bottom edge tells how much is above and below, and the
 // titles of the headers on its lines.
@@ -292,13 +302,4 @@ func (m *Model) helpBoxLines() (lines, heads []string) {
 		lines[len(lines)-1] = scrollEdge(st, w, top, len(all)-top-h, m.scrollKeys()+" wheel")
 	}
 	return lines, hs[top : top+h]
-}
-
-// renderHelp is the ? popup over lines, from the row popups are drawn
-// from (ADR-127).
-func (m *Model) renderHelp(lines []string) []string {
-	b, heads := m.helpBoxLines()
-	w := m.helpWidth()
-	m.helpBox = helpBox{x: max((m.width-w)/2, 0), y: m.popupTop(), w: w, h: len(b), heads: heads}
-	return m.overlay(lines, b, m.popupTop(), m.width)
 }

@@ -478,44 +478,20 @@ func boxItems(owner []int, top, h, feet int) []int {
 // does, and acts within ADR-012: what writes to GitHub stays on its key.
 // The text being written takes none, so a click does not throw it away.
 func (m *Model) popupMouse(msg tea.MouseMsg) (cmd tea.Cmd, ok bool) {
-	switch {
-	case m.bulk != nil:
-		if m.bulk.close != nil {
-			if cmd, ok := m.closeMouse(msg); ok {
-				return cmd, true
-			}
-		}
-		m.popupBodyMouse(m.bulkSpec(), msg)
-	case m.notesAt != nil:
-		return m.popupListMouse(m.notesSpec(), msg), true
-	case m.picker != nil:
-		return m.popupListMouse(m.pickSpec(), msg), true
-	case m.chooser != nil:
-		return m.popupListMouse(m.chooserSpec(), msg), true
-	case m.menu != nil:
-		if !m.menuGone() {
-			return m.popupListMouse(m.menuSpec(), msg), true
-		}
-	case m.triage != nil && m.triage.open && !m.triage.typing && !m.triage.asking:
-		m.popupBodyMouse(m.triageSpec(false), msg)
-	case m.triage != nil && m.triage.open:
-		tr := m.triage
-		top := tr.top
-		if m.scrollMouse(msg, &tr.top) {
-			// A request on its way is stopped by its key, not a click.
-			if !tr.asking {
-				m.closeTriage()
-			}
-		} else if tr.top != top {
-			tr.follow = false
-		}
-	case m.help && m.relBox != nil:
-		m.popupBodyMouse(m.releaseSpec(), msg)
-	case m.help:
-		m.popupBodyMouse(m.helpSpec(), msg)
-	case m.compose != nil:
-	default:
+	p, open := m.openPopup()
+	if !open {
 		return nil, false
+	}
+	if p.mouse != nil {
+		if cmd, took := p.mouse(msg); took {
+			return cmd, true
+		}
+	}
+	switch {
+	case p.list != nil:
+		return m.popupListMouse(p, msg), true
+	case p.body != nil:
+		m.popupBodyMouse(p, msg)
 	}
 	return nil, true
 }

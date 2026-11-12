@@ -584,30 +584,13 @@ func (m *Model) key(msg tea.KeyPressMsg) tea.Cmd {
 	if k == keymap.Interrupt {
 		return tea.Quit
 	}
+	// The popup open reads every key, through its declaration.
+	if p, ok := m.openPopup(); ok {
+		return m.popupKey(p, msg)
+	}
 	switch {
-	case m.bulk != nil:
-		return m.bulkKeyMsg(msg)
-	case m.notesAt != nil:
-		return m.popupKey(m.notesSpec(), msg)
-	case m.picker != nil:
-		return m.popupKey(m.pickSpec(), msg)
-	case m.chooser != nil:
-		return m.popupKey(m.chooserSpec(), msg)
-	case m.menu != nil:
-		if m.menuGone() {
-			return nil
-		}
-		return m.popupKey(m.menuSpec(), msg)
-	case m.triage != nil && m.triage.open:
-		return m.triageKey(msg)
-	case m.help && m.relBox != nil:
-		return m.popupKey(m.releaseSpec(), msg)
-	case m.help:
-		return m.popupKey(m.helpSpec(), msg)
 	case m.filtering:
 		return m.filterKey(msg)
-	case m.compose != nil:
-		return m.composeKey(msg)
 	case m.typingChat():
 		return m.chatTyping(msg)
 	}

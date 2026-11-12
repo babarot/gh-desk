@@ -61,6 +61,7 @@ func (m *Model) chooserSpec() popupSpec {
 	c := m.chooser
 	vs := m.chooserValues()
 	return popupSpec{
+		draw: m.renderChooser,
 		list: &popupList{sel: &c.sel, n: len(vs), ptr: &c.pointer, choose: m.chooseScope, moveHint: true},
 		// The keys that go through the questions asked elsewhere move here
 		// too, whatever they are set to, as they type nothing.
@@ -80,6 +81,7 @@ func (m *Model) chooserSpec() popupSpec {
 				return cmd
 			},
 			editNav:   []keymap.Action{"top", "bottom", "page_up", "page_down"},
+			cursor:    c.input.Cursor,
 			typeWords: "to narrow",
 		},
 		closeWords: "cancel",

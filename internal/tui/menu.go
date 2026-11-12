@@ -308,25 +308,20 @@ func stateWords(s model.PRState) string {
 	return "not open"
 }
 
-// menuGone closes the menu when there is nothing left for it to act on,
-// and reports whether it did.
-func (m *Model) menuGone() bool {
-	if len(m.menuItems()) > 0 {
-		return false
-	}
-	m.menu = nil
-	return true
-}
-
 // menuSpec is the menu as the shared popup layer reads it: a list of the
 // actions, each also run by its own key (ADR-125). It changes nothing, so
 // that the hints can be drawn from it; with nothing to act on it holds no
-// list, and the keys close the menu (menuGone).
+// list, and any key or click closes the menu.
 func (m *Model) menuSpec() popupSpec {
 	closeMenu := func() { m.menu = nil }
 	its := m.menuItems()
+	draw := func() ([]string, int) { return m.renderMenu(), -1 }
 	if len(its) == 0 {
-		return popupSpec{close: closeMenu}
+		// Nothing is left to act on: any key or click closes it.
+		gone := func() (tea.Cmd, bool) { m.menu = nil; return nil, true }
+		return popupSpec{draw: draw, close: closeMenu,
+			key:   func(tea.KeyPressMsg) (tea.Cmd, bool) { return gone() },
+			mouse: func(tea.MouseMsg) (tea.Cmd, bool) { return gone() }}
 	}
 	v := m.menu
 	own := make([]ownKey, len(its))
@@ -338,6 +333,7 @@ func (m *Model) menuSpec() popupSpec {
 		}}
 	}
 	return popupSpec{
+		draw: draw,
 		list: &popupList{sel: &v.sel, n: len(its), ptr: &v.pointer, chooseWords: "run",
 			choose: func() tea.Cmd { return m.runMenu(its[v.sel]) },
 			// Marking done in the inbox writes to GitHub with no popup
