@@ -132,88 +132,116 @@ func (m *Model) closeTriage() {
 
 func (m *Model) triageWidth() int { return min(max(m.width-8, 40), 110) }
 
+// triageKey reads a key in the triage. The list of names offered while
+// # or @ is typed, and the search of the questions, are levels over the
+// text box that read their own keys first (ADR-097, ADR-098); the rest goes
+// through the shared popup layer.
 func (m *Model) triageKey(msg tea.KeyPressMsg) tea.Cmd {
-	tr, k := m.triage, msg.String()
-	is := func(a keymap.Action) bool { return m.keys.Matches(a, k) }
+	tr := m.triage
 	switch {
 	case tr.typing && tr.search != nil:
 		return m.searchKey(&tr.search, &tr.input, &tr.recall, tr.history, msg)
 	case tr.typing && len(m.askMenu()) > 0:
 		return m.askMenuKey(msg)
-	case tr.typing:
-		armed := tr.restart
-		tr.restart = false
-		switch {
-		case k == keymap.Back:
-			tr.typing = false
-			tr.input.Blur()
-			if len(tr.turns) == 0 {
-				m.closeTriage()
-			}
-			return nil
-		case is("accept"):
-			q := strings.TrimSpace(tr.input.Value())
-			if q == "" {
-				return nil
-			}
-			tr.input.Reset()
-			tr.recall.Leave()
-			tr.typing = false
-			tr.input.Blur()
-			return m.askTriage(q)
-		case m.recallKey(&tr.recall, &tr.input, tr.history, msg):
-			return nil
-		case is("history_search"):
-			return m.openSearch(&tr.search, &tr.input, tr.history)
-		case is("complete"):
-			completeAsk(&tr.recall, &tr.input, claude.TriageQuestions(), tr.history)
-			return nil
-		case is("expand") && msg.Text == "" && askGhost(&tr.input, &tr.recall, claude.TriageQuestions(), tr.history) != "":
-			completeAsk(&tr.recall, &tr.input, claude.TriageQuestions(), tr.history)
-			return nil
-		case is("chat_restart"):
-			switch {
-			case len(tr.turns) == 0:
-				m.refuse("nothing has been asked yet")
-			case !armed:
-				tr.restart = true
-				m.say(fmt.Sprintf("press %s again to start over", m.firstKey("chat_restart")))
-			default:
-				m.restartTriage()
-			}
-			return nil
-		}
-		return editAsk(&tr.recall, &tr.input, msg)
-	case tr.asking:
-		switch {
-		case k == keymap.Back && !tr.stopping:
-			m.stopTriage()
-		case k == keymap.Back, is("chat_close"):
-			m.closeTriage()
-		}
-	default:
-		return m.popupKey(m.triageSpec(), k)
 	}
-	return nil
+	// Starting over takes the key twice in a row.
+	armed := tr.restart
+	tr.restart = false
+	return m.popupKey(m.triageSpec(armed), msg)
 }
 
-// triageSpec is the triage, once Claude has answered, as the shared popup
-// layer reads it: a body of the conversation, with its own keys to apply
-// the plan and to ask more (ADR-125). While a question is typed or a
-// request is on its way, triageKey reads the keys itself.
-func (m *Model) triageSpec() popupSpec {
+// triageSpec is the triage as the shared popup layer reads it, by its
+// state (ADR-125): while a question is typed, a text box with the keys of
+// asking; while a request is on its way, esc stops it and chat_close
+// closes the popup with Claude still at work; once Claude has answered, a
+// body of the conversation, with its own key to apply the plan, and write
+// to ask more. armed is set when the key before was chat_restart.
+func (m *Model) triageSpec(armed bool) popupSpec {
 	tr := m.triage
+	switch {
+	case tr.typing:
+		qs := claude.TriageQuestions()
+		own := []ownKey{
+			{"accept", func() tea.Cmd {
+				q := strings.TrimSpace(tr.input.Value())
+				if q == "" {
+					return nil
+				}
+				tr.input.Reset()
+				tr.recall.Leave()
+				tr.typing = false
+				tr.input.Blur()
+				return m.askTriage(q)
+			}},
+			{"history_search", func() tea.Cmd { return m.openSearch(&tr.search, &tr.input, tr.history) }},
+			{"complete", func() tea.Cmd {
+				completeAsk(&tr.recall, &tr.input, qs, tr.history)
+				return nil
+			}},
+			{"chat_restart", func() tea.Cmd {
+				switch {
+				case len(tr.turns) == 0:
+					m.refuse("nothing has been asked yet")
+				case !armed:
+					tr.restart = true
+					m.say(fmt.Sprintf("press %s again to start over", m.firstKey("chat_restart")))
+				default:
+					m.restartTriage()
+				}
+				return nil
+			}},
+		}
+		// The rest of a question shows faintly after the cursor; expand
+		// fills it in, and moves the cursor otherwise.
+		if askGhost(&tr.input, &tr.recall, qs, tr.history) != "" {
+			own = append(own, ownKey{"expand", func() tea.Cmd {
+				completeAsk(&tr.recall, &tr.input, qs, tr.history)
+				return nil
+			}})
+		}
+		return popupSpec{
+			own: own,
+			text: &popupText{
+				focused: true,
+				blur: func() {
+					tr.typing = false
+					tr.input.Blur()
+					if len(tr.turns) == 0 {
+						m.closeTriage()
+					}
+				},
+				edit:    func(msg tea.Msg) tea.Cmd { return editAsk(&tr.recall, &tr.input, msg) },
+				editNav: navActions,
+				claim: func(msg tea.KeyPressMsg) bool {
+					return m.recallKey(&tr.recall, &tr.input, tr.history, msg)
+				},
+			},
+			close: m.closeTriage,
+		}
+	case tr.asking:
+		return popupSpec{
+			own: []ownKey{{"chat_close", func() tea.Cmd { m.closeTriage(); return nil }}},
+			back: func() {
+				if tr.stopping {
+					m.closeTriage()
+					return
+				}
+				m.stopTriage()
+			},
+			close: m.closeTriage,
+		}
+	}
 	var own []ownKey
 	if m.applicable() {
 		own = append(own, ownKey{"triage_apply", m.applyTriage})
 	}
-	own = append(own, ownKey{"triage_more", m.typeTriage})
 	return popupSpec{
 		body: &popupBody{page: tr.rows, scroll: func(d int) {
 			// Kept within the conversation when it is drawn.
 			tr.top = max(tr.top+d, 0)
 			tr.follow = false
 		}},
+		text:  &popupText{focus: m.typeTriage},
 		own:   own,
 		close: m.closeTriage,
 	}
@@ -627,7 +655,7 @@ func (m *Model) renderTriage() ([]string, int) {
 		if m.applicable() {
 			as = append(as, "triage_apply")
 		}
-		foot = append(foot, m.footKeys(append(as, "triage_more"), "", "close"))
+		foot = append(foot, m.footKeys(append(as, "write"), "", "close"))
 	}
 	if len(tr.turns) == 0 && !tr.asking {
 		body = append(m.triageWelcome(m.popupHeight()-2-len(foot)), body...)
@@ -742,8 +770,12 @@ func (m *Model) footKeys(as []keymap.Action, accept, back string) string {
 	var parts []string
 	for _, a := range as {
 		help := m.keys.Help(a)
-		if a == "accept" && accept != "" {
+		switch {
+		case a == "accept" && accept != "":
 			help = accept
+		case a == "write":
+			// Writing in the triage is asking Claude more.
+			help = "ask more"
 		}
 		parts = append(parts, m.st.key.Render(m.firstKey(a))+" "+m.st.muted.Render(help))
 	}

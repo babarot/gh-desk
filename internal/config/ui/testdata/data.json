@@ -3215,6 +3215,14 @@
    "scopeWords": "The menu of enter, and the popups that pick from a list"
   },
   {
+   "action": "write",
+   "keys": [
+    "i"
+   ],
+   "scope": "popup",
+   "scopeWords": "The menu of enter, and the popups that pick from a list"
+  },
+  {
    "action": "confirm",
    "keys": [
     "y",
@@ -3248,14 +3256,6 @@
    "scopeWords": "A confirm popup"
   },
   {
-   "action": "write_comment",
-   "keys": [
-    "i"
-   ],
-   "scope": "confirm",
-   "scopeWords": "A confirm popup"
-  },
-  {
    "action": "log_this_pr",
    "keys": [
     "f"
@@ -3267,14 +3267,6 @@
    "action": "triage_apply",
    "keys": [
     "enter"
-   ],
-   "scope": "triage",
-   "scopeWords": "The list, while Claude's plan is shown"
-  },
-  {
-   "action": "triage_more",
-   "keys": [
-    "i"
    ],
    "scope": "triage",
    "scopeWords": "The list, while Claude's plan is shown"

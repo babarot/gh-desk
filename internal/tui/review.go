@@ -135,37 +135,53 @@ func (m *Model) openCompose(c *compose) tea.Cmd {
 	return c.ta.Focus()
 }
 
-func (m *Model) composeKey(msg tea.KeyPressMsg) tea.Cmd {
+func (m *Model) composeKey(msg tea.KeyPressMsg) tea.Cmd { return m.popupKey(m.composeSpec(), msg) }
+
+// composeSpec is the popup a comment or a review is written in, as the
+// shared popup layer reads it: a text box, with the focus when it opens,
+// and the popup's own keys, which work in it and out of it (ADR-125). esc
+// takes the focus out of the text box, and only then throws the text away.
+func (m *Model) composeSpec() popupSpec {
 	c := m.compose
-	k := msg.String()
-	switch {
-	case k == keymap.Back:
-		m.compose = nil
-		m.say(sentWord(c.single, kinds[c.kind]) + " discarded")
-		return nil
-	case m.keys.Matches("next_kind", k):
-		if !c.own && !c.single {
-			c.kind = (c.kind + 1) % len(kinds)
-		}
-		return nil
-	case m.keys.Matches("post", k):
-		ev := kinds[c.kind]
-		body := strings.TrimSpace(c.ta.Value())
-		if body == "" && (c.single || ev != model.EventApprove) {
-			m.refuse("write the " + sentWord(c.single, ev) + " first")
-			return nil
-		}
-		if !c.single {
-			// The popup reads each pull request again and asks, in place
-			// of this one; the review is kept until its batch starts.
-			return m.startBulkFor(runner.Review, runner.ReviewText{Event: ev, Body: body}, c.prs)
-		}
-		// The text is the review's field the popup shows and a batch keeps.
-		return m.startBulkFor(runner.Comment, runner.ReviewText{Body: body}, c.prs)
-	case m.keys.Matches("editor", k):
-		return m.openEditor()
+	return popupSpec{
+		own: []ownKey{
+			{"next_kind", func() tea.Cmd {
+				if !c.own && !c.single {
+					c.kind = (c.kind + 1) % len(kinds)
+				}
+				return nil
+			}},
+			{"post", func() tea.Cmd {
+				ev := kinds[c.kind]
+				body := strings.TrimSpace(c.ta.Value())
+				if body == "" && (c.single || ev != model.EventApprove) {
+					m.refuse("write the " + sentWord(c.single, ev) + " first")
+					return nil
+				}
+				if !c.single {
+					// The popup reads each pull request again and asks, in
+					// place of this one; the review is kept until its batch
+					// starts.
+					return m.startBulkFor(runner.Review, runner.ReviewText{Event: ev, Body: body}, c.prs)
+				}
+				// The text is the review's field the popup shows and a batch
+				// keeps.
+				return m.startBulkFor(runner.Comment, runner.ReviewText{Body: body}, c.prs)
+			}},
+			{"editor", m.openEditor},
+		},
+		text: &popupText{
+			focused: c.ta.Focused(),
+			focus:   c.ta.Focus,
+			blur:    c.ta.Blur,
+			edit:    c.update,
+			editNav: navActions,
+		},
+		close: func() {
+			m.compose = nil
+			m.say(sentWord(c.single, kinds[c.kind]) + " discarded")
+		},
 	}
-	return c.update(msg)
 }
 
 // editedMsg is the editor's exit, with the file it edited.
@@ -253,12 +269,19 @@ func (m *Model) renderCompose() ([]string, int) {
 		lines = append(lines, strings.Join(ks, tabGap), "")
 		keys += st.dim.Render(" · ") + st.key.Render(m.firstKey("next_kind")) + " " + st.muted.Render("kind")
 	}
+	// esc takes the focus out of the text box first, and write puts it
+	// back; out of it, esc throws the text away.
+	back := "done writing"
+	if !c.ta.Focused() {
+		back = "discard"
+		keys = st.key.Render(m.firstKey("write")) + " " + st.muted.Render("write") + st.dim.Render(" · ") + keys
+	}
 	// Below the box's top edge.
 	at := 1 + len(lines)
 	lines = append(lines, strings.Split(c.ta.View(), "\n")...)
 	lines = append(lines, "", keys+
 		st.dim.Render(" · ")+st.key.Render(m.firstKey("editor"))+" "+st.muted.Render("$EDITOR")+
-		st.dim.Render(" · ")+st.key.Render(keymap.Back)+" "+st.muted.Render("discard"))
+		st.dim.Render(" · ")+st.key.Render(keymap.Back)+" "+st.muted.Render(back))
 	return box(st, title, lines, composeWidth(m.width)), at
 }
 

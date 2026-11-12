@@ -52,35 +52,37 @@ func (m *Model) chooserValues() []string {
 	return out
 }
 
-// chooserKey handles a key while the chooser is open: the arrows and the
-// keys of history_next and history_prev move, enter chooses, esc closes,
-// and the rest is typed. j and k are typed, as a name
-// may hold them.
-func (m *Model) chooserKey(msg tea.KeyPressMsg) tea.Cmd {
-	c, k := m.chooser, msg.String()
-	is := func(a keymap.Action) bool { return m.keys.Matches(a, k) }
+// chooserSpec is the scope chooser as the shared popup layer reads it: a
+// text box that narrows the values, with the focus as long as it is open,
+// and a list of the values (ADR-125). The text box is one line, so it
+// gives up and down to the list; j and k are typed, as a name may hold
+// them.
+func (m *Model) chooserSpec() popupSpec {
+	c := m.chooser
 	vs := m.chooserValues()
-	switch {
-	case k == keymap.Back:
-		m.chooser = nil
-	case is("choose"):
-		return m.chooseScope()
-	// ctrl+n and ctrl+p move too, as in the triage's lists, since they
-	// type nothing.
-	case is("down") && msg.Text == "", is("history_next"):
-		c.sel = min(c.sel+1, max(len(vs)-1, 0))
-	case is("up") && msg.Text == "", is("history_prev"):
-		c.sel = max(c.sel-1, 0)
-	default:
-		before := c.input.Value()
-		var cmd tea.Cmd
-		c.input, cmd = c.input.Update(msg)
-		if c.input.Value() != before {
-			c.sel, c.top = 0, 0
-		}
-		return cmd
+	return popupSpec{
+		list: &popupList{sel: &c.sel, n: len(vs), ptr: &c.pointer, choose: m.chooseScope},
+		// The keys that go through the questions asked elsewhere move here
+		// too, whatever they are set to, as they type nothing.
+		own: []ownKey{
+			{"history_next", func() tea.Cmd { c.sel = min(c.sel+1, max(len(vs)-1, 0)); return nil }},
+			{"history_prev", func() tea.Cmd { c.sel = max(c.sel-1, 0); return nil }},
+		},
+		text: &popupText{
+			focused: true,
+			edit: func(msg tea.Msg) tea.Cmd {
+				before := c.input.Value()
+				var cmd tea.Cmd
+				c.input, cmd = c.input.Update(msg)
+				if c.input.Value() != before {
+					c.sel, c.top = 0, 0
+				}
+				return cmd
+			},
+			editNav: []keymap.Action{"top", "bottom", "page_up", "page_down"},
+		},
+		close: func() { m.chooser = nil },
 	}
-	return nil
 }
 
 // chooseScope chooses the value under the chooser's cursor and closes it.

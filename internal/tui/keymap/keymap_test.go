@@ -106,7 +106,7 @@ func TestMatches(t *testing.T) {
 	if !m.Matches("approve", "A") || m.Matches("approve", "a") {
 		t.Error("approve should match A only")
 	}
-	if got := m.Actions(ScopeConfirm); !slices.Equal(got, []Action{"confirm", "include_failing", "wait_for_checks", "delete_branch", "write_comment"}) {
+	if got := m.Actions(ScopeConfirm); !slices.Equal(got, []Action{"confirm", "include_failing", "wait_for_checks", "delete_branch"}) {
 		t.Errorf("Actions(confirm) = %v", got)
 	}
 }

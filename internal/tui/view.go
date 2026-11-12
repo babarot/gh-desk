@@ -456,7 +456,7 @@ func (m *Model) hints() string {
 	case m.bulk != nil && m.bulk.close != nil && m.bulk.close.editing:
 		as = nil
 	case m.bulk != nil && m.bulk.close != nil:
-		as = []keymap.Action{"confirm", "delete_branch", "write_comment"}
+		as = []keymap.Action{"confirm", "delete_branch", "write"}
 	case m.bulk != nil:
 		as = []keymap.Action{"confirm"}
 	case m.picker != nil:
@@ -465,6 +465,9 @@ func (m *Model) hints() string {
 		as = []keymap.Action{"choose"}
 	case m.compose != nil:
 		as = []keymap.Action{"next_kind", "post", "editor"}
+		if !m.compose.ta.Focused() {
+			as = append([]keymap.Action{"write"}, as...)
+		}
 	case m.triage != nil && m.triage.open:
 		switch {
 		case m.triage.typing:
@@ -486,9 +489,9 @@ func (m *Model) hints() string {
 				back = "stop"
 			}
 		case m.applicable():
-			as = []keymap.Action{"triage_apply", "triage_more"}
+			as = []keymap.Action{"triage_apply", "write"}
 		default:
-			as = []keymap.Action{"triage_more"}
+			as = []keymap.Action{"write"}
 		}
 	case m.filtering:
 		as = []keymap.Action{"accept"}

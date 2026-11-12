@@ -15,7 +15,7 @@ desk // @me    1 review (3)   2 mine (1)   3 involved (0)   4 inbox (1)
                │ ┃                                                                                                │
                │ ┃                                                                                                │
                │                                                                                                  │
-               │ ctrl+s post · ctrl+e $EDITOR · esc discard                                                       │
+               │ ctrl+s post · ctrl+e $EDITOR · esc done writing                                                  │
                ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
 
 
@@ -88,7 +88,7 @@ L17 31-37 fg=#96bfff bold
 L17 38-45 fg=#8888a4
 L17 46-47 fg=#706f87
 L17 48-51 fg=#96bfff bold
-L17 52-59 fg=#8888a4
+L17 52-64 fg=#8888a4
 L17 114-115 fg=#96bfff
 L18 15-115 fg=#96bfff
 L21 0-130 fg=#706f87

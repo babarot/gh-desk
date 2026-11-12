@@ -412,8 +412,6 @@ func (m *Model) decideBulk() {
 	}
 }
 
-func (m *Model) bulkKey(k string) tea.Cmd { return m.popupKey(m.bulkSpec(), k) }
-
 // bulkSpec is the confirm popup as the shared popup layer reads it: a body
 // of what each pull request will have done to it, the write it asks to
 // confirm once every one is read again, and its own keys for what may be
@@ -422,7 +420,14 @@ func (m *Model) bulkKey(k string) tea.Cmd { return m.popupKey(m.bulkSpec(), k) }
 func (m *Model) bulkSpec() popupSpec {
 	b := m.bulk
 	var own []ownKey
-	if b.approves() && !b.loading {
+	var text *popupText
+	if b.close != nil {
+		text = m.closeText(b.close)
+	}
+	// While the comment has the focus the popup has no keys of its own: a
+	// letter is typed, and none confirms (ADR-066).
+	writing := text != nil && text.focused
+	if b.approves() && !b.loading && !writing {
 		own = append(own, ownKey{"include_failing", func() tea.Cmd {
 			b.includeFailing = !b.includeFailing
 			m.decideBulk()
@@ -436,25 +441,28 @@ func (m *Model) bulkSpec() popupSpec {
 			}})
 		}
 	}
-	if b.close != nil {
-		own = append(own,
-			ownKey{"delete_branch", func() tea.Cmd {
-				b.close.del = !b.close.del
-				m.decideBulk()
-				return nil
-			}},
-			ownKey{"write_comment", b.close.focus})
+	if b.close != nil && !writing {
+		own = append(own, ownKey{"delete_branch", func() tea.Cmd {
+			b.close.del = !b.close.del
+			m.decideBulk()
+			return nil
+		}})
 	}
-	return popupSpec{
-		// Kept within the body when it is drawn.
-		body: &popupBody{scroll: func(d int) { b.offset = max(b.offset+d, 0) }, page: b.rows},
-		question: &popupQuestion{confirm: func() tea.Cmd {
+	var question *popupQuestion
+	if !writing {
+		question = &popupQuestion{confirm: func() tea.Cmd {
 			if b.loading {
 				return nil
 			}
 			return m.runBulk()
-		}},
-		own: own,
+		}}
+	}
+	return popupSpec{
+		question: question,
+		// Kept within the body when it is drawn.
+		body: &popupBody{scroll: func(d int) { b.offset = max(b.offset+d, 0) }, page: b.rows},
+		own:  own,
+		text: text,
 		close: func() {
 			// A review being written is under the popup, and comes back.
 			if b.close != nil {
@@ -777,9 +785,8 @@ func (m *Model) renderBulk() []string {
 	}
 	ask := st.sub0.Render(hint) + st.key.Render(m.firstKey("confirm")) + " " + st.muted.Render("yes")
 	if b.close != nil {
-		for _, a := range []keymap.Action{"delete_branch", "write_comment"} {
-			ask += st.dim.Render(" · ") + st.key.Render(m.firstKey(a)) + " " + st.muted.Render(m.keys.Help(a))
-		}
+		ask += st.dim.Render(" · ") + st.key.Render(m.firstKey("delete_branch")) + " " + st.muted.Render(m.keys.Help("delete_branch"))
+		ask += st.dim.Render(" · ") + st.key.Render(m.firstKey("write")) + " " + st.muted.Render("write a comment")
 	}
 	ask += st.dim.Render(" · ") + st.key.Render(keymap.Back) + " " + st.muted.Render("no")
 	if b.close != nil && b.close.editing {

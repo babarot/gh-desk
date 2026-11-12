@@ -1,6 +1,6 @@
 # Approving and merging
 
-An approval or a merge cannot be taken back on GitHub, so every write goes through a confirm popup first, but the approvals of the rules you write to approve, below. `A` approves, `M` merges, `R` writes a review of any kind, and `c` comments on the conversation; each acts on the selection, or on the pull request under the cursor.
+An approval or a merge cannot be taken back on GitHub, so every write goes through a confirm popup first, but the approvals of the rules you write to approve, below. `A` approves, `M` merges, `R` writes a review of any kind, and `c` comments on the conversation; each acts on the selection, or on the pull request under the cursor. A review or a comment is written in a popup: `ctrl+s` takes it on to the confirm popup, `esc` leaves the text box keeping what was written and `i` goes back into it, and `esc` once more throws it away.
 
 ## The confirm popup
 

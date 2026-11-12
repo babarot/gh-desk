@@ -583,19 +583,19 @@ func (m *Model) key(msg tea.KeyPressMsg) tea.Cmd {
 	case m.bulk != nil:
 		return m.bulkKeyMsg(msg)
 	case m.notesAt != nil:
-		return m.popupKey(m.notesSpec(), k)
+		return m.popupKey(m.notesSpec(), msg)
 	case m.picker != nil:
-		return m.popupKey(m.pickSpec(), k)
+		return m.popupKey(m.pickSpec(), msg)
 	case m.chooser != nil:
-		return m.chooserKey(msg)
+		return m.popupKey(m.chooserSpec(), msg)
 	case m.menu != nil:
-		return m.popupKey(m.menuSpec(), k)
+		return m.popupKey(m.menuSpec(), msg)
 	case m.triage != nil && m.triage.open:
 		return m.triageKey(msg)
 	case m.help && m.relBox != nil:
-		return m.popupKey(m.releaseSpec(), k)
+		return m.popupKey(m.releaseSpec(), msg)
 	case m.help:
-		return m.popupKey(m.helpSpec(), k)
+		return m.popupKey(m.helpSpec(), msg)
 	case m.filtering:
 		return m.filterKey(msg)
 	case m.compose != nil:
@@ -632,7 +632,12 @@ func (m *Model) paste(msg tea.PasteMsg) tea.Cmd {
 		}
 		return editAsk(&m.triage.recall, &m.triage.input, msg)
 	case m.compose != nil:
-		return m.compose.update(msg)
+		// Pasted text goes only into the text box with the focus; nothing
+		// under the popup takes it.
+		if m.compose.ta.Focused() {
+			return m.compose.update(msg)
+		}
+		return nil
 	case m.typingChat():
 		c := m.chat()
 		if c.search != nil {

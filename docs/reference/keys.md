@@ -93,6 +93,7 @@ browse = []
 | `space` | `toggle_rule` | check a rule |
 | `a` | `add_to_selection` | add to the selection |
 | `f` | `filter_by_rule` | show only these |
+| `i` | `write` | write |
 
 ## A confirm popup
 
@@ -102,14 +103,12 @@ browse = []
 | `f` | `include_failing` | include failing |
 | `w` | `wait_for_checks` | wait for checks |
 | `x` | `delete_branch` | delete branches |
-| `i` | `write_comment` | write a comment |
 
 ## Claude on the list
 
 | Key | Action | Does |
 |---|---|---|
 | `enter` | `triage_apply` | apply |
-| `i` | `triage_more` | ask more |
 
 ## The log
 

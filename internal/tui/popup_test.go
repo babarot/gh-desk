@@ -111,7 +111,7 @@ func TestPopupsOnASmallScreen(t *testing.T) {
 		m := startSmall(t, f)
 		selectAll(m, keys)
 		press(m, "c")
-		readPopup(t, m, linesOnly(m.renderCompose), "discard", "j")
+		readPopup(t, m, linesOnly(m.renderCompose), "done writing", "j")
 		body := "First line of a comment that is long enough to be wrapped in the popup, then more.\nsecond line"
 		run(m, m.paste(tea.PasteMsg{Content: body}))
 		press(m, "ctrl+s")
