@@ -1,5 +1,20 @@
 # Changelog
 
+## [v0.20.0](https://github.com/babarot/gh-desk/compare/v0.19.0...v0.20.0) - 2026-11-12
+### New Features
+- Decide how popups read their keys, and move on ctrl+n and ctrl+p by @babarot in https://github.com/babarot/gh-desk/pull/147
+### Bug fixes
+- Draw the preview on a screen too narrow for its facts by @babarot in https://github.com/babarot/gh-desk/pull/154
+### Improvements
+- Read the keys of the menu, the picker and the notifications in one place by @babarot in https://github.com/babarot/gh-desk/pull/149
+- Read the keys of the popups that scroll in one place, and close popups on esc alone by @babarot in https://github.com/babarot/gh-desk/pull/150
+- Read the keys of every text box in a popup in one place by @babarot in https://github.com/babarot/gh-desk/pull/151
+- Make the keys a popup tells from what it declares by @babarot in https://github.com/babarot/gh-desk/pull/152
+- Draw every popup from one row, in one of two widths by @babarot in https://github.com/babarot/gh-desk/pull/153
+- Open a popup where the eye is by @babarot in https://github.com/babarot/gh-desk/pull/156
+### Refactorings
+- Name the right ADR and the scopes as the code reads them by @babarot in https://github.com/babarot/gh-desk/pull/155
+
 ## [v0.19.0](https://github.com/babarot/gh-desk/compare/v0.18.0...v0.19.0) - 2026-11-12
 ### New Features
 - Stop what waits without quitting by @babarot in https://github.com/babarot/gh-desk/pull/144
