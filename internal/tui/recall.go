@@ -217,6 +217,11 @@ func (m *Model) openSearch(sp **search, in *textarea.Model, list []askbox.Entry)
 	ta.ShowLineNumbers = false
 	ta.SetHeight(1)
 	ta.SetWidth(in.Width())
+	// The hit chosen is drawn on a band, so the text box has none of its
+	// own: one band on the box draws the eye to where the choice is.
+	ss := ta.Styles()
+	ss.Focused.CursorLine = ss.Focused.CursorLine.UnsetBackground()
+	ta.SetStyles(ss)
 	in.Blur()
 	*sp = &search{input: ta}
 	return (*sp).input.Focus()
@@ -274,7 +279,12 @@ func (m *Model) searchLines(s *search, list []askbox.Entry, width, rows int) []s
 		if e.Tab != "" {
 			lead += st.muted.Render(fit(safeLine(e.Tab), 10))
 		}
-		out = append(out, lead+m.markHit(safeLine(e.Question), q, text))
+		line := lead + m.markHit(safeLine(e.Question), q, text)
+		if i == at {
+			// The chosen one on the band of a cursor's row, as in a menu.
+			line = onBackground(line, st.sel, width)
+		}
+		out = append(out, line)
 	}
 	reply := hits[at].Reply
 	if reply == "" {

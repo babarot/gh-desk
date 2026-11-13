@@ -580,6 +580,19 @@ func TestTriageSearch(t *testing.T) {
 	if strings.Count(s, "╭") != 2 {
 		t.Errorf("a box over the popup:\n%s", s)
 	}
+	// The hit chosen is on the band of a cursor's row; the text box has no
+	// band of its own.
+	probe := m.st.sel.Render("\x00")
+	band := probe[:strings.IndexByte(probe, 0)]
+	if box := tr.search.input.Styles().Focused.CursorLine.Render("\x00"); box != "\x00" {
+		t.Errorf("the text box has a band: %q", box)
+	}
+	raw, _ := m.render()
+	for l := range strings.Lines(raw) {
+		if strings.Contains(ansi.Strip(l), "› 2d") && !strings.Contains(l, band) {
+			t.Errorf("the hit chosen is not on a band: %q", l)
+		}
+	}
 	press(m, "動", "い")
 	if s := screen(m); !strings.Contains(s, "先週から") || strings.Contains(s, "2 bots") {
 		t.Errorf("not narrowed:\n%s", s)
