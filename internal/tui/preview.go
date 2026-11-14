@@ -48,6 +48,9 @@ type pane struct {
 	// the pages a click on each line opens.
 	heads []string
 	links [][]link
+	// bar is where the pane last drew what scrolls, for the scrollbar on
+	// its right edge; the zero value when it draws its own.
+	bar track
 }
 
 // fileTabSpan is a file tab on cells x to x+w of the pane's line; tab is
@@ -496,6 +499,7 @@ func (m *Model) renderPane(b *strings.Builder, height int) {
 		}
 		tabs = m.paneTabs(p)
 		hint = m.paneHint(p)
+		m.pane.bar = track{}
 		body = m.paneBody(p, n, e, files, height-2)
 	}
 	top := st.border.Render("╭ ") + tabs + " "
@@ -507,7 +511,13 @@ func (m *Model) renderPane(b *strings.Builder, height int) {
 		if i < len(body) {
 			s = body[i]
 		}
-		b.WriteString(st.border.Render("│ ") + fit(s, inner) + st.border.Render(" │") + "\n")
+		edge := st.border.Render(" │")
+		if ok && m.pane.bar.thumb(i) {
+			// On the frame, so it takes no width from what scrolls; it
+			// has to stand out from the frame it is drawn on.
+			edge = " " + st.muted.Render("┃")
+		}
+		b.WriteString(st.border.Render("│ ") + fit(s, inner) + edge + "\n")
 	}
 	b.WriteString(st.border.Render("╰"+strings.Repeat("─", max(m.width-2, 0))+"╯") + "\n")
 }
@@ -617,6 +627,7 @@ func (m *Model) paneBody(p model.PR, n *model.Notification, e *entry[[]diff.File
 		top = append(top, s)
 		topLinks = append(topLinks, nil)
 	}
+	m.pane.bar = track{row: len(top), room: rest, first: m.pane.scroll, total: len(ls)}
 	m.pane.heads = make([]string, len(top), height)
 	m.pane.links = append(make([][]link, 0, height), topLinks...)
 	for _, l := range shown {

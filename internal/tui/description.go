@@ -67,6 +67,7 @@ func (m *Model) descPane(p model.PR, n *model.Notification, height int) []string
 	rest := max(height-len(top), 1)
 	m.pane.scroll = min(m.pane.scroll, max(len(ls)-rest, 0))
 	shown := ls[m.pane.scroll:min(len(ls), m.pane.scroll+rest)]
+	bar := track{row: len(top), room: rest, first: m.pane.scroll, total: len(ls)}
 	m.pane.tabRow, m.pane.tabs = -1, nil
 	m.pane.heads = make([]string, len(top), height)
 	m.pane.links = append(make([][]link, 0, height), topLinks...)
@@ -80,6 +81,7 @@ func (m *Model) descPane(p model.PR, n *model.Notification, height int) []string
 		m.pane.links = append(m.pane.links, l.links)
 	}
 	if right == 0 {
+		m.pane.bar = bar
 		return top
 	}
 	facts := m.facts(p, d, right)
@@ -110,7 +112,13 @@ func (m *Model) descPane(p model.PR, n *model.Notification, height int) []string
 		if i < len(facts) {
 			f = facts[i]
 		}
-		out[i] = fit(l, left) + st.border.Render(" │ ") + f.text
+		// The scrollbar is on the line between the description, which
+		// scrolls, and the facts, which do not.
+		sep := st.border.Render(" │ ")
+		if bar.thumb(i) {
+			sep = " " + st.muted.Render("┃") + " "
+		}
+		out[i] = fit(l, left) + sep + f.text
 		for _, k := range f.links {
 			k.x += left + 3
 			m.pane.links[i] = append(m.pane.links[i], k)
