@@ -380,8 +380,17 @@ func (m *Model) hideSelected() tea.Cmd {
 	return tea.Batch(cmds...)
 }
 
-// browseAll opens each of prs in the browser.
+// maxBrowse is the most pull requests the browser opens at once: V can
+// select hundreds, and each is a tab of the browser. A constant, as no one
+// wants that many tabs.
+const maxBrowse = 10
+
+// browseAll opens each of prs in the browser, or none past maxBrowse.
 func (m *Model) browseAll(prs []model.PR) tea.Cmd {
+	if len(prs) > maxBrowse {
+		m.refuse(fmt.Sprintf("open at most %d in the browser: %d selected", maxBrowse, len(prs)))
+		return nil
+	}
 	var cmds []tea.Cmd
 	for _, p := range prs {
 		cmds = append(cmds, m.browse(p))
