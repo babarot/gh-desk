@@ -22,9 +22,9 @@ desk // @me    1 review (3)   2 mine (1)   3 involved (0)   4 inbox (1)
 ╭ claude on acme/api#12 ───────────────────────────────────────── claude-opus-5-5 · at aaaaaaa · read-only · $0.40 · pgup/pgdown ╮
 │                                                                                                                                │
 │   ⏺ Answer 1: the retry loop has no limit.                                                                                     │
-│                                                                                                                                │
-│     1 tool · $0.40                                                                                                             │
-│                                                                                                                                │
+│                                                                                                                                ┃
+│     1 tool · $0.40                                                                                                             ┃
+│                                                                                                                                ┃
 │ ╭ ask claude ──────────────────────────────────────────────────────────────────────────────────────╮                           │
 │ │ ┃ Ask Claude                                                                                     │                           │
 │ │ ┃                                                                                                │                           │
@@ -76,11 +76,13 @@ L23 0-1 fg=#7aa2f7
 L23 4-5 fg=#c0caf5
 L23 6-44 fg=#a9b1d6
 L23 129-130 fg=#7aa2f7
-L24 0-130 fg=#7aa2f7
+L24 0-1 fg=#7aa2f7
+L24 129-130 fg=#c0caf5
 L25 0-1 fg=#7aa2f7
 L25 6-20 fg=#565f89
-L25 129-130 fg=#7aa2f7
-L26 0-130 fg=#7aa2f7
+L25 129-130 fg=#c0caf5
+L26 0-1 fg=#7aa2f7
+L26 129-130 fg=#c0caf5
 L27 0-1 fg=#7aa2f7
 L27 2-3 fg=#3b4261
 L27 4-14 fg=#a9b1d6 bold

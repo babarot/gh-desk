@@ -1010,6 +1010,7 @@ func (m *Model) renderClaude(b *strings.Builder, height int) *tea.Cursor {
 	fill := m.width - lipgloss.Width(head) - lipgloss.Width(right)
 	b.WriteString(head + frame.Render(strings.Repeat("─", max(fill, 0))) + right + "\n")
 	bodyH = height - 2 - len(ask)
+	bar := track{room: min(bodyH, len(body)), first: start, total: len(L)}
 	for i := 0; i < height-2; i++ {
 		s := ""
 		switch {
@@ -1018,7 +1019,12 @@ func (m *Model) renderClaude(b *strings.Builder, height int) *tea.Cursor {
 		case i >= bodyH && i-bodyH < len(ask):
 			s = ask[i-bodyH]
 		}
-		b.WriteString(frame.Render("│ ") + fit(s, inner) + frame.Render(" │") + "\n")
+		edge := frame.Render(" │")
+		if bar.thumb(i) {
+			// Brighter than the frame, which is in the color of the focus.
+			edge = " " + st.text.Render("┃")
+		}
+		b.WriteString(frame.Render("│ ") + fit(s, inner) + edge + "\n")
 	}
 	b.WriteString(frame.Render("╰"+strings.Repeat("─", max(m.width-2, 0))+"╯") + "\n")
 	if len(ask) == 0 {
