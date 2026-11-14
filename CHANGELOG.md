@@ -1,5 +1,12 @@
 # Changelog
 
+## [v0.21.0](https://github.com/babarot/gh-desk/compare/v0.20.0...v0.21.0) - 2026-11-14
+### New Features
+- Show a scrollbar on the frame of the preview and claude panes by @babarot in https://github.com/babarot/gh-desk/pull/159
+### Improvements
+- Put the band on the hit chosen in a search of the questions by @babarot in https://github.com/babarot/gh-desk/pull/157
+- Open at most ten pull requests in the browser at once by @babarot in https://github.com/babarot/gh-desk/pull/160
+
 ## [v0.20.0](https://github.com/babarot/gh-desk/compare/v0.19.0...v0.20.0) - 2026-11-12
 ### New Features
 - Decide how popups read their keys, and move on ctrl+n and ctrl+p by @babarot in https://github.com/babarot/gh-desk/pull/147
