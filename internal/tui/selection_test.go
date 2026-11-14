@@ -101,6 +101,33 @@ func TestBrowseSelection(t *testing.T) {
 	}
 }
 
+// Past maxBrowse, o opens none of the selection and says why; the
+// selection stays.
+func TestBrowseRefusesTooMany(t *testing.T) {
+	f := fixture()
+	m := start(t, f, keymap.Default())
+	var prs []model.PR
+	for i := range maxBrowse + 1 {
+		prs = append(prs, model.PR{Key: key("acme", "api", 100+i), URL: "https://github.com/acme/api/pull/" + strconv.Itoa(100+i)})
+	}
+	if cmd := m.browseAll(prs); cmd != nil {
+		run(m, cmd)
+	}
+	if len(f.browsed) != 0 {
+		t.Fatalf("browsed %v", f.browsed)
+	}
+	want := fmt.Sprintf("open at most %d in the browser: %d selected", maxBrowse, maxBrowse+1)
+	if !strings.Contains(status(m), want) {
+		t.Errorf("status = %q, want %q", status(m), want)
+	}
+	if cmd := m.browseAll(prs[:maxBrowse]); cmd != nil {
+		run(m, cmd)
+	}
+	if len(f.browsed) != maxBrowse {
+		t.Errorf("browsed %d at the limit, want %d", len(f.browsed), maxBrowse)
+	}
+}
+
 // y copies the URL of the pull request under the cursor or, with a
 // selection, of each selected one, a line each; the selection stays.
 func TestCopyURL(t *testing.T) {
