@@ -23,6 +23,8 @@ type fake struct {
 	mu    sync.Mutex
 	rules []rule
 	sent  []sent
+	// status answers a path with this status instead of one by the body.
+	status map[string]int
 }
 
 type rule struct {
@@ -31,7 +33,7 @@ type rule struct {
 }
 
 type sent struct {
-	method, path, accept, body string
+	method, path, accept, body, version string
 }
 
 func (f *fake) RoundTrip(r *http.Request) (*http.Response, error) {
@@ -42,13 +44,16 @@ func (f *fake) RoundTrip(r *http.Request) (*http.Response, error) {
 	}
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	f.sent = append(f.sent, sent{r.Method, r.URL.Path, r.Header.Get("Accept"), body})
+	f.sent = append(f.sent, sent{r.Method, r.URL.Path, r.Header.Get("Accept"), body, r.Header.Get("X-GitHub-Api-Version")})
 	for _, ru := range f.rules {
 		if ru.match(r, body) {
 			h := http.Header{"Content-Type": {"application/json"}, "X-Github-Request-Id": {"REQ-1"}}
 			status := http.StatusOK
 			if ru.body == "" {
 				status = http.StatusNoContent
+			}
+			if st, ok := f.status[r.URL.Path]; ok {
+				status = st
 			}
 			return &http.Response{StatusCode: status, Header: h, Body: io.NopCloser(strings.NewReader(ru.body)), Request: r}, nil
 		}

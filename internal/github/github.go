@@ -31,7 +31,9 @@ type Client struct {
 	gql  *api.GraphQLClient
 	rest *api.RESTClient
 	diff *api.RESTClient
-	log  *slog.Logger
+	// async asks for the API version that has the asynchronous merge.
+	async *api.RESTClient
+	log   *slog.Logger
 	// host is the host gh is logged in to, and next the transport under
 	// the one that logs, for reading github.com when host is another.
 	host string
@@ -80,11 +82,16 @@ func New(log *slog.Logger, o Options) (*Client, error) {
 	if err != nil {
 		return nil, err
 	}
+	opts.Headers = map[string]string{"Accept": "application/vnd.github+json", "X-GitHub-Api-Version": asyncAPIVersion}
+	async, err := api.NewRESTClient(opts)
+	if err != nil {
+		return nil, err
+	}
 	host := o.Host
 	if host == "" {
 		host = DefaultHost()
 	}
-	return &Client{gql: gql, rest: rest, diff: diff, log: log, host: host, next: next}, nil
+	return &Client{gql: gql, rest: rest, diff: diff, async: async, log: log, host: host, next: next}, nil
 }
 
 // rateLimit is asked for in every query, to log what each costs.

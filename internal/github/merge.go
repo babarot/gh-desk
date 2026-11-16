@@ -21,7 +21,8 @@ const infoFields = `
   id number state isDraft headRefOid baseRefOid mergeStateStatus reviewDecision
   viewerCanMergeAsAdmin autoMergeRequest { enabledAt } isMergeQueueEnabled isInMergeQueue
   viewerCanClose locked headRefName baseRefName headRef { id }
-  baseRef { associatedPullRequests(states: OPEN, first: 1) { nodes { number } } } isCrossRepository viewerCanDeleteHeadRef
+  baseRef { associatedPullRequests(states: OPEN, first: 1) { nodes { number } } }
+  stack { number } isCrossRepository viewerCanDeleteHeadRef
   repository { nameWithOwner mergeCommitAllowed squashMergeAllowed rebaseMergeAllowed autoMergeAllowed viewerPermission }
   latestReviews(first: 20) { nodes { author { login } state } }
   viewerLatestReview { state commit { oid } }
@@ -75,6 +76,8 @@ type infoNode struct {
 	BaseRef *struct {
 		AssociatedPullRequests struct{ Nodes []struct{ Number int } }
 	}
+	// Stack is set on a pull request in one of GitHub's stacks.
+	Stack             *struct{ Number int }
 	IsCrossRepository bool
 	// ViewerCanDeleteHeadRef is whether the viewer can delete the head
 	// branch.
@@ -111,7 +114,7 @@ func (n infoNode) toModel() model.MergeInfo {
 		AdminMerge: n.ViewerCanMergeAsAdmin,
 		Repo:       model.RepoMerge{AutoMerge: n.Repository.AutoMergeAllowed},
 		CanClose:   n.ViewerCanClose, Locked: n.Locked, HeadInFork: n.IsCrossRepository, CanDeleteHead: n.ViewerCanDeleteHeadRef,
-		Head: model.Branch{Owner: owner, Repo: repo, Name: n.HeadRefName}, BaseRef: n.BaseRefName,
+		Head: model.Branch{Owner: owner, Repo: repo, Name: n.HeadRefName}, BaseRef: n.BaseRefName, Stacked: n.Stack != nil,
 		CanWrite: slices.Contains([]string{"WRITE", "MAINTAIN", "ADMIN"}, n.Repository.ViewerPermission),
 	}
 	if n.HeadRef != nil {

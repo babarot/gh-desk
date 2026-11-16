@@ -37,6 +37,73 @@ type fakeGH struct {
 	based    map[model.Branch][]int
 	basedErr error
 	closeErr error
+	// async is GitHub's asynchronous merge of stacked pull requests.
+	async asyncFake
+}
+
+// asyncFake is how the asynchronous merge answers: busy asks answer that
+// one asked before is pending, then a request stays pending for polls
+// reads of it and ends as end, merged when empty.
+type asyncFake struct {
+	busy, polls int
+	end         model.MergeStatus
+	message     string
+	reads       int
+}
+
+// errStacked is GitHub refusing a stacked pull request through the
+// synchronous merge.
+var errStacked = errors.New("this pull request is part of a stack and must be merged using the asynchronous merge REST API")
+
+func (f *fakeGH) byKey(k model.PRKey) *model.MergeInfo {
+	for _, mi := range f.prs {
+		if mi.Key == k {
+			return mi
+		}
+	}
+	return nil
+}
+
+func (f *fakeGH) MergeAsync(_ context.Context, k model.PRKey, head string, req model.MergeRequest) (model.MergeResult, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.log(fmt.Sprintf("merge-async %s %s queue=%v bypass=%v", k, head, req.Queue, req.Bypass))
+	if f.byKey(k).HeadOID != head {
+		return model.MergeResult{}, fmt.Errorf("head branch was modified")
+	}
+	if f.async.busy > 0 {
+		f.async.busy--
+		return model.MergeResult{Status: model.MergePending}, nil
+	}
+	if f.async.polls > 0 {
+		return model.MergeResult{Status: model.MergePending, ID: "req-" + k.String()}, nil
+	}
+	return f.endAsync(k), nil
+}
+
+func (f *fakeGH) MergeStatus(_ context.Context, k model.PRKey, id string) (model.MergeResult, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.log(fmt.Sprintf("merge-status %s %s", k, id))
+	f.async.reads++
+	if f.async.reads < f.async.polls {
+		return model.MergeResult{Status: model.MergePending, ID: id}, nil
+	}
+	return f.endAsync(k), nil
+}
+
+// endAsync ends a request as the fake says. Called with mu held.
+func (f *fakeGH) endAsync(k model.PRKey) model.MergeResult {
+	mi := f.byKey(k)
+	switch f.async.end {
+	case model.MergeFailed:
+		return model.MergeResult{Status: model.MergeFailed, Message: f.async.message}
+	case model.MergeEnqueued:
+		mi.InQueue = true
+		return model.MergeResult{Status: model.MergeEnqueued}
+	}
+	mi.State = model.StateMerged
+	return model.MergeResult{Status: model.MergeMerged}
 }
 
 func (f *fakeGH) PostComment(_ context.Context, pr model.PR, body string) error {
@@ -120,6 +187,9 @@ func (f *fakeGH) Merge(_ context.Context, k model.PRKey, id, head string, m mode
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.log(fmt.Sprintf("merge %s %s %s", k, head, m))
+	if f.prs[id].Stacked {
+		return errStacked
+	}
 	if f.prs[id].HeadOID != head {
 		return fmt.Errorf("head branch was modified")
 	}
@@ -144,6 +214,9 @@ func (f *fakeGH) Enqueue(_ context.Context, k model.PRKey, id, head string) erro
 	f.log(fmt.Sprintf("enqueue %s %s", k, head))
 	if f.enqueueErr != nil {
 		return f.enqueueErr
+	}
+	if f.prs[id].Stacked {
+		return errStacked
 	}
 	if f.prs[id].HeadOID != head {
 		return fmt.Errorf("head branch was modified")

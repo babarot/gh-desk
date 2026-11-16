@@ -54,6 +54,17 @@ func TestForMerge(t *testing.T) {
 			return mi
 		}, bot, StepAutoMerge, true, "turn on auto-merge", model.MethodMerge},
 		{"blocked without auto-merge waits", func() model.MergeInfo { return info(model.MergeBlocked) }, bot, StepWait, true, "", model.MethodMerge},
+		{"stacked blocked has no auto-merge", func() model.MergeInfo {
+			mi := info(model.MergeBlocked)
+			mi.Repo.AutoMerge, mi.Stacked = true, true
+			return mi
+		}, bot, StepWait, true, "", model.MethodMerge},
+		{"lowest of a stack merges", func() model.MergeInfo { mi := info(model.MergeClean); mi.Stacked = true; return mi }, human, StepMerge, true, "merge now", model.MethodMerge},
+		{"higher up a stack waits for those below", func() model.MergeInfo {
+			mi := info(model.MergeClean)
+			mi.Stacked, mi.BasePR = true, 3
+			return mi
+		}, human, StepWait, true, "wait for #3 below it", model.MethodMerge},
 		{"required check failed", func() model.MergeInfo {
 			mi := info(model.MergeBlocked)
 			mi.Checks = []model.Check{{Name: "test", State: model.CheckFailure, Required: true}}

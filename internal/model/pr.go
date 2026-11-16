@@ -312,6 +312,9 @@ type MergeInfo struct {
 	// whose head is its base branch, 0 for none: it is stacked on that
 	// one.
 	BasePR int
+	// Stacked is whether it is in one of GitHub's stacks, which GitHub
+	// merges only through its asynchronous merge API.
+	Stacked bool
 	// HeadRefID is the node ID of the head branch, empty when it is gone.
 	HeadRefID string
 	// HeadInFork is whether the head branch is in another repository.
@@ -389,8 +392,43 @@ type Pending struct {
 	// Readied is set once marking the draft ready is sent or on its way:
 	// a draft found again after it was turned back by someone, and stops
 	// the merge instead of being marked ready again.
-	Readied       bool          `json:"readied"`
+	Readied bool `json:"readied"`
+	// MergeRequest is the ID of a merge asked of GitHub's asynchronous
+	// merge API and not yet ended, followed again at the next launch.
+	MergeRequest  string        `json:"merge_request,omitempty"`
 	ChecksWaited  time.Duration `json:"checks_waited"`
 	BlockedWaited time.Duration `json:"blocked_waited"`
 	Watched       time.Duration `json:"watched"`
+}
+
+// MergeRequest is how a merge asked of GitHub's asynchronous merge API
+// goes.
+type MergeRequest struct {
+	Method MergeMethod
+	// Queue puts it in the merge queue instead of merging it directly.
+	Queue bool
+	// Bypass merges past the rules the viewer may bypass.
+	Bypass bool
+}
+
+// MergeStatus is where a merge asked of GitHub's asynchronous merge API
+// stands.
+type MergeStatus string
+
+// The statuses of an asynchronous merge.
+const (
+	MergePending  MergeStatus = "pending"
+	MergeMerged   MergeStatus = "merged"
+	MergeEnqueued MergeStatus = "enqueued"
+	MergeFailed   MergeStatus = "failed"
+)
+
+// MergeResult is what GitHub says of an asynchronous merge.
+type MergeResult struct {
+	Status MergeStatus
+	// ID is the request to follow while it is pending; empty when it is
+	// one asked before, which GitHub does not name.
+	ID string
+	// Message is what GitHub said, such as why it failed.
+	Message string
 }
