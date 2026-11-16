@@ -1891,8 +1891,9 @@ func (j *job) jobsEnd() (model.MergeInfo, plan.Decision, bool) {
 // wait reads the pull request until it is ready to write: no job is at
 // work on its head, and it was decided to merge, to turn on auto-merge or
 // to update its branch. It reports false when the job ended, as it does
-// when jobs, or the required checks, run past WaitTimeout, or when it stays
-// blocked BlockedTimeout after they finished.
+// when jobs, or the required checks, run past WaitTimeout, when it stays
+// blocked BlockedTimeout after they finished, or when it is blocked while
+// stacked on a pull request no merge is at work on.
 func (j *job) wait() bool {
 	// The times waited carry on from a record, so time gh-desk was not
 	// running is not counted.
@@ -1942,6 +1943,12 @@ func (j *job) wait() bool {
 			}
 			j.waitingFor(mi, w)
 			j.forecast([]Step{lastStep(mi)})
+		case mi.BasePR != 0 && !j.r.basePending(j.it.PR.Key):
+			// Stacked on a pull request no merge of gh-desk's is at work
+			// on: what blocks it does not end while it waits (ADR-128).
+			w.end("base-open")
+			j.say(Stopped, fmt.Sprintf("its base #%d is not merged · merge that one first", mi.BasePR))
+			return false
 		default:
 			now := time.Now()
 			j.pend.BlockedWaited += now.Sub(last)

@@ -20,7 +20,8 @@ import (
 const infoFields = `
   id number state isDraft headRefOid baseRefOid mergeStateStatus reviewDecision
   viewerCanMergeAsAdmin autoMergeRequest { enabledAt } isMergeQueueEnabled isInMergeQueue
-  viewerCanClose locked headRefName baseRefName headRef { id } isCrossRepository viewerCanDeleteHeadRef
+  viewerCanClose locked headRefName baseRefName headRef { id }
+  baseRef { associatedPullRequests(states: OPEN, first: 1) { nodes { number } } } isCrossRepository viewerCanDeleteHeadRef
   repository { nameWithOwner mergeCommitAllowed squashMergeAllowed rebaseMergeAllowed autoMergeAllowed viewerPermission }
   latestReviews(first: 20) { nodes { author { login } state } }
   viewerLatestReview { state commit { oid } }
@@ -70,7 +71,11 @@ type infoNode struct {
 	HeadRefName           string
 	BaseRefName           string
 	HeadRef               *struct{ ID string }
-	IsCrossRepository     bool
+	// BaseRef holds the open pull requests whose head is the base branch.
+	BaseRef *struct {
+		AssociatedPullRequests struct{ Nodes []struct{ Number int } }
+	}
+	IsCrossRepository bool
 	// ViewerCanDeleteHeadRef is whether the viewer can delete the head
 	// branch.
 	ViewerCanDeleteHeadRef bool
@@ -111,6 +116,9 @@ func (n infoNode) toModel() model.MergeInfo {
 	}
 	if n.HeadRef != nil {
 		mi.HeadRefID = n.HeadRef.ID
+	}
+	if n.BaseRef != nil && len(n.BaseRef.AssociatedPullRequests.Nodes) > 0 {
+		mi.BasePR = n.BaseRef.AssociatedPullRequests.Nodes[0].Number
 	}
 	if n.Repository.MergeCommitAllowed {
 		mi.Repo.Methods = append(mi.Repo.Methods, model.MethodMerge)

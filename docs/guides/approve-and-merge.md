@@ -22,7 +22,7 @@ For each pull request, gh-desk decides the steps from what is true when it acts.
 - approve, when your approval is needed, once the jobs passed
 - merge now, when nothing blocks it
 - turn on GitHub's auto-merge, where the repository allows it and `merge.auto_merge` is on, once no job is at work; the popup says that commits pushed later are merged too, as GitHub does
-- wait for the rest, where auto-merge is not available: a required check, a second approval, code owners
+- wait for the rest, where auto-merge is not available: a required check, a second approval, code owners, for up to `merge.blocked_timeout`. A pull request stacked on another open one, whose base is that one's branch, waits while gh-desk merges that one; otherwise it stops at once, since waiting would not unblock it
 - update the branch when it is behind its base, as `merge.update_branch` says: by default a person's branch, not a bot's, since bots rebase their own
 
 Commit statuses, such as a policy bot's, are not jobs: gh-desk waits for them only where GitHub blocks the merge on them.

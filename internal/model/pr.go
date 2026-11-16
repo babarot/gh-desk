@@ -308,6 +308,10 @@ type MergeInfo struct {
 	Head Branch
 	// BaseRef is the name of its base branch.
 	BaseRef string
+	// BasePR is the number of an open pull request of the repository
+	// whose head is its base branch, 0 for none: it is stacked on that
+	// one.
+	BasePR int
 	// HeadRefID is the node ID of the head branch, empty when it is gone.
 	HeadRefID string
 	// HeadInFork is whether the head branch is in another repository.
