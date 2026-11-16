@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/babarot/gh-desk/internal/logging"
 	"github.com/babarot/gh-desk/internal/model"
 )
 
@@ -293,6 +294,81 @@ func TestAStoppedBaseLetsItsChildGoOn(t *testing.T) {
 		t.Errorf("api#1: %+v", e)
 	}
 	merged(t, evs, ib)
+}
+
+// stacked makes mi a pull request blocked on its base, the head of the
+// open pull request n, its required checks done.
+func stacked(mi *model.MergeInfo, n int) {
+	mi.BasePR, mi.MergeState = n, model.MergeBlocked
+	mi.Checks = []model.Check{{Name: "build", State: model.CheckSuccess, Required: true}}
+}
+
+// A resumed merge blocked on a base no merge is at work on stops at once,
+// and its record goes: waiting would not unblock it.
+func TestAResumedMergeBlockedOnAnOpenBaseStops(t *testing.T) {
+	b, _ := pr("2", "api", 2, "me")
+	branches(&b, "child", "feature")
+	stacked(&b, 1)
+	f := newFake(b)
+	st := newStore()
+	st.now[b.Key] = model.Pending{Key: b.Key, ID: "2", Head: "h-2", Author: "me"}
+	r := New(f, logging.Discard(), Options{Settings: settings, Viewer: "me", Store: st, CanWait: true,
+		WaitTimeout: time.Second, BlockedTimeout: time.Minute, WatchTimeout: time.Second,
+		PollFast: 5 * time.Millisecond, PollSlow: 5 * time.Millisecond, Recheck: 2 * time.Millisecond, RecheckFor: 50 * time.Millisecond, Quiet: 20 * time.Millisecond})
+	_, ch := r.Resume(context.Background(), []model.Pending{st.now[b.Key]})
+	es := drain(t, ch)
+	if e := last(es); e.Result != Stopped || e.Text != "its base #1 is not merged · merge that one first" {
+		t.Errorf("last event = %+v", e)
+	}
+	if len(f.calls) != 0 {
+		t.Errorf("wrote to GitHub: %v", f.calls)
+	}
+	if _, ok := st.now[b.Key]; ok {
+		t.Error("the record stayed")
+	}
+}
+
+// A base that ended without a merge in the same batch stops its stacked
+// child, which would otherwise wait out merge.blocked_timeout.
+func TestABaseThatDidNotMergeStopsItsBlockedChild(t *testing.T) {
+	a, ia := pr("1", "api", 1, "me")
+	b, ib := pr("2", "api", 2, "me")
+	branches(&a, "feature", "main")
+	branches(&b, "child", "feature")
+	a.MergeState = model.MergeDirty
+	stacked(&b, 1)
+	f := newFake(a, b)
+	evs := runBatch(t, f, Merge, ia, ib)
+	if e := last(evs[ia.PR.Key]); e.Result != Skipped {
+		t.Errorf("api#1: %+v", e)
+	}
+	if e := last(evs[ib.PR.Key]); e.Result != Stopped || !strings.Contains(e.Text, "#1 is not merged") {
+		t.Errorf("api#2: %+v", e)
+	}
+}
+
+// While its base is being merged, a blocked stacked child waits, and goes
+// on once the merge retargets it.
+func TestABlockedChildWaitsWhileItsBaseIsAtWork(t *testing.T) {
+	a, ia := pr("1", "api", 1, "me")
+	b, ib := pr("2", "api", 2, "me")
+	branches(&a, "feature", "main")
+	branches(&b, "child", "feature")
+	stacked(&b, 1)
+	f := newFake(a, b)
+	pending(f, f.prs["1"], 6)
+	prev := f.onRead
+	f.onRead = func(id string, mi *model.MergeInfo, n int) {
+		prev(id, mi, n)
+		if id == "2" && f.prs["1"].State == model.StateMerged {
+			mi.BasePR, mi.BaseRef, mi.MergeState = 0, "main", model.MergeClean
+		}
+	}
+	r := New(f, logging.Discard(), Options{Settings: settings, Viewer: "me", Store: newStore(), CanWait: true,
+		WaitTimeout: time.Second, BlockedTimeout: time.Minute, WatchTimeout: time.Second,
+		PollFast: 5 * time.Millisecond, PollSlow: 5 * time.Millisecond, Recheck: 2 * time.Millisecond, RecheckFor: 50 * time.Millisecond, Quiet: 20 * time.Millisecond})
+	_, ch := r.Start(context.Background(), Merge, []Item{ib, ia})
+	merged(t, drainAll(t, ch), ia, ib)
 }
 
 func TestAMergeWaitsForABaseOnAutoMerge(t *testing.T) {
