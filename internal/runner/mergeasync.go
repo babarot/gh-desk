@@ -42,8 +42,10 @@ func (j *job) mergeAsync(req model.MergeRequest) bool {
 		// lost and GitHub may have taken this one; GitHub does not name
 		// it. It is GitHub's now, and asked again until GitHub takes it
 		// or says why it cannot. The head is the confirmed one, so
-		// asking again merges nothing else.
+		// asking again merges nothing else. A stop that came while it
+		// was on its way forgot the record: it is written again.
 		j.handed()
+		j.save()
 		if time.Now().After(deadline) {
 			j.unsure("a merge asked before is still pending")
 			return false

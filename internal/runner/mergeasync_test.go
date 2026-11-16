@@ -253,3 +253,35 @@ func TestAStopLeavesAResumedStackedMerge(t *testing.T) {
 		t.Errorf("last event = %+v", e)
 	}
 }
+
+func (g *gateGH) MergeAsync(ctx context.Context, k model.PRKey, head string, req model.MergeRequest) (model.MergeResult, error) {
+	g.hold("merge-async")
+	return g.fakeGH.MergeAsync(ctx, k, head, req)
+}
+
+// A stop while the request is on its way forgets the record; once GitHub
+// may have taken the request, the record is written again.
+func TestAStopDuringAnUnansweredStackedMergeKeepsItsRecord(t *testing.T) {
+	mi, it := pr("1", "api", 1, "alice")
+	stack(&mi, 0)
+	f := newFake(mi)
+	f.async.busy = 1 << 20
+	st := newStore()
+	g := newGate(f, "merge-async")
+	r := newRunner(g, st)
+	ctx, cancel := context.WithCancel(context.Background())
+	_, ch := r.Start(ctx, Merge, []Item{it})
+	<-g.started
+	if got := r.Stop([]model.PRKey{mi.Key}); len(got) != 1 {
+		t.Fatalf("stopped %v", got)
+	}
+	close(g.release)
+	waitFor(t, func() bool {
+		st.mu.Lock()
+		defer st.mu.Unlock()
+		_, ok := st.now[mi.Key]
+		return ok
+	})
+	cancel()
+	drain(t, ch)
+}
