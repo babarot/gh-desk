@@ -310,11 +310,14 @@ type MergeInfo struct {
 	BaseRef string
 	// BasePR is the number of an open pull request of the repository
 	// whose head is its base branch, 0 for none: it is stacked on that
-	// one.
+	// one. A base that is the default branch has none.
 	BasePR int
 	// Stacked is whether it is in one of GitHub's stacks, which GitHub
 	// merges only through its asynchronous merge API.
 	Stacked bool
+	// StackBase is the branch its stack merges into: it is the lowest
+	// open pull request of its stack when its base is that branch.
+	StackBase string
 	// HeadRefID is the node ID of the head branch, empty when it is gone.
 	HeadRefID string
 	// HeadInFork is whether the head branch is in another repository.

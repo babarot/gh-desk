@@ -50,6 +50,8 @@ type asyncFake struct {
 	// read that GitHub no longer knows it.
 	failReads int
 	gone      bool
+	// goneReads answers that many reads that GitHub does not know it.
+	goneReads int
 	end       model.MergeStatus
 	message   string
 	reads     int
@@ -92,6 +94,10 @@ func (f *fakeGH) MergeStatus(_ context.Context, k model.PRKey, id string) (model
 	if f.async.failReads > 0 {
 		f.async.failReads--
 		return model.MergeResult{}, errors.New("HTTP 503")
+	}
+	if f.async.goneReads > 0 {
+		f.async.goneReads--
+		return model.MergeResult{Status: model.MergeGone}, nil
 	}
 	if f.async.gone {
 		f.byKey(k).State = model.StateMerged

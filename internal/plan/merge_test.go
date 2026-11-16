@@ -59,10 +59,19 @@ func TestForMerge(t *testing.T) {
 			mi.Repo.AutoMerge, mi.Stacked = true, true
 			return mi
 		}, bot, StepWait, true, "", model.MethodMerge},
-		{"lowest of a stack merges", func() model.MergeInfo { mi := info(model.MergeClean); mi.Stacked = true; return mi }, human, StepMerge, true, "merge now", model.MethodMerge},
+		{"lowest of a stack merges", func() model.MergeInfo {
+			mi := info(model.MergeClean)
+			mi.Stacked, mi.BaseRef, mi.StackBase = true, "main", "main"
+			return mi
+		}, human, StepMerge, true, "merge now", model.MethodMerge},
+		{"lowest of a stack merges though an open one has its base for head", func() model.MergeInfo {
+			mi := info(model.MergeClean)
+			mi.Stacked, mi.BaseRef, mi.StackBase, mi.BasePR = true, "release", "release", 9
+			return mi
+		}, human, StepMerge, true, "merge now", model.MethodMerge},
 		{"higher up a stack waits for those below", func() model.MergeInfo {
 			mi := info(model.MergeClean)
-			mi.Stacked, mi.BasePR = true, 3
+			mi.Stacked, mi.BaseRef, mi.StackBase, mi.BasePR = true, "feature", "main", 3
 			return mi
 		}, human, StepWait, true, "wait for #3 below it", model.MethodMerge},
 		{"required check failed", func() model.MergeInfo {

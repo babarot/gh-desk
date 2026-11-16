@@ -16,6 +16,10 @@ func (j *job) merged(method model.MergeMethod) {
 	j.forget()
 }
 
+// goneAfter is how long after asking a merge GitHub may still not know
+// it: a constant, as it is GitHub's own delay.
+const goneAfter = time.Minute
+
 // mergeAsync asks GitHub's asynchronous merge API to merge the stacked pull
 // request, or to put it in the merge queue, and follows the request to its
 // result (ADR-129). Only the lowest open pull request of a stack gets here,
@@ -40,19 +44,39 @@ func (j *job) mergeAsync(req model.MergeRequest) bool {
 		}
 		// A request asked before is still pending, or the answer was
 		// lost and GitHub may have taken this one; GitHub does not name
-		// it. It is GitHub's now, and asked again until GitHub takes it
-		// or says why it cannot. The head is the confirmed one, so
-		// asking again merges nothing else. A stop that came while it
-		// was on its way forgot the record: it is written again.
-		j.handed()
-		j.save()
+		// it. It is asked again until GitHub takes it or says why it
+		// cannot. The head is the confirmed one, so asking again merges
+		// nothing else. A stop asks nothing more (ADR-122): what was
+		// sent stays GitHub's, and the pull request tells how it ended.
+		if j.halted() {
+			j.afterStop()
+			return false
+		}
 		if time.Now().After(deadline) {
 			j.unsure("a merge asked before is still pending")
 			return false
 		}
-		if !j.sleepIn(j.ctx, j.r.opt.PollFast) {
+		if !j.sleepIn(j.waitCtx(), j.r.opt.PollFast) {
+			if j.halted() {
+				j.afterStop()
+			}
 			return false
 		}
+	}
+}
+
+// afterStop ends a merge the user stopped while a request may be GitHub's:
+// the pull request is read to tell whether it merged.
+func (j *job) afterStop() {
+	mi, ok := j.read(false)
+	switch {
+	case !ok:
+	case mi.State == model.StateMerged:
+		j.say(Merged, "merged")
+	case mi.InQueue:
+		j.say(Queued, "in the merge queue")
+	default:
+		j.stoppedByUser("a merge asked may still be GitHub's · ")
 	}
 }
 
@@ -78,13 +102,17 @@ func (j *job) refused(err error) bool {
 // the next launch follows it if gh-desk quits meanwhile. A stop does not
 // end it: the merge is GitHub's once asked.
 func (j *job) followMerge(res model.MergeResult, method model.MergeMethod) bool {
+	// A request this job just asked may not show at once; one from the
+	// record, already there, was asked long before.
+	fresh := j.pend.MergeRequest != res.ID
 	if res.Status == model.MergePending {
 		j.handed()
 		j.pend.MergeRequest = res.ID
 		j.save()
 		j.step(StepMerge, "GitHub is merging")
 	}
-	deadline := time.Now().Add(j.r.opt.MergeFor)
+	asked := time.Now()
+	deadline := asked.Add(j.r.opt.MergeFor)
 	for res.Status == model.MergePending {
 		if time.Now().After(deadline) {
 			j.unsure("GitHub has not said how the merge ended")
@@ -99,6 +127,9 @@ func (j *job) followMerge(res model.MergeResult, method model.MergeMethod) bool 
 			// Read again at the next turn, until MergeFor: the request
 			// is kept, as it may still be GitHub's.
 			j.log.Warn("could not read the merge", "err", short(err))
+			continue
+		case next.Status == model.MergeGone && fresh && time.Since(asked) < goneAfter:
+			// Just asked, GitHub may not show the request yet.
 			continue
 		case next.Status == model.MergeGone:
 			// GitHub keeps a result for a while only: read the pull

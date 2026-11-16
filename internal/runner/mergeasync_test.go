@@ -12,7 +12,11 @@ import (
 // stack puts mi in a stack; based on the open pull request base, or the
 // lowest of its stack when base is 0.
 func stack(mi *model.MergeInfo, base int) {
-	mi.Stacked, mi.BasePR = true, base
+	mi.Stacked, mi.BasePR, mi.StackBase = true, base, "main"
+	mi.BaseRef = "main"
+	if base != 0 {
+		mi.BaseRef = "below"
+	}
 }
 
 func called(f *fakeGH, prefix string) int {
@@ -259,29 +263,53 @@ func (g *gateGH) MergeAsync(ctx context.Context, k model.PRKey, head string, req
 	return g.fakeGH.MergeAsync(ctx, k, head, req)
 }
 
-// A stop while the request is on its way forgets the record; once GitHub
-// may have taken the request, the record is written again.
-func TestAStopDuringAnUnansweredStackedMergeKeepsItsRecord(t *testing.T) {
+// A stop while the request is on its way asks nothing more: what was sent
+// stays GitHub's, and the pull request is read to tell how it ended.
+func TestAStopDuringAnUnansweredStackedMergeAsksNoMore(t *testing.T) {
 	mi, it := pr("1", "api", 1, "alice")
 	stack(&mi, 0)
 	f := newFake(mi)
 	f.async.busy = 1 << 20
-	st := newStore()
 	g := newGate(f, "merge-async")
-	r := newRunner(g, st)
-	ctx, cancel := context.WithCancel(context.Background())
-	_, ch := r.Start(ctx, Merge, []Item{it})
+	r := newRunner(g, newStore())
+	_, ch := r.Start(context.Background(), Merge, []Item{it})
 	<-g.started
 	if got := r.Stop([]model.PRKey{mi.Key}); len(got) != 1 {
 		t.Fatalf("stopped %v", got)
 	}
 	close(g.release)
-	waitFor(t, func() bool {
-		st.mu.Lock()
-		defer st.mu.Unlock()
-		_, ok := st.now[mi.Key]
-		return ok
-	})
-	cancel()
-	drain(t, ch)
+	e := last(drain(t, ch))
+	if e.Result != Stopped || !e.StoppedByUser {
+		t.Errorf("last event = %+v", e)
+	}
+	if n := called(f, "merge-async"); n != 1 {
+		t.Errorf("asked %d times: %v", n, f.calls)
+	}
+}
+
+// GitHub may not show a request it just took: a first answer that it does
+// not know it is read again.
+func TestAStackedMergeJustAskedIsReadAgainWhenNotFound(t *testing.T) {
+	mi, it := pr("1", "api", 1, "alice")
+	stack(&mi, 0)
+	f := newFake(mi)
+	f.async.polls, f.async.goneReads = 2, 1
+	evs := runBatch(t, f, Merge, it)
+	if e := last(evs[it.PR.Key]); e.Result != Merged {
+		t.Errorf("last event = %+v; calls %v", e, f.calls)
+	}
+}
+
+// A merge asked before gh-desk quit is followed even when the approval it
+// started with was dismissed since: GitHub has the request.
+func TestAResumedStackedMergeIsFollowedWhateverTheApproval(t *testing.T) {
+	mi, _ := pr("1", "api", 1, "alice")
+	stack(&mi, 0)
+	f := newFake(mi)
+	f.async.polls = 1
+	r := newRunner(f, newStore())
+	_, ch := r.Resume(context.Background(), []model.Pending{{Key: mi.Key, ID: "1", Head: "h-1", Author: "alice", Approved: true, MergeRequest: "req-acme/api#1"}})
+	if e := last(drain(t, ch)); e.Result != Merged {
+		t.Errorf("last event = %+v", e)
+	}
 }

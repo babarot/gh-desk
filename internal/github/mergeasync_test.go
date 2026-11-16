@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"maps"
 	"net/http"
+	"strings"
 	"testing"
 
 	"github.com/babarot/gh-desk/internal/model"
@@ -93,5 +94,46 @@ func TestMergeAsyncUnansweredAndGone(t *testing.T) {
 	st, err := c.MergeStatus(context.Background(), k, "u-1")
 	if err != nil || st.Status != model.MergeGone {
 		t.Errorf("status = %+v, %v", st, err)
+	}
+}
+
+const intoDefaultBody = `{"data": {
+  "rateLimit": {"cost": 1, "remaining": 4999},
+  "n0": {"id": "PR_1", "number": 7, "state": "OPEN", "headRefOid": "abc123", "baseRefName": "main",
+    "baseRef": {"associatedPullRequests": {"nodes": [{"number": 6}]}},
+    "repository": {"nameWithOwner": "acme/tool", "defaultBranchRef": {"name": "main"}},
+    "latestReviews": {"nodes": []}, "commits": {"nodes": []}}
+}}`
+
+// A pull request into the default branch is stacked on none, though an
+// open one, such as a release, has the default branch for its head.
+func TestIntoTheDefaultBranchIsStackedOnNone(t *testing.T) {
+	f := &fake{rules: []rule{{match: gqlHas("n0:"), body: intoDefaultBody}}}
+	c := newClient(t, f, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	got, err := c.MergeInfo(context.Background(), []string{"PR_1"}, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if mi := got["PR_1"]; mi.BasePR != 0 || mi.Stacked {
+		t.Errorf("base pull request = %d, stacked %v; want none", mi.BasePR, mi.Stacked)
+	}
+}
+
+// Stacks are read on github.com only: another host's schema may not have
+// them, and would refuse the whole read.
+func TestStacksAreReadOnGitHubComOnly(t *testing.T) {
+	anyHost := func(_ *http.Request, body string) bool { return strings.Contains(body, "n0:") }
+	for host, want := range map[string]bool{"github.com": true, "ghe.example.com": false} {
+		f := &fake{rules: []rule{{match: anyHost, body: intoDefaultBody}}}
+		c, err := New(slog.New(slog.NewTextHandler(io.Discard, nil)), Options{Host: host, AuthToken: "test-token", Transport: f})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := c.MergeInfo(context.Background(), []string{"PR_1"}, false); err != nil {
+			t.Fatal(err)
+		}
+		if got := strings.Contains(f.sent[0].body, "stack {"); got != want {
+			t.Errorf("%s: stack read = %v", host, got)
+		}
 	}
 }

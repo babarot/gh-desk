@@ -322,11 +322,15 @@ func ForMerge(mi model.MergeInfo, pr model.PR, viewer string, set Settings) Deci
 	d := forMerge(mi, pr, viewer, set)
 	switch d.Step {
 	case StepMerge, StepEnqueue, StepAutoMerge, StepUpdate:
-		if mi.Stacked && mi.BasePR != 0 {
+		if mi.Stacked && mi.BaseRef != mi.StackBase {
 			// Merging one higher up a stack merges those below it too,
 			// which were not confirmed with it: it waits for them
 			// (ADR-129).
-			d.Step, d.Reason, d.Admin, d.AdminLater = StepWait, fmt.Sprintf("wait for #%d below it", mi.BasePR), false, false
+			why := "wait for the ones below it"
+			if mi.BasePR != 0 {
+				why = fmt.Sprintf("wait for #%d below it", mi.BasePR)
+			}
+			d.Step, d.Reason, d.Admin, d.AdminLater = StepWait, why, false, false
 		}
 	}
 	return d

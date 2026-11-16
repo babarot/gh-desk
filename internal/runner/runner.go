@@ -861,6 +861,19 @@ func (j *job) resume() {
 		j.say(Stopped, "closed meanwhile")
 		return
 	}
+	if j.pend.MergeRequest != "" {
+		// A merge asked before gh-desk quit is GitHub's: it is followed,
+		// whatever happened to the approval since, holding the lane as
+		// a write that may move the base.
+		j.stacked = true
+		t, ok := j.enterLane()
+		if !ok {
+			return
+		}
+		defer j.r.leave(t)
+		j.followMerge(model.MergeResult{Status: model.MergePending, ID: j.pend.MergeRequest}, "")
+		return
+	}
 	approved := approvedBy(mi, j.r.opt.Viewer)
 	switch {
 	case j.pend.Approved && !approved:
@@ -872,18 +885,6 @@ func (j *job) resume() {
 		return
 	case j.pend.Approving:
 		j.approved, j.pend.Approving = true, false
-	}
-	if j.pend.MergeRequest != "" {
-		// A merge asked before gh-desk quit is still a write that may
-		// move the base: it is followed holding the lane.
-		j.stacked = true
-		t, ok := j.enterLane()
-		if !ok {
-			return
-		}
-		defer j.r.leave(t)
-		j.followMerge(model.MergeResult{Status: model.MergePending, ID: j.pend.MergeRequest}, "")
-		return
 	}
 	if j.pend.Watching {
 		j.handOver(mi.InQueue)
