@@ -321,11 +321,12 @@ func OwnOrBot(pr model.PR, viewer string) bool {
 func ForMerge(mi model.MergeInfo, pr model.PR, viewer string, set Settings) Decision {
 	d := forMerge(mi, pr, viewer, set)
 	switch d.Step {
-	case StepMerge, StepEnqueue, StepAutoMerge, StepUpdate:
+	case StepMerge, StepEnqueue, StepAutoMerge, StepUpdate, StepRecheck:
 		if mi.Stacked && mi.BaseRef != mi.StackBase {
 			// Merging one higher up a stack merges those below it too,
 			// which were not confirmed with it: it waits for them
-			// (ADR-129).
+			// (ADR-129), whatever GitHub says of it meanwhile, even that
+			// it is still working out whether it can be merged.
 			why := "wait for the ones below it"
 			if mi.BasePR != 0 {
 				why = fmt.Sprintf("wait for #%d below it", mi.BasePR)

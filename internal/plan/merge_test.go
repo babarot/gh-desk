@@ -74,6 +74,11 @@ func TestForMerge(t *testing.T) {
 			mi.Stacked, mi.BaseRef, mi.StackBase, mi.BasePR = true, "feature", "main", 3
 			return mi
 		}, human, StepWait, true, "wait for #3 below it", model.MethodMerge},
+		{"higher up a stack waits while GitHub works it out", func() model.MergeInfo {
+			mi := info(model.MergeUnknown)
+			mi.Stacked, mi.BaseRef, mi.StackBase, mi.BasePR = true, "feature", "main", 3
+			return mi
+		}, human, StepWait, true, "wait for #3 below it", model.MethodMerge},
 		{"required check failed", func() model.MergeInfo {
 			mi := info(model.MergeBlocked)
 			mi.Checks = []model.Check{{Name: "test", State: model.CheckFailure, Required: true}}
