@@ -546,9 +546,10 @@ func (r *Runner) run(ctx context.Context, kind Kind, items []Item, resume map[mo
 			if s.claimed {
 				r.busy[it.PR.Key] = true
 				s.stop = newStopper(ctx)
-				// A watch resumed from the record was handed to GitHub
-				// before: a stop leaves it alone from its claim on.
-				if p, ok := resume[it.PR.Key]; ok && p.Watching {
+				// A watch or a merge request resumed from the record was
+				// handed to GitHub before: a stop leaves it alone from
+				// its claim on.
+				if p, ok := resume[it.PR.Key]; ok && (p.Watching || p.MergeRequest != "") {
 					s.stop.handed = true
 				}
 				r.stops[it.PR.Key] = s.stop

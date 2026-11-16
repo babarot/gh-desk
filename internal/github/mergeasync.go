@@ -60,6 +60,11 @@ func (c *Client) MergeAsync(ctx context.Context, key model.PRKey, head string, r
 	case errors.As(err, &he) && he.StatusCode == http.StatusConflict:
 		c.log.Info("merge-async already pending", attrs...)
 		return model.MergeResult{Status: model.MergePending}, nil
+	case err != nil && ctx.Err() == nil && (!errors.As(err, &he) || he.StatusCode >= 500):
+		// No answer, or GitHub failing: it may have taken the request.
+		// Answered as one pending but unnamed, which is asked again.
+		c.log.Info("merge-async not answered", append(attrs, "err", err.Error())...)
+		return model.MergeResult{Status: model.MergePending}, nil
 	case err != nil:
 		c.log.Info("merge-async failed", append(attrs, "err", err.Error())...)
 		return model.MergeResult{}, err
@@ -69,11 +74,16 @@ func (c *Client) MergeAsync(ctx context.Context, key model.PRKey, head string, r
 	return out, nil
 }
 
-// MergeStatus reads where an asynchronous merge asked before stands.
+// MergeStatus reads where an asynchronous merge asked before stands; gone
+// when GitHub no longer knows it.
 func (c *Client) MergeStatus(ctx context.Context, key model.PRKey, id string) (model.MergeResult, error) {
 	path := fmt.Sprintf("repos/%s/%s/pulls/%d/merge-async/%s", url.PathEscape(key.Owner), url.PathEscape(key.Repo), key.Number, url.PathEscape(id))
 	var resp asyncResult
 	if err := c.async.DoWithContext(ctx, http.MethodGet, path, nil, &resp); err != nil {
+		var he *api.HTTPError
+		if errors.As(err, &he) && he.StatusCode == http.StatusNotFound {
+			return model.MergeResult{Status: model.MergeGone}, nil
+		}
 		return model.MergeResult{}, err
 	}
 	out := resp.toModel()

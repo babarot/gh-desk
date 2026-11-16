@@ -46,9 +46,13 @@ type fakeGH struct {
 // reads of it and ends as end, merged when empty.
 type asyncFake struct {
 	busy, polls int
-	end         model.MergeStatus
-	message     string
-	reads       int
+	// failReads fails that many reads of a request; gone answers every
+	// read that GitHub no longer knows it.
+	failReads int
+	gone      bool
+	end       model.MergeStatus
+	message   string
+	reads     int
 }
 
 // errStacked is GitHub refusing a stacked pull request through the
@@ -85,6 +89,14 @@ func (f *fakeGH) MergeStatus(_ context.Context, k model.PRKey, id string) (model
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.log(fmt.Sprintf("merge-status %s %s", k, id))
+	if f.async.failReads > 0 {
+		f.async.failReads--
+		return model.MergeResult{}, errors.New("HTTP 503")
+	}
+	if f.async.gone {
+		f.byKey(k).State = model.StateMerged
+		return model.MergeResult{Status: model.MergeGone}, nil
+	}
 	f.async.reads++
 	if f.async.reads < f.async.polls {
 		return model.MergeResult{Status: model.MergePending, ID: id}, nil

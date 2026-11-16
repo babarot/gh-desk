@@ -38,10 +38,11 @@ func (j *job) mergeAsync(req model.MergeRequest) bool {
 		case res.Status != model.MergePending || res.ID != "":
 			return j.followMerge(res, req.Method)
 		}
-		// A request asked before is still pending, and GitHub does not
-		// name it: it is GitHub's now, and asked again once it ends,
-		// which merges or says why it cannot. The head is the confirmed
-		// one, so asking again merges nothing else.
+		// A request asked before is still pending, or the answer was
+		// lost and GitHub may have taken this one; GitHub does not name
+		// it. It is GitHub's now, and asked again until GitHub takes it
+		// or says why it cannot. The head is the confirmed one, so
+		// asking again merges nothing else.
 		j.handed()
 		if time.Now().After(deadline) {
 			j.unsure("a merge asked before is still pending")
@@ -91,7 +92,13 @@ func (j *job) followMerge(res model.MergeResult, method model.MergeMethod) bool 
 			return false
 		}
 		next, err := j.r.gh.MergeStatus(j.ctx, j.it.PR.Key, res.ID)
-		if err != nil {
+		switch {
+		case err != nil:
+			// Read again at the next turn, until MergeFor: the request
+			// is kept, as it may still be GitHub's.
+			j.log.Warn("could not read the merge", "err", short(err))
+			continue
+		case next.Status == model.MergeGone:
 			// GitHub keeps a result for a while only: read the pull
 			// request instead, and go on from what it says.
 			j.pend.MergeRequest = ""
@@ -107,7 +114,7 @@ func (j *job) followMerge(res model.MergeResult, method model.MergeMethod) bool 
 				j.queued()
 				return false
 			}
-			j.unsure("could not read the merge: " + short(err))
+			j.unsure("GitHub no longer knows the merge asked")
 			return false
 		}
 		res = next

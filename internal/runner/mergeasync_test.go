@@ -207,3 +207,49 @@ func TestAStackedAdminMergeBypassesTheRules(t *testing.T) {
 		t.Errorf("calls = %v", f.calls)
 	}
 }
+
+// A read of the request that fails is tried again, the request kept.
+func TestAFailedReadOfAStackedMergeIsTriedAgain(t *testing.T) {
+	mi, it := pr("1", "api", 1, "alice")
+	stack(&mi, 0)
+	f := newFake(mi)
+	f.async.polls, f.async.failReads = 2, 3
+	evs := runBatch(t, f, Merge, it)
+	if e := last(evs[it.PR.Key]); e.Result != Merged {
+		t.Errorf("last event = %+v; calls %v", e, f.calls)
+	}
+}
+
+// A request GitHub no longer knows is told by reading the pull request.
+func TestAStackedMergeGitHubForgotIsReadFromThePullRequest(t *testing.T) {
+	mi, _ := pr("1", "api", 1, "alice")
+	stack(&mi, 0)
+	f := newFake(mi)
+	f.async.gone = true
+	r := newRunner(f, newStore())
+	_, ch := r.Resume(context.Background(), []model.Pending{{Key: mi.Key, ID: "1", Head: "h-1", Author: "alice", MergeRequest: "req-old"}})
+	if e := last(drain(t, ch)); e.Result != Merged {
+		t.Errorf("last event = %+v", e)
+	}
+}
+
+// A merge request resumed from the record is GitHub's from its claim: a
+// stop leaves it, and its record, alone.
+func TestAStopLeavesAResumedStackedMerge(t *testing.T) {
+	mi, _ := pr("1", "api", 1, "alice")
+	stack(&mi, 0)
+	f := newFake(mi)
+	f.async.polls = 20
+	st := newStore()
+	p := model.Pending{Key: mi.Key, ID: "1", Head: "h-1", Author: "alice", MergeRequest: "req-acme/api#1"}
+	st.now[mi.Key] = p
+	r := newRunner(f, st)
+	// Claimed when Resume returns, before its first read.
+	_, ch := r.Resume(context.Background(), []model.Pending{p})
+	if got := r.Stop([]model.PRKey{mi.Key}); len(got) != 0 {
+		t.Errorf("stopped %v", got)
+	}
+	if e := last(drain(t, ch)); e.Result != Merged {
+		t.Errorf("last event = %+v", e)
+	}
+}

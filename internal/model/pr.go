@@ -421,13 +421,17 @@ const (
 	MergeMerged   MergeStatus = "merged"
 	MergeEnqueued MergeStatus = "enqueued"
 	MergeFailed   MergeStatus = "failed"
+	// MergeGone is gh-desk's, not GitHub's: GitHub no longer knows the
+	// request, which it keeps for a limited time.
+	MergeGone MergeStatus = "gone"
 )
 
 // MergeResult is what GitHub says of an asynchronous merge.
 type MergeResult struct {
 	Status MergeStatus
-	// ID is the request to follow while it is pending; empty when it is
-	// one asked before, which GitHub does not name.
+	// ID is the request to follow while it is pending; empty when GitHub
+	// did not name it: one asked before is pending, or the answer was lost
+	// and GitHub may have taken it.
 	ID string
 	// Message is what GitHub said, such as why it failed.
 	Message string

@@ -74,3 +74,24 @@ func TestMergeAsyncAlreadyPending(t *testing.T) {
 		t.Errorf("result = %+v, %v", got, err)
 	}
 }
+
+// GitHub failing to answer may have taken the request: it is answered as
+// pending and unnamed, to be asked again. A request GitHub no longer keeps
+// is gone.
+func TestMergeAsyncUnansweredAndGone(t *testing.T) {
+	f := &fake{status: map[string]int{"/repos/acme/tool/pulls/7/merge-async": http.StatusBadGateway, "/repos/acme/tool/pulls/7/merge-async/u-1": http.StatusNotFound},
+		rules: []rule{
+			{match: restIs(http.MethodPut, "/repos/acme/tool/pulls/7/merge-async"), body: `{"message": "Bad Gateway"}`},
+			{match: restIs(http.MethodGet, "/repos/acme/tool/pulls/7/merge-async/u-1"), body: `{"message": "Not Found"}`},
+		}}
+	c := newClient(t, f, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	k := model.PRKey{Owner: "acme", Repo: "tool", Number: 7}
+	got, err := c.MergeAsync(context.Background(), k, "abc123", model.MergeRequest{})
+	if err != nil || got != (model.MergeResult{Status: model.MergePending}) {
+		t.Errorf("put = %+v, %v", got, err)
+	}
+	st, err := c.MergeStatus(context.Background(), k, "u-1")
+	if err != nil || st.Status != model.MergeGone {
+		t.Errorf("status = %+v, %v", st, err)
+	}
+}
