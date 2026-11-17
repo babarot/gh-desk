@@ -21,11 +21,25 @@ const infoFields = `
   id number state isDraft headRefOid baseRefOid mergeStateStatus reviewDecision
   viewerCanMergeAsAdmin autoMergeRequest { enabledAt } isMergeQueueEnabled isInMergeQueue
   viewerCanClose locked headRefName baseRefName headRef { id }
-  baseRef { associatedPullRequests(states: OPEN, first: 1) { nodes { number } } } isCrossRepository viewerCanDeleteHeadRef
-  repository { nameWithOwner mergeCommitAllowed squashMergeAllowed rebaseMergeAllowed autoMergeAllowed viewerPermission }
+  baseRef { associatedPullRequests(states: OPEN, first: 1) { nodes { number } } }
+  isCrossRepository viewerCanDeleteHeadRef
+  repository { nameWithOwner mergeCommitAllowed squashMergeAllowed rebaseMergeAllowed autoMergeAllowed viewerPermission defaultBranchRef { name } }
   latestReviews(first: 20) { nodes { author { login } state } }
   viewerLatestReview { state commit { oid } }
   commits(last: 1) { nodes { commit { statusCheckRollup { state } } } }`
+
+// stackFields read a pull request's stack, which only github.com has: a
+// host without them would refuse every read (ADR-129).
+const stackFields = `
+  stack { baseRefName }`
+
+// infoFields are what is read of each pull request on this host.
+func (c *Client) infoFields() string {
+	if c.host == "github.com" {
+		return infoFields + stackFields
+	}
+	return infoFields
+}
 
 type commitsNode struct {
 	Nodes []struct {
@@ -75,6 +89,8 @@ type infoNode struct {
 	BaseRef *struct {
 		AssociatedPullRequests struct{ Nodes []struct{ Number int } }
 	}
+	// Stack is set on a pull request in one of GitHub's stacks.
+	Stack             *struct{ BaseRefName string }
 	IsCrossRepository bool
 	// ViewerCanDeleteHeadRef is whether the viewer can delete the head
 	// branch.
@@ -86,6 +102,7 @@ type infoNode struct {
 		RebaseMergeAllowed bool
 		AutoMergeAllowed   bool
 		ViewerPermission   string
+		DefaultBranchRef   *struct{ Name string }
 	}
 	LatestReviews struct {
 		Nodes []struct {
@@ -117,8 +134,14 @@ func (n infoNode) toModel() model.MergeInfo {
 	if n.HeadRef != nil {
 		mi.HeadRefID = n.HeadRef.ID
 	}
-	if n.BaseRef != nil && len(n.BaseRef.AssociatedPullRequests.Nodes) > 0 {
+	// A pull request into the default branch is stacked on none, though a
+	// long-lived one may have the default branch for its head (ADR-128).
+	if n.BaseRef != nil && len(n.BaseRef.AssociatedPullRequests.Nodes) > 0 &&
+		(n.Repository.DefaultBranchRef == nil || n.Repository.DefaultBranchRef.Name != n.BaseRefName) {
 		mi.BasePR = n.BaseRef.AssociatedPullRequests.Nodes[0].Number
+	}
+	if n.Stack != nil {
+		mi.Stacked, mi.StackBase = true, n.Stack.BaseRefName
 	}
 	if n.Repository.MergeCommitAllowed {
 		mi.Repo.Methods = append(mi.Repo.Methods, model.MethodMerge)
@@ -188,7 +211,7 @@ func (c *Client) MergeInfo(ctx context.Context, ids []string, details bool) (map
 	var b strings.Builder
 	b.WriteString("query {\n  rateLimit { cost remaining resetAt }\n")
 	for i, id := range ids {
-		fmt.Fprintf(&b, "  n%d: node(id: %q) { ... on PullRequest {%s\n", i, id, infoFields)
+		fmt.Fprintf(&b, "  n%d: node(id: %q) { ... on PullRequest {%s\n", i, id, c.infoFields())
 		if details {
 			// isRequired needs the pull request, so each one is asked for
 			// with its own ID.

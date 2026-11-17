@@ -1,6 +1,7 @@
 package plan
 
 import (
+	"fmt"
 	"path"
 	"slices"
 	"strings"
@@ -318,6 +319,25 @@ func OwnOrBot(pr model.PR, viewer string) bool {
 // write, so what it decided when the user said yes is checked against what
 // is true when it acts.
 func ForMerge(mi model.MergeInfo, pr model.PR, viewer string, set Settings) Decision {
+	d := forMerge(mi, pr, viewer, set)
+	switch d.Step {
+	case StepMerge, StepEnqueue, StepAutoMerge, StepUpdate, StepRecheck:
+		if mi.Stacked && mi.BaseRef != mi.StackBase {
+			// Merging one higher up a stack merges those below it too,
+			// which were not confirmed with it: it waits for them
+			// (ADR-129), whatever GitHub says of it meanwhile, even that
+			// it is still working out whether it can be merged.
+			why := "wait for the ones below it"
+			if mi.BasePR != 0 {
+				why = fmt.Sprintf("wait for #%d below it", mi.BasePR)
+			}
+			d.Step, d.Reason, d.Admin, d.AdminLater = StepWait, why, false, false
+		}
+	}
+	return d
+}
+
+func forMerge(mi model.MergeInfo, pr model.PR, viewer string, set Settings) Decision {
 	d := Decision{Notes: notes(mi, set)}
 	skip := func(why string) Decision {
 		d.Step, d.Reason, d.Ready, d.Approve, d.Method, d.Admin, d.AdminLater = StepSkip, why, false, false, "", false, false
@@ -435,7 +455,8 @@ func mergeWord(mi model.MergeInfo) string {
 // While jobs are at work it waits: GitHub's auto-merge waits only for the
 // required ones.
 func blocked(d Decision, mi model.MergeInfo, set Settings, jobs bool) Decision {
-	if set.AutoMerge && mi.Repo.AutoMerge && !jobs {
+	// GitHub has no auto-merge for a stacked pull request (ADR-129).
+	if set.AutoMerge && mi.Repo.AutoMerge && !mi.Stacked && !jobs {
 		d.Step, d.Reason = StepAutoMerge, "turn on auto-merge"
 	} else {
 		d.Step, d.Reason = StepWait, "wait for checks → "+mergeWord(mi)

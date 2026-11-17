@@ -287,3 +287,13 @@ func (g *GitHub) DeleteBranch(ctx context.Context, k model.PRKey, refID, head st
 func (g *GitHub) CommitInfo(ctx context.Context, k model.PRKey, oid string) (runner.Commit, error) {
 	return runner.Commit{Author: Viewer}, g.wait(ctx, 200)
 }
+
+// MergeAsync is never asked: the demo has no stacked pull requests.
+func (g *GitHub) MergeAsync(context.Context, model.PRKey, string, model.MergeRequest) (model.MergeResult, error) {
+	return model.MergeResult{}, errors.New("the demo has no stacked pull requests")
+}
+
+// MergeStatus is never asked: the demo has no stacked pull requests.
+func (g *GitHub) MergeStatus(context.Context, model.PRKey, string) (model.MergeResult, error) {
+	return model.MergeResult{}, errors.New("the demo has no stacked pull requests")
+}

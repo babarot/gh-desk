@@ -32,6 +32,10 @@ type GitHub interface {
 	Review(ctx context.Context, pr model.PR, event model.ReviewEvent, body string) error
 	Merge(ctx context.Context, key model.PRKey, id, head string, method model.MergeMethod) error
 	EnableAutoMerge(ctx context.Context, key model.PRKey, id, head string, method model.MergeMethod) error
+	// MergeAsync asks for a merge through GitHub's asynchronous merge API;
+	// MergeStatus reads where one asked before stands.
+	MergeAsync(ctx context.Context, key model.PRKey, head string, req model.MergeRequest) (model.MergeResult, error)
+	MergeStatus(ctx context.Context, key model.PRKey, id string) (model.MergeResult, error)
 	Enqueue(ctx context.Context, key model.PRKey, id, head string) error
 	UpdateBranch(ctx context.Context, key model.PRKey, id, head string) error
 	MarkReady(ctx context.Context, key model.PRKey, id, head string) error
@@ -92,6 +96,10 @@ type Options struct {
 	// FullRead is the longest a waiting pull request goes without a full
 	// read when the light read leaves it asleep; 5m unless set.
 	FullRead time.Duration
+	// MergeFor is how long a merge asked of GitHub's asynchronous merge
+	// API is followed before it is left to the next launch; 10m unless
+	// set.
+	MergeFor time.Duration
 	// Recheck is how often, and RecheckFor how long, a pull request whose
 	// merge state GitHub is still working out is read again.
 	Recheck, RecheckFor time.Duration
@@ -118,6 +126,9 @@ func (o Options) withDefaults() Options {
 	}
 	if o.FullRead == 0 {
 		o.FullRead = 5 * time.Minute
+	}
+	if o.MergeFor == 0 {
+		o.MergeFor = 10 * time.Minute
 	}
 	if o.Recheck == 0 {
 		o.Recheck = 3 * time.Second
@@ -535,9 +546,10 @@ func (r *Runner) run(ctx context.Context, kind Kind, items []Item, resume map[mo
 			if s.claimed {
 				r.busy[it.PR.Key] = true
 				s.stop = newStopper(ctx)
-				// A watch resumed from the record was handed to GitHub
-				// before: a stop leaves it alone from its claim on.
-				if p, ok := resume[it.PR.Key]; ok && p.Watching {
+				// A watch or a merge request resumed from the record was
+				// handed to GitHub before: a stop leaves it alone from
+				// its claim on.
+				if p, ok := resume[it.PR.Key]; ok && (p.Watching || p.MergeRequest != "") {
 					s.stop.handed = true
 				}
 				r.stops[it.PR.Key] = s.stop
@@ -686,6 +698,11 @@ type job struct {
 	trigger plan.Trigger
 	// stop is how the user stops the job; nil on one that was not claimed.
 	stop *stopper
+	// stacked is set when the last read found it in one of GitHub's
+	// stacks, merged only through the asynchronous merge API (ADR-129).
+	stacked bool
+	// admin is set when the merge decided goes past the rules as an admin.
+	admin bool
 	// ended is set once the job said how it ended. Only the goroutine that
 	// runs the job reads or writes it.
 	ended bool
@@ -842,6 +859,19 @@ func (j *job) resume() {
 		return
 	case model.StateClosed:
 		j.say(Stopped, "closed meanwhile")
+		return
+	}
+	if j.pend.MergeRequest != "" {
+		// A merge asked before gh-desk quit is GitHub's: it is followed,
+		// whatever happened to the approval since, holding the lane as
+		// a write that may move the base.
+		j.stacked = true
+		t, ok := j.enterLane()
+		if !ok {
+			return
+		}
+		defer j.r.leave(t)
+		j.followMerge(model.MergeResult{Status: model.MergePending, ID: j.pend.MergeRequest}, "")
 		return
 	}
 	approved := approvedBy(mi, j.r.opt.Viewer)
@@ -1181,6 +1211,7 @@ func (j *job) decide() (model.MergeInfo, plan.Decision, bool) {
 			return mi, plan.Decision{}, false
 		}
 		d := plan.ForMerge(mi, j.it.PR, j.r.opt.Viewer, j.r.opt.Settings)
+		j.stacked = mi.Stacked
 		j.log.Debug("decided", logging.KeyStep, string(d.Step), logging.KeyMergeState, string(mi.MergeState), "approve", d.Approve)
 		if j.unseen(d) {
 			// A read just after a write may not show it yet: the
@@ -1460,6 +1491,7 @@ func (j *job) dismissed(d plan.Decision) bool {
 // mergeDecided merges as decided, saying first when it goes past the base
 // branch's rules as an admin.
 func (j *job) mergeDecided(d plan.Decision) {
+	j.admin = d.Admin
 	if d.Admin {
 		j.log.Info("merging as admin", "method", string(d.Method))
 	}
@@ -1470,13 +1502,13 @@ func (j *job) mergeNow(method model.MergeMethod) bool {
 	if j.halted() {
 		return false
 	}
+	if j.stacked {
+		return j.mergeAsync(model.MergeRequest{Method: method, Bypass: j.admin})
+	}
 	j.step(StepMerge, "merging")
 	err := j.r.gh.Merge(j.ctx, j.it.PR.Key, j.it.PR.ID, j.head, method)
 	if err == nil {
-		j.ended = true
-		j.emit(Event{Key: j.it.PR.Key, Result: Merged, Text: "merged", Approved: j.approved, Readied: j.readied, Method: method})
-		j.log.Info("pr end", logging.KeyStep, resultWord[Merged], "method", string(method))
-		j.forget()
+		j.merged(method)
 		return true
 	}
 	// A refused merge is read again to tell why: the head moved, it was
@@ -1499,6 +1531,10 @@ func (j *job) mergeNow(method model.MergeMethod) bool {
 // confirmed head, and watches it there.
 func (j *job) enqueue() {
 	if j.halted() {
+		return
+	}
+	if j.stacked {
+		j.mergeAsync(model.MergeRequest{Queue: true, Bypass: j.admin})
 		return
 	}
 	j.step(StepEnqueue, "adding to the merge queue")

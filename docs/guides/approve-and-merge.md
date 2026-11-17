@@ -22,10 +22,12 @@ For each pull request, gh-desk decides the steps from what is true when it acts.
 - approve, when your approval is needed, once the jobs passed
 - merge now, when nothing blocks it
 - turn on GitHub's auto-merge, where the repository allows it and `merge.auto_merge` is on, once no job is at work; the popup says that commits pushed later are merged too, as GitHub does
-- wait for the rest, where auto-merge is not available: a required check, a second approval, code owners, for up to `merge.blocked_timeout`. A pull request stacked on another open one, whose base is that one's branch, waits while gh-desk merges that one; otherwise it stops at once, since waiting would not unblock it
+- wait for the rest, where auto-merge is not available: a required check, a second approval, code owners, for up to `merge.blocked_timeout`. A pull request stacked on another open one, whose base is that one's branch other than the default branch, waits while gh-desk merges that one; otherwise it stops at once, since waiting would not unblock it
 - update the branch when it is behind its base, as `merge.update_branch` says: by default a person's branch, not a bot's, since bots rebase their own
 
 Commit statuses, such as a policy bot's, are not jobs: gh-desk waits for them only where GitHub blocks the merge on them.
+
+A pull request in one of GitHub's stacks is merged through GitHub's asynchronous merge, the only way GitHub merges one, and gh-desk follows it until GitHub says it merged or why not. gh-desk merges only the lowest open pull request of a stack, since GitHub merges every one below the one asked for; one higher up waits while gh-desk merges those below it. GitHub may rebase the next one as it moves it onto the stack's base, and a new head is confirmed again, as any head that moved. A stacked pull request is not put on auto-merge, which GitHub does not offer for a stack.
 
 Where the base branch has a merge queue, merging it means putting it in the queue: gh-desk never merges it itself, which GitHub refuses there. A pull request already in the queue is only followed. Its branch is not updated when it is behind, since the queue tests it on the latest base. Auto-merge on such a branch puts it in the queue once it can be merged. gh-desk then follows it in the queue until the queue merges it or takes it out, and the queue merges by the method its own settings name.
 

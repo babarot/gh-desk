@@ -702,3 +702,13 @@ const listLines = 14
 // tab leaves, since the world's lists are short and the pane is what a
 // visitor reads. The TUI still keeps a third of the lines for the list.
 func PaneHeight(rows int) int { return max(rows-listLines, 0) }
+
+// MergeAsync is never asked: the demo has no stacked pull requests.
+func (r Runner) MergeAsync(context.Context, model.PRKey, string, model.MergeRequest) (model.MergeResult, error) {
+	return model.MergeResult{}, errors.New("the demo has no stacked pull requests")
+}
+
+// MergeStatus is never asked: the demo has no stacked pull requests.
+func (r Runner) MergeStatus(context.Context, model.PRKey, string) (model.MergeResult, error) {
+	return model.MergeResult{}, errors.New("the demo has no stacked pull requests")
+}
