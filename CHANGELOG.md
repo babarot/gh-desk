@@ -1,5 +1,10 @@
 # Changelog
 
+## [v0.21.1](https://github.com/babarot/gh-desk/compare/v0.21.0...v0.21.1) - 2026-11-20
+### Bug fixes
+- Send a merge once more when GitHub refuses it for a moved base by @babarot in https://github.com/babarot/gh-desk/pull/163
+- Stop a merge left on the branch of a base that ended by @babarot in https://github.com/babarot/gh-desk/pull/165
+
 ## [v0.21.0](https://github.com/babarot/gh-desk/compare/v0.20.0...v0.21.0) - 2026-11-17
 ### New Features
 - Show a scrollbar on the frame of the preview and claude panes by @babarot in https://github.com/babarot/gh-desk/pull/159
