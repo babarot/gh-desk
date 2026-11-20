@@ -31,7 +31,10 @@ type fakeGH struct {
 	enqueueErr   error
 	// mergeErrs fail the merges sent, one each, in order.
 	mergeErrs []error
-	commits   map[string]Commit
+	// keepBranches leaves the head branch of a merged pull request in
+	// place, so GitHub does not retarget those based on it.
+	keepBranches bool
+	commits      map[string]Commit
 	// bodies are the bodies of the reviews sent, by pull request ID.
 	bodies map[string]string
 	// based are the pull requests based on each branch; basedErr fails
@@ -183,9 +186,29 @@ func (f *fakeGH) MergeInfo(ctx context.Context, ids []string, _ bool) (map[strin
 		if f.onRead != nil {
 			f.onRead(id, mi, f.reads[id])
 		}
+		f.rebase(mi)
 		out[id] = *mi
 	}
 	return out, nil
+}
+
+// rebase does to mi what GitHub does to a pull request based on the head
+// branch of another: names that one while it is open, and retargets mi
+// onto its base once it is merged, unless keepBranches.
+func (f *fakeGH) rebase(mi *model.MergeInfo) {
+	for _, o := range f.prs {
+		if o == mi || o.Key.Repository() != mi.Key.Repository() || o.Head.Name == "" || o.Head.Name != mi.BaseRef {
+			continue
+		}
+		switch {
+		case o.State == model.StateOpen && mi.BasePR == 0:
+			mi.BasePR = o.Key.Number
+		case o.State == model.StateMerged && !f.keepBranches:
+			mi.BaseRef, mi.BasePR = o.BaseRef, 0
+		case o.State != model.StateOpen && mi.BasePR == o.Key.Number:
+			mi.BasePR = 0
+		}
+	}
 }
 
 func (f *fakeGH) Review(_ context.Context, pr model.PR, ev model.ReviewEvent, body string) error {

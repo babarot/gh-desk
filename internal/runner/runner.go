@@ -1399,6 +1399,9 @@ func (j *job) inTurn() (again bool) {
 		if d.Step != plan.StepSkip && !jobs && j.r.basePending(j.it.PR.Key) {
 			return true
 		}
+		if d.Step != plan.StepSkip && j.leftBehind(mi) {
+			return false
+		}
 		switch {
 		case d.Step == plan.StepSkip:
 			j.say(Skipped, d.Reason)
@@ -1443,6 +1446,22 @@ func (j *job) inTurn() (again bool) {
 			return false
 		}
 	}
+}
+
+// leftBehind stops the job when the merge it was found based on ended and
+// it still has that merge's head branch for its base: merged there, it
+// would not reach the branch both were meant for (ADR-131).
+func (j *job) leftBehind(mi model.MergeInfo) bool {
+	n, head, ok := j.r.endedBase(j.it.PR.Key)
+	if !ok || head == "" || mi.BaseRef != head {
+		return false
+	}
+	if mi.BasePR == n {
+		j.say(Stopped, fmt.Sprintf("its base #%d did not merge · confirm again", n))
+	} else {
+		j.say(Stopped, fmt.Sprintf("its base #%d is closed, but it still targets its branch", n))
+	}
+	return true
 }
 
 // redrafted stops the job when a decision asks to mark the pull request
@@ -1965,6 +1984,10 @@ func (j *job) wait() bool {
 			return false
 		}
 		w.read(mi)
+		if d.Step != plan.StepSkip && j.leftBehind(mi) {
+			w.end("base-ended")
+			return false
+		}
 		jobs := plan.JobsRunning(mi, j.trigger, time.Now())
 		switch d.Step {
 		case plan.StepMerge, plan.StepEnqueue:

@@ -20,6 +20,9 @@ type activeMerge struct {
 	known chan struct{}
 	done  chan struct{}
 	read  bool
+	// parent is the merge at work it was first found based on. It is kept
+	// after that merge ends, so how it ended can be told (ADR-131).
+	parent *activeMerge
 }
 
 // track notes k as a merge at work, its branches not known yet. Called with
@@ -85,6 +88,46 @@ func (r *Runner) readBranches(ctx context.Context, prs []model.PR, failed func(i
 			m.branchesKnown()
 		}
 	}
+	r.link(prs)
+}
+
+// link notes, for every merge at work in the repositories of prs, the merge
+// at work it is based on, the first time one is found. Called with mu held.
+func (r *Runner) link(prs []model.PR) {
+	seen := map[string]bool{}
+	for _, p := range prs {
+		repo := p.Key.Repository()
+		if seen[repo] {
+			continue
+		}
+		seen[repo] = true
+		ms := r.merges[repo]
+		for _, m := range ms {
+			if m.parent == nil && m.read {
+				m.parent = baseOf(ms, m)
+			}
+		}
+	}
+}
+
+// endedBase is the merge k was found based on, once that merge ended and
+// no other merge at work is one k waits for: its number and head branch.
+func (r *Runner) endedBase(k model.PRKey) (n int, head string, ok bool) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	m := r.merges[k.Repository()][k]
+	if m == nil || m.parent == nil {
+		return 0, "", false
+	}
+	select {
+	case <-m.parent.done:
+	default:
+		return 0, "", false
+	}
+	if on, cycle := r.waitsOn(k); on != nil || cycle {
+		return 0, "", false
+	}
+	return m.parent.key.Number, m.parent.head, true
 }
 
 // baseWait is how a wait for the merge a pull request is based on ended.

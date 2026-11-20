@@ -242,8 +242,9 @@ func TestStopInTheLaneGivesItUp(t *testing.T) {
 	}
 }
 
-// The merge a stopped one was based on no longer holds its child back.
-func TestAStoppedParentLetsItsChildGoOn(t *testing.T) {
+// A merge stopped by the user stops the child based on it, which no longer
+// waits for it either.
+func TestAStoppedParentStopsItsChild(t *testing.T) {
 	a, ia := pr("1", "api", 1, "me")
 	b, ib := pr("2", "api", 2, "me")
 	branches(&a, "feature", "main")
@@ -261,7 +262,9 @@ func TestAStoppedParentLetsItsChildGoOn(t *testing.T) {
 	if e := last(evs[ia.PR.Key]); e.Result != Stopped || !e.StoppedByUser {
 		t.Errorf("api#1: %+v", e)
 	}
-	merged(t, evs, ib)
+	if e := last(evs[ib.PR.Key]); e.Result != Stopped || e.StoppedByUser || !strings.Contains(e.Text, "#1 did not merge") {
+		t.Errorf("api#2: %+v", e)
+	}
 }
 
 // An approval waiting for the jobs is ended once, by the goroutine it was

@@ -282,18 +282,71 @@ func TestAResumedMergeWaitsForItsBase(t *testing.T) {
 	}
 }
 
-func TestAStoppedBaseLetsItsChildGoOn(t *testing.T) {
+// A base that ended without a merge stops its child before it is merged
+// into the base's branch, even when the base ended while the child still
+// waited for its jobs (ADR-131).
+func TestAStoppedBaseStopsItsChild(t *testing.T) {
 	a, ia := pr("1", "api", 1, "me")
 	b, ib := pr("2", "api", 2, "me")
 	branches(&a, "feature", "main")
 	branches(&b, "child", "feature")
 	a.MergeState = model.MergeDirty
 	f := newFake(a, b)
+	pending(f, f.prs["2"], 5)
 	evs := runBatch(t, f, Merge, ia, ib)
 	if e := last(evs[ia.PR.Key]); e.Result != Skipped {
 		t.Errorf("api#1: %+v", e)
 	}
-	merged(t, evs, ib)
+	if e := last(evs[ib.PR.Key]); e.Result != Stopped || !strings.Contains(e.Text, "#1 did not merge") {
+		t.Errorf("api#2: %+v", e)
+	}
+	if pos(f, "merge acme/api#2") >= 0 {
+		t.Errorf("the child was merged: %v", f.calls)
+	}
+}
+
+// A base whose merge GitHub refused stops its child too.
+func TestAFailedBaseStopsItsChild(t *testing.T) {
+	a, ia := pr("1", "api", 1, "me")
+	b, ib := pr("2", "api", 2, "me")
+	branches(&a, "feature", "main")
+	branches(&b, "child", "feature")
+	f := newFake(a, b)
+	f.mergeErrs = []error{errors.New("GitHub said no")}
+	evs := runBatch(t, f, Merge, ia, ib)
+	if e := last(evs[ia.PR.Key]); e.Result != Failed {
+		t.Errorf("api#1: %+v", e)
+	}
+	if e := last(evs[ib.PR.Key]); e.Result != Stopped || !strings.Contains(e.Text, "#1 did not merge") {
+		t.Errorf("api#2: %+v (calls %v)", e, f.calls)
+	}
+}
+
+// A base merged whose branch stays, so GitHub does not retarget the child,
+// stops the child: merged, it would land on a branch nobody merges.
+func TestAMergedBaseNotRetargetedStopsItsChild(t *testing.T) {
+	a, ia := pr("1", "api", 1, "me")
+	b, ib := pr("2", "api", 2, "me")
+	branches(&a, "feature", "main")
+	branches(&b, "child", "feature")
+	f := newFake(a, b)
+	f.keepBranches = true
+	evs := runBatch(t, f, Merge, ia, ib)
+	merged(t, evs, ia)
+	if e := last(evs[ib.PR.Key]); e.Result != Stopped || !strings.Contains(e.Text, "still targets") {
+		t.Errorf("api#2: %+v (calls %v)", e, f.calls)
+	}
+}
+
+// A child confirmed alone, its base merged by no merge of gh-desk's, is
+// merged into its base's branch as before.
+func TestAChildAloneMergesIntoItsBase(t *testing.T) {
+	a, _ := pr("1", "api", 1, "me")
+	b, ib := pr("2", "api", 2, "me")
+	branches(&a, "feature", "main")
+	branches(&b, "child", "feature")
+	f := newFake(a, b)
+	merged(t, runBatch(t, f, Merge, ib), ib)
 }
 
 // stacked makes mi a pull request blocked on its base, the head of the
@@ -329,7 +382,8 @@ func TestAResumedMergeBlockedOnAnOpenBaseStops(t *testing.T) {
 }
 
 // A base that ended without a merge in the same batch stops its stacked
-// child, which would otherwise wait out merge.blocked_timeout.
+// child, which would otherwise wait out merge.blocked_timeout, as one left
+// behind (ADR-131).
 func TestABaseThatDidNotMergeStopsItsBlockedChild(t *testing.T) {
 	a, ia := pr("1", "api", 1, "me")
 	b, ib := pr("2", "api", 2, "me")
@@ -342,7 +396,7 @@ func TestABaseThatDidNotMergeStopsItsBlockedChild(t *testing.T) {
 	if e := last(evs[ia.PR.Key]); e.Result != Skipped {
 		t.Errorf("api#1: %+v", e)
 	}
-	if e := last(evs[ib.PR.Key]); e.Result != Stopped || !strings.Contains(e.Text, "#1 is not merged") {
+	if e := last(evs[ib.PR.Key]); e.Result != Stopped || !strings.Contains(e.Text, "#1 did not merge") {
 		t.Errorf("api#2: %+v", e)
 	}
 }
