@@ -185,6 +185,21 @@ func TestEnableAutoMergeOnACleanPullRequest(t *testing.T) {
 	}
 }
 
+// A merge GitHub refuses because another merge moved the base a moment
+// before says so with ErrBaseModified; a refused head does not.
+func TestMergeOnAMovedBase(t *testing.T) {
+	for msg, want := range map[string]bool{
+		"Base branch was modified. Review and try the merge again.": true,
+		"Head branch was modified. Review and try the merge again.": false,
+	} {
+		f := &fake{rules: []rule{{gqlHas("mergePullRequest"), `{"errors": [{"message": "` + msg + `"}]}`}}}
+		err := newClient(t, f, logging.Discard()).Merge(context.Background(), writeKey, "PR_1", "abc123", model.MethodMerge)
+		if err == nil || errors.Is(err, ErrBaseModified) != want {
+			t.Errorf("%q: err = %v, want ErrBaseModified %v", msg, err, want)
+		}
+	}
+}
+
 // logLine is the one line logged at info, decoded.
 func logLine(t *testing.T, logs string) map[string]any {
 	t.Helper()

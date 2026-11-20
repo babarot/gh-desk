@@ -29,7 +29,9 @@ type fakeGH struct {
 	reads        map[string]int
 	autoMergeErr error
 	enqueueErr   error
-	commits      map[string]Commit
+	// mergeErrs fail the merges sent, one each, in order.
+	mergeErrs []error
+	commits   map[string]Commit
 	// bodies are the bodies of the reviews sent, by pull request ID.
 	bodies map[string]string
 	// based are the pull requests based on each branch; basedErr fails
@@ -207,6 +209,11 @@ func (f *fakeGH) Merge(_ context.Context, k model.PRKey, id, head string, m mode
 	f.log(fmt.Sprintf("merge %s %s %s", k, head, m))
 	if f.prs[id].Stacked {
 		return errStacked
+	}
+	if len(f.mergeErrs) > 0 {
+		err := f.mergeErrs[0]
+		f.mergeErrs = f.mergeErrs[1:]
+		return err
 	}
 	if f.prs[id].HeadOID != head {
 		return fmt.Errorf("head branch was modified")
@@ -440,6 +447,57 @@ func TestCleanStatusMergesDirectly(t *testing.T) {
 	mi.MergeState, mi.Repo.AutoMerge = model.MergeBlocked, true
 	f := newFake(mi)
 	f.autoMergeErr = fmt.Errorf("%w: GitHub said so", ErrCleanStatus)
+	evs := runBatch(t, f, Merge, it)
+	if e := last(evs[it.PR.Key]); e.Result != Merged {
+		t.Errorf("last event = %+v (calls %v)", e, f.calls)
+	}
+}
+
+// GitHub refuses a merge read as clean just before another merge moved the
+// base: it is decided again and sent once more, and fails if refused again.
+func TestBaseMovedMergesAgainOnce(t *testing.T) {
+	moved := fmt.Errorf("%w: GitHub said so", ErrBaseModified)
+	for _, tt := range []struct {
+		name  string
+		errs  []error
+		want  Result
+		sends int
+	}{
+		{"once", []error{moved}, Merged, 2},
+		{"twice", []error{moved, moved}, Failed, 2},
+		{"other", []error{errors.New("something else")}, Failed, 1},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			mi, it := pr("1", "api", 1, "alice")
+			mi.Reviews = []model.Review{{Author: "me", State: model.ReviewApproved}}
+			f := newFake(mi)
+			f.mergeErrs = tt.errs
+			evs := runBatch(t, f, Merge, it)
+			if e := last(evs[it.PR.Key]); e.Result != tt.want {
+				t.Errorf("last event = %+v (calls %v)", e, f.calls)
+			}
+			sends := 0
+			for _, c := range f.calls {
+				if strings.HasPrefix(c, "merge ") {
+					sends++
+				}
+			}
+			if sends != tt.sends {
+				t.Errorf("merges sent = %d, want %d: %v", sends, tt.sends, f.calls)
+			}
+		})
+	}
+}
+
+// Merging at once when GitHub refuses auto-merge on a clean pull request
+// is sent once more too.
+func TestCleanStatusBaseMovedMergesAgain(t *testing.T) {
+	mi, it := pr("1", "api", 1, "renovate")
+	it.AutoMerge = true
+	mi.MergeState, mi.Repo.AutoMerge = model.MergeBlocked, true
+	f := newFake(mi)
+	f.autoMergeErr = fmt.Errorf("%w: GitHub said so", ErrCleanStatus)
+	f.mergeErrs = []error{fmt.Errorf("%w: GitHub said so", ErrBaseModified)}
 	evs := runBatch(t, f, Merge, it)
 	if e := last(evs[it.PR.Key]); e.Result != Merged {
 		t.Errorf("last event = %+v (calls %v)", e, f.calls)
