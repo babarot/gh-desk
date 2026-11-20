@@ -713,6 +713,9 @@ type job struct {
 	ended bool
 	// byUser is set once the job ends as the user stopped it.
 	byUser bool
+	// baseAtRead is how it stood toward the merges it is based on at the
+	// last read decide took.
+	baseAtRead baseState
 }
 
 func (j *job) say(res Result, text string) {
@@ -1208,9 +1211,10 @@ func (j *job) decide() (model.MergeInfo, plan.Decision, bool) {
 	// wait of its own.
 	w := &waitLog{log: j.log}
 	for {
-		// Known before the read, so the read shows the pull request after
-		// the merge it was based on ended.
-		n, head, ended := j.r.endedBase(j.it.PR.Key)
+		// Taken on both sides of the read: one that changed meanwhile
+		// is read again, so the read shows the pull request as it stands
+		// toward the merge it was based on (ADR-131).
+		before := j.r.baseState(j.it.PR.Key)
 		mi, ok := j.read(true)
 		if !ok {
 			w.end("stopped")
@@ -1220,19 +1224,24 @@ func (j *job) decide() (model.MergeInfo, plan.Decision, bool) {
 			j.say(Merged, "merged")
 			return mi, plan.Decision{}, false
 		}
-		if ended && mi.BaseRef == head {
+		base := j.r.baseState(j.it.PR.Key)
+		if base != before {
+			continue
+		}
+		j.baseAtRead = base
+		if base.ended && mi.BaseRef == base.head {
 			// Left on the branch of the merge it was based on, which
 			// ended: merged there, it would not reach the branch both
 			// were meant for (ADR-131). GitHub retargets it a moment
 			// after that one is merged and its branch deleted.
 			switch {
-			case mi.BasePR == n:
+			case mi.BasePR == base.n:
 				w.end("stopped")
-				j.say(Stopped, fmt.Sprintf("its base #%d did not merge · confirm again", n))
+				j.say(Stopped, fmt.Sprintf("its base #%d did not merge · confirm again", base.n))
 				return mi, plan.Decision{}, false
 			case time.Now().After(deadline):
 				w.end("stopped")
-				j.say(Stopped, fmt.Sprintf("its base #%d is closed, but it still targets its branch", n))
+				j.say(Stopped, fmt.Sprintf("its base #%d is closed, but it still targets its branch", base.n))
 				return mi, plan.Decision{}, false
 			}
 			w.at("retarget", mi, nil)
@@ -1424,7 +1433,7 @@ func (j *job) inTurn() (again bool) {
 		jobs := plan.JobsRunning(mi, j.trigger, time.Now())
 		// A merge it is based on may have been confirmed since it entered
 		// the lane: that one goes first, and this one waits off the lane.
-		if d.Step != plan.StepSkip && !jobs && j.r.basePending(j.it.PR.Key) {
+		if d.Step != plan.StepSkip && !jobs && (j.baseAtRead.pending || j.r.basePending(j.it.PR.Key)) {
 			return true
 		}
 		switch {
@@ -2033,7 +2042,7 @@ func (j *job) wait() bool {
 		case mi.BasePR != 0 && !j.r.basePending(j.it.PR.Key):
 			// The merge it was based on ended just after this read: the
 			// next read tells how it ended (ADR-131).
-			if _, head, ok := j.r.endedBase(j.it.PR.Key); ok && mi.BaseRef == head {
+			if b := j.r.baseState(j.it.PR.Key); b.ended && mi.BaseRef == b.head {
 				continue
 			}
 			// Stacked on a pull request no merge of gh-desk's is at work

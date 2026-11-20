@@ -110,24 +110,32 @@ func (r *Runner) link(prs []model.PR) {
 	}
 }
 
-// endedBase is the merge k was found based on, once that merge ended and
-// no other merge at work is one k waits for: its number and head branch.
-func (r *Runner) endedBase(k model.PRKey) (n int, head string, ok bool) {
+// baseState is how k stands toward the merges it is based on: whether it
+// must wait for one at work, or, once the merge it was found based on
+// ended and none is to wait for, that merge's number and head branch.
+type baseState struct {
+	pending bool
+	ended   bool
+	n       int
+	head    string
+}
+
+func (r *Runner) baseState(k model.PRKey) baseState {
 	r.mu.Lock()
 	defer r.mu.Unlock()
+	if on, cycle := r.waitsOn(k); on != nil || cycle {
+		return baseState{pending: true}
+	}
 	m := r.merges[k.Repository()][k]
 	if m == nil || m.parent == nil || m.parent.head == "" {
-		return 0, "", false
+		return baseState{}
 	}
 	select {
 	case <-m.parent.done:
+		return baseState{ended: true, n: m.parent.key.Number, head: m.parent.head}
 	default:
-		return 0, "", false
+		return baseState{}
 	}
-	if on, cycle := r.waitsOn(k); on != nil || cycle {
-		return 0, "", false
-	}
-	return m.parent.key.Number, m.parent.head, true
 }
 
 // baseWait is how a wait for the merge a pull request is based on ended.
