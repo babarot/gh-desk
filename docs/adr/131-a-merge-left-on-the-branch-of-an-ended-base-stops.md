@@ -26,5 +26,6 @@ These replace, in ADR-104, "How the parent ended does not matter", and, in ADR-1
 ## Consequences
 
 - A child confirmed with its parent is merged only after the parent, and only once retargeted. In a repository that does not delete merged branches, every such child stops, and is merged by retargeting it and confirming it again.
+- What is guaranteed is that no write follows a read that found the parent's merge ended. An approval sent while the parent is still at work, as ADR-104 lets approvals go, is not held back, and a parent that ends in the moment between that read and the write is not caught: auto-merge already on the child may then merge it into the parent's branch. Holding approvals until the parent ends would change ADR-104, and is left to a decision of its own.
 - The tie lives in one running gh-desk, as the lane does (ADR-082). A child resumed at a next launch after its parent ended is not tied, and goes on as ADR-128 says.
 - [lanes_test.go](../../internal/runner/lanes_test.go) checks that a parent skipped, refused or merged without a retarget stops its child, before its approval too, that a child retargeted late is merged, and that a child confirmed alone is merged into its base's branch.
