@@ -384,6 +384,64 @@ func TestNoApprovalForAChildOfAFailedBase(t *testing.T) {
 	}
 }
 
+// A child whose auto-merge waits only for the approval is not approved
+// while its base is being merged: the approval would merge it into the
+// base's branch at once, whatever the base's merge comes to (ADR-131).
+func TestNoApprovalWhileTheBaseIsAtWork(t *testing.T) {
+	for _, tt := range []struct {
+		name   string
+		fails  bool
+		result Result
+	}{
+		{"base fails", true, Stopped},
+		{"base merges", false, Merged},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			a, ia := pr("1", "api", 1, "me")
+			b, ib := pr("2", "api", 2, "alice")
+			branches(&a, "feature", "main")
+			branches(&b, "child", "feature")
+			b.AutoMerge = true
+			f := newFake(a, b)
+			f.autoMergeOnApproval = true
+			pending(f, f.prs["1"], 8)
+			if tt.fails {
+				f.mergeErrs = []error{errors.New("GitHub said no")}
+			}
+			evs := runBatch(t, f, Merge, ia, ib)
+			if e := last(evs[ib.PR.Key]); e.Result != tt.result {
+				t.Errorf("api#2: %+v (calls %v)", e, f.calls)
+			}
+			if pos(f, "auto-merged acme/api#2 into feature") >= 0 {
+				t.Errorf("the child was merged into its base's branch: %v", f.calls)
+			}
+			if r := pos(f, "review acme/api#2"); r >= 0 && r < pos(f, "merge acme/api#1") {
+				t.Errorf("the child was approved before its base's merge ended: %v", f.calls)
+			}
+		})
+	}
+}
+
+// Marking a draft child ready waits for its base too: with an approval in
+// already, it could let auto-merge merge it.
+func TestNoReadyWhileTheBaseIsAtWork(t *testing.T) {
+	a, ia := pr("1", "api", 1, "me")
+	b, ib := pr("2", "api", 2, "me")
+	branches(&a, "feature", "main")
+	branches(&b, "child", "feature")
+	b.Draft = true
+	f := newFake(a, b)
+	pending(f, f.prs["1"], 8)
+	f.mergeErrs = []error{errors.New("GitHub said no")}
+	evs := runBatch(t, f, Merge, ia, ib)
+	if e := last(evs[ib.PR.Key]); e.Result != Stopped || !strings.Contains(e.Text, "#1 did not merge") {
+		t.Errorf("api#2: %+v (calls %v)", e, f.calls)
+	}
+	if pos(f, "ready acme/api#2") >= 0 {
+		t.Errorf("the child was marked ready: %v", f.calls)
+	}
+}
+
 // A child confirmed alone, its base merged by no merge of gh-desk's, is
 // merged into its base's branch as before.
 func TestAChildAloneMergesIntoItsBase(t *testing.T) {

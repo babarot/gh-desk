@@ -31,6 +31,9 @@ type fakeGH struct {
 	enqueueErr   error
 	// mergeErrs fail the merges sent, one each, in order.
 	mergeErrs []error
+	// autoMergeOnApproval merges a pull request with auto-merge on once
+	// it is approved, as GitHub does when the approval was all it lacked.
+	autoMergeOnApproval bool
 	// keepBranches leaves the head branch of a merged pull request in
 	// place, so GitHub does not retarget those based on it.
 	keepBranches bool
@@ -223,6 +226,11 @@ func (f *fakeGH) Review(_ context.Context, pr model.PR, ev model.ReviewEvent, bo
 		model.EventComment: model.ReviewCommented, model.EventRequestChanges: model.ReviewChangesRequested}[ev]
 	mi := f.prs[pr.ID]
 	mi.Reviews = append(mi.Reviews, model.Review{Author: "me", State: state})
+	// As GitHub's auto-merge does once the approval it waited for is in.
+	if f.autoMergeOnApproval && ev == model.EventApprove && mi.AutoMerge && !mi.Draft {
+		f.log(fmt.Sprintf("auto-merged %s into %s", pr.Key, mi.BaseRef))
+		mi.State = model.StateMerged
+	}
 	return nil
 }
 

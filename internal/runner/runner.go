@@ -1322,17 +1322,18 @@ func (j *job) merge() {
 		j.say(Failed, "could not record the pending merge; nothing was sent")
 		return
 	}
-	if d.Ready && !j.readyToMerge() {
-		return
+	if d.Ready {
+		if d, ok = j.afterBase(d, false); !ok {
+			return
+		}
+		if d.Ready && !j.readyToMerge() {
+			return
+		}
 	}
 	if d.Approve {
 		// An approval is not taken back, so it goes once the jobs passed:
 		// a job that fails stops the merge before it.
-		if _, d, ok = j.jobsEnd(); !ok {
-			return
-		}
-		if d.Step == plan.StepSkip {
-			j.say(Skipped, d.Reason)
+		if d, ok = j.afterBase(d, true); !ok {
 			return
 		}
 		if d.Approve && !j.sendApproval("") {
@@ -1478,6 +1479,44 @@ func (j *job) inTurn() (again bool) {
 		}
 		if !j.wait() {
 			return false
+		}
+	}
+}
+
+// afterBase holds marking the pull request ready and approving it, either
+// of which may let GitHub's auto-merge merge it at once, while a merge it is
+// based on is at work, then decides again: a base that ended unmerged stops
+// it there (ADR-131). With jobs, it waits for the jobs too, as an approval
+// does. It reports false when the job ended.
+func (j *job) afterBase(d plan.Decision, jobs bool) (plan.Decision, bool) {
+	for {
+		var ok bool
+		if jobs {
+			_, d, ok = j.jobsEnd()
+		} else {
+			_, d, ok = j.decide()
+		}
+		if !ok {
+			return d, false
+		}
+		if d.Step == plan.StepSkip {
+			j.say(Skipped, d.Reason)
+			return d, false
+		}
+		if !j.baseAtRead.pending && !j.r.basePending(j.it.PR.Key) {
+			return d, true
+		}
+		if !j.canWait {
+			j.locked("locked by another gh-desk")
+			return d, false
+		}
+		j.step(StepWaitBlocked, "waiting for its base")
+		switch j.r.waitForBase(j.waitCtx(), j.it.PR.Key) {
+		case baseCanceled:
+			return d, false
+		case baseCycle:
+			j.say(Stopped, "its base waits for it · confirm one at a time")
+			return d, false
 		}
 	}
 }
