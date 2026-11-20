@@ -31,7 +31,13 @@ type fakeGH struct {
 	enqueueErr   error
 	// mergeErrs fail the merges sent, one each, in order.
 	mergeErrs []error
-	commits   map[string]Commit
+	// autoMergeOnApproval merges a pull request with auto-merge on once
+	// it is approved, as GitHub does when the approval was all it lacked.
+	autoMergeOnApproval bool
+	// keepBranches leaves the head branch of a merged pull request in
+	// place, so GitHub does not retarget those based on it.
+	keepBranches bool
+	commits      map[string]Commit
 	// bodies are the bodies of the reviews sent, by pull request ID.
 	bodies map[string]string
 	// based are the pull requests based on each branch; basedErr fails
@@ -183,9 +189,29 @@ func (f *fakeGH) MergeInfo(ctx context.Context, ids []string, _ bool) (map[strin
 		if f.onRead != nil {
 			f.onRead(id, mi, f.reads[id])
 		}
+		f.rebase(mi)
 		out[id] = *mi
 	}
 	return out, nil
+}
+
+// rebase does to mi what GitHub does to a pull request based on the head
+// branch of another: names that one while it is open, and retargets mi
+// onto its base once it is merged, unless keepBranches.
+func (f *fakeGH) rebase(mi *model.MergeInfo) {
+	for _, o := range f.prs {
+		if o == mi || o.Key.Repository() != mi.Key.Repository() || o.Head.Name == "" || o.Head.Name != mi.BaseRef {
+			continue
+		}
+		switch {
+		case o.State == model.StateOpen && mi.BasePR == 0:
+			mi.BasePR = o.Key.Number
+		case o.State == model.StateMerged && !f.keepBranches:
+			mi.BaseRef, mi.BasePR = o.BaseRef, 0
+		case o.State != model.StateOpen && mi.BasePR == o.Key.Number:
+			mi.BasePR = 0
+		}
+	}
 }
 
 func (f *fakeGH) Review(_ context.Context, pr model.PR, ev model.ReviewEvent, body string) error {
@@ -200,6 +226,11 @@ func (f *fakeGH) Review(_ context.Context, pr model.PR, ev model.ReviewEvent, bo
 		model.EventComment: model.ReviewCommented, model.EventRequestChanges: model.ReviewChangesRequested}[ev]
 	mi := f.prs[pr.ID]
 	mi.Reviews = append(mi.Reviews, model.Review{Author: "me", State: state})
+	// As GitHub's auto-merge does once the approval it waited for is in.
+	if f.autoMergeOnApproval && ev == model.EventApprove && mi.AutoMerge && !mi.Draft {
+		f.log(fmt.Sprintf("auto-merged %s into %s", pr.Key, mi.BaseRef))
+		mi.State = model.StateMerged
+	}
 	return nil
 }
 

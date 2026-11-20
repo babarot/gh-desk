@@ -20,6 +20,9 @@ type activeMerge struct {
 	known chan struct{}
 	done  chan struct{}
 	read  bool
+	// parent is the merge at work it was first found based on. It is kept
+	// after that merge ends, so how it ended can be told (ADR-131).
+	parent *activeMerge
 }
 
 // track notes k as a merge at work, its branches not known yet. Called with
@@ -84,6 +87,54 @@ func (r *Runner) readBranches(ctx context.Context, prs []model.PR, failed func(i
 			m.head, m.base, m.fork = mi.Head.Name, mi.BaseRef, mi.HeadInFork
 			m.branchesKnown()
 		}
+	}
+	r.link(prs)
+}
+
+// link notes, for every merge at work in the repositories of prs, the merge
+// at work it is based on, the first time one is found. Called with mu held.
+func (r *Runner) link(prs []model.PR) {
+	seen := map[string]bool{}
+	for _, p := range prs {
+		repo := p.Key.Repository()
+		if seen[repo] {
+			continue
+		}
+		seen[repo] = true
+		ms := r.merges[repo]
+		for _, m := range ms {
+			if m.parent == nil && m.read {
+				m.parent = baseOf(ms, m)
+			}
+		}
+	}
+}
+
+// baseState is how k stands toward the merges it is based on: whether it
+// must wait for one at work, or, once the merge it was found based on
+// ended and none is to wait for, that merge's number and head branch.
+type baseState struct {
+	pending bool
+	ended   bool
+	n       int
+	head    string
+}
+
+func (r *Runner) baseState(k model.PRKey) baseState {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if on, cycle := r.waitsOn(k); on != nil || cycle {
+		return baseState{pending: true}
+	}
+	m := r.merges[k.Repository()][k]
+	if m == nil || m.parent == nil || m.parent.head == "" {
+		return baseState{}
+	}
+	select {
+	case <-m.parent.done:
+		return baseState{ended: true, n: m.parent.key.Number, head: m.parent.head}
+	default:
+		return baseState{}
 	}
 }
 

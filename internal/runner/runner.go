@@ -713,6 +713,9 @@ type job struct {
 	ended bool
 	// byUser is set once the job ends as the user stopped it.
 	byUser bool
+	// baseAtRead is how it stood toward the merges it is based on at the
+	// last read decide took.
+	baseAtRead baseState
 }
 
 func (j *job) say(res Result, text string) {
@@ -1198,14 +1201,20 @@ func (j *job) sendApproval(body string) bool {
 
 // decide reads the pull request and decides its next step, reading again
 // while GitHub works out whether it can be merged, and while what this job
-// just wrote does not show yet. Every read stops the job if it finds the
-// recorded approval dismissed.
+// just wrote does not show yet, or GitHub retargets it off the branch of
+// the merge it was based on. Every read stops the job if it finds the
+// recorded approval dismissed, or it left on the branch of a merge that
+// ended (ADR-131).
 func (j *job) decide() (model.MergeInfo, plan.Decision, bool) {
 	deadline := time.Now().Add(j.r.opt.RecheckFor)
 	// Reading again while GitHub works out whether it can be merged is a
 	// wait of its own.
 	w := &waitLog{log: j.log}
 	for {
+		// Taken on both sides of the read: one that changed meanwhile
+		// is read again, so the read shows the pull request as it stands
+		// toward the merge it was based on (ADR-131).
+		before := j.r.baseState(j.it.PR.Key)
 		mi, ok := j.read(true)
 		if !ok {
 			w.end("stopped")
@@ -1214,6 +1223,34 @@ func (j *job) decide() (model.MergeInfo, plan.Decision, bool) {
 		if mi.State == model.StateMerged {
 			j.say(Merged, "merged")
 			return mi, plan.Decision{}, false
+		}
+		base := j.r.baseState(j.it.PR.Key)
+		if base != before {
+			continue
+		}
+		j.baseAtRead = base
+		if base.ended && mi.BaseRef == base.head {
+			// Left on the branch of the merge it was based on, which
+			// ended: merged there, it would not reach the branch both
+			// were meant for (ADR-131). GitHub retargets it a moment
+			// after that one is merged and its branch deleted.
+			switch {
+			case mi.BasePR == base.n:
+				w.end("stopped")
+				j.say(Stopped, fmt.Sprintf("its base #%d did not merge · confirm again", base.n))
+				return mi, plan.Decision{}, false
+			case time.Now().After(deadline):
+				w.end("stopped")
+				j.say(Stopped, fmt.Sprintf("its base #%d is closed, but it still targets its branch", base.n))
+				return mi, plan.Decision{}, false
+			}
+			w.at("retarget", mi, nil)
+			j.say(Running, "checking")
+			if !j.sleep(j.r.opt.Recheck) {
+				w.end("canceled")
+				return mi, plan.Decision{}, false
+			}
+			continue
 		}
 		d := plan.ForMerge(mi, j.it.PR, j.r.opt.Viewer, j.r.opt.Settings)
 		j.stacked = mi.Stacked
@@ -1285,17 +1322,18 @@ func (j *job) merge() {
 		j.say(Failed, "could not record the pending merge; nothing was sent")
 		return
 	}
-	if d.Ready && !j.readyToMerge() {
-		return
+	if d.Ready {
+		if d, ok = j.afterBase(d, false); !ok {
+			return
+		}
+		if d.Ready && !j.readyToMerge() {
+			return
+		}
 	}
 	if d.Approve {
 		// An approval is not taken back, so it goes once the jobs passed:
 		// a job that fails stops the merge before it.
-		if _, d, ok = j.jobsEnd(); !ok {
-			return
-		}
-		if d.Step == plan.StepSkip {
-			j.say(Skipped, d.Reason)
+		if d, ok = j.afterBase(d, true); !ok {
 			return
 		}
 		if d.Approve && !j.sendApproval("") {
@@ -1396,7 +1434,7 @@ func (j *job) inTurn() (again bool) {
 		jobs := plan.JobsRunning(mi, j.trigger, time.Now())
 		// A merge it is based on may have been confirmed since it entered
 		// the lane: that one goes first, and this one waits off the lane.
-		if d.Step != plan.StepSkip && !jobs && j.r.basePending(j.it.PR.Key) {
+		if d.Step != plan.StepSkip && !jobs && (j.baseAtRead.pending || j.r.basePending(j.it.PR.Key)) {
 			return true
 		}
 		switch {
@@ -1441,6 +1479,44 @@ func (j *job) inTurn() (again bool) {
 		}
 		if !j.wait() {
 			return false
+		}
+	}
+}
+
+// afterBase holds marking the pull request ready and approving it, either
+// of which may let GitHub's auto-merge merge it at once, while a merge it is
+// based on is at work, then decides again: a base that ended unmerged stops
+// it there (ADR-131). With jobs, it waits for the jobs too, as an approval
+// does. It reports false when the job ended.
+func (j *job) afterBase(d plan.Decision, jobs bool) (plan.Decision, bool) {
+	for {
+		var ok bool
+		if jobs {
+			_, d, ok = j.jobsEnd()
+		} else {
+			_, d, ok = j.decide()
+		}
+		if !ok {
+			return d, false
+		}
+		if d.Step == plan.StepSkip {
+			j.say(Skipped, d.Reason)
+			return d, false
+		}
+		if !j.baseAtRead.pending && !j.r.basePending(j.it.PR.Key) {
+			return d, true
+		}
+		if !j.canWait {
+			j.locked("locked by another gh-desk")
+			return d, false
+		}
+		j.step(StepWaitBlocked, "waiting for its base")
+		switch j.r.waitForBase(j.waitCtx(), j.it.PR.Key) {
+		case baseCanceled:
+			return d, false
+		case baseCycle:
+			j.say(Stopped, "its base waits for it · confirm one at a time")
+			return d, false
 		}
 	}
 }
@@ -2003,6 +2079,11 @@ func (j *job) wait() bool {
 			j.waitingFor(mi, w)
 			j.forecast([]Step{lastStep(mi)})
 		case mi.BasePR != 0 && !j.r.basePending(j.it.PR.Key):
+			// The merge it was based on ended just after this read: the
+			// next read tells how it ended (ADR-131).
+			if b := j.r.baseState(j.it.PR.Key); b.ended && mi.BaseRef == b.head {
+				continue
+			}
 			// Stacked on a pull request no merge of gh-desk's is at work
 			// on: what blocks it does not end while it waits (ADR-128).
 			w.end("base-open")
