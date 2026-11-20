@@ -527,6 +527,14 @@ func (g runnerGitHub) EnableAutoMerge(ctx context.Context, key model.PRKey, id, 
 	return err
 }
 
+func (g runnerGitHub) Merge(ctx context.Context, key model.PRKey, id, head string, method model.MergeMethod) error {
+	err := g.Client.Merge(ctx, key, id, head, method)
+	if errors.Is(err, github.ErrBaseModified) {
+		return fmt.Errorf("%w: %w", runner.ErrBaseModified, err)
+	}
+	return err
+}
+
 func (g runnerGitHub) CommitInfo(ctx context.Context, key model.PRKey, oid string) (runner.Commit, error) {
 	c, err := g.Client.CommitInfo(ctx, key, oid)
 	return runner.Commit(c), err

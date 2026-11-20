@@ -25,6 +25,8 @@ For each pull request, gh-desk decides the steps from what is true when it acts.
 - wait for the rest, where auto-merge is not available: a required check, a second approval, code owners, for up to `merge.blocked_timeout`. A pull request stacked on another open one, whose base is that one's branch other than the default branch, waits while gh-desk merges that one; otherwise it stops at once, since waiting would not unblock it
 - update the branch when it is behind its base, as `merge.update_branch` says: by default a person's branch, not a bot's, since bots rebase their own
 
+When GitHub refuses a merge because another merge moved its base a moment before, gh-desk waits a little, decides again and sends it once more; refused again, it fails.
+
 Commit statuses, such as a policy bot's, are not jobs: gh-desk waits for them only where GitHub blocks the merge on them.
 
 A pull request in one of GitHub's stacks is merged through GitHub's asynchronous merge, the only way GitHub merges one, and gh-desk follows it until GitHub says it merged or why not. gh-desk merges only the lowest open pull request of a stack, since GitHub merges every one below the one asked for; one higher up waits while gh-desk merges those below it. GitHub may rebase the next one as it moves it onto the stack's base, and a new head is confirmed again, as any head that moved. A stacked pull request is not put on auto-merge, which GitHub does not offer for a stack.

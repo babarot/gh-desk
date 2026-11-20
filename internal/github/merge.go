@@ -346,6 +346,11 @@ func (c *Client) WorkflowRuns(ctx context.Context, key model.PRKey, sha string) 
 // can already be merged: GitHub wants it merged directly then.
 var ErrCleanStatus = errors.New("pull request is in clean status")
 
+// ErrBaseModified is what a merge returns when GitHub refuses it because
+// the base branch moved after GitHub last worked out whether it can be
+// merged: another merge went in a moment before.
+var ErrBaseModified = errors.New("base branch was modified")
+
 // write sends a mutation and logs it at info with its request ID.
 func (c *Client) write(ctx context.Context, step string, key model.PRKey, head, mutation string, vars map[string]any) error {
 	ctx, reqID := withRequestID(ctx)
@@ -356,6 +361,9 @@ func (c *Client) write(ctx context.Context, step string, key model.PRKey, head, 
 		c.log.Info(step+" failed", append(attrs, "err", err.Error())...)
 		if step == "enable-auto-merge" && strings.Contains(strings.ToLower(err.Error()), "clean status") {
 			return fmt.Errorf("%w: %w", ErrCleanStatus, err)
+		}
+		if step == "merge" && strings.Contains(strings.ToLower(err.Error()), "base branch was modified") {
+			return fmt.Errorf("%w: %w", ErrBaseModified, err)
 		}
 		return err
 	}

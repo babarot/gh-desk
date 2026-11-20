@@ -62,6 +62,11 @@ type Commit struct {
 // the GitHub client's error to it.
 var ErrCleanStatus = errors.New("pull request is in clean status")
 
+// ErrBaseModified is what Merge returns when GitHub refuses the merge
+// because the base branch moved after GitHub last worked out whether it can
+// be merged. The app package maps the GitHub client's error to it.
+var ErrBaseModified = errors.New("base branch was modified")
+
 // Store records the merges being waited for, so the next launch goes on
 // with them. Nil records nothing.
 type Store interface {
@@ -1374,9 +1379,11 @@ func (j *job) enterLane() (*ticket, bool) {
 // inTurn reads the pull request again and writes, holding the lane. It
 // reports true when the pull request must wait after all. One whose branch
 // it updated keeps the lane until it is merged or given up: another merge
-// passing it would leave it behind again.
+// passing it would leave it behind again. A merge GitHub refused because
+// the base moved a moment before is decided again, after GitHub had time to
+// work out the new base, and sent once more (ADR-130).
 func (j *job) inTurn() (again bool) {
-	updated := false
+	updated, resent := false, false
 	for {
 		mi, d, ok := j.decide()
 		if !ok {
@@ -1401,16 +1408,22 @@ func (j *job) inTurn() (again bool) {
 			return false
 		case d.Step == plan.StepMerge && !jobs:
 			j.forecast(ahead(d))
-			j.mergeDecided(d)
-			return false
+			if !j.mergeDecided(d, !resent) || !j.sleep(j.r.opt.Recheck) {
+				return false
+			}
+			resent = true
+			continue
 		case d.Step == plan.StepEnqueue && !jobs:
 			j.forecast(ahead(d))
 			j.enqueue()
 			return false
 		case d.Step == plan.StepAutoMerge && !jobs:
 			j.forecast(ahead(d))
-			j.autoMerge(d.Method, mi.Queue)
-			return false
+			if !j.autoMerge(d.Method, mi.Queue, !resent) || !j.sleep(j.r.opt.Recheck) {
+				return false
+			}
+			resent = true
+			continue
 		}
 		if waits(d.Step) && !j.canWait {
 			j.locked("locked by another gh-desk")
@@ -1489,26 +1502,35 @@ func (j *job) dismissed(d plan.Decision) bool {
 }
 
 // mergeDecided merges as decided, saying first when it goes past the base
-// branch's rules as an admin.
-func (j *job) mergeDecided(d plan.Decision) {
+// branch's rules as an admin. It reports what mergeNow does.
+func (j *job) mergeDecided(d plan.Decision, resend bool) (baseMoved bool) {
 	j.admin = d.Admin
 	if d.Admin {
 		j.log.Info("merging as admin", "method", string(d.Method))
 	}
-	j.mergeNow(d.Method)
+	return j.mergeNow(d.Method, resend)
 }
 
-func (j *job) mergeNow(method model.MergeMethod) bool {
+// mergeNow merges the pull request on the confirmed head. When GitHub
+// refuses it because the base moved and resend is set, it ends nothing and
+// reports true: the caller decides again and sends it once more.
+func (j *job) mergeNow(method model.MergeMethod, resend bool) (baseMoved bool) {
 	if j.halted() {
 		return false
 	}
 	if j.stacked {
-		return j.mergeAsync(model.MergeRequest{Method: method, Bypass: j.admin})
+		j.mergeAsync(model.MergeRequest{Method: method, Bypass: j.admin})
+		return false
 	}
 	j.step(StepMerge, "merging")
 	err := j.r.gh.Merge(j.ctx, j.it.PR.Key, j.it.PR.ID, j.head, method)
 	if err == nil {
 		j.merged(method)
+		return false
+	}
+	if resend && errors.Is(err, ErrBaseModified) {
+		j.log.Info("base moved; deciding again", logging.KeyStep, "merge")
+		j.step(StepMerge, "the base moved · checking again")
 		return true
 	}
 	// A refused merge is read again to tell why: the head moved, it was
@@ -1518,7 +1540,6 @@ func (j *job) mergeNow(method model.MergeMethod) bool {
 	case !ok:
 	case mi.State == model.StateMerged:
 		j.say(Merged, "merged")
-		return true
 	case mi.InQueue:
 		j.queued()
 	default:
@@ -1570,27 +1591,29 @@ func (j *job) queued() {
 	j.startWatch()
 }
 
-func (j *job) autoMerge(method model.MergeMethod, queue bool) {
+// autoMerge turns on auto-merge, or merges at once when GitHub says it can
+// be merged now. It reports what mergeNow does.
+func (j *job) autoMerge(method model.MergeMethod, queue, resend bool) (baseMoved bool) {
 	if j.halted() {
-		return
+		return false
 	}
 	j.step(StepAutoMerge, "turning on auto-merge")
 	err := j.r.gh.EnableAutoMerge(j.ctx, j.it.PR.Key, j.it.PR.ID, j.head, method)
 	if errors.Is(err, ErrCleanStatus) {
 		if queue {
 			j.enqueue()
-		} else {
-			j.mergeNow(method)
+			return false
 		}
-		return
+		return j.mergeNow(method, resend)
 	}
 	if err != nil {
 		j.unsure("auto-merge failed: " + short(err))
-		return
+		return false
 	}
 	j.handOver(false)
 	j.say(AutoMergeOn, "auto-merge on")
 	j.startWatch()
+	return false
 }
 
 // startWatch watches aside; the watch releases the pull request when it
