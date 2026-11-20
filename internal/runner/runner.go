@@ -1198,14 +1198,19 @@ func (j *job) sendApproval(body string) bool {
 
 // decide reads the pull request and decides its next step, reading again
 // while GitHub works out whether it can be merged, and while what this job
-// just wrote does not show yet. Every read stops the job if it finds the
-// recorded approval dismissed.
+// just wrote does not show yet, or GitHub retargets it off the branch of
+// the merge it was based on. Every read stops the job if it finds the
+// recorded approval dismissed, or it left on the branch of a merge that
+// ended (ADR-131).
 func (j *job) decide() (model.MergeInfo, plan.Decision, bool) {
 	deadline := time.Now().Add(j.r.opt.RecheckFor)
 	// Reading again while GitHub works out whether it can be merged is a
 	// wait of its own.
 	w := &waitLog{log: j.log}
 	for {
+		// Known before the read, so the read shows the pull request after
+		// the merge it was based on ended.
+		n, head, ended := j.r.endedBase(j.it.PR.Key)
 		mi, ok := j.read(true)
 		if !ok {
 			w.end("stopped")
@@ -1214,6 +1219,29 @@ func (j *job) decide() (model.MergeInfo, plan.Decision, bool) {
 		if mi.State == model.StateMerged {
 			j.say(Merged, "merged")
 			return mi, plan.Decision{}, false
+		}
+		if ended && mi.BaseRef == head {
+			// Left on the branch of the merge it was based on, which
+			// ended: merged there, it would not reach the branch both
+			// were meant for (ADR-131). GitHub retargets it a moment
+			// after that one is merged and its branch deleted.
+			switch {
+			case mi.BasePR == n:
+				w.end("stopped")
+				j.say(Stopped, fmt.Sprintf("its base #%d did not merge · confirm again", n))
+				return mi, plan.Decision{}, false
+			case time.Now().After(deadline):
+				w.end("stopped")
+				j.say(Stopped, fmt.Sprintf("its base #%d is closed, but it still targets its branch", n))
+				return mi, plan.Decision{}, false
+			}
+			w.at("retarget", mi, nil)
+			j.say(Running, "checking")
+			if !j.sleep(j.r.opt.Recheck) {
+				w.end("canceled")
+				return mi, plan.Decision{}, false
+			}
+			continue
 		}
 		d := plan.ForMerge(mi, j.it.PR, j.r.opt.Viewer, j.r.opt.Settings)
 		j.stacked = mi.Stacked
@@ -1399,9 +1427,6 @@ func (j *job) inTurn() (again bool) {
 		if d.Step != plan.StepSkip && !jobs && j.r.basePending(j.it.PR.Key) {
 			return true
 		}
-		if d.Step != plan.StepSkip && j.leftBehind(mi) {
-			return false
-		}
 		switch {
 		case d.Step == plan.StepSkip:
 			j.say(Skipped, d.Reason)
@@ -1446,22 +1471,6 @@ func (j *job) inTurn() (again bool) {
 			return false
 		}
 	}
-}
-
-// leftBehind stops the job when the merge it was found based on ended and
-// it still has that merge's head branch for its base: merged there, it
-// would not reach the branch both were meant for (ADR-131).
-func (j *job) leftBehind(mi model.MergeInfo) bool {
-	n, head, ok := j.r.endedBase(j.it.PR.Key)
-	if !ok || head == "" || mi.BaseRef != head {
-		return false
-	}
-	if mi.BasePR == n {
-		j.say(Stopped, fmt.Sprintf("its base #%d did not merge · confirm again", n))
-	} else {
-		j.say(Stopped, fmt.Sprintf("its base #%d is closed, but it still targets its branch", n))
-	}
-	return true
 }
 
 // redrafted stops the job when a decision asks to mark the pull request
@@ -1984,10 +1993,6 @@ func (j *job) wait() bool {
 			return false
 		}
 		w.read(mi)
-		if d.Step != plan.StepSkip && j.leftBehind(mi) {
-			w.end("base-ended")
-			return false
-		}
 		jobs := plan.JobsRunning(mi, j.trigger, time.Now())
 		switch d.Step {
 		case plan.StepMerge, plan.StepEnqueue:
@@ -2026,6 +2031,11 @@ func (j *job) wait() bool {
 			j.waitingFor(mi, w)
 			j.forecast([]Step{lastStep(mi)})
 		case mi.BasePR != 0 && !j.r.basePending(j.it.PR.Key):
+			// The merge it was based on ended just after this read: the
+			// next read tells how it ended (ADR-131).
+			if _, head, ok := j.r.endedBase(j.it.PR.Key); ok && mi.BaseRef == head {
+				continue
+			}
 			// Stacked on a pull request no merge of gh-desk's is at work
 			// on: what blocks it does not end while it waits (ADR-128).
 			w.end("base-open")

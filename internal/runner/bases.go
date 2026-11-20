@@ -116,7 +116,7 @@ func (r *Runner) endedBase(k model.PRKey) (n int, head string, ok bool) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	m := r.merges[k.Repository()][k]
-	if m == nil || m.parent == nil {
+	if m == nil || m.parent == nil || m.parent.head == "" {
 		return 0, "", false
 	}
 	select {

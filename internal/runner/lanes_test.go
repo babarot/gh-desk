@@ -338,6 +338,52 @@ func TestAMergedBaseNotRetargetedStopsItsChild(t *testing.T) {
 	}
 }
 
+// GitHub retargets a child a moment after its base is merged: a read
+// before that does not stop it.
+func TestAChildRetargetedLateIsMerged(t *testing.T) {
+	a, ia := pr("1", "api", 1, "me")
+	b, ib := pr("2", "api", 2, "me")
+	branches(&a, "feature", "main")
+	branches(&b, "child", "feature")
+	f := newFake(a, b)
+	f.keepBranches = true
+	late := 0
+	f.onRead = func(id string, mi *model.MergeInfo, _ int) {
+		if id == "2" && f.prs["1"].State == model.StateMerged {
+			if late++; late >= 3 {
+				mi.BaseRef = "main"
+			}
+		}
+	}
+	merged(t, runBatch(t, f, Merge, ia, ib), ia, ib)
+}
+
+// A child whose base ended unmerged while its jobs ran is not approved:
+// the stop comes before any write (ADR-131).
+func TestNoApprovalForAChildOfAFailedBase(t *testing.T) {
+	a, ia := pr("1", "api", 1, "me")
+	b, ib := pr("2", "api", 2, "alice")
+	branches(&a, "feature", "main")
+	branches(&b, "child", "feature")
+	b.MergeState = model.MergeBlocked
+	b.Checks = []model.Check{checkRun("build", "IN_PROGRESS", "")}
+	f := newFake(a, b)
+	f.onRead = func(id string, mi *model.MergeInfo, n int) {
+		if id == "2" && n > 15 {
+			mi.Checks = []model.Check{checkRun("build", model.RunCompleted, model.CheckSuccess)}
+		}
+	}
+	pending(f, f.prs["1"], 2)
+	f.mergeErrs = []error{errors.New("GitHub said no")}
+	evs := runBatch(t, f, Merge, ia, ib)
+	if e := last(evs[ib.PR.Key]); e.Result != Stopped || !strings.Contains(e.Text, "#1 did not merge") {
+		t.Errorf("api#2: %+v (calls %v)", e, f.calls)
+	}
+	if pos(f, "review acme/api#2") >= 0 {
+		t.Errorf("the child was approved: %v", f.calls)
+	}
+}
+
 // A child confirmed alone, its base merged by no merge of gh-desk's, is
 // merged into its base's branch as before.
 func TestAChildAloneMergesIntoItsBase(t *testing.T) {
