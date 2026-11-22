@@ -38,7 +38,7 @@ func Run(ctx context.Context, speed float64) error {
 	set := app.Settings(cfg)
 	set.Viewer = Viewer
 	set.Host = "github.com"
-	set.Version = version.String()
+	set.Version = version.Version
 	set.CanWait = true
 	gh := NewGitHub(time.Now())
 	gh.Speed = speed
