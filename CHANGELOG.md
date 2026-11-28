@@ -1,5 +1,7 @@
 # Changelog
 
+## [v0.21.2](https://github.com/babarot/gh-desk/compare/v0.21.1...v0.21.2) - 2026-11-28
+
 ## [v0.21.1](https://github.com/babarot/gh-desk/compare/v0.21.0...v0.21.1) - 2026-11-20
 ### Bug fixes
 - Send a merge once more when GitHub refuses it for a moved base by @babarot in https://github.com/babarot/gh-desk/pull/163
